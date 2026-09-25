@@ -126,7 +126,7 @@ Login.html
 <script>
 const SUPABASE_URL = 'https://gpqlximhoqdybcewdfde.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_xUnGxyLCc5TB5nv4keVQVw__grqGJkP';
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 function togglePwVisibility_(inputId, btn){
   const el = document.getElementById(inputId);
@@ -193,7 +193,7 @@ async function doLogin(){
   setBusy_(true, 'loginBtn', '로그인');
   try {
     const p = phone.replace(/[^0-9]/g, '');
-    const { data, error } = await supabase.from('app_users').select('*').eq('phone', p).maybeSingle();
+    const { data, error } = await sbClient.from('app_users').select('*').eq('phone', p).maybeSingle();
     if (error || !data) {
       setBusy_(false, 'loginBtn', '로그인');
       errEl.innerText = '등록되지 않은 전화번호입니다.';
@@ -240,7 +240,7 @@ async function doRegister(){
   try {
     const p = phone.replace(/[^0-9]/g, '');
     const hash = await hashPassword(password, p);
-    const { error } = await supabase.from('app_users').insert([{
+    const { error } = await sbClient.from('app_users').insert([{
       phone: p,
       name: name,
       hash: hash,
