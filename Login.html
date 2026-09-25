@@ -1,0 +1,299 @@
+
+Login.html
+
+100%
+<!-- ===== S1 북서울지사 영업일보 - Supabase 로그인 ===== -->
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<title>에스원 북서울지사 영업일보 포털 - 로그인</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body{
+    font-family:'Malgun Gothic','Segoe UI',sans-serif; color:#222; font-size:12pt;
+    min-height:100vh; display:flex; align-items:flex-end; justify-content:flex-end;
+    padding: clamp(20px,6vh,70px) clamp(20px,6vw,90px);
+    background: #1c2f4a linear-gradient(135deg, #0b1f3f 0%, #1e3a8a 100%);
+  }
+  .card{ background:rgba(255,255,255,.95); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); border-radius:10px; padding:32px 36px; width:380px; max-width:92vw; box-shadow:0 8px 28px rgba(0,0,0,.35); }
+  .card h1{ margin:0 0 4px; font-size:18px; color:#5c1c2f; }
+  .subtitle{ margin:0 0 20px; font-size:13px; color:#8a93a0; }
+  .field{ display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+  .field label{ font-size:13px; color:#555; font-weight:600; }
+  .field input{ padding:8px 10px; border:1px solid #c7cfd8; border-radius:5px; font-size:14px; font-family:inherit; }
+  .field input:focus{ outline:none; border-color:#5c1c2f; }
+  .field select{ padding:8px 10px; border:1px solid #c7cfd8; border-radius:5px; font-size:14px; font-family:inherit; background:#fff; }
+  .field select:focus{ outline:none; border-color:#5c1c2f; }
+  .pw-wrap{ position:relative; }
+  .pw-wrap input{ width:100%; padding-right:34px; }
+  .pw-eye-btn{ position:absolute; right:2px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:16px; opacity:.5; padding:4px 7px; line-height:1; }
+  .pw-eye-btn.active{ opacity:1; }
+  .hint{ font-size:11px; color:#888; margin-top:2px; }
+  .err{ font-size:12px; color:#c00000; min-height:16px; margin-bottom:4px; }
+  .actions{ display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:10px; }
+  button.primary{ background:#5c1c2f; color:#fff; border:none; border-radius:5px; padding:9px 18px; font-size:14px; cursor:pointer; white-space:nowrap; }
+  button.primary:hover{ background:#701f3a; }
+  button.primary:disabled{ opacity:.6; cursor:default; }
+  a.link{ font-size:13px; color:#4a86e8; cursor:pointer; text-decoration:underline; }
+  .switchbar{ margin-top:18px; text-align:center; font-size:12px; color:#8a93a0; }
+  .switchbar a{ color:#4a86e8; cursor:pointer; text-decoration:underline; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+  .loading-overlay{ position:fixed; inset:0; background:rgba(238,241,244,.96); display:none; align-items:center; justify-content:center; color:#8a93a0; font-size:13px; z-index:999; }
+  .loading-overlay.show{ display:flex; }
+  @media (max-width:520px){
+    body{ align-items:center; justify-content:center; padding:16px; }
+    .card{ width:100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">이동 중입니다...</div>
+
+<div class="card">
+  <h1>에스원 북서울지사</h1>
+  <div class="subtitle">영업일보 관리 포털</div>
+
+  <div id="userView" class="view active">
+    <div class="field">
+      <label>전화번호</label>
+      <input type="text" id="login_phone" placeholder="01012345678">
+    </div>
+    <div class="field">
+      <label>비밀번호</label>
+      <div class="pw-wrap"><input type="password" id="login_password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" class="pw-eye-btn" tabindex="-1" title="비밀번호 보기" onclick="togglePwVisibility_('login_password', this)">&#128065;</button></div>
+    </div>
+    <div class="err" id="login_err"></div>
+    <div class="actions">
+      <a class="link" onclick="showView('registerView')">사용자 등록</a>
+      <button class="primary" id="loginBtn" onclick="doLogin()">로그인</button>
+    </div>
+    <div class="switchbar"><a onclick="showView('masterView')">마스터 로그인</a></div>
+  </div>
+
+  <div id="registerView" class="view">
+    <div class="field">
+      <label>사용자명</label>
+      <input type="text" id="reg_name" placeholder="홍길동">
+    </div>
+    <div class="field">
+      <label>직무</label>
+      <select id="reg_job">
+        <option value="">선택하세요</option>
+        <option value="컨설턴트(영업)">컨설턴트</option>
+        <option value="엔지니어(기술)">기술</option>
+        <option value="서비스(CS)">CS관리자</option>
+        <option value="Staff(지원)">본사스탭</option>
+        <option value="매니저(관리자)">본사관리자</option>
+        <option value="지사관리자">지사관리자</option>
+        <option value="CS근무자">CS근무자</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>전화번호</label>
+      <input type="text" id="reg_phone" placeholder="01012345678">
+    </div>
+    <div class="field">
+      <label>비밀번호</label>
+      <div class="pw-wrap"><input type="password" id="reg_password" placeholder="8~10자, 영문+숫자+특수문자 혼합" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" class="pw-eye-btn" tabindex="-1" title="비밀번호 보기" onclick="togglePwVisibility_('reg_password', this)">&#128065;</button></div>
+      <div class="hint">8~10자, 영문자·숫자·특수문자를 모두 포함해야 합니다.</div>
+    </div>
+    <div class="err" id="reg_err"></div>
+    <div class="actions">
+      <a class="link" onclick="showView('userView')">로그인 화면으로</a>
+      <button class="primary" id="registerBtn" onclick="doRegister()">등록</button>
+    </div>
+  </div>
+
+  <div id="masterView" class="view">
+    <div class="field">
+      <label>마스터 비밀번호</label>
+      <div class="pw-wrap"><input type="password" id="master_password" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doMasterLogin()"><button type="button" class="pw-eye-btn" tabindex="-1" title="비밀번호 보기" onclick="togglePwVisibility_('master_password', this)">&#128065;</button></div>
+    </div>
+    <div class="err" id="master_err"></div>
+    <div class="actions">
+      <a class="link" onclick="showView('userView')">일반 로그인으로</a>
+      <button class="primary" id="masterBtn" onclick="doMasterLogin()">로그인</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://gpqlximhoqdybcewdfde.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_xUnGxyLCc5TB5nv4keVQVw__grqGJkP';
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+function togglePwVisibility_(inputId, btn){
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const showing = el.type === 'text';
+  el.type = showing ? 'password' : 'text';
+  if (btn) btn.classList.toggle('active', !showing);
+}
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.err').forEach(e => e.innerText = '');
+}
+
+let BUSY = false;
+function setBusy_(busy, btnId, label){
+  BUSY = busy;
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = busy; btn.innerText = busy ? '처리 중...' : label; }
+}
+
+function isValidPasswordClient(pw){
+  if (!pw || pw.length < 8 || pw.length > 10) return false;
+  return /[a-zA-Z]/.test(pw) && /[0-9]/.test(pw) && /[^a-zA-Z0-9]/.test(pw);
+}
+
+async function hashPassword(password, phone) {
+  const p = String(phone || '').replace(/[^0-9]/g, '');
+  const data = new TextEncoder().encode(p + ':' + String(password));
+  const hashBuf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function detectDeviceInfo_(){
+  const ua = navigator.userAgent || '';
+  let browser = '기타';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/SamsungBrowser/.test(ua)) browser = '삼성인터넷';
+  else if (/Whale\//.test(ua)) browser = 'Whale';
+  else if (/Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+  const isMobile = /Mobi|Android|iPhone|iPod/i.test(ua);
+  return { browser: browser, deviceType: isMobile ? '모바일' : 'PC' };
+}
+
+function goToDestination_(session){
+  try { sessionStorage.removeItem('s1_admin_session_v1'); } catch(e){}
+  try { sessionStorage.removeItem('s1_session_v1'); } catch(e){}
+  try { sessionStorage.setItem('s1_admin_session_v1', JSON.stringify(session)); } catch(e){}
+  try { sessionStorage.setItem('s1_session_v1', JSON.stringify(session)); } catch(e){}
+  document.getElementById('loadingOverlay').classList.add('show');
+  window.location.href = session.isAdmin ? 'Admin.html' : 'Index.html';
+}
+
+async function doLogin(){
+  if (BUSY) return;
+  const phone = document.getElementById('login_phone').value.trim();
+  const password = document.getElementById('login_password').value;
+  const errEl = document.getElementById('login_err');
+  errEl.innerText = '';
+  if (!phone || !password) { errEl.innerText = '전화번호와 비밀번호를 입력하세요.'; return; }
+
+  setBusy_(true, 'loginBtn', '로그인');
+  try {
+    const p = phone.replace(/[^0-9]/g, '');
+    const { data, error } = await supabase.from('app_users').select('*').eq('phone', p).maybeSingle();
+    if (error || !data) {
+      setBusy_(false, 'loginBtn', '로그인');
+      errEl.innerText = '등록되지 않은 전화번호입니다.';
+      return;
+    }
+    const hash = await hashPassword(password, p);
+    if (hash !== data.hash) {
+      setBusy_(false, 'loginBtn', '로그인');
+      errEl.innerText = '비밀번호가 일치하지 않습니다.';
+      return;
+    }
+    const role = data.role || '읽기전용';
+    const session = {
+      token: 'sess_' + p + '_' + Date.now(),
+      name: data.name,
+      phone: p,
+      role: role,
+      job: data.job || '',
+      isAdmin: (role === '메인마스터' || role === '서브마스터' || role === '수정가능'),
+      isMaster: (role === '메인마스터' || role === '서브마스터'),
+      isMainMaster: (role === '메인마스터')
+    };
+    goToDestination_(session);
+  } catch(err) {
+    setBusy_(false, 'loginBtn', '로그인');
+    errEl.innerText = '통신 오류: ' + String(err);
+  }
+}
+
+async function doRegister(){
+  if (BUSY) return;
+  const name = document.getElementById('reg_name').value.trim();
+  const phone = document.getElementById('reg_phone').value.trim();
+  const password = document.getElementById('reg_password').value;
+  const job = document.getElementById('reg_job').value;
+  const errEl = document.getElementById('reg_err');
+  errEl.innerText = '';
+  if (!name || !job || !phone) { errEl.innerText = '모든 필드를 입력하세요.'; return; }
+  if (!isValidPasswordClient(password)) {
+    errEl.innerText = '비밀번호는 8~10자, 영문자·숫자·특수문자를 포함해야 합니다.';
+    return;
+  }
+  setBusy_(true, 'registerBtn', '등록');
+  try {
+    const p = phone.replace(/[^0-9]/g, '');
+    const hash = await hashPassword(password, p);
+    const { error } = await supabase.from('app_users').insert([{
+      phone: p,
+      name: name,
+      hash: hash,
+      job: job,
+      role: '읽기전용'
+    }]);
+    if (error) {
+      setBusy_(false, 'registerBtn', '등록');
+      errEl.innerText = '등록 실패: ' + (error.message || '이미 등록된 번호일 수 있습니다.');
+      return;
+    }
+    const session = {
+      token: 'sess_' + p + '_' + Date.now(),
+      name: name,
+      phone: p,
+      role: '읽기전용',
+      job: job,
+      isAdmin: false,
+      isMaster: false,
+      isMainMaster: false
+    };
+    goToDestination_(session);
+  } catch(err) {
+    setBusy_(false, 'registerBtn', '등록');
+    errEl.innerText = '통신 오류: ' + String(err);
+  }
+}
+
+function doMasterLogin(){
+  if (BUSY) return;
+  const password = document.getElementById('master_password').value;
+  const errEl = document.getElementById('master_err');
+  errEl.innerText = '';
+  if (!password) { errEl.innerText = '비밀번호를 입력하세요.'; return; }
+  setBusy_(true, 'masterBtn', '로그인');
+  if (password === 'sy0928@@') {
+    const session = {
+      token: 'sess_admin_' + Date.now(),
+      name: '지사장',
+      phone: 'admin',
+      role: '메인마스터',
+      job: '매니저(관리자)',
+      isAdmin: true,
+      isMaster: true,
+      isMainMaster: true
+    };
+    goToDestination_(session);
+  } else {
+    setBusy_(false, 'masterBtn', '로그인');
+    errEl.innerText = '비밀번호가 일치하지 않습니다.';
+  }
+}
+</script>
+</body>
+</html>
+Login.html 표시 중입니다.
