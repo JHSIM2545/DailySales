@@ -4,6 +4,19 @@
 <!DOCTYPE html>  
 <html>  
 <head>
+<script>
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  if (!window.google.script.run) {
+    const createSafeProxy = () => new Proxy({}, {
+      get: (target, prop) => {
+        if (prop === 'withSuccessHandler' || prop === 'withFailureHandler') return () => createSafeProxy();
+        return (...args) => console.warn('[SafeProxy] google.script.run.' + String(prop), args);
+      }
+    });
+    window.google.script.run = createSafeProxy();
+  }
+</script>
 <base target="_top">
 <meta charset="utf-8">
 <!-- Supabase JS Client v2 CDN -->
@@ -766,10 +779,12 @@ function fmtStatusDate(ds){
 /* ---- 깃발(임시 마크) : 클라이언트 상태만 유지 ---- */  
 /* ---- 깃발(서버 동기화 영구 마크) ---- */  
 let FLAGGED_SET = new Set();  
+if (window.google && window.google.script && window.google.script.run) {
 google.script.run.withSuccessHandler(function(res){   
-FLAGGED_SET = new Set(res);   
+if (Array.isArray(res)) FLAGGED_SET = new Set(res);   
 if(currentTab === 'order_start') render(); else if(currentTab === 'cancel') renderCancel(); else if(currentTab === 'price_change') renderPrice(); else if(currentTab === 'restart') renderRestart(); else if(currentTab === 'product_daily') renderProductDaily();   
-}).getGlobalFlags();  
+}).getGlobalFlags();
+}  
   
 function toggleFlag(scope, id){  
  const isSet = !FLAGGED_SET.has(id);  
@@ -1365,7 +1380,7 @@ function isValidPasswordClient(pw){
  return hasLetter && hasDigit && hasSpecial;  
 }  
   
-let LOGIN_BUSY = false;  
+var LOGIN_BUSY = false;  
   
 function setAuthBusy_(busy, btnId, label, busyLabel){  
  LOGIN_BUSY = busy;  
