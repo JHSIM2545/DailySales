@@ -2247,6 +2247,12 @@ function formatMoneyInput(el){
  el.value = raw ? Number(raw).toLocaleString('ko-KR') : '';  
 }  
 function moneyValue(el){ return el.value.replace(/[^0-9]/g, ''); }  
+
+function fmtK(v){  
+  const n = Number(v) || 0;  
+  return Math.round(n).toLocaleString('ko-KR');  
+}
+
 function commaFmt(v){  
  if (v === '' || v === null || v === undefined) return '';  
  const n = Number(String(v).replace(/,/g, ''));  
@@ -7645,6 +7651,393 @@ function openBizTeamModal_(){ document.getElementById('bizTeamModalOverlay')?.cl
 function closeBizTeamModal_(){ document.getElementById('bizTeamModalOverlay')?.classList.remove('open'); }
 function openFileStoreModal_(){ document.getElementById('fileStoreModalOverlay')?.classList.add('open'); }
 function closeFileStoreModal_(){ document.getElementById('fileStoreModalOverlay')?.classList.remove('open'); }
+
+
+
+/* ===================== 부가 유틸리티 & 그리드 내보내기/출력 헬퍼 ===================== */
+/* --- normalizeCellForOutput_ --- */
+function normalizeCellForOutput_(td) {  
+ const select = td.querySelector('select');  
+ if (select) {  
+ const opt = select.options[select.selectedIndex];  
+ td.textContent = opt ? opt.textContent : '';  
+ return;  
+ }  
+ // 달력 아이콘 버튼, 숨은 date input, datalist 등 편집용 요소 제거  
+ td.querySelectorAll('button, input[type="date"], datalist').forEach(el => el.remove());  
+ const input = td.querySelector('input');  
+ if (input) {  
+ td.textContent = input.value || '';  
+ return;  
+ }  
+}
+
+/* --- statusSummaryTableHtml --- */
+function statusSummaryTableHtml(t, actual){  
+ t = t || {}; actual = actual || {};  
+ const cols = [  
+ { key:'수주', 목표:t.목표_수주금액, 계획:t.계획_수주금액, 실적:actual.수주 },  
+ { key:'개시', 목표:t.목표_개시금액, 계획:t.계획_개시금액, 실적:actual.개시 },  
+ { key:'유지감소', 목표:t.목표_유지감소, 계획:t.계획_유지감소, 실적:actual.유지감소 },  
+ { key:'유지증가', 목표:t.목표_유지증가, 계획:t.계획_유지증가, 실적:actual.유지증가 }  
+ ];  
+ const row = (cells) => cells.map(c => `<td class="num">${c}</td>`).join('');  
+ return `  
+ <table class="status-summary status-summary-full">  
+ <thead><tr><th>${statusProductFilter}</th><th>수주</th><th>개시</th><th>유지감소</th><th>유지증가</th></tr></thead>  
+ <tbody>  
+ <tr class="row-target"><th>목표</th>${row(cols.map(c => fmtK(c.목표)))}</tr>  
+ <tr class="row-plan"><th>계획</th>${row(cols.map(c => fmtK(c.계획)))}</tr>  
+ <tr class="row-actual"><th>실적</th>${row(cols.map(c => fmtK(c.실적)))}</tr>  
+ <tr class="row-ratio"><th>(목표비)</th>${row(cols.map(c => pctVs_(c.실적, c.목표)))}</tr>  
+ <tr class="row-diff"><th>차이</th>${row(cols.map(c => diffVs_(c.실적, c.목표)))}</tr>  
+ <tr class="row-ratio"><th>(계획비)</th>${row(cols.map(c => pctVs_(c.실적, c.계획)))}</tr>  
+ <tr class="row-diff"><th>차이</th>${row(cols.map(c => diffVs_(c.실적, c.계획)))}</tr>  
+ </tbody>  
+ </table>`;  
+}
+
+/* --- sortedProductDailyRows --- */
+function sortedProductDailyRows(){  
+ const filterText = (document.getElementById('productDailySearchBox')||{}).value || '';  
+ const repFilter = (document.getElementById('repFilterProductDaily')||{}).value || '';  
+ const gubunFilter = (document.getElementById('gubunFilterProductDaily')||{}).value || '';  
+ let list = PRODUCT_DAILY_ROWS.map(r => Object.assign({}, r, computeAutoProductDaily(r)));  
+ if (filterText) list = list.filter(r => String(r.서비스제공처||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
+ if (repFilter) list = list.filter(r => r.계약담당자 === repFilter);  
+ if (gubunFilter) list = list.filter(r => r.구분 === gubunFilter);  
+ const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
+ list.sort((a,b) => {  
+ let va = a[key], vb = b[key];  
+ const blankA = va === '' || va === null || va === undefined;  
+ const blankB = vb === '' || vb === null || vb === undefined;  
+ if (blankA && blankB) return 0;  
+ if (blankA) return 1;  
+ if (blankB) return -1;  
+ if (['계약설치비','계약기기비','합계'].indexOf(key) !== -1) { va = Number(String(va).replace(/,/g,'')); vb = Number(String(vb).replace(/,/g,'')); }  
+ if (va < vb) return -1 * dir;  
+ if (va > vb) return 1 * dir;  
+ return 0;  
+ });  
+ return list;  
+}
+
+/* --- printGridData --- */
+function printGridData(scope) {  
+ let rows, titleName;  
+ if (scope === 'order') { rows = getFilteredRowsForAction_('order', sortedRows()); titleName = '에스원 북서울지사 수주개시 현황'; }  
+ else if (scope === 'cancel') { rows = getFilteredRowsForAction_('cancel', sortedCancelRows()); titleName = '에스원 북서울지사 해약중지 현황'; }  
+ else if (scope === 'price') { rows = getFilteredRowsForAction_('price', sortedPriceRows()); titleName = '에스원 북서울지사 인상인하 현황'; }  
+ else if (scope === 'restart') { rows = getFilteredRowsForAction_('restart', sortedRestartRows()); titleName = '에스원 북서울지사 재개시 현황'; }  
+ else if (scope === 'productdaily') { rows = getFilteredRowsForAction_('productdaily', sortedProductDailyRows()); titleName = '에스원 북서울지사 상품일보 현황'; }  
+  
+ const onlyFlagged = chkVal(scope === 'order' ? 'onlyFlaggedOrder' : (scope === 'cancel' ? 'onlyFlaggedCancel' : (scope === 'price' ? 'onlyFlaggedPrice' : (scope === 'restart' ? 'onlyFlaggedRestart' : 'onlyFlaggedProductDaily'))), false);  
+ if (onlyFlagged && (!rows || rows.length === 0)) {  
+ alert('선택된(깃발이 체크된) 항목이 없습니다.');  
+ return;  
+ }  
+  
+ const gridWrap = document.querySelector('.grid-wrap');  
+ if (!gridWrap) return;  
+ const clonedTable = gridWrap.querySelector('table').cloneNode(true);  
+  
+ // 불필요한 첫 번째 열(깃발)과 마지막 열(관리 버튼) 제거  
+ Array.from(clonedTable.querySelectorAll('tr')).forEach(tr => {  
+ if (tr.cells.length > 0) {  
+ tr.deleteCell(0);  
+ tr.deleteCell(tr.cells.length - 1);  
+ }  
+ });  
+  
+ // 드롭다운/달력 아이콘/버튼 등 편집용 요소 제거 (실제 값만 표시)  
+ Array.from(clonedTable.querySelectorAll('tbody td')).forEach(td => normalizeCellForOutput_(td));  
+  
+ if (onlyFlagged) {  
+ const tbody = clonedTable.querySelector('tbody');  
+ if (tbody) {  
+ const allTrs = Array.from(tbody.querySelectorAll('tr'));  
+ const targetIds = new Set(rows.map(r => String(r.id)));  
+ allTrs.forEach(tr => {  
+ const rowId = tr.getAttribute('data-id');  
+ if (!rowId || !targetIds.has(rowId)) tr.remove();  
+ });  
+ }  
+ }  
+  
+ const totalCols = clonedTable.querySelector('tr') ? clonedTable.querySelector('tr').cells.length : 1;  
+ const printDate = todayStr() + ' ' + String(new Date().getHours()).padStart(2,'0') + ':' + String(new Date().getMinutes()).padStart(2,'0');  
+ const printUser = (SESSION && SESSION.name) ? SESSION.name : '지사장';  
+  
+ const thead = clonedTable.querySelector('thead');  
+ if (thead) {  
+ const titleTr = document.createElement('tr');  
+ // 제목 행: 완전한 흰 바탕(#ffffff)에 검은색 글자 적용  
+ titleTr.innerHTML = `<th colspan="${totalCols}" style="background-color: #ffffff !important; background: #ffffff !important; color: #000000 !important; font-size: 15pt; font-family: 'Malgun Gothic', sans-serif; padding: 12px 10px; text-align: left; border: none; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact;">  
+ <span>${titleName}</span>  
+ <span style="float: right; font-size: 10pt; font-weight: normal; line-height: 1.5; color: #000000;">인쇄일자: ${printDate} | 인쇄자: ${printUser}</span>  
+ </th>`;  
+ thead.insertBefore(titleTr, thead.firstChild);  
+ }  
+  
+ const printWindow = window.open('', '_blank', 'width=1000,height=800');  
+ printWindow.document.write('<html><head><title>인쇄</title>');  
+ printWindow.document.write('<style>');  
+ printWindow.document.write('body { font-family: "Malgun Gothic", sans-serif; font-size: 12pt; color: #222; margin: 10px; }');  
+ printWindow.document.write('table { border-collapse: collapse; width: 100%; white-space: nowrap; }');  
+ printWindow.document.write('th { background: #4a86e8 !important; color: #fff !important; padding: 7px 8px; border: 1px solid #3a6fc4; text-align: center; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }');  
+ printWindow.document.write('td { padding: 6px 6px; border: 1px solid #cfd6dc; font-size: 12pt; }');  
+ // 소팅된 컬럼 셀 노란색 바탕 유지  
+ printWindow.document.write('td.sort-col, td.sort-col input, td.sort-col select { background: rgb(255,255,0) !important; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }');  
+ printWindow.document.write('tr.status-total-row { background: #dfe6ee !important; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }');  
+ printWindow.document.write('td.contract-bad, td.contract-bad input { background: rgb(255,200,200) !important; color: rgb(150,0,0) !important; font-weight: 700; text-align: center; }');  
+ printWindow.document.write('td.gross-corp { background: #b9bec4 !important; color: rgb(0,0,255) !important; font-weight: 700; }');  
+ printWindow.document.write('td.prod-sec { background: #4b0f78 !important; color: #ffffff !important; font-weight: 700; }');  
+ printWindow.document.write('td.today-hl { background: rgb(198,239,206) !important; color: rgb(0,97,0) !important; font-weight: 600; }');  
+ printWindow.document.write('td.pc-up { background: rgb(200,255,255) !important; color: rgb(0,150,150) !important; font-weight: 600; }');  
+ printWindow.document.write('td.pc-down { background: rgb(255,200,100) !important; color: rgb(150,100,0) !important; font-weight: 600; }');  
+ printWindow.document.write('td.amt-up { color: rgb(0,0,255) !important; font-weight: 600; }');  
+ printWindow.document.write('td.amt-down { color: rgb(255,0,0) !important; font-weight: 600; }');  
+ printWindow.document.write('input, select { border: none; background: transparent; font-family: inherit; font-size: inherit; width: 100%; }');  
+ printWindow.document.write('</style></head><body>');  
+   
+printWindow.document.write(clonedTable.outerHTML);  
+ printWindow.document.write('</body></html>');  
+ printWindow.document.close();  
+ printWindow.focus();  
+ setTimeout(() => { printWindow.print(); printWindow.close(); }, 300);  
+}
+
+/* --- exportGridToExcel --- */
+function exportGridToExcel(scope, filename) {  
+ let rows, titleName;  
+ if (scope === 'order') { rows = getFilteredRowsForAction_('order', sortedRows()); titleName = '에스원 북서울지사 수주개시 현황'; }  
+ else if (scope === 'cancel') { rows = getFilteredRowsForAction_('cancel', sortedCancelRows()); titleName = '에스원 북서울지사 해약중지 현황'; }  
+ else if (scope === 'price') { rows = getFilteredRowsForAction_('price', sortedPriceRows()); titleName = '에스원 북서울지사 인상인하 현황'; }  
+ else if (scope === 'restart') { rows = getFilteredRowsForAction_('restart', sortedRestartRows()); titleName = '에스원 북서울지사 재개시 현황'; }  
+ else if (scope === 'productdaily') { rows = getFilteredRowsForAction_('productdaily', sortedProductDailyRows()); titleName = '에스원 북서울지사 상품일보 현황'; }  
+  
+ const onlyFlagged = chkVal(scope === 'order' ? 'onlyFlaggedOrder' : (scope === 'cancel' ? 'onlyFlaggedCancel' : (scope === 'price' ? 'onlyFlaggedPrice' : (scope === 'restart' ? 'onlyFlaggedRestart' : 'onlyFlaggedProductDaily'))), false);  
+ if (onlyFlagged && (!rows || rows.length === 0)) {  
+ alert('선택된(깃발이 체크된) 항목이 없습니다.');  
+ return;  
+ }  
+  
+ let gridWrap = document.querySelector('.grid-wrap');  
+ if (!gridWrap) return;  
+   
+const clonedTable = gridWrap.querySelector('table').cloneNode(true);  
+ Array.from(clonedTable.querySelectorAll('tr')).forEach(tr => {  
+ if (tr.cells.length > 0) {  
+ tr.deleteCell(0);  
+ tr.deleteCell(tr.cells.length - 1);  
+ }  
+ });  
+  
+ // 드롭다운/달력 아이콘/버튼 등 편집용 요소 제거 (실제 값만 표시)  
+ Array.from(clonedTable.querySelectorAll('tbody td')).forEach(td => normalizeCellForOutput_(td));  
+  
+ if (onlyFlagged) {  
+ const tbody = clonedTable.querySelector('tbody');  
+ if (tbody) {  
+ const allTrs = Array.from(tbody.querySelectorAll('tr'));  
+ const targetIds = new Set(rows.map(r => String(r.id)));  
+ allTrs.forEach(tr => {  
+ const rowId = tr.getAttribute('data-id');  
+ if (!rowId || !targetIds.has(rowId)) tr.remove();  
+ });  
+ }  
+ }  
+  
+ const totalCols = clonedTable.querySelector('tr') ? clonedTable.querySelector('tr').cells.length : 1;  
+ const printDate = todayStr() + ' ' + String(new Date().getHours()).padStart(2,'0') + ':' + String(new Date().getMinutes()).padStart(2,'0');  
+ const printUser = (SESSION && SESSION.name) ? SESSION.name : '지사장';  
+  
+ const thead = clonedTable.querySelector('thead');  
+ if (thead) {  
+ const titleTr = document.createElement('tr');  
+ // 엑셀 상단 제목 행: 흰 바탕(#ffffff) 고정  
+ titleTr.innerHTML = `<th colspan="${totalCols}" style="background-color: #ffffff; color: #000000; font-size: 15pt; font-family: 'Malgun Gothic', sans-serif; padding: 12px 10px; text-align: left; border: none; mso-pattern: auto;">  
+ <b>${titleName}</b> \&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp;\&nbsp; 인쇄일자: ${printDate} | 인쇄자: ${printUser}  
+ </th>`;  
+ thead.insertBefore(titleTr, thead.firstChild);  
+ }  
+  
+ // 필드 헤더 스타일 지정  
+ clonedTable.querySelectorAll('th').forEach(th => {  
+ if (!th.getAttribute('colspan')) {  
+ th.setAttribute('style', 'background-color: #4a86e8; color: #ffffff; font-weight: bold; text-align: center; border: 1px solid #3a6fc4; font-size: 12pt;');  
+ }  
+ });  
+  
+ // 엑셀 출력 시 소팅된 컬럼 셀 데이터 부분에 노란색 바탕(#ffff00) 반영  
+ clonedTable.querySelectorAll('td.sort-col').forEach(td => {  
+ td.setAttribute('style', 'background-color: #ffff00 !important; font-weight: bold; border: 1px solid #cfd6dc; font-size: 12pt;');  
+ });  
+  
+ const htmlContent = `  
+ <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">  
+ <head><meta charset="utf-8">  
+ <style>  
+ table { font-family: 'Malgun Gothic', sans-serif; font-size: 12pt; }  
+ th { background-color: #4a86e8; color: #ffffff; font-size: 12pt; }  
+ td { font-size: 12pt; }  
+ td.sort-col { background-color: #ffff00; font-weight: bold; font-size: 12pt; }  
+ </style>  
+ </head>  
+ <body>  
+ <table border="1">${clonedTable.innerHTML}</table>  
+ </body>  
+ </html>  
+ `;  
+  
+ // 파일명 뒤에 내보내기 일시(YYYYMMDD_HHmm)를 붙여 매번 고유한 파일명으로 저장  
+ const exportTs = todayStr().replace(/-/g, '') + '_' + String(new Date().getHours()).padStart(2, '0') + String(new Date().getMinutes()).padStart(2, '0');  
+ const dotIdx = filename.lastIndexOf('.');  
+ const timestampedFilename = dotIdx > -1 ? (filename.slice(0, dotIdx) + '_' + exportTs + filename.slice(dotIdx)) : (filename + '_' + exportTs);  
+  
+ const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel;charset=utf-8;' });  
+ const url = URL.createObjectURL(blob);  
+ const a = document.createElement('a');  
+ a.href = url;  
+ a.download = timestampedFilename;  
+ document.body.appendChild(a);  
+ a.click();  
+ document.body.removeChild(a);  
+}
+
+/* --- exportGridToImage --- */
+function exportGridToImage(scope){  
+ const cols = IMG_EXPORT_COLUMNS_[scope];  
+ const getRows = IMG_EXPORT_ROWS_[scope];  
+ if (!cols || !getRows) return;  
+  
+ const flaggedRows = getRows().filter(r => FLAGGED_SET.has(r.id));  
+ if (!flaggedRows.length) { alert('선택된(깃발이 체크된) 항목이 없습니다.'); return; }  
+  
+ const titleName = IMG_EXPORT_TITLE_[scope] || '';  
+ const borderColor = '#2b3a55';  
+ const headerBg = '#c9d5ea';  
+ const yellowBg = '#ffff00';  
+ const greenBg = '#d9ead3';  
+  
+ let tableHtml = '<table style="border-collapse:collapse; font-family:\'Malgun Gothic\',sans-serif; background:#ffffff;">';  
+ tableHtml += '<thead><tr>';  
+ cols.forEach(function(c){  
+ const bg = (c.highlight === 'yellow') ? yellowBg : headerBg;  
+ tableHtml += '<th style="border:1px solid ' + borderColor + '; background:' + bg + '; color:#1a1a2e; font-weight:700; font-size:15px; padding:10px 14px; white-space:nowrap;">' + escHtml(c.label) + '</th>';  
+ });  
+ tableHtml += '</tr></thead><tbody>';  
+  
+ flaggedRows.forEach(function(row){  
+ tableHtml += '<tr>';  
+ cols.forEach(function(c){  
+ const raw = row[c.key];  
+ let displayVal;  
+
+      if (c.key === '계약처명') {
+        displayVal = escHtml(raw || '');
+        if (row.비고) displayVal += ' <span style="color:#c00000; font-weight:700;">(' + escHtml(row.비고) + ')</span>';
+      } else if (c.money) {
+        displayVal = commaFmt(raw);
+      } else if (c.date) {
+        displayVal = escHtml(fmtMD(raw));
+      } else {
+        displayVal = escHtml(raw != null ? raw : '');
+      }
+      let bg = '#ffffff';
+      let color = '#222222';
+      if (c.highlight === 'yellow') { bg = yellowBg; color = '#6b5b00'; }
+      else if (c.highlight === 'green') { bg = greenBg; color = '#274e13'; }
+      if (c.money) color = '#1155cc';
+      tableHtml += '<td style="border:1px solid ' + borderColor + '; background:' + bg + '; color:' + color + '; text-align:' + c.align + '; font-weight:' + (c.highlight || c.money ? '700' : '500') + '; font-size:14px; padding:9px 14px; white-space:nowrap;">' + displayVal + '</td>';
+    });
+    tableHtml += '</tr>';
+  });
+  tableHtml += '</tbody></table>';
+
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed; left:-99999px; top:0; padding:16px; background:#ffffff; display:inline-block;';
+  container.innerHTML = tableHtml;
+  document.body.appendChild(container);
+
+  ensureImgExportLibReady_(function(){
+    html2canvas(container, { backgroundColor: '#ffffff', scale: 2 }).then(function(canvas){
+      if (container.parentNode) document.body.removeChild(container);
+      GRID_IMG_PREVIEW_DATAURL_ = canvas.toDataURL('image/png');
+      GRID_IMG_PREVIEW_NAME_ = (titleName || 'export').replace(/\s+/g, '_');
+      document.getElementById('gridImgPreviewTitle').innerText = titleName + ' - 선택 ' + flaggedRows.length + '건';
+      document.getElementById('gridImgPreviewImg').src = GRID_IMG_PREVIEW_DATAURL_;
+      document.getElementById('gridImgPreviewOverlay').classList.add('open');
+    }).catch(function(err){
+      if (container.parentNode) document.body.removeChild(container);
+      alert('이미지 생성 실패: ' + err);
+    });
+  });
+}
+
+/* --- renderBizTeamFullScreenView_ --- */
+function renderBizTeamFullScreenView_(){  
+ const contentEl = document.getElementById('content');  
+ const res = BIZ_TEAM_STATUS_DATA_;  
+ let bodyHtml;  
+ if (!res) {  
+ bodyHtml = '<div id="bizTeamLoadingBody" style="padding:30px 0;"></div>';  
+ } else if (!res.success) {  
+ bodyHtml = '<div class="denied">' + escHtml(res.error || '불러오기 실패') + '</div>';  
+ } else if (!res.found) {  
+ bodyHtml = '<div class="placeholder"><h2>등록된 사업팀 데이터가 없습니다</h2><p>관리자 화면에서 사업팀 데이터가 등록되면 이 화면에 표시됩니다.</p></div>';  
+ } else {  
+ const branches = res.branches || [];  
+ const rows = res.rows || [];  
+ const orderedIdx = bizTeamOrderedIndices_(branches); // 북서울이 맨 앞(첫 컬럼)에 오도록 재배열된 원본 인덱스  
+ const bizTeamProductForView_ = res.productType || BIZ_TEAM_VIEW_PRODUCT_;  
+ // 순위 차트를 위쪽, 지사별 현황표를 아래쪽에 배치 — 4종류 차트를 가로로 나란히 배치해 한눈에 비교할 수 있도록 함.  
+ bodyHtml = '<div style="display:flex; flex-wrap:nowrap; gap:10px; overflow-x:auto; align-items:flex-start;">' +  
+ bizTeamRankChartHtml_('계약(수주)', branches, bizTeamFindRow_(rows, '계약달성률(%)')) +  
+ bizTeamRankChartHtml_('개시', branches, bizTeamFindRow_(rows, '개시달성률(%)')) +  
+ bizTeamRankChartHtml_('유지감소', branches, bizTeamFindRow_(rows, '유지감소달성률(%)')) +  
+ bizTeamDivergingChartHtml_('유지증가', branches, bizTeamFindRow_(rows, '유지증가달성률(%)')) +  
+ '</div>';  
+ const bizTeamMetaHtml_ = '<span style="font-size:12px; color:#888; font-weight:normal;">' + escHtml(res.date || '') + ' 기준 (단위: 천원) · ' + escHtml(res.registeredBy || '') + ' · ' + escHtml(res.registeredAt || '') + ' 등록</span>';  
+ bodyHtml += '<div class="dash-section" style="margin-top:12px;"><div class="dash-section-title"><span>지사별 현황표</span>' + bizTeamMetaHtml_ + '</div><div style="overflow-x:auto;">' +  
+ bizTeamGroupedTableHtml_(branches, rows, orderedIdx, bizTeamProductForView_) + '</div></div>';  
+ }  
+  
+ const html = '<div class="dash-wrap dashboard-view">' +  
+ '<div class="dash-head">' +  
+ '<button onclick="dashShowMainView_()" style="margin-right:10px;">◀ 종합대시보드</button>' +  
+ '<h2>사업팀현황</h2>' +  
+ '<button type="button" onclick="bizTeamShiftViewDate_(-1)" style="padding:4px 8px;" title="하루 전">◀</button>' +  
+ '<input type="date" id="bizTeamViewDate" value="' + escHtml(BIZ_TEAM_VIEW_DATE_) + '" onchange="bizTeamViewFilterChanged_()">' +  
+ '<span style="font-size:13px; font-weight:700; color:#374151;">(' + escHtml(weekdayKo(BIZ_TEAM_VIEW_DATE_)) + ')</span>' +  
+ '<button type="button" onclick="bizTeamShiftViewDate_(1)" style="padding:4px 8px;" title="하루 후">▶</button>' +  
+ '<select id="bizTeamViewProduct" onchange="bizTeamViewFilterChanged_()">' +  
+ BIZ_TEAM_PRODUCT_TYPES_.map(function(p){ return '<option value="' + p + '"' + (p === BIZ_TEAM_VIEW_PRODUCT_ ? ' selected' : '') + '>' + escHtml(p) + '</option>'; }).join('') +  
+ '</select>' +  
+ '</div>' +  
+ '<div class="dash-scroll">' + bodyHtml + '</div>' +  
+ '</div>';  
+ contentEl.innerHTML = html;  
+ bizTeamBindBarTooltips_();  
+ if (!res) { showLoadingProgress_('bizTeamLoadingBody', '사업팀 현황 데이터를 불러오는 중입니다...'); }  
+ ensureBizTeamStatusLoaded_(renderDashboard); // 아직 못 불러왔으면 받아온 뒤 이 화면을 다시 그림  
+}
+
+/* --- ensureBizTeamStatusLoaded_ --- */
+function ensureBizTeamStatusLoaded_(cb){  
+ if (BIZ_TEAM_STATUS_DATA_) return;  
+ const cacheKey = bizTeamStatusCacheKey_();  
+ const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
+ if (cached) { BIZ_TEAM_STATUS_DATA_ = cached; if (cb) cb(); return; }  
+ google.script.run  
+ .withSuccessHandler(function(res){  
+ BIZ_TEAM_STATUS_DATA_ = res || { success: false, error: '알 수 없는 오류' };  
+ if (res && res.success) cacheSet_(cacheKey, res);  
+ if (cb) cb();  
+ })  
+ .withFailureHandler(function(err){ BIZ_TEAM_STATUS_DATA_ = { success: false, error: String(err) }; if (cb) cb(); })  
+ .getBizTeamDataNearestOnOrBefore(SESSION.token, BIZ_TEAM_VIEW_DATE_, BIZ_TEAM_VIEW_PRODUCT_);  
+}
 
 /* ===================== 초기화 실행 ===================== */
 SESSION = loadSession();
