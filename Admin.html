@@ -4382,6 +4382,222 @@ function hideAllToolbars(){
  ['toolbar-order','toolbar-cancel','toolbar-price','toolbar-restart','toolbar-product-daily','toolbar-users','toolbar-loginhistory','toolbar-userhistory','toolbar-target','toolbar-daily-report'].forEach(id => document.getElementById(id).style.display = 'none');  
 }  
   
+
+/* ===================== 영업현황 (sales_status) 탭 구현 ===================== */
+var STATUS_DATA = null;
+var STATUS_TARGET = null;
+var STATUS_ACTUAL = null;
+var STATUS_REP_TARGETS = null;
+var STATUS_REP_METRICS = null;
+
+function repTargetFor_(rep, key) {
+  const t = STATUS_REP_TARGETS && STATUS_REP_TARGETS[rep];
+  if (!t) return 0;
+  const f = { 수주: '목표_수주금액', 개시: '목표_개시금액', 유지감소: '목표_유지감소', 유지증가: '목표_유지증가' }[key];
+  return Number(t[f] || t[key] || t['목표_' + key] || t[key + '금액']) || 0;
+}
+
+function shiftMonth(delta){
+  const [y, m] = statusYearMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  statusYearMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  loadSalesStatus();
+}
+
+function onStatusFilterChange(sel){
+  statusProductFilter = sel.value;
+  loadSalesStatus();
+}
+
+function applySalesStatusResult_(res){
+  STATUS_DATA = res.rows;
+  STATUS_TARGET = res.target;
+  STATUS_ACTUAL = res.actual;
+  STATUS_REP_METRICS = res.repMetrics; // 차트용 데이터 수신
+  STATUS_REP_TARGETS = res.repTargets; // 담당자별 부여된 개인 목표(비율 배분 반영)
+  renderSalesStatus();
+}
+
+function loadSalesStatus(){
+  const cacheKey = 'salesStatus|' + statusYearMonth + '|' + statusProductFilter;
+  const cached = (typeof cacheGet_ === 'function') ? cacheGet_(cacheKey) : null;
+  if (cached) { applySalesStatusResult_(cached); return; }
+
+  if (typeof showLoadingProgress_ === 'function') {
+    showLoadingProgress_('content', '데이터를 불러오는 중입니다...', 'loadSalesStatus');
+  }
+  if (typeof setLoadingCursor === 'function') setLoadingCursor(true);
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (typeof setLoadingCursor === 'function') setLoadingCursor(false);
+      if (res && res.error) { if (typeof showLogin === 'function') showLogin(res.error); return; }
+      if (!res || !res.success) {
+        const c = document.getElementById('content');
+        if (c) c.innerHTML = '<div class="loading">데이터 로드 실패: ' + (res && res.error) + '</div>';
+        return;
+      }
+      if (typeof cacheSet_ === 'function') cacheSet_(cacheKey, res);
+      applySalesStatusResult_(res);
+    })
+    .withFailureHandler(function(err){
+      if (typeof setLoadingCursor === 'function') setLoadingCursor(false);
+      const c = document.getElementById('content');
+      if (c) c.innerHTML = '<div class="loading">데이터 로드 실패: ' + err + '</div>';
+    })
+    .getSalesStatus(SESSION ? SESSION.token : '', statusYearMonth, statusProductFilter);
+}
+window.loadSalesStatus = loadSalesStatus;
+
+function gaugeAxisMax_(pctList) {
+  const maxAbs = Math.max(0, ...pctList.map(p => Math.abs(p)));
+  return maxAbs <= 100 ? 100 : Math.ceil(maxAbs / 100) * 100;
+}
+
+function renderSalesStatus(){
+  const [y, m] = statusYearMonth.split('-').map(Number);
+  const rows = STATUS_DATA || [];
+  const filterOptions = ['일반알람', '알람+휴엔', '정보보안'];
+
+  const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+  const REP_COLORS = { '최영국': '#2563eb', '이수열': '#16a34a', '박광춘': '#8b4513', '정문재': '#7c3aed', '임영민': '#f97316' };
+
+  const gaugeMetrics = [
+    { key: '수주' },
+    { key: '개시' },
+    { key: '유지감소' }
+  ];
+
+  let chartHtml = '<div class="chart-grid">';
+
+  gaugeMetrics.forEach(m => {
+    const pctList = reps.map(rep => {
+      const val = (STATUS_REP_METRICS && STATUS_REP_METRICS[rep] && STATUS_REP_METRICS[rep][m.key]) || 0;
+      const tgt = repTargetFor_(rep, m.key);
+      return tgt !== 0 ? (val / tgt) * 100 : 0;
+    });
+    const axisMax = gaugeAxisMax_(pctList);
+    const targetSum = reps.reduce((s, rep) => s + repTargetFor_(rep, m.key), 0);
+
+    chartHtml += `<div class="chart-card">
+      <div class="chart-card-title"><span>${m.key}</span> <span style="font-weight:normal; color:#888;">목표(개인 합계): ${fmtK(targetSum)}${axisMax > 100 ? ` (0~${axisMax}% 표시)` : ''}</span></div>`;
+    reps.forEach((rep, idx) => {
+      const val = (STATUS_REP_METRICS && STATUS_REP_METRICS[rep] && STATUS_REP_METRICS[rep][m.key]) || 0;
+      const tgt = repTargetFor_(rep, m.key);
+      const pct = Math.round(pctList[idx]);
+      const barWidth = Math.min(Math.max((pct / axisMax) * 100, 0), 100);
+      const color = REP_COLORS[rep] || '#888';
+
+      chartHtml += `<div class="bar-row" title="실적: ${fmtK(val)} / 목표: ${fmtK(tgt)}">
+        <div class="bar-name">${rep}</div>
+        <div class="bar-track"><div class="bar-fill" style="width: ${barWidth}%; background: ${color};"></div></div>
+        <div class="bar-pct">${pct}%</div>
+      </div>`;
+    });
+    chartHtml += `</div>`;
+  });
+
+  {
+    const incPctList = reps.map(rep => {
+      const val = (STATUS_REP_METRICS && STATUS_REP_METRICS[rep] && STATUS_REP_METRICS[rep]['유지증가']) || 0;
+      const tgt = repTargetFor_(rep, '유지증가');
+      return tgt !== 0 ? (val / tgt) * 100 : 0;
+    });
+    const incAxisMax = gaugeAxisMax_(incPctList);
+    const incTargetSum = reps.reduce((s, rep) => s + repTargetFor_(rep, '유지증가'), 0);
+
+    chartHtml += `<div class="chart-card">
+      <div class="chart-card-title"><span>유지증가</span> <span style="font-weight:normal; color:#888;">목표(개인 합계): ${fmtK(incTargetSum)}${incAxisMax > 100 ? ` (0~±${incAxisMax}% 표시)` : ''}</span></div>`;
+    reps.forEach((rep, idx) => {
+      const val = (STATUS_REP_METRICS && STATUS_REP_METRICS[rep] && STATUS_REP_METRICS[rep]['유지증가']) || 0;
+      const tgt = repTargetFor_(rep, '유지증가');
+      const pct = Math.round(incPctList[idx]);
+      const half = Math.min(Math.abs(pct) / incAxisMax * 50, 50);
+      const color = REP_COLORS[rep] || '#888';
+      const isNeg = pct < 0;
+      const fillStyle = isNeg
+        ? `left: ${(50 - half)}%; width: ${half}%; background: ${color}; filter: saturate(35%);`
+        : `left: 50%; width: ${half}%; background: ${color};`;
+
+      chartHtml += `<div class="bar-row" title="실적: ${fmtK(val)} / 목표: ${fmtK(tgt)}">
+        <div class="bar-name">${rep}</div>
+        <div class="bar-track bipolar"><span class="zero-line"></span><div class="bar-fill bipolar-fill" style="${fillStyle}"></div></div>
+        <div class="bar-pct">${pct}%</div>
+      </div>`;
+    });
+    chartHtml += `</div>`;
+  }
+
+  chartHtml += '</div>';
+
+  let html = `
+    <div class="status-wrap">
+      <div class="status-head">
+        <button onclick="shiftMonth(-1)">◀</button>
+        <h2>${y}.${m}월 영업현황</h2>
+        <button onclick="shiftMonth(1)">▶</button>
+        <select id="statusProductFilter" class="status-filter-select" onchange="onStatusFilterChange(this)">
+          ${filterOptions.map(o => `<option value="${o}" ${statusProductFilter===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+      </div>
+      
+      <div style="display:flex; gap:16px; align-items:stretch; margin-bottom:12px; flex-wrap:wrap;">
+        <div class="status-target" style="margin-bottom:0; flex:0 0 auto;">
+          <div class="status-target-title">영업현황 집계 (단위: 천원)</div>
+          ${statusSummaryTableHtml(STATUS_TARGET, STATUS_ACTUAL)}
+        </div>
+        <div class="status-target" style="margin-bottom:0; flex:1 1 500px; background:#f4f6f8;">
+          <div class="status-target-title">컨설턴트별 달성률</div>
+          ${chartHtml}
+        </div>
+      </div>
+
+      <div class="grid-wrap"><table><thead>
+        <tr>
+          <th rowspan="2" class="date-head date-col-head">날짜</th>
+          <th colspan="9" class="date-head">일 현황(천원)</th>
+          <th colspan="8" class="gap-left cum-head">일 누계(천원)</th>
+        </tr>
+        <tr>
+          <th class="date-head">수주</th><th class="date-head">개시</th><th class="date-head">해약중지</th><th class="date-head">인상</th><th class="date-head">인하</th><th class="date-head">재개시</th><th class="date-head">일유증</th><th class="date-head">유지증가</th><th class="date-head">달성률</th>
+          <th class="gap-left cum-head">수주</th><th class="cum-head">개시</th><th class="cum-head">해약중지</th><th class="cum-head">인상</th><th class="cum-head">인하</th><th class="cum-head">재개시</th><th class="cum-head">유지감소</th><th class="cum-head">유지증가</th>
+        </tr>
+      </thead><tbody>`;
+
+  const today = todayStr();
+  rows.forEach(r => {
+    let rowCls = isBlockedDate(r.날짜) ? 'holiday-row' : '';
+    if (r.날짜 === today) rowCls = 'today-row';
+    html += `<tr class="${rowCls}">
+      <td class="datecell${isBlockedDate(r.날짜)?' holi':''}">${fmtStatusDate(r.날짜)}</td>
+      <td class="num">${fmtK(r.수주)}</td><td class="num">${fmtK(r.개시)}</td><td class="num">${fmtK(r.해약중지)}</td>
+      <td class="num">${fmtK(r.인상)}</td><td class="num">${fmtK(r.인하)}</td><td class="num">${fmtK(r.재개시)}</td>
+      <td class="num">${fmtK(r.일유증)}</td><td class="num">${fmtK(r.유지증가)}</td><td class="num">${r.달성률}%</td>
+      <td class="num gap-left">${fmtK(r.누계수주)}</td><td class="num">${fmtK(r.누계개시)}</td><td class="num">${fmtK(r.누계해약중지)}</td>
+      <td class="num">${fmtK(r.누계인상)}</td><td class="num">${fmtK(r.누계인하)}</td><td class="num">${fmtK(r.누계재개시)}</td>
+      <td class="num">${fmtK(r.누계유지감소)}</td><td class="num">${fmtK(r.누계유지증가)}</td>
+    </tr>`;
+  });
+
+  const last = rows[rows.length - 1] || {};
+  html += `<tr class="status-total-row">
+    <td class="datecell">합계</td>
+    <td class="num">${fmtK(last.누계수주||0)}</td><td class="num">${fmtK(last.누계개시||0)}</td><td class="num">${fmtK(last.누계해약중지||0)}</td>
+    <td class="num">${fmtK(last.누계인상||0)}</td><td class="num">${fmtK(last.누계인하||0)}</td><td class="num">${fmtK(last.누계재개시||0)}</td>
+    <td class="num">${fmtK(last.누계유지증가||0)}</td><td class="num">${fmtK(last.누계유지증가||0)}</td><td class="num">${last.달성률||0}%</td>
+    <td class="num gap-left"></td><td class="num"></td><td class="num"></td>
+    <td class="num"></td><td class="num"></td><td class="num"></td>
+    <td class="num"></td><td class="num"></td>
+  </tr>`;
+
+  html += '</tbody></table></div></div>';
+  const c = document.getElementById('content');
+  if (c) c.innerHTML = html;
+  if (typeof fitTwoRowStickyHeader_ === 'function') fitTwoRowStickyHeader_('.status-wrap .grid-wrap table');
+  if (typeof fitGridWrapToViewport_ === 'function') fitGridWrapToViewport_();
+}
+window.renderSalesStatus = renderSalesStatus;
+
 function selectTab(key){  
  checkSheetFreshness_(); // 탭 이동 시 다른 화면/다른 사용자의 변경사항이 있었는지 가볍게 확인  
  if (currentTab === 'target_input' && key !== 'target_input' && TARGET_REP_DIRTY) {  
