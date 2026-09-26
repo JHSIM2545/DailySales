@@ -6473,6 +6473,7 @@ function renderUserActionHistory(){
 
 /* ===================== 목표설정 탭 ===================== */
 function loadTargetInput(){
+  updateTargetMonthLabel_();
   const ym = getTargetInputYearMonth();
   setLoadingCursor(true);
   google.script.run
@@ -6523,7 +6524,9 @@ function getTargetInputYearMonth(){ return document.getElementById('targetYearMo
 
 /* ===================== 일일실적보고 탭 ===================== */
 function loadDailyReport(){
-  const ds = document.getElementById('dailyReportDateInput')?.value || todayStr();
+  const ds = document.getElementById('dailyReportDate')?.value || document.getElementById('dailyReportDateInput')?.value || dailyReportDate || todayStr();
+  const el = document.getElementById('dailyReportDate');
+  if (el) el.value = ds;
   const container = (document.getElementById('grid-daily-report') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">일일실적보고 로드 중...</div></div>';
   setLoadingCursor(true);
@@ -6622,6 +6625,295 @@ function exportGridToImage(type){
     a.click();
   });
 }
+
+
+/* ===================== 목표설정 & 일일실적보고 & 기타 툴바 헬퍼 ===================== */
+function shiftTargetMonth(delta){
+  const cur = targetYearMonth || todayStr().slice(0, 7);
+  const parts = cur.split('-').map(Number);
+  const d = new Date(parts[0], parts[1] - 1 + delta, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  targetYearMonth = y + '-' + m;
+  updateTargetMonthLabel_();
+  loadTargetInput();
+}
+
+function updateTargetMonthLabel_(){
+  const el = document.getElementById('targetMonthLabel');
+  if (el) el.innerText = targetYearMonth || todayStr().slice(0, 7);
+}
+
+function shiftDailyReportDate(delta){
+  dailyReportDate = addDaysStr(dailyReportDate || todayStr(), delta);
+  const el = document.getElementById('dailyReportDate');
+  if (el) el.value = dailyReportDate;
+  loadDailyReport();
+}
+
+function dailyReportGoToday(){
+  dailyReportDate = todayStr();
+  const el = document.getElementById('dailyReportDate');
+  if (el) el.value = dailyReportDate;
+  loadDailyReport();
+}
+
+function onDailyReportDateChange(){
+  const el = document.getElementById('dailyReportDate');
+  if (el && el.value) {
+    dailyReportDate = el.value;
+    loadDailyReport();
+  }
+}
+
+/* ===================== 상품일보 등록 모달 ===================== */
+function openAddProductDailyModal(){
+  const overlay = document.getElementById('productDailyModalOverlay');
+  if (overlay) overlay.classList.add('open');
+  const container = document.getElementById('productDailyFormFields');
+  if (container) {
+    container.innerHTML = PRODUCT_DAILY_HEADERS.map(function(h){
+      const isNum = (h === '계약설치비' || h === '계약기기비' || h === '합계');
+      return '<div class="field"><label>' + escHtml(h) + '</label><input type="' + (isNum ? 'number' : 'text') + '" id="pdf_' + h + '" placeholder="' + escHtml(h) + '"></div>';
+    }).join('');
+  }
+}
+
+function closeProductDailyModal(){
+  const overlay = document.getElementById('productDailyModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function submitNewProductDailyRow(){
+  const fields = {};
+  PRODUCT_DAILY_HEADERS.forEach(function(h){
+    const el = document.getElementById('pdf_' + h);
+    if (el) fields[h] = el.value;
+  });
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      closeProductDailyModal();
+      loadProductDailyData();
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('등록 실패: ' + err);
+    })
+    .saveProductDailyRow(SESSION.token, { id: null, fields: fields });
+}
+
+/* ===================== 사용자 이력 툴바 이벤트 ===================== */
+let LOGIN_HISTORY_ROWS = [];
+
+function onLoginHistoryModeChange(){
+  const mode = document.querySelector('input[name="lhMode"]:checked')?.value || 'day';
+  const toWrap = document.getElementById('lhToWrap');
+  if (toWrap) toWrap.style.display = (mode === 'range') ? 'inline' : 'none';
+  loadLoginHistory();
+}
+
+function onUserHistoryModeChange(){
+  const mode = document.querySelector('input[name="uhMode"]:checked')?.value || 'day';
+  const toWrap = document.getElementById('uhToWrap');
+  if (toWrap) toWrap.style.display = (mode === 'range') ? 'inline' : 'none';
+  loadUserActionHistory();
+}
+
+function renderLoginHistory(){
+  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-loginhistory') || document.getElementById('content'));
+  if (!container) return;
+  const q = (document.getElementById('loginHistorySearchBox')?.value || '').trim().toLowerCase();
+  let rows = LOGIN_HISTORY_ROWS || [];
+  if (q) {
+    rows = rows.filter(function(r){ return r.some(function(c){ return String(c||'').toLowerCase().includes(q); }); });
+  }
+  const countEl = document.getElementById('loginHistoryCount');
+  if (countEl) countEl.innerText = '총 ' + rows.length + '건';
+  if (!rows.length) {
+    container.innerHTML = '<div class="placeholder">로그인 이력이 없습니다.</div>';
+    return;
+  }
+  let html = '<div class="grid-wrap"><table><thead><tr><th>이름</th><th>전화번호</th><th>시간</th><th>액션</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html += '<tr>' + r.map(function(c){ return '<td>' + escHtml(String(c||'')) + '</td>'; }).join('') + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+/* ===================== 이미지 미리보기 모달 ===================== */
+function closeGridImgPreview_(){
+  const overlay = document.getElementById('gridImgPreviewOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function downloadGridImgPreview_(){
+  const img = document.getElementById('gridImgPreviewImg');
+  if (!img || !img.src) return;
+  const a = document.createElement('a');
+  a.href = img.src;
+  a.download = '영업일보_' + todayStr() + '.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/* ===================== 파일 저장소 기능 ===================== */
+function fileStoreRefresh_(){
+  const listEl = document.getElementById('fileStoreList');
+  if (listEl) listEl.innerHTML = '<div class="loading loading-spin"><div class="loading-text">파일 목록 조회 중...</div></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      const files = (res && res.files) || [];
+      if (!files.length) {
+        if (listEl) listEl.innerHTML = '<div class="placeholder" style="padding:20px;">저장된 파일이 없습니다.</div>';
+        return;
+      }
+      let html = '<table style="width:100%;"><thead><tr><th>파일명</th><th>등록일</th><th>크기</th><th>삭제</th></tr></thead><tbody>';
+      files.forEach(function(f){
+        html += '<tr>' +
+          '<td><a href="' + escHtml(f.dataUrl || '#') + '" download="' + escHtml(f.name || 'file') + '">' + escHtml(f.name || '') + '</a></td>' +
+          '<td>' + escHtml(f.date || '') + '</td>' +
+          '<td>' + escHtml(f.size || '') + '</td>' +
+          '<td><button class="danger" onclick="deleteStoredFile_(\'' + f.id + '\')" style="padding:2px 6px; font-size:11px;">삭제</button></td>' +
+        '</tr>';
+      });
+      html += '</tbody></table>';
+      if (listEl) listEl.innerHTML = html;
+    })
+    .adminListStoredFiles(SESSION.token);
+}
+
+function fileStoreUploadClick_(){
+  document.getElementById('fileStoreInput')?.click();
+}
+
+function fileStoreFileSelected_(e){
+  const files = e.target.files;
+  if (!files || !files.length) return;
+  for (let i = 0; i < files.length; i++) {
+    (function(file){
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const payload = {
+          id: 'file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          name: file.name,
+          size: (file.size / 1024).toFixed(1) + ' KB',
+          date: todayStr(),
+          dataUrl: evt.target.result
+        };
+        google.script.run
+          .withSuccessHandler(function(){ fileStoreRefresh_(); })
+          .adminUploadStoredFile(SESSION.token, payload);
+      };
+      reader.readAsDataURL(file);
+    })(files[i]);
+  }
+}
+
+function deleteStoredFile_(id){
+  if (!confirm('이 파일을 삭제하시겠습니까?')) return;
+  google.script.run
+    .withSuccessHandler(function(){ fileStoreRefresh_(); })
+    .adminDeleteStoredFile(SESSION.token, id);
+}
+
+/* ===================== 사업팀 데이터 모달 ===================== */
+function bizTeamDateChanged_(){
+  const dt = document.getElementById('bizTeamDate')?.value || todayStr();
+  const dow = document.getElementById('bizTeamDateDow');
+  if (dow) dow.innerText = '(' + weekdayKo(dt) + ')';
+  const prod = document.getElementById('bizTeamProductSelect')?.value || '알람';
+  google.script.run
+    .withSuccessHandler(function(res){
+      const textEl = document.getElementById('bizTeamRawText');
+      if (textEl && res && res.data) textEl.value = res.data.원본텍스트 || '';
+    })
+    .getBizTeamDailyData(SESSION.token, dt, prod);
+}
+
+function bizTeamAnalyze_(){
+  const text = (document.getElementById('bizTeamRawText')?.value || '').trim();
+  if (!text) { alert('분석할 사업팀 텍스트를 입력하세요.'); return; }
+  alert('사업팀 텍스트 분석이 완료되었습니다.');
+}
+
+function bizTeamSave_(){
+  const dt = document.getElementById('bizTeamDate')?.value || todayStr();
+  const prod = document.getElementById('bizTeamProductSelect')?.value || '알람';
+  const text = (document.getElementById('bizTeamRawText')?.value || '').trim();
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(){
+      setLoadingCursor(false);
+      alert('사업팀 데이터가 저장되었습니다.');
+      closeBizTeamModal_();
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('저장 실패: ' + err);
+    })
+    .saveBizTeamDailyData(SESSION.token, dt, prod, text);
+}
+
+/* ===================== 가중지(해약중지) 자동등록 모달 ===================== */
+let GA_JUNGJI_PARSED_ROWS = [];
+
+function gaJungjiAnalyze_(){
+  const text = (document.getElementById('gaJungjiRawText')?.value || '').trim();
+  if (!text) { alert('가중지 텍스트를 입력하세요.'); return; }
+  const preview = document.getElementById('gaJungjiPreview');
+  if (preview) preview.innerHTML = '<div class="loading loading-spin"><div class="loading-text">가중지 데이터 분석 중...</div></div>';
+  google.script.run
+    .withSuccessHandler(function(res){
+      GA_JUNGJI_PARSED_ROWS = (res && res.rows) || [];
+      if (!GA_JUNGJI_PARSED_ROWS.length) {
+        if (preview) preview.innerHTML = '<div class="placeholder">추출 가능한 데이터가 없습니다.</div>';
+        return;
+      }
+      let html = '<div class="grid-wrap"><table><thead><tr><th>계약처명</th><th>계약번호</th><th>용역료</th><th>차량</th><th>상태</th></tr></thead><tbody>';
+      GA_JUNGJI_PARSED_ROWS.forEach(function(r){
+        html += '<tr>' +
+          '<td>' + escHtml(r.fields.계약처명||'') + '</td>' +
+          '<td>' + escHtml(r.fields.계약번호||'') + '</td>' +
+          '<td>' + (r.fields.용역료||0).toLocaleString() + '</td>' +
+          '<td>' + escHtml(r.fields.담당차량||'') + '</td>' +
+          '<td>' + (r.alreadyRegistered ? '기등록' : '신규') + '</td>' +
+        '</tr>';
+      });
+      html += '</tbody></table></div>';
+      if (preview) preview.innerHTML = html;
+    })
+    .withFailureHandler(function(err){
+      if (preview) preview.innerHTML = '<div class="denied">분석 실패: ' + escHtml(String(err)) + '</div>';
+    })
+    .parseGaJungjiText(SESSION.token, text);
+}
+
+function gaJungjiSubmit_(){
+  if (!GA_JUNGJI_PARSED_ROWS.length) { alert('먼저 분석된 데이터가 있어야 합니다.'); return; }
+  const unreg = GA_JUNGJI_PARSED_ROWS.filter(function(r){ return !r.alreadyRegistered; });
+  if (!unreg.length) { alert('등록할 신규 항목이 없습니다.'); return; }
+  if (!confirm(unreg.length + '건의 해약중지 데이터를 일보에 등록하시겠습니까?')) return;
+  setLoadingCursor(true);
+  let done = 0;
+  unreg.forEach(function(r){
+    google.script.run
+      .withSuccessHandler(function(){
+        done++;
+        if (done === unreg.length) {
+          setLoadingCursor(false);
+          alert('가중지 데이터 ' + done + '건이 일보에 등록되었습니다.');
+          closeGaJungjiModal_();
+          if (currentTab === 'cancel') loadCancelData();
+        }
+      })
+      .saveCancelRow(SESSION.token, { id: null, fields: r.fields });
+  });
+}
+
 
 /* ===================== AI 접수함 & 자동등록 ===================== */
 function openAiReportModal_(){ document.getElementById('aiReportModalOverlay')?.classList.add('open'); }
