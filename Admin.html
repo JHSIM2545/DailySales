@@ -4287,6 +4287,188 @@ function selectTab(key){
  `<div class="placeholder"><h2>준비 중입니다</h2><p>"${TABS.find(t=>t.key===key).label}" 시트 필드 정의 완료 후 동일한 방식으로 탭이 활성화됩니다.</p></div>`;  
 }  
   
+
+/* ===================== 영업보고 자동입력 (자동등록) 탭 ===================== */
+function loadAutoRegisterTab_(){
+  const container = document.getElementById('content');
+  if (!container) return;
+
+  container.innerHTML = '<div style="padding:20px; max-width:1100px; margin:0 auto;">' +
+    '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">' +
+      '<h2 style="margin:0; font-size:20px; color:#5c1c2f;">⚡ 영업보고 자동입력 및 접수함</h2>' +
+      '<button class="primary" onclick="loadPendingAiReports_()" style="padding:6px 14px;">↻ 접수함 새로고침</button>' +
+    '</div>' +
+    '<div style="background:#fff; border:1px solid #c7cfd8; border-radius:8px; padding:18px 20px; margin-bottom:24px; box-shadow:0 2px 6px rgba(0,0,0,0.04);">' +
+      '<div style="font-weight:700; font-size:15px; margin-bottom:8px; color:#1c2f4a;">📝 영업보고 텍스트 붙여넣기 (카카오톡 / 문자 보고 등)</div>' +
+      '<div style="font-size:13px; color:#667; margin-bottom:12px;">영업담당자나 CS에서 전달받은 보고 텍스트를 그대로 붙여넣으면, AI 분석기가 수주/해약/인상/재개시를 자동 분류하고 필드를 추출합니다.</div>' +
+      '<textarea id="aiInputText" rows="4" style="width:100%; border:1px solid #c7cfd8; border-radius:6px; padding:10px; font-size:13px; font-family:inherit; resize:vertical;" placeholder="예: 8/26 에스원빌딩 N1234567 최영국 알람 8만 수주완료"></textarea>' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">' +
+        '<div>' +
+          '<label style="font-size:13px; margin-right:8px;">보고자: <input type="text" id="aiReporterName" placeholder="이름 (선택)" style="padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px; width:120px;"></label>' +
+        '</div>' +
+        '<button class="primary" onclick="parseAndPreviewAiReport_()" style="padding:8px 20px; font-size:14px; font-weight:700;">🔍 텍스트 분석하기</button>' +
+      '</div>' +
+      '<div id="aiParsePreview" style="display:none; margin-top:16px; padding:16px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px;"></div>' +
+    '</div>' +
+    '<div style="background:#fff; border:1px solid #c7cfd8; border-radius:8px; padding:18px 20px; box-shadow:0 2px 6px rgba(0,0,0,0.04);">' +
+      '<div style="font-weight:700; font-size:15px; margin-bottom:8px; color:#1c2f4a;">📬 제출된 대기 영업보고 접수함</div>' +
+      '<div id="pendingAiReportsList" style="min-height:120px;">' +
+        '<div class="loading loading-spin"><div class="loading-text">접수함 목록을 불러오는 중...</div></div>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+
+  loadPendingAiReports_();
+}
+
+let CURRENT_PARSED_AI_DATA = null;
+
+function parseAndPreviewAiReport_(){
+  const text = (document.getElementById('aiInputText')?.value || '').trim();
+  const reporter = (document.getElementById('aiReporterName')?.value || '').trim();
+  const previewEl = document.getElementById('aiParsePreview');
+  if (!text) { alert('분석할 텍스트를 입력하세요.'); return; }
+  
+  if (previewEl) {
+    previewEl.style.display = 'block';
+    previewEl.innerHTML = '<div class="loading loading-spin"><div class="loading-text">텍스트 분석 중...</div></div>';
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.success) {
+        if (previewEl) previewEl.innerHTML = '<div class="denied">분석에 실패했습니다.</div>';
+        return;
+      }
+      CURRENT_PARSED_AI_DATA = res;
+      renderAiParsedPreview_(res);
+    })
+    .withFailureHandler(function(err){
+      if (previewEl) previewEl.innerHTML = '<div class="denied">오류 발생: ' + escHtml(String(err)) + '</div>';
+    })
+    .parseSalesReportText(SESSION.token, text, reporter);
+}
+
+function renderAiParsedPreview_(res){
+  const previewEl = document.getElementById('aiParsePreview');
+  if (!previewEl) return;
+  const typeMap = {
+    order_start: '수주개시',
+    cancel: '해약중지',
+    price_change: '인상인하',
+    restart: '재개시'
+  };
+  const typeName = typeMap[res.type] || res.type;
+  const f = res.fields || {};
+
+  let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">' +
+    '<span style="font-size:14px; font-weight:700; color:#1e40af;">🎯 분류 결과: [' + typeName + ']</span>' +
+    '<button class="primary" onclick="commitAiParsedRow_()" style="padding:6px 18px; font-weight:700;">✓ 해당 일보에 바로 등록</button>' +
+  '</div>' +
+  '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; font-size:13px;">' +
+    '<div><b>계약처명:</b> ' + escHtml(f['계약처명'] || '-') + '</div>' +
+    '<div><b>계약번호:</b> ' + escHtml(f['계약번호'] || '-') + '</div>' +
+    '<div><b>영업담당:</b> ' + escHtml(f['영업담당'] || '-') + '</div>' +
+    '<div><b>담당차량:</b> ' + escHtml(f['담당차량'] || '-') + '</div>' +
+    '<div><b>용역료:</b> ' + (f['용역료'] || 0).toLocaleString() + '원</div>' +
+    '<div><b>상품:</b> ' + escHtml(f['상품'] || '알람') + '</div>' +
+    '<div><b>보고일:</b> ' + escHtml(f['보고일'] || '-') + '</div>' +
+  '</div>';
+  previewEl.innerHTML = html;
+}
+
+function commitAiParsedRow_(){
+  if (!CURRENT_PARSED_AI_DATA) return;
+  const res = CURRENT_PARSED_AI_DATA;
+  setLoadingCursor(true);
+
+  const payload = { id: null, fields: res.fields };
+
+  let callPromise;
+  if (res.type === 'cancel') {
+    callPromise = google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveCancelRow(SESSION.token, payload);
+  } else if (res.type === 'price_change') {
+    callPromise = google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).savePriceRow(SESSION.token, payload);
+  } else if (res.type === 'restart') {
+    callPromise = google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveRestartRow(SESSION.token, payload);
+  } else {
+    callPromise = google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveOrderStartRow(SESSION.token, payload);
+  }
+
+  function handleSuccess(saveRes){
+    setLoadingCursor(false);
+    alert('성공적으로 일보에 등록되었습니다!');
+    const inp = document.getElementById('aiInputText');
+    if (inp) inp.value = '';
+    const prev = document.getElementById('aiParsePreview');
+    if (prev) prev.style.display = 'none';
+    CURRENT_PARSED_AI_DATA = null;
+  }
+
+  function handleErr(err){
+    setLoadingCursor(false);
+    alert('등록 실패: ' + err);
+  }
+}
+
+function loadPendingAiReports_(){
+  const listEl = document.getElementById('pendingAiReportsList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="loading loading-spin"><div class="loading-text">대기 목록 조회 중...</div></div>';
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      const items = (res && res.items) || [];
+      if (!items.length) {
+        listEl.innerHTML = '<div class="placeholder" style="padding:24px 0;">대기 중인 영업보고 접수 건이 없습니다.</div>';
+        return;
+      }
+      let html = '<div class="grid-wrap"><table><thead><tr><th>접수시간</th><th>제출자</th><th>보고 내용</th><th>관리</th></tr></thead><tbody>';
+      items.forEach(it => {
+        html += '<tr>' +
+          '<td>' + escHtml(String(it.submitted_at || '').slice(0, 19).replace('T', ' ')) + '</td>' +
+          '<td>' + escHtml(it.submitted_by || '사용자') + '</td>' +
+          '<td style="max-width:400px; white-space:pre-wrap;">' + escHtml(it.raw_text || '') + '</td>' +
+          '<td>' +
+            '<button class="primary" onclick="processAiInboxItem_(\'' + it.id + '\')" style="padding:4px 8px; font-size:12px;">분석/등록</button>' +
+            '<button class="danger" onclick="dismissAiInboxItem_(\'' + it.id + '\')" style="padding:4px 8px; font-size:12px; margin-left:4px;">무시</button>' +
+          '</td>' +
+        '</tr>';
+      });
+      html += '</tbody></table></div>';
+      listEl.innerHTML = html;
+    })
+    .withFailureHandler(function(err){
+      listEl.innerHTML = '<div class="denied">목록 로드 실패: ' + escHtml(String(err)) + '</div>';
+    })
+    .listPendingAiReportMessages(SESSION.token);
+}
+
+function processAiInboxItem_(id){
+  google.script.run
+    .withSuccessHandler(function(res){
+      const items = (res && res.items) || [];
+      const item = items.find(it => String(it.id) === String(id));
+      if (item) {
+        const inp = document.getElementById('aiInputText');
+        if (inp) inp.value = item.raw_text || '';
+        const rep = document.getElementById('aiReporterName');
+        if (rep) rep.value = item.submitted_by || '';
+        parseAndPreviewAiReport_();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    })
+    .listPendingAiReportMessages(SESSION.token);
+}
+
+function dismissAiInboxItem_(id){
+  if (!confirm('이 접수 건을 무시(삭제) 처리하시겠습니까?')) return;
+  google.script.run
+    .withSuccessHandler(function(){ loadPendingAiReports_(); })
+    .dismissAiReportMessage(SESSION.token, id);
+}
+
+
 /* ===================== 수주개시 데이터 로드 ===================== */  
 function setLoadingCursor(on){  
  document.body.classList.toggle('loading-cursor', !!on);  
@@ -6119,9 +6301,46 @@ function deleteProductDailyRow(id){
     .deleteProductDailyRow(SESSION.token, id);
 }
 
+
+/* ===================== 사용자 관리 서브 탭 뷰 전환 ===================== */
+let USERMGMT_VIEW = 'info';
+
+function selectUserMgmtView(view){
+  USERMGMT_VIEW = view || 'info';
+  hideAllToolbars();
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  const isInfo = USERMGMT_VIEW === 'info';
+  const isLogin = USERMGMT_VIEW === 'login';
+  const isAction = USERMGMT_VIEW === 'action';
+
+  content.innerHTML = '<div style="background:#f1f5f9; padding:10px 16px; border-bottom:1px solid #cbd5e1; display:flex; gap:8px;">' +
+    '<button class="' + (isInfo ? 'primary' : '') + '" onclick="selectUserMgmtView(\'info\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">👥 사용자 정보</button>' +
+    '<button class="' + (isLogin ? 'primary' : '') + '" onclick="selectUserMgmtView(\'login\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">🔑 로그인 이력</button>' +
+    '<button class="' + (isAction ? 'primary' : '') + '" onclick="selectUserMgmtView(\'action\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">📋 작업 변경 이력</button>' +
+  '</div>' +
+  '<div id="userMgmtBody"></div>';
+
+  if (isLogin) {
+    const tb = document.getElementById('toolbar-loginhistory');
+    if (tb) tb.style.display = 'flex';
+    loadLoginHistory();
+  } else if (isAction) {
+    const tb = document.getElementById('toolbar-userhistory');
+    if (tb) tb.style.display = 'flex';
+    loadUserActionHistory();
+  } else {
+    const tb = document.getElementById('toolbar-users');
+    if (tb) tb.style.display = 'flex';
+    loadUsers();
+  }
+}
+
+
 /* ===================== 사용자 관리 탭 ===================== */
 function loadUsers(){
-  const container = (document.getElementById('grid-users') || document.getElementById('content'));
+  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-users') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">사용자 목록 로드 중...</div></div>';
   setLoadingCursor(true);
   google.script.run
@@ -6138,7 +6357,7 @@ function loadUsers(){
 }
 
 function renderUsers(){
-  const container = (document.getElementById('grid-users') || document.getElementById('content'));
+  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-users') || document.getElementById('content'));
   if (!USER_ROWS.length) { container.innerHTML = '<div class="placeholder">등록된 사용자가 없습니다.</div>'; return; }
   let html = '<table><thead><tr>' +
     '<th>이름</th><th>전화번호</th><th>직무</th><th>권한</th><th>등록일시</th><th>최근접속</th><th>브라우저</th><th>기기</th><th>작업</th>' +
@@ -6199,7 +6418,7 @@ function deleteUser(phone){
 
 /* ===================== 사용내역(로그인/작업이력) ===================== */
 function loadLoginHistory(){
-  const container = (document.getElementById('grid-loginhistory') || document.getElementById('content'));
+  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-loginhistory') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">로그인 이력 로드 중...</div></div>';
   google.script.run
     .withSuccessHandler(function(res){
@@ -6217,7 +6436,7 @@ function loadLoginHistory(){
 let USER_ACTION_HISTORY_ROWS = [];
 
 function loadUserActionHistory(){
-  const container = (document.getElementById('grid-userhistory') || document.getElementById('content'));
+  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-userhistory') || document.getElementById('content'));
   if (container) container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">작업 이력 로드 중...</div></div>';
   google.script.run
     .withSuccessHandler(function(res){
@@ -6231,7 +6450,7 @@ function loadUserActionHistory(){
 }
 
 function renderUserActionHistory(){
-  const container = (document.getElementById('grid-userhistory') || document.getElementById('content'));
+  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-userhistory') || document.getElementById('content'));
   if (!container) return;
   const q = (document.getElementById('userHistorySearchBox')?.value || '').trim().toLowerCase();
   let rows = USER_ACTION_HISTORY_ROWS || [];
