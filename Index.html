@@ -1934,7 +1934,14 @@
 </div>  
   
 <script>  
-/* ===================== 설정값 ===================== */  
+/* ===================== 설정값 ===================== */
+
+/* --- 전역 기본 날짜 및 상태 필터 변수 --- */
+var statusYearMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+var statusProductFilter = '일반알람';
+var targetYearMonth = statusYearMonth;
+var dailyReportDate = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  
 const HEADERS = ['개시','수주월','개시월','이월','구분','계약번호','계약처명','영업담당','영업동기','담당차량','보고일','계약일','개시일','기산일','용역료','상품','그로스','비고','유형'];  
 const EDITABLE_FIELDS = ['계약번호','계약처명','영업담당','영업동기','담당차량','보고일','계약일','개시일','기산일','용역료','상품','그로스','비고','유형'];  
 const AUTO_FIELDS = ['개시','수주월','개시월','이월','구분'];  
@@ -2619,6 +2626,12 @@ function preloadSilent_(cacheKey, runFn){
 }  
 function preloadAllTabsInBackground_(){  
  if (!SESSION || !SESSION.token) return;  
+ const today = todayStr();
+ const curYm = today.slice(0, 7);
+ const statusYearMonth = curYm;
+ const statusProductFilter = '일반알람';
+ const targetYearMonth = curYm;
+ const dailyReportDate = today;  
  preloadSilent_('orderStartData_', function(cb){  
  google.script.run.withSuccessHandler(cb).withFailureHandler(function(){}).getOrderStartData(SESSION.token, '');  
  });  
@@ -5368,8 +5381,8 @@ function submitNewRestartRow(){
 }  
   
 /* ===================== 영업현황 ===================== */  
-let statusYearMonth = todayStr().slice(0, 7);  
-let statusProductFilter = '일반알람';  
+var statusYearMonth = todayStr().slice(0, 7);  
+var statusProductFilter = '일반알람';  
 let STATUS_DATA = null;  
 let STATUS_TARGET = null;  
 let STATUS_ACTUAL = null;  
@@ -5705,7 +5718,7 @@ const FULL_REPORT_EXTRA_SECTIONS = [
  ] }  
 ];  
   
-let dailyReportDate = todayStr();  
+var dailyReportDate = todayStr();  
 let DAILY_REPORT_DATA = null; // { [product]: item }  
 let DAILY_FORECAST_ORDERS = null; // 이 변수가 반드시 있어야 합니다!  
 let EXTRA_PRODUCT_DATA = null; // { 안전상품:{수주,매출}, AI도어캠:{판매량} }  
