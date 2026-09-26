@@ -6400,247 +6400,568 @@ function submitNewRestartRow(){
  .saveRestartRow(SESSION.token, { id: null, fields: fields });  
 }  
   
+/* ===================== 상품일보 (안전상품 실적 관리) 구현 ===================== */
 const PRODUCT_DAILY_HEADERS = ['계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부'];  
-const PRODUCT_DAILY_EDITABLE_FIELDS = ['계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','구분','매출여부'];  
 const PRODUCT_DAILY_AUTO_FIELDS = ['합계'];  
-  
 const LIST_PRODUCT_DAILY_REP = ['박정훈','박광모','김상훈','최영국','이수열','박광춘','정문재','임영민'];  
 const LIST_PRODUCT_DAILY_MOTIVE = ['신규','변추가','안전상품A/S','기타'];  
 const LIST_PRODUCT_DAILY_GUBUN = ['지사','법인','전략'];  
 const LIST_PRODUCT_DAILY_SALES = ['매출','미매출'];  
-const PRODUCT_DAILY_CONTRACT_RE = /^T\d{7}$/;  
-const PRODUCT_DAILY_FORECAST_RE = /^(\d{2}\.\d{2}월|취소)$/;  
-  
-const PRODUCT_DAILY_FIELD_TYPE = {  
- 계약번호:'text', 서비스제공처:'text', 보고일:'date', 계약담당자:'select', 매출예상:'text',  
- 계약동기:'select', 계약설치비:'number', 계약기기비:'number', 구분:'select', 매출여부:'select'  
-};  
-  
+const PRODUCT_DAILY_CONTRACT_RE = /^T\\d{7}$/;  
+const PRODUCT_DAILY_DATE_FIELDS = ['보고일'];  
+
 let PRODUCT_DAILY_ROWS = [];  
 let productDailySortState = { key:'보고일', dir:'desc' };  
-  
-function computeAutoProductDaily(row){  
- if (row.계약설치비 === '' && row.계약기기비 === '') return { 합계:'' };  
- const a = Number(String(row.계약설치비||'0').replace(/,/g,'')) || 0;  
- const b = Number(String(row.계약기기비||'0').replace(/,/g,'')) || 0;  
- return { 합계: String(a + b) };  
-}  
-  
 let productDailySummaryYm = todayStr().slice(0,7);  
 let PRODUCT_DAILY_SUMMARY_EXTRA = null;  
-let productDailySummaryIncludeUnconfirmed = false; // 매출 집계에 "미매출" 포함 여부 (체크 시 전체 포함, 해제 시 매출 확정분만)  
-  
+let productDailySummaryIncludeUnconfirmed = false; // 매출 집계에 "미매출" 포함 여부
+
+function computeAutoProductDaily(row){  
+  if (row.계약설치비 === '' && row.계약기기비 === '') return { 합계:'' };  
+  const a = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;  
+  const b = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;  
+  return { 합계: String(a + b) };  
+}  
+
 function toggleProductDailySummaryUnconfirmed(){  
- const el = document.getElementById('pdSummaryIncludeUnconfirmed');  
- productDailySummaryIncludeUnconfirmed = !!(el && el.checked);  
- renderProductDaily();  
+  const el = document.getElementById('pdSummaryIncludeUnconfirmed');  
+  productDailySummaryIncludeUnconfirmed = !!(el && el.checked);  
+  renderProductDaily();  
 }  
-  
+
 function shiftProductDailySummaryMonth(delta){  
- const [y, m] = productDailySummaryYm.split('-').map(Number);  
- const d = new Date(y, m - 1 + delta, 1);  
- productDailySummaryYm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');  
- loadProductDailySummaryTarget_(function(){ renderProductDaily(); });  
+  const [y, m] = productDailySummaryYm.split('-').map(Number);  
+  const d = new Date(y, m - 1 + delta, 1);  
+  productDailySummaryYm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');  
+  loadProductDailySummaryTarget_(function(){ renderProductDaily(); });  
 }  
-  
+
 function loadProductDailySummaryTarget_(cb){  
- const cacheKey = 'pdSummarySafetyTarget|' + productDailySummaryYm;  
- const cached = cacheGet_(cacheKey);  
- if (cached) { PRODUCT_DAILY_SUMMARY_EXTRA = cached; cb(); return; }  
- google.script.run  
- .withSuccessHandler(function(res){  
- if (res && res.success) { PRODUCT_DAILY_SUMMARY_EXTRA = res; cacheSet_(cacheKey, res); } else { PRODUCT_DAILY_SUMMARY_EXTRA = null; }  
- cb();  
- })  
- .withFailureHandler(function(){ PRODUCT_DAILY_SUMMARY_EXTRA = null; cb(); })  
- .getSafetyProductSummary(SESSION.token, productDailySummaryYm);  
+  const cacheKey = 'pdSummarySafetyTarget|' + productDailySummaryYm;  
+  const cached = (typeof cacheGet_ === 'function') ? cacheGet_(cacheKey) : null;  
+  if (cached) { PRODUCT_DAILY_SUMMARY_EXTRA = cached; if (cb) cb(); return; }  
+  google.script.run  
+    .withSuccessHandler(function(res){  
+      if (res && res.success) { 
+        PRODUCT_DAILY_SUMMARY_EXTRA = res; 
+        if (typeof cacheSet_ === 'function') cacheSet_(cacheKey, res); 
+      } else { 
+        PRODUCT_DAILY_SUMMARY_EXTRA = null; 
+      }  
+      if (cb) cb();  
+    })  
+    .withFailureHandler(function(){ PRODUCT_DAILY_SUMMARY_EXTRA = null; if (cb) cb(); })  
+    .getSafetyProductSummary(SESSION.token, productDailySummaryYm);  
 }  
-  
+
+function matchForecastMonth_(val, yearNum, monthNum) {
+  if (!val) return false;
+  const s = String(val).replace(/\\s+/g, '');
+  const pat1 = String(yearNum).slice(2) + '.' + String(monthNum).padStart(2,'0') + '월';
+  const pat2 = String(yearNum) + '년' + String(monthNum).padStart(2,'0') + '월';
+  const pat3 = String(yearNum) + '년' + monthNum + '월';
+  const pat4 = String(yearNum) + '-' + String(monthNum).padStart(2,'0');
+  return s.includes(pat1) || s.includes(pat2) || s.includes(pat3) || s.includes(pat4);
+}
+
 function productDailySummaryTableHtml_(){  
- const ymNow = productDailySummaryYm;  
- const yearNum = Number(ymNow.slice(0,4));  
- const monthNum = Number(ymNow.slice(5,7));  
- const forecastStr = String(yearNum).slice(2) + '.' + String(monthNum).padStart(2,'0') + '월';  
- const sumBy = (pred) => PRODUCT_DAILY_ROWS.filter(pred).reduce((s,r) => s + (Number(String(r.합계||'0').replace(/,/g,'')) || 0), 0);  
- // 2026-09-18: "카드매출" 입력값(월별 단일 금액, 원단위) - 지사 몫의 매출에만 더해진다(수주에는 반영하지 않음).  
- const cardSales = Number((PRODUCT_DAILY_SUMMARY_EXTRA && PRODUCT_DAILY_SUMMARY_EXTRA.카드매출) || 0);  
+  const ymNow = productDailySummaryYm;  
+  const yearNum = Number(ymNow.slice(0,4));  
+  const monthNum = Number(ymNow.slice(5,7));  
   
- const ord지사 = sumBy(r => r.구분 === '지사' && String(r.보고일||'').slice(0,7) === ymNow);  
- const ord법인 = sumBy(r => r.구분 === '법인' && String(r.보고일||'').slice(0,7) === ymNow);  
- const ord계 = ord지사 + ord법인;  
- const ord잔략협력 = sumBy(r => r.구분 === '전략' && String(r.보고일||'').slice(0,7) === ymNow);  
- const ord합계 = ord계 + ord잔략협력;  
-  
- const saleConfirmedOk = r => productDailySummaryIncludeUnconfirmed || r.매출여부 === '매출';  
- const sale지사 = sumBy(r => r.구분 === '지사' && r.매출예상 === forecastStr && saleConfirmedOk(r)) + cardSales;  
- const sale법인 = sumBy(r => r.구분 === '법인' && r.매출예상 === forecastStr && saleConfirmedOk(r));  
- const sale계 = sale지사 + sale법인;  
- const sale잔략협력 = sumBy(r => r.구분 === '전략' && r.매출예상 === forecastStr && saleConfirmedOk(r));  
- const sale합계 = sale계 + sale잔략협력;  
-  
- const summary = PRODUCT_DAILY_SUMMARY_EXTRA || {};  
- const tgt = summary.목표 || {}, pln = summary.계획 || {};  
- const ordTarget = (Number(tgt.수주) || 0) * 1000; // 목표/계획은 천원 단위로 저장되므로 원 단위로 환산  
- const saleTarget = (Number(tgt.매출) || 0) * 1000;  
- const ordTargetTotal = ordTarget * 2;  
- const saleTargetTotal = saleTarget * 2;  
- const ordPlan = (Number(pln.수주) || 0) * 1000;  
- const salePlan = (Number(pln.매출) || 0) * 1000;  
- const ordPlanTotal = ordPlan + ordTarget; // 잔략협력은 계획이 아닌 목표금액과 동일  
- const salePlanTotal = salePlan + saleTarget;  
-  
- const rate = (actual, target) => target > 0 ? (Math.round((actual/target)*1000)/10) + '%' : '-';  
- const fmt = (v) => commaFmt(v);  
- const dash = '<span style="color:#999;">-</span>';  
- const B = 'border:1px solid #999; padding:4px 8px; text-align:right;';  
- const BH = 'border:1px solid #999; padding:4px 8px; text-align:center;';  
- const ORD_BAND = 'background:#5b9bd5; color:#ffffff;';  
- const SALE_BAND = 'background:#e6a8a8; color:#333333;';  
-  
- return `  
- <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; flex-wrap:wrap;">  
- <div style="border:2px dashed #2e7d32; border-radius:4px; padding:8px; overflow-x:auto; display:inline-block;">  
- <table style="border-collapse:collapse; font-size:11pt; white-space:nowrap;">  
- <tr>  
- <td colspan="11" style="border:1px solid #999; padding:6px 10px; text-align:center; font-weight:700; font-size:13pt; position:relative;">  
- <button onclick="shiftProductDailySummaryMonth(-1)" style="margin-right:10px;">◀</button>${yearNum}.${monthNum}월 안전상품 실적<button onclick="shiftProductDailySummaryMonth(1)" style="margin-left:10px;">▶</button>  
- <label style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-weight:400; font-size:10pt; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" style="margin:0;" ${productDailySummaryIncludeUnconfirmed ? 'checked' : ''} onchange="toggleProductDailySummaryUnconfirmed()"><span>미매출 포함</span></label>  
- </td>  
- </tr>  
- <tr>  
- <td rowspan="3" style="border:1px solid #999;"></td>  
- <td colspan="5" style="${BH} ${ORD_BAND} font-weight:700;">수주</td>  
- <td colspan="5" style="${BH} ${SALE_BAND} font-weight:700;">매출</td>  
- </tr>  
- <tr>  
- <td colspan="3" style="${BH} background:#ffffff; font-weight:600;">자력</td>  
- <td rowspan="2" style="${BH} background:#ffffff; font-weight:600;">잔략협력</td>  
- <td rowspan="2" style="${BH} ${ORD_BAND} font-weight:700;">수주<br>합계</td>  
- <td colspan="3" style="${BH} background:#ffffff; font-weight:600;">자력</td>  
- <td rowspan="2" style="${BH} background:#ffffff; font-weight:600;">잔략협력</td>  
- <td rowspan="2" style="${BH} ${SALE_BAND} font-weight:700;">매출<br>합계</td>  
- </tr>  
- <tr>  
- <td style="${BH} background:#f3f3f3;">계</td>  
- <td style="${BH} background:#f3f3f3;">지사</td>  
- <td style="${BH} background:#f3f3f3;">법인</td>  
- <td style="${BH} background:#f3f3f3;">계</td>  
- <td style="${BH} background:#f3f3f3;">지사</td>  
- <td style="${BH} background:#f3f3f3;">법인</td>  
- </tr>  
- <tr>  
- <td style="border:1px solid #999; padding:4px 10px; font-weight:600;">목표</td>  
- <td style="${B}">${fmt(ordTarget)}</td>  
- <td style="${B}">${dash}</td>  
- <td style="${B}">${dash}</td>  
- <td style="${B}">${fmt(ordTarget)}</td>  
- <td style="${B} font-weight:700;">${fmt(ordTargetTotal)}</td>  
- <td style="${B}">${fmt(saleTarget)}</td>  
- <td style="${B}">${dash}</td>  
- <td style="${B}">${dash}</td>  
- <td style="${B}">${fmt(saleTarget)}</td>  
- <td style="${B} font-weight:700;">${fmt(saleTargetTotal)}</td>  
- </tr>  
- <tr>  
- <td style="border:1px solid #999; padding:4px 10px; font-weight:600; background:#eef5ff;">계획</td>  
- <td style="${B} background:#eef5ff;">${fmt(ordPlan)}</td>  
-      <td style="${B} background:#eef5ff;">${fmt(salePlan)}</td>
-      <td style="${B} background:#eef5ff;">${dash}</td>
-      <td style="${B} background:#eef5ff;">${dash}</td>
-      <td style="${B} background:#eef5ff;">${fmt(saleTarget)}</td>
-    </tr>
-  </tbody>
-</table>
-`;
-}
+  const sumBy = (pred) => PRODUCT_DAILY_ROWS.filter(pred).reduce((s,r) => {
+    const inst = Number(String(r.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;
+    const dev = Number(String(r.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
+    const tot = (r.합계 != null && r.합계 !== '') ? (Number(String(r.합계).replace(/[^0-9.-]/g,'')) || 0) : (inst + dev);
+    return s + tot;
+  }, 0);  
 
-function onCardSalesInput_(input){
-  const clean = input.value.replace(/[^0-9]/g, '');
-  input.value = clean ? Number(clean).toLocaleString() : '';
-}
+  const cardSales = Number((PRODUCT_DAILY_SUMMARY_EXTRA && PRODUCT_DAILY_SUMMARY_EXTRA.카드매출) || 0);  
+  
+  const ord지사 = sumBy(r => r.구분 === '지사' && String(r.보고일||'').slice(0,7) === ymNow);  
+  const ord법인 = sumBy(r => r.구분 === '법인' && String(r.보고일||'').slice(0,7) === ymNow);  
+  const ord계 = ord지사 + ord법인;  
+  const ord잔략협력 = sumBy(r => r.구분 === '전략' && String(r.보고일||'').slice(0,7) === ymNow);  
+  const ord합계 = ord계 + ord잔략협력;  
+  
+  const saleConfirmedOk = r => productDailySummaryIncludeUnconfirmed || r.매출여부 === '매출';  
+  const sale지사 = sumBy(r => r.구분 === '지사' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r)) + cardSales;  
+  const sale법인 = sumBy(r => r.구분 === '법인' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r));  
+  const sale계 = sale지사 + sale법인;  
+  const sale잔략협력 = sumBy(r => r.구분 === '전략' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r));  
+  const sale합계 = sale계 + sale잔략협력;  
+  
+  const summary = PRODUCT_DAILY_SUMMARY_EXTRA || {};  
+  const tgt = summary.목표 || {}, pln = summary.계획 || {};  
+  const ordTarget = (Number(tgt.수주) || 0) * 1000;  
+  const saleTarget = (Number(tgt.매출) || 0) * 1000;  
+  const ordTargetTotal = ordTarget * 2;  
+  const saleTargetTotal = saleTarget * 2;  
+  const ordPlan = (Number(pln.수주) || 0) * 1000;  
+  const salePlan = (Number(pln.매출) || 0) * 1000;  
+  const ordPlanTotal = ordPlan + ordTarget;  
+  const salePlanTotal = salePlan + saleTarget;  
+  
+  const rate = (actual, target) => target > 0 ? (Math.round((actual/target)*1000)/10) + '%' : '-';  
+  const fmt = (v) => fmtK ? fmtK(v) : Number(v||0).toLocaleString('ko-KR');  
+  const dash = '<span style="color:#999;">-</span>';  
+  const B = 'border:1px solid #999; padding:4px 8px; text-align:right;';  
+  const BH = 'border:1px solid #999; padding:4px 8px; text-align:center;';  
+  const ORD_BAND = 'background:#5b9bd5; color:#ffffff;';  
+  const SALE_BAND = 'background:#e6a8a8; color:#333333;';  
+  
+  return `  
+  <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; flex-wrap:wrap;">  
+    <div style="border:2px dashed #2e7d32; border-radius:4px; padding:8px; overflow-x:auto; display:inline-block;">  
+      <table style="border-collapse:collapse; font-size:11pt; white-space:nowrap;">  
+        <tr>  
+          <td colspan="11" style="border:1px solid #999; padding:6px 10px; text-align:center; font-weight:700; font-size:13pt; position:relative;">  
+            <button onclick="shiftProductDailySummaryMonth(-1)" style="margin-right:10px; padding:2px 8px; cursor:pointer;">◀</button>${yearNum}.${monthNum}월 안전상품 실적<button onclick="shiftProductDailySummaryMonth(1)" style="margin-left:10px; padding:2px 8px; cursor:pointer;">▶</button>  
+            <label style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-weight:400; font-size:10pt; white-space:nowrap; display:inline-flex; align-items:center; gap:2px; cursor:pointer;"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" style="margin:0;" ${productDailySummaryIncludeUnconfirmed ? 'checked' : ''} onchange="toggleProductDailySummaryUnconfirmed()"><span>미매출 포함</span></label>  
+          </td>  
+        </tr>  
+        <tr>  
+          <td rowspan="3" style="border:1px solid #999;"></td>  
+          <td colspan="5" style="${BH} ${ORD_BAND} font-weight:700;">수주</td>  
+          <td colspan="5" style="${BH} ${SALE_BAND} font-weight:700;">매출</td>  
+        </tr>  
+        <tr>  
+          <td colspan="3" style="${BH} background:#ffffff; font-weight:600;">자력</td>  
+          <td rowspan="2" style="${BH} background:#ffffff; font-weight:600;">잔략협력</td>  
+          <td rowspan="2" style="${BH} ${ORD_BAND} font-weight:700;">수주<br>합계</td>  
+          <td colspan="3" style="${BH} background:#ffffff; font-weight:600;">자력</td>  
+          <td rowspan="2" style="${BH} background:#ffffff; font-weight:600;">잔략협력</td>  
+          <td rowspan="2" style="${BH} ${SALE_BAND} font-weight:700;">매출<br>합계</td>  
+        </tr>  
+        <tr>  
+          <td style="${BH} background:#f3f3f3;">계</td>  
+          <td style="${BH} background:#f3f3f3;">지사</td>  
+          <td style="${BH} background:#f3f3f3;">법인</td>  
+          <td style="${BH} background:#f3f3f3;">계</td>  
+          <td style="${BH} background:#f3f3f3;">지사</td>  
+          <td style="${BH} background:#f3f3f3;">법인</td>  
+        </tr>  
+        <tr>  
+          <td style="border:1px solid #999; padding:4px 10px; font-weight:600;">목표</td>  
+          <td style="${B}">${fmt(ordTarget)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${fmt(ordTarget)}</td>  
+          <td style="${B} font-weight:700;">${fmt(ordTargetTotal)}</td>  
+          <td style="${B}">${fmt(saleTarget)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${fmt(saleTarget)}</td>  
+          <td style="${B} font-weight:700;">${fmt(saleTargetTotal)}</td>  
+        </tr>  
+        <tr>  
+          <td style="border:1px solid #999; padding:4px 10px; font-weight:600; background:#eef5ff;">계획</td>  
+          <td style="${B} background:#eef5ff;">${fmt(ordPlan)}</td>  
+          <td style="${B} background:#eef5ff;">${dash}</td>  
+          <td style="${B} background:#eef5ff;">${dash}</td>  
+          <td style="${B} background:#eef5ff;">${fmt(ordTarget)}</td>  
+          <td style="${B} background:#eef5ff; font-weight:700;">${fmt(ordPlanTotal)}</td>  
+          <td style="${B} background:#eef5ff;">${fmt(salePlan)}</td>  
+          <td style="${B} background:#eef5ff;">${dash}</td>  
+          <td style="${B} background:#eef5ff;">${dash}</td>  
+          <td style="${B} background:#eef5ff;">${fmt(saleTarget)}</td>  
+          <td style="${B} background:#eef5ff; font-weight:700;">${fmt(salePlanTotal)}</td>  
+        </tr>  
+        <tr>  
+          <td style="border:1px solid #999; padding:4px 10px; font-weight:600; background:#ffff00;">실적</td>  
+          <td style="${B} background:#ffff00;">${fmt(ord계)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(ord지사)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(ord법인)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(ord잔략협력)}</td>  
+          <td style="${B} background:#ffff00; font-weight:700;">${fmt(ord합계)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(sale계)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(sale지사)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(sale법인)}</td>  
+          <td style="${B} background:#ffff00;">${fmt(sale잔략협력)}</td>  
+          <td style="${B} background:#ffff00; font-weight:700;">${fmt(sale합계)}</td>  
+        </tr>  
+        <tr>  
+          <td style="border:1px solid #999; padding:4px 10px; font-weight:600;">달성율</td>  
+          <td style="${B}">${rate(ord계, ordTarget)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${rate(ord잔략협력, ordTarget)}</td>  
+          <td style="${B} font-weight:700;">${rate(ord합계, ordTargetTotal)}</td>  
+          <td style="${B}">${rate(sale계, saleTarget)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B}">${rate(sale잔략협력, saleTarget)}</td>  
+          <td style="${B} font-weight:700;">${rate(sale합계, saleTargetTotal)}</td>  
+        </tr>  
+      </table>  
+    </div>  
+    <div style="border:1px solid #90caf9; border-radius:4px; padding:10px 16px; background:#eaf6fd; min-width:170px;">  
+      <div style="font-weight:700; font-size:11pt; margin-bottom:8px; color:#0d5c8a;">카드매출 (단위 : 원)</div>  
+      <input type="text" id="cardSalesInput" value="${fmt(cardSales)}" oninput="formatMoneyInput(this)" onchange="onCardSalesChange_(this.value)"
+        style="width:140px; padding:6px 8px; border:1px solid #c7cfd8; border-radius:4px; text-align:right; font-size:12pt; background:#ffffff; box-sizing:border-box; font-weight:bold; color:#0d5c8a;">  
+    </div>  
+  </div>`;  
+}  
 
-function saveCardSalesAmount_(){
-  const input = document.getElementById('cardSalesAmountInput');
-  if (!input) return;
-  const raw = Number(input.value.replace(/[^0-9]/g, '')) || 0;
-  setLoadingCursor(true);
+function onCardSalesChange_(val){
+  const num = Number(String(val).replace(/[^0-9.-]/g, '')) || 0;
+  if (!PRODUCT_DAILY_SUMMARY_EXTRA) PRODUCT_DAILY_SUMMARY_EXTRA = {};
+  PRODUCT_DAILY_SUMMARY_EXTRA.카드매출 = num;
+  renderProductDaily();
   google.script.run
-    .withSuccessHandler(function(res){
-      setLoadingCursor(false);
-      delete CLIENT_CACHE_['productDailyData_'];
-      delete CLIENT_CACHE_['safetyProductSummary_'];
-      loadProductDailyData();
-      alert('카드매출이 저장되었습니다: ' + raw.toLocaleString() + '원');
-    })
-    .withFailureHandler(function(err){
-      setLoadingCursor(false);
-      alert('카드매출 저장 실패: ' + err);
-    })
-    .saveCardSales(SESSION.token, getProductDailyYearMonth_(), raw);
+    .withSuccessHandler(function(){})
+    .withFailureHandler(function(err){ alert('카드매출 저장 실패: ' + err); })
+    .saveCardSales(SESSION.token, productDailySummaryYm, num);
 }
 
-/* ===================== 상품일보 로드 및 렌더링 ===================== */
-function getProductDailyYearMonth_(){
-  return todayStr().slice(0, 7);
-}
+function loadProductDailyData(silent){  
+  const cacheKey = 'productDailyData';  
+  const cached = (typeof cacheGet_ === 'function') ? cacheGet_(cacheKey, GRID_CACHE_TTL_MS_) : null;  
+  if (cached) {  
+    PRODUCT_DAILY_ROWS = cached.rows.map(r => {  
+      const obj = { id: r[r.length-1] };  
+      PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = r[i]);  
+      return obj;  
+    });  
+    SCOPE_LOADED_.productdaily = true;  
+    STALE_SCOPES_.delete('productdaily'); 
+    updateManualRefreshBtn_();  
+    if (!silent) loadProductDailySummaryTarget_(function(){ renderProductDaily(); });  
+    return;  
+  }  
+  if (!silent) { 
+    showLoadingProgress_('content', '데이터를 불러오는 중입니다...', 'loadProductDailyData'); 
+    setLoadingCursor(true); 
+  }  
+  google.script.run  
+    .withSuccessHandler(function(data){  
+      if (!silent) setLoadingCursor(false);  
+      if (data && data.error) { if (!silent) showLogin(data.error); return; }  
+      if (typeof cacheSet_ === 'function') cacheSet_(cacheKey, data);  
+      PRODUCT_DAILY_ROWS = (data.rows || []).map(r => {  
+        const obj = { id: r[r.length-1] };  
+        PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = r[i]);  
+        return obj;  
+      });  
+      SCOPE_LOADED_.productdaily = true;  
+      STALE_SCOPES_.delete('productdaily'); 
+      updateManualRefreshBtn_();  
+      if (!silent) loadProductDailySummaryTarget_(function(){ renderProductDaily(); });  
+    })  
+    .withFailureHandler(function(err){ 
+      if (!silent) { 
+        setLoadingCursor(false); 
+        document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + err + '</div>'; 
+      } 
+    })  
+    .getProductDailyData(SESSION.token);  
+}  
 
-function loadProductDailyData(){
-  const container = (document.getElementById('grid-product-daily') || document.getElementById('content'));
-  container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">데이터를 불러오는 중입니다...</div></div>';
-  setLoadingCursor(true);
-  google.script.run
-    .withSuccessHandler(function(res){
-      setLoadingCursor(false);
-      PRODUCT_DAILY_ROWS = (res.rows || []).map(r => {
-        const obj = { id: r[r.length-1] };
-        PRODUCT_DAILY_HEADERS.forEach((h, i) => obj[h] = r[i]);
-        return obj;
-      });
-      renderProductDaily();
-    })
-    .withFailureHandler(function(err){
-      setLoadingCursor(false);
-      container.innerHTML = '<div class="denied">데이터 로드 실패: ' + escHtml(String(err)) + '</div>';
-    })
-    .getProductDailyData(SESSION.token);
-}
+function sortedProductDailyRows(){  
+  const filterText = (document.getElementById('productDailySearchBox')||{}).value || '';  
+  const repFilter = (document.getElementById('repFilterProductDaily')||{}).value || '';  
+  const gubunFilter = (document.getElementById('gubunFilterProductDaily')||{}).value || '';  
+  let list = PRODUCT_DAILY_ROWS.map(r => Object.assign({}, r, computeAutoProductDaily(r)));  
+  if (filterText) list = list.filter(r => String(r.서비스제공처||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
+  if (repFilter) list = list.filter(r => r.계약담당자 === repFilter);  
+  if (gubunFilter) list = list.filter(r => r.구분 === gubunFilter);  
+  const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
+  list.sort((a,b) => {  
+    let va = a[key], vb = b[key];  
+    const blankA = va === '' || va === null || va === undefined;  
+    const blankB = vb === '' || vb === null || vb === undefined;  
+    if (blankA && blankB) return 0;  
+    if (blankA) return 1;  
+    if (blankB) return -1;  
+    if (['계약설치비','계약기기비','합계'].indexOf(key) !== -1) { 
+      va = Number(String(va).replace(/[^0-9.-]/g,'')); 
+      vb = Number(String(vb).replace(/[^0-9.-]/g,'')); 
+    }  
+    if (va < vb) return -1 * dir;  
+    if (va > vb) return 1 * dir;  
+    return 0;  
+  });  
+  return list;  
+}  
 
-function renderProductDaily(){
-  const container = (document.getElementById('grid-product-daily') || document.getElementById('content'));
-  if (!PRODUCT_DAILY_ROWS.length) {
-    container.innerHTML = '<div class="placeholder">등록된 상품일보 데이터가 없습니다.</div>';
-    return;
+function setProductDailySort(key){  
+  if (productDailySortState.key === key) productDailySortState.dir = productDailySortState.dir === 'asc' ? 'desc' : 'asc';  
+  else { productDailySortState.key = key; productDailySortState.dir = 'asc'; }  
+  renderProductDaily();  
+}  
+
+function headerCellProductDaily(h){  
+  const arrow = productDailySortState.key === h ? (productDailySortState.dir === 'asc' ? '▲' : '▼') : '';  
+  const sw = localStorage.getItem('colw_productdaily_' + h);  
+  const style = sw ? ` style="width:${sw}px; min-width:${sw}px;"` : '';  
+  return `<th${style} onclick="setProductDailySort('${h}')">${h}<span class="arrow">${arrow}</span><div class="col-resizer" onclick="event.stopPropagation()" onmousedown="initColResize(event, 'productdaily', '${h}')"></div></th>`;  
+}  
+
+function productDailyContractBad(val, allRows){  
+  const s = String(val === null || val === undefined ? '' : val).trim();  
+  if (!s) return false;  
+  if (s === 'T') return false;  
+  if (!PRODUCT_DAILY_CONTRACT_RE.test(s)) return true;  
+  let cnt = 0;  
+  for (let i = 0; i < allRows.length; i++) {  
+    if (String(allRows[i].계약번호 === null || allRows[i].계약번호 === undefined ? '' : allRows[i].계약번호).trim() === s) cnt++;  
+    if (cnt > 1) return true;  
+  }  
+  return false;  
+}  
+
+function productDailyMotiveStyle(val){  
+  const s = String(val||'');  
+  if (s === '신규') return 'background-color:rgb(200,250,200); color:rgb(0,100,0); font-weight:600;';  
+  if (s === '변추가') return 'background-color:rgb(255,255,150); color:rgb(156,100,0); font-weight:600;';  
+  if (s === '안전상품A/S') return 'background-color:#ffffff; color:blue; font-weight:600;';  
+  return '';  
+}  
+
+function productDailyCellClass(field, val, allRows){  
+  let cls = '';  
+  if (field === '계약번호') cls = 'contract-cell' + (productDailyContractBad(val, allRows) ? ' contract-bad' : '');  
+  else if (field === '서비스제공처') cls = 'name-cell';  
+  else if (field === '계약설치비' || field === '계약기기비') cls = 'fee money num';  
+  if (PRODUCT_DAILY_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
+  if (['계약담당자','구분','매출여부'].indexOf(field) !== -1) cls += ' narrow';  
+  if (field === '구분' && String(val) === '법인') cls += ' gross-corp';  
+  if (field === '매출여부' && String(val) === '미매출') cls += ' pc-down';  
+  if (productDailySortState.key === field) cls += ' sort-col';  
+  return cls.trim();  
+}  
+
+DATE_CELL_HANDLERS.productdaily = function(id, field, value){
+  onProductDailyFieldChange(id, field, value);
+};
+
+function openMonthPickerForPd_(btn, id){
+  const inp = btn.parentElement.querySelector('input[type="month"]');
+  if (inp) {
+    if (inp.showPicker) inp.showPicker();
+    else inp.click();
   }
-  let html = '<table><thead><tr>' +
-    '<th class="flag-col">선택</th>' +
-    PRODUCT_DAILY_HEADERS.map(h => '<th>' + escHtml(h) + '</th>').join('') +
-    '<th>작업</th></tr></thead><tbody>';
-
-  PRODUCT_DAILY_ROWS.forEach(row => {
-    const isFlg = FLAGGED_SET.has(row.id);
-    html += '<tr class="' + (isFlg ? 'flagged' : '') + '">';
-    html += '<td class="flag-cell"><input type="checkbox" ' + (isFlg ? 'checked' : '') + ' onchange="toggleFlag(\'" + row.id + "\', this.checked)"></td>';
-    PRODUCT_DAILY_HEADERS.forEach(h => {
-      const val = row[h] != null ? row[h] : '';
-      const isNum = (h === '계약설치비' || h === '계약기기비' || h === '합계');
-      html += '<td class="' + (isNum ? 'money' : '') + '">' + (isNum ? commaFmt(val) : escHtml(String(val))) + '</td>';
-    });
-    html += '<td class="actions"><button class="danger" onclick="deleteProductDailyRow(\'" + row.id + "\')">삭제</button></td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  container.innerHTML = html;
 }
 
-function deleteProductDailyRow(id){
-  if (!confirm('정말 삭제하시겠습니까?')) return;
+function onPdMonthPicked_(inp, id){
+  if (!inp.value) return;
+  const [y, m] = inp.value.split('-');
+  const formatted = y + '년 ' + m + '월';
+  onProductDailyFieldChange(id, '매출예상', formatted);
+}
+
+function fieldCellHtmlProductDaily(row, field, allRows){  
+  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
+  const cls = productDailyCellClass(field, val, allRows);  
+  let inner;  
+
+  if (field === '계약담당자') {
+    inner = `<select onchange="onProductDailyFieldChange('${row.id}','계약담당자',this.value)">` +
+      `<option value="">선택</option>` +
+      LIST_PRODUCT_DAILY_REP.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('') +
+      `</select>`;
+  } else if (field === '구분') {
+    inner = `<select onchange="onProductDailyFieldChange('${row.id}','구분',this.value)">` +
+      LIST_PRODUCT_DAILY_GUBUN.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('') +
+      `</select>`;
+  } else if (field === '매출여부') {
+    const isUnbilled = String(val) === '미매출';
+    inner = `<select style="${isUnbilled?'color:#d97706;font-weight:600;':''}" onchange="onProductDailyFieldChange('${row.id}','매출여부',this.value)">` +
+      LIST_PRODUCT_DAILY_SALES.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('') +
+      `</select>`;
+  } else if (field === '계약동기') {
+    const motiveStyle = productDailyMotiveStyle(val);
+    inner = `<select style="${motiveStyle}" onchange="this.style=productDailyMotiveStyle(this.value); onProductDailyFieldChange('${row.id}','계약동기',this.value)">` +
+      `<option value="">선택</option>` +
+      LIST_PRODUCT_DAILY_MOTIVE.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('') +
+      `</select>`;
+  } else if (field === '계약설치비' || field === '계약기기비') {
+    inner = `<input type="text" inputmode="numeric" style="text-align:right;" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onProductDailyFieldChange('${row.id}','${field}',moneyValue(this))">`;
+  } else if (field === '보고일') {
+    inner = dateCellInputHtml('productdaily', row.id, '보고일', val);
+  } else if (field === '매출예상') {
+    inner = `<span class="datecell-wrap" style="position:relative;">` +
+      `<input type="text" style="text-align:center; min-width:85px;" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','매출예상',this.value)">` +
+      `<button type="button" class="date-pick-btn" title="월 선택" onclick="openMonthPickerForPd_(this, '${row.id}')">&#128197;</button>` +
+      `<input type="month" class="date-pick-hidden" onchange="onPdMonthPicked_(this, '${row.id}')">` +
+      `</span>`;
+  } else {
+    inner = `<input type="text" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','${field}',this.value)">`;
+  }
+
+  const tdStyle = (field === '보고일') ? ' style="background-color:#ffff00;"' : '';
+  const titleAttr = (field === '서비스제공처') ? ` title="${escAttr(val)}"` : '';
+  return `<td class="${cls}"${titleAttr}${tdStyle}>${inner}</td>`;  
+}  
+
+function onProductDailyFieldChange(id, field, value){  
+  const row = PRODUCT_DAILY_ROWS.find(r => r.id === id);  
+  if (!row) return;  
+  row[field] = value;  
+  if (field === '계약설치비' || field === '계약기기비') {
+    const inst = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;
+    const dev = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
+    row.합계 = inst + dev;
+  }
+  row._unsynced = true; row._syncError = false;  
+  renderProductDaily();  
+  pushSaveProductDaily(row);  
+}  
+
+function pushSaveProductDaily(row){  
+  setSyncStatus('saving');  
+  const fields = {};  
+  PRODUCT_DAILY_HEADERS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
+  google.script.run  
+    .withSuccessHandler(function(res){  
+      if (res && res.success) { 
+        row._unsynced = false; row._syncError = false; setSyncStatus('ok'); 
+        loadProductDailySummaryTarget_(function(){ renderProductDaily(); });
+      } else { 
+        row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); 
+        renderProductDaily();
+      }  
+    })  
+    .withFailureHandler(function(err){ 
+      row._syncError = true; setSyncStatus('error', err); renderProductDaily(); 
+    })  
+    .saveProductDailyRow(SESSION.token, { id: row.id, fields: fields });  
+}  
+
+function deleteProductDailyRow(id){  
+  if (!confirm('이 건을 삭제하시겠습니까? 삭제하면 복구할 수 없습니다.')) return;  
+  const idx = PRODUCT_DAILY_ROWS.findIndex(r => r.id === id);  
+  if (idx === -1) return;  
+  const removed = PRODUCT_DAILY_ROWS[idx];  
+  PRODUCT_DAILY_ROWS.splice(idx, 1);  
+  renderProductDaily();  
+  setSyncStatus('saving');  
+  google.script.run  
+    .withSuccessHandler(function(res){  
+      if (res && res.success) {
+        setSyncStatus('ok');
+        loadProductDailySummaryTarget_(function(){ renderProductDaily(); });
+      } else { 
+        PRODUCT_DAILY_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderProductDaily(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); 
+      }  
+    })  
+    .withFailureHandler(function(err){ 
+      PRODUCT_DAILY_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderProductDaily(); alert('삭제 실패: ' + err); 
+    })  
+    .deleteProductDailyRow(SESSION.token, id);  
+}  
+
+function renderProductDaily(){  
+  const rows = sortedProductDailyRows();  
+  let html = productDailySummaryTableHtml_();  
+  html += '<div class="grid-top-sum">' +
+    '<span class="sum-total" id="productDailyTopSum">' + flaggedSumText_(rows, '합계') + '</span>' +
+    '<span class="count" id="productDailyTopCount">총 ' + rows.length + '건</span>' +
+    '</div>';  
+  html += '<div class="grid-wrap"><table><thead><tr>' + flagHeaderHtml();  
+  PRODUCT_DAILY_HEADERS.forEach(h => html += headerCellProductDaily(h));  
+  html += '<th style="width:60px; min-width:60px; text-align:center;">관리</th>';  
+  html += '</tr></thead><tbody>';  
+
+  rows.forEach(row => {  
+    const isFlg = FLAGGED_SET.has(row.id);
+    const rowCls = ((row._syncError ? 'sync-error' : (row._unsynced ? 'unsynced' : '')) + (isFlg ? ' flagged' : '')).trim();  
+    html += `<tr data-id="${row.id}" class="${rowCls}">` + flagCellHtml('productdaily', row.id);  
+    PRODUCT_DAILY_HEADERS.forEach(h => {  
+      if (PRODUCT_DAILY_AUTO_FIELDS.includes(h)) {  
+        const autoVal = (Number(String(row.계약설치비||0).replace(/[^0-9.-]/g,'')) || 0) + (Number(String(row.계약기기비||0).replace(/[^0-9.-]/g,'')) || 0);
+        row.합계 = autoVal;
+        const autoCls = ('auto money' + (productDailySortState.key === h ? ' sort-col' : '')).trim();  
+        html += `<td class="${autoCls}" style="font-weight:bold; color:blue; text-align:right;">${commaFmt(autoVal)}</td>`;  
+      } else {
+        html += fieldCellHtmlProductDaily(row, h, rows);  
+      }
+    });  
+    html += `<td class="actions" style="text-align:center;"><button class="danger" onclick="deleteProductDailyRow('${row.id}')" style="padding:2px 8px; border:1px solid #dc3545; color:#dc3545; background:#fff; border-radius:4px; cursor:pointer;">삭제</button></td>`;  
+    html += '</tr>';  
+  });  
+  html += '</tbody></table></div>';  
+
+  const content = document.getElementById('content');
+  if (content) content.innerHTML = html;  
+
+  const countEl = document.getElementById('productDailyRowCount');  
+  if (countEl) countEl.innerText = `총 ${rows.length}건`;  
+  const topCountEl = document.getElementById('productDailyTopCount');  
+  if (topCountEl) topCountEl.innerText = `총 ${rows.length}건`;  
+  const topSumEl = document.getElementById('productDailyTopSum');  
+  if (topSumEl) topSumEl.innerText = flaggedSumText_(rows, '합계');  
+  
+  if (typeof fitGridWrapToViewport_ === 'function') fitGridWrapToViewport_();  
+}  
+window.renderProductDaily = renderProductDaily;
+window.loadProductDailyData = loadProductDailyData;
+
+/* ---- 상품일보 신규 등록 모달 ---- */
+function buildProductDailyForm(){
+  const container = document.getElementById('productDailyFormFields');
+  if (!container) return;
+  const today = todayStr();
+  const ymNow = today.slice(0, 7);
+  const ymFormatted = ymNow.slice(0, 4) + '년 ' + ymNow.slice(5, 7) + '월';
+
+  container.innerHTML = `
+    <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" placeholder="T8588826"></div>
+    <div class="field"><label>서비스제공처</label><input type="text" id="pdf_서비스제공처" placeholder="고객사/서비스처 명칭"></div>
+    <div class="field"><label>보고일</label><input type="date" id="pdf_보고일" value="${today}"></div>
+    <div class="field"><label>계약담당자</label><select id="pdf_계약담당자">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
+    <div class="field"><label>매출예상</label><input type="text" id="pdf_매출예상" value="${ymFormatted}" placeholder="2026년 09월"></div>
+    <div class="field"><label>계약동기</label><select id="pdf_계약동기">${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
+    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" value="0" inputmode="numeric" oninput="formatMoneyInput(this)"></div>
+    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" value="0" inputmode="numeric" oninput="formatMoneyInput(this)"></div>
+    <div class="field"><label>구분</label><select id="pdf_구분">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
+    <div class="field"><label>매출여부</label><select id="pdf_매출여부">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
+  `;
+}
+
+function openAddProductDailyModal(){
+  buildProductDailyForm();
+  const overlay = document.getElementById('productDailyModalOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeProductDailyModal(){
+  const overlay = document.getElementById('productDailyModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function submitNewProductDailyRow(){
+  const getVal = id => { const el = document.getElementById('pdf_' + id); return el ? el.value.trim() : ''; };
+  const instFee = Number(moneyValue(document.getElementById('pdf_계약설치비') || {value:0})) || 0;
+  const devFee = Number(moneyValue(document.getElementById('pdf_계약기기비') || {value:0})) || 0;
+
+  const fields = {
+    계약번호: getVal('계약번호') || 'T',
+    서비스제공처: getVal('서비스제공처'),
+    보고일: getVal('보고일'),
+    계약담당자: getVal('계약담당자'),
+    매출예상: getVal('매출예상'),
+    계약동기: getVal('계약동기'),
+    계약설치비: instFee,
+    계약기기비: devFee,
+    합계: instFee + devFee,
+    구분: getVal('구분') || '지사',
+    매출여부: getVal('매출여부') || '미매출'
+  };
+
   setLoadingCursor(true);
   google.script.run
-    .withSuccessHandler(function(){ setLoadingCursor(false); loadProductDailyData(); })
-    .withFailureHandler(function(err){ setLoadingCursor(false); alert('삭제 실패: ' + err); })
-    .deleteProductDailyRow(SESSION.token, id);
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      closeProductDailyModal();
+      loadProductDailyData();
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('등록 실패: ' + err);
+    })
+    .saveProductDailyRow(SESSION.token, { id: null, fields: fields });
 }
-
 
 /* ===================== 사용자 관리 서브 탭 뷰 전환 ===================== */
 let USERMGMT_VIEW = 'info';
@@ -7411,44 +7732,6 @@ function onDailyReportDateChange(){
     dailyReportDate = el.value;
     loadDailyReport();
   }
-}
-
-/* ===================== 상품일보 등록 모달 ===================== */
-function openAddProductDailyModal(){
-  const overlay = document.getElementById('productDailyModalOverlay');
-  if (overlay) overlay.classList.add('open');
-  const container = document.getElementById('productDailyFormFields');
-  if (container) {
-    container.innerHTML = PRODUCT_DAILY_HEADERS.map(function(h){
-      const isNum = (h === '계약설치비' || h === '계약기기비' || h === '합계');
-      return '<div class="field"><label>' + escHtml(h) + '</label><input type="' + (isNum ? 'number' : 'text') + '" id="pdf_' + h + '" placeholder="' + escHtml(h) + '"></div>';
-    }).join('');
-  }
-}
-
-function closeProductDailyModal(){
-  const overlay = document.getElementById('productDailyModalOverlay');
-  if (overlay) overlay.classList.remove('open');
-}
-
-function submitNewProductDailyRow(){
-  const fields = {};
-  PRODUCT_DAILY_HEADERS.forEach(function(h){
-    const el = document.getElementById('pdf_' + h);
-    if (el) fields[h] = el.value;
-  });
-  setLoadingCursor(true);
-  google.script.run
-    .withSuccessHandler(function(res){
-      setLoadingCursor(false);
-      closeProductDailyModal();
-      loadProductDailyData();
-    })
-    .withFailureHandler(function(err){
-      setLoadingCursor(false);
-      alert('등록 실패: ' + err);
-    })
-    .saveProductDailyRow(SESSION.token, { id: null, fields: fields });
 }
 
 /* ===================== 사용자 이력 툴바 이벤트 ===================== */
