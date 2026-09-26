@@ -1013,18 +1013,36 @@
     },
 
     // 13. 설정 및 기타
-    getEditableLists: async function(token) {
-      const client = getSupabase();
-      const { data } = await client.from('editable_settings').select('*').order('sort_order', { ascending: true });
+        getEditableLists: async function(token) {
       const lists = { '영업동기': [], '해약유형': [], '인상인하사유': [], '영업컨설턴트': [], '상품일보_담당자': [] };
       const defaults = {};
 
-      (data || []).forEach(r => {
-        if (lists[r.category]) {
-          lists[r.category].push(r.item_value);
-          if (r.is_default) defaults[r.category] = r.item_value;
+      // 1. Try local storage first
+      try {
+        const local = localStorage.getItem('S1_EDITABLE_SETTINGS');
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && parsed.lists) {
+            return { success: true, lists: parsed.lists, defaults: parsed.defaults || {} };
+          }
         }
-      });
+      } catch(e) {}
+
+      // 2. Try Supabase
+      try {
+        const client = getSupabase();
+        if (client) {
+          const { data, error } = await client.from('editable_settings').select('*').order('sort_order', { ascending: true });
+          if (!error && data) {
+            data.forEach(r => {
+              if (lists[r.category]) {
+                lists[r.category].push(r.item_value);
+                if (r.is_default) defaults[r.category] = r.item_value;
+              }
+            });
+          }
+        }
+      } catch(e) {}
 
       // 기본값 폴백
       if (!lists['영업동기'].length) lists['영업동기'] = ['개척', '콜센터', '사내소개', '고객소개', '대리점', '관내이전', '관외이전', '그로스', '기타'];
@@ -1037,22 +1055,46 @@
     },
 
     saveEditableListsBulk: async function(token, payload) {
-      const client = getSupabase();
-      const rows = [];
+      const lists = {};
+      const defaults = {};
+
       Object.keys(payload || {}).forEach(cat => {
         const entry = payload[cat] || {};
-        (entry.items || []).forEach((val, idx) => {
-          rows.push({
-            category: cat,
-            item_value: val,
-            is_default: (val === entry.defaultValue),
-            sort_order: idx + 1
-          });
-        });
+        lists[cat] = entry.items || [];
+        if (entry.defaultValue) defaults[cat] = entry.defaultValue;
       });
-      const { error } = await client.from('editable_settings').upsert(rows, { onConflict: 'category,item_value' });
-      if (error) throw error;
-      return Backend.getEditableLists(token);
+
+      // 1. Save to localStorage immediately
+      try {
+        localStorage.setItem('S1_EDITABLE_SETTINGS', JSON.stringify({ lists: lists, defaults: defaults }));
+      } catch(e) {}
+
+      // 2. Try Supabase upsert safely
+      try {
+        const client = getSupabase();
+        if (client) {
+          const rows = [];
+          Object.keys(payload || {}).forEach(cat => {
+            const entry = payload[cat] || {};
+            (entry.items || []).forEach((val, idx) => {
+              rows.push({
+                category: cat,
+                item_value: val,
+                is_default: (val === entry.defaultValue),
+                sort_order: idx + 1
+              });
+            });
+          });
+          if (rows.length) {
+            const { error } = await client.from('editable_settings').upsert(rows, { onConflict: 'category,item_value' });
+            if (error) console.warn('Supabase editable_settings sync notice (saved locally):', error.message || error);
+          }
+        }
+      } catch(e) {
+        console.warn('Supabase sync skipped, saved locally:', e);
+      }
+
+      return { success: true, lists: lists, defaults: defaults };
     },
 
     getTaPortalUrl: async function(token) {
