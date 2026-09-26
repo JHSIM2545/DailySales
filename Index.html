@@ -1937,6 +1937,12 @@
 /* ===================== 설정값 ===================== */
 
 /* --- 전역 기본 날짜 및 상태 필터 변수 --- */
+
+/* --- 전역 상태 및 타겟 플래그 변수 --- */
+var TARGET_REP_DIRTY = false;
+var USER_ROWS = [];
+function saveRepTargetsAll_(cb){ if (cb) cb(); }
+
 var statusYearMonth = (function(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
 var statusProductFilter = '일반알람';
 var targetYearMonth = statusYearMonth;
