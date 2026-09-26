@@ -896,15 +896,80 @@
     getExtraProductReport: async function(token, dateStr) {
       const client = getSupabase();
       const ds = dateStr || getTzToday();
-      const { data } = await client.from('daily_extra_products').select('*').eq('report_date', ds).maybeSingle();
+      let data = null;
+
+      try {
+        if (client) {
+          const res = await client.from('daily_extra_products').select('*').eq('report_date', ds).maybeSingle();
+          if (res.data) {
+            data = res.data;
+          } else {
+            // 해당 날짜 데이터가 없으면 이전 가장 최근 데이터를 찾아 목표와 누계실적을 이어받음
+            const prevRes = await client.from('daily_extra_products')
+              .select('*')
+              .lte('report_date', ds)
+              .order('report_date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (prevRes.data) {
+              const p = prevRes.data;
+              data = {
+                report_date: ds,
+                doorcam_target: p.doorcam_target != null ? p.doorcam_target : 54,
+                doorcam_prev: (Number(p.doorcam_prev) || 0) + (Number(p.doorcam_today) || 0),
+                doorcam_today: 0,
+                safety_order_target: p.safety_order_target || 0,
+                safety_order_prev: (Number(p.safety_order_prev) || 0) + (Number(p.safety_order_today) || 0),
+                safety_order_today: 0,
+                safety_sales_target: p.safety_sales_target || 0,
+                safety_sales_prev: (Number(p.safety_sales_prev) || 0) + (Number(p.safety_sales_today) || 0),
+                safety_sales_today: 0
+              };
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('daily_extra_products fetch notice:', e);
+      }
+
+      // 로컬 스토리지에 저장된 해당 날짜 입력값 반영 (Fail-safe)
+      try {
+        const local = localStorage.getItem('EXTRA_PRODUCT_' + ds);
+        if (local) {
+          const lData = JSON.parse(local);
+          data = Object.assign({}, data || {}, lData);
+        }
+      } catch(e) {}
+
+      // 기본값 폴백 (북서울지사 목표 54대, 8월말 기준 누계실적 23대)
+      const dcTarget = (data && data.doorcam_target != null && data.doorcam_target !== '') ? Number(data.doorcam_target) : 54;
+      const dcPrev = (data && data.doorcam_prev != null && data.doorcam_prev !== '') ? Number(data.doorcam_prev) : 23;
+      const dcToday = (data && data.doorcam_today != null && data.doorcam_today !== '') ? Number(data.doorcam_today) : 0;
+      const dcCum = dcPrev + dcToday;
+
       return {
         success: true, date: ds,
         안전상품: {
-          수주: { 목표: data ? data.safety_order_target : 0, 전일누계: data ? data.safety_order_prev : 0, 당일: data ? data.safety_order_today : 0 },
-          매출: { 목표: data ? data.safety_sales_target : 0, 전일누계: data ? data.safety_sales_prev : 0, 당일: data ? data.safety_sales_today : 0 }
+          수주: { 
+            목표: data ? (Number(data.safety_order_target) || 0) : 0, 
+            전일누계: data ? (Number(data.safety_order_prev) || 0) : 0, 
+            당일: data ? (Number(data.safety_order_today) || 0) : 0,
+            누계: data ? ((Number(data.safety_order_prev) || 0) + (Number(data.safety_order_today) || 0)) : 0
+          },
+          매출: { 
+            목표: data ? (Number(data.safety_sales_target) || 0) : 0, 
+            전일누계: data ? (Number(data.safety_sales_prev) || 0) : 0, 
+            당일: data ? (Number(data.safety_sales_today) || 0) : 0,
+            누계: data ? ((Number(data.safety_sales_prev) || 0) + (Number(data.safety_sales_today) || 0)) : 0
+          }
         },
         AI도어캠: {
-          판매량: { 목표: data ? data.doorcam_target : 0, 전일누계: data ? data.doorcam_prev : 0, 당일: data ? data.doorcam_today : 0 }
+          판매량: { 
+            목표: dcTarget, 
+            전일누계: dcPrev, 
+            당일: dcToday,
+            누계: dcCum
+          }
         }
       };
     },
@@ -912,21 +977,43 @@
     saveExtraProductReport: async function(token, dateStr, d) {
       const client = getSupabase();
       const ds = dateStr || getTzToday();
+
+      // 1. 기존 데이터 조회하여 필드 병합(Merge)
+      let existing = null;
+      try {
+        if (client) {
+          const { data } = await client.from('daily_extra_products').select('*').eq('report_date', ds).maybeSingle();
+          existing = data;
+        }
+      } catch(e) {}
+
       const record = {
         report_date: ds,
-        safety_order_target: d.안전상품_수주_목표 || 0,
-        safety_order_prev: d.안전상품_수주_전일누계 || 0,
-        safety_order_today: d.안전상품_수주_당일 || 0,
-        safety_sales_target: d.안전상품_매출_목표 || 0,
-        safety_sales_prev: d.안전상품_매출_전일누계 || 0,
-        safety_sales_today: d.안전상품_매출_당일 || 0,
-        doorcam_target: d.AI도어캠_판매량_목표 || 0,
-        doorcam_prev: d.AI도어캠_판매량_전일누계 || 0,
-        doorcam_today: d.AI도어캠_판매량_당일 || 0,
+        doorcam_target: d.AI도어캠_판매량_목표 != null ? Number(d.AI도어캠_판매량_목표) : (existing && existing.doorcam_target != null ? existing.doorcam_target : 54),
+        doorcam_prev: d.AI도어캠_판매량_전일누계 != null ? Number(d.AI도어캠_판매량_전일누계) : (existing && existing.doorcam_prev != null ? existing.doorcam_prev : 23),
+        doorcam_today: d.AI도어캠_판매량_당일 != null ? Number(d.AI도어캠_판매량_당일) : (existing && existing.doorcam_today != null ? existing.doorcam_today : 0),
+        safety_order_target: d.안전상품_수주_목표 != null ? Number(d.안전상품_수주_목표) : (existing ? existing.safety_order_target : 0),
+        safety_order_prev: d.안전상품_수주_전일누계 != null ? Number(d.안전상품_수주_전일누계) : (existing ? existing.safety_order_prev : 0),
+        safety_order_today: d.안전상품_수주_당일 != null ? Number(d.안전상품_수주_당일) : (existing ? existing.safety_order_today : 0),
+        safety_sales_target: d.안전상품_매출_목표 != null ? Number(d.안전상품_매출_목표) : (existing ? existing.safety_sales_target : 0),
+        safety_sales_prev: d.안전상품_매출_전일누계 != null ? Number(d.안전상품_매출_전일누계) : (existing ? existing.safety_sales_prev : 0),
+        safety_sales_today: d.안전상품_매출_당일 != null ? Number(d.안전상품_매출_당일) : (existing ? existing.safety_sales_today : 0),
         updated_at: new Date().toISOString()
       };
-      const { error } = await client.from('daily_extra_products').upsert(record, { onConflict: 'report_date' });
-      if (error) throw error;
+
+      // 2. 로컬 스토리지에 안전 백업 (Fail-safe)
+      try {
+        localStorage.setItem('EXTRA_PRODUCT_' + ds, JSON.stringify(record));
+      } catch(e) {}
+
+      // 3. Supabase upsert
+      if (client) {
+        const { error } = await client.from('daily_extra_products').upsert(record, { onConflict: 'report_date' });
+        if (error) {
+          console.warn('daily_extra_products upsert warning:', error);
+          throw error;
+        }
+      }
       return Backend.getExtraProductReport(token, ds);
     },
 
