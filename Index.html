@@ -3284,8 +3284,7 @@ function renderDashboard(){
  '<option value="" ' + (DASH_REP===''?'selected':'') + '>전체(지사)</option>' +  
  DASH_REP_LIST.map(function(rep){ return '<option value="' + rep + '" ' + (DASH_REP===rep?'selected':'') + '>' + rep + '</option>'; }).join('') +  
  '</select>' +  
- '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:12px; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
-  '<button id="bizTeamOpenModalBtn" onclick="openBizTeamModal_()" style="background:#1f6f4a; color:#fff; border-color:#154f34; margin-left:8px;">사업팀 데이터</button>' +  
+ '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:auto; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
  '</div>' +  
   
  '<div class="dash-scroll">' +  
@@ -3663,7 +3662,7 @@ function renderBizTeamFullScreenView_(){
  } else if (!res.success) {  
  bodyHtml = '<div class="denied">' + escHtml(res.error || '불러오기 실패') + '</div>';  
  } else if (!res.found) {  
-  bodyHtml = '<div class="placeholder"><h2>등록된 사업팀 데이터가 없습니다</h2><p>관리자 화면에서 사업팀 데이터가 등록되면 이 화면에 표시됩니다.</p><div style="margin-top:16px;"><button type="button" onclick="openBizTeamModal_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; border-radius:4px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer;">+ 사업팀 데이터 등록하기</button></div></div>';  
+  bodyHtml = '<div class="placeholder"><h2>등록된 사업팀 데이터가 없습니다</h2><p>관리자 화면에서 사업팀 데이터가 등록되면 이 화면에 표시됩니다.</p></div>';  
  } else {  
  const branches = res.branches || [];  
  const rows = res.rows || [];  
@@ -3692,7 +3691,7 @@ function renderBizTeamFullScreenView_(){
  '<select id="bizTeamViewProduct" onchange="bizTeamViewFilterChanged_()">' +  
  BIZ_TEAM_PRODUCT_TYPES_.map(function(p){ return '<option value="' + p + '"' + (p === BIZ_TEAM_VIEW_PRODUCT_ ? ' selected' : '') + '>' + escHtml(p) + '</option>'; }).join('') +  
  '</select>' +  
-  '<button type="button" id="btnOpenBizTeamDataModal" onclick="openBizTeamModal_()" style="margin-left:12px; background:#1f6f4a; color:#fff; border:1px solid #154f34; border-radius:4px; padding:6px 14px; font-size:13px; font-weight:700; cursor:pointer;">사업팀 데이터</button>' +  
+  '<button type="button" id="btnOpenBizTeamDataModal" onclick="openBizTeamModal_()" style="margin-left:auto; background:#1f6f4a; color:#fff; border:1px solid #154f34; border-radius:4px; padding:6px 14px; font-size:13px; font-weight:700; cursor:pointer;">사업팀 데이터</button>' +  
  '</div>' +  
  '<div class="dash-scroll">' + bodyHtml + '</div>' +  
  '</div>';  
