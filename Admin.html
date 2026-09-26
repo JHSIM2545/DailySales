@@ -2178,7 +2178,27 @@
  </div>  
 </div>  
   
-<script>  
+<script>
+/* ===================== 핵심 공통 포맷팅 함수 (최상단 즉시 정의) ===================== */
+window.fmtK = function(v){
+  const n = Number(v) || 0;
+  return Math.round(n).toLocaleString('ko-KR');
+};
+var fmtK = window.fmtK;
+
+window.pctVs_ = function(actual, base){
+  const a = Number(actual) || 0, b = Number(base) || 0;
+  if (b === 0) return '-';
+  return Math.round((a / b) * 100) + '%';
+};
+var pctVs_ = window.pctVs_;
+
+window.diffVs_ = function(actual, base){
+  const a = Number(actual) || 0, b = Number(base) || 0;
+  return fmtK(a - b);
+};
+var diffVs_ = window.diffVs_;
+  
 /* ===================== 설정값 ===================== */
 
 /* --- 전역 기본 날짜 및 상태 필터 변수 --- */
@@ -8037,6 +8057,280 @@ function ensureBizTeamStatusLoaded_(cb){
  })  
  .withFailureHandler(function(err){ BIZ_TEAM_STATUS_DATA_ = { success: false, error: String(err) }; if (cb) cb(); })  
  .getBizTeamDataNearestOnOrBefore(SESSION.token, BIZ_TEAM_VIEW_DATE_, BIZ_TEAM_VIEW_PRODUCT_);  
+}
+
+
+
+/* ===================== 부가 추출 헬퍼 (Index.html 동기화) ===================== */
+/* --- pctVs_ --- */
+function pctVs_(actual, base){  
+ const a = Number(actual) || 0, b = Number(base) || 0;  
+ if (b === 0) return '-';  
+ return Math.round((a / b) * 100) + '%';  
+}
+
+/* --- diffVs_ --- */
+function diffVs_(actual, base){  
+ const a = Number(actual) || 0, b = Number(base) || 0;  
+ return fmtK(a - b);  
+}
+
+/* --- getFilteredRowsForAction_ --- */
+function getFilteredRowsForAction_(scope, allRows) {  
+ const onlyFlagged = chkVal(scope === 'order' ? 'onlyFlaggedOrder' : (scope === 'cancel' ? 'onlyFlaggedCancel' : (scope === 'price' ? 'onlyFlaggedPrice' : (scope === 'restart' ? 'onlyFlaggedRestart' : 'onlyFlaggedProductDaily'))), false);  
+ if (!onlyFlagged) return allRows;  
+ return allRows.filter(r => FLAGGED_SET.has(r.id));  
+}
+
+/* --- ensureImgExportLibReady_ --- */
+function ensureImgExportLibReady_(cb){  
+ if (window.html2canvas) { cb(); return; }  
+ let tries = 0;  
+ const timer = setInterval(function(){  
+ tries++;  
+ if (window.html2canvas) { clearInterval(timer); cb(); }  
+ else if (tries > 50) { clearInterval(timer); alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인하신 뒤 새로고침 후 다시 시도해 주세요.'); }  
+ }, 100);  
+}
+
+/* --- bizTeamStatusCacheKey_ --- */
+function bizTeamStatusCacheKey_(){  
+ return 'bizTeamStatus|' + BIZ_TEAM_VIEW_DATE_ + '|' + BIZ_TEAM_VIEW_PRODUCT_;  
+}
+
+/* --- bizTeamShiftViewDate_ --- */
+function bizTeamShiftViewDate_(deltaDays){  
+ const input = document.getElementById('bizTeamViewDate');  
+ if (!input || !input.value) return;  
+ const d = new Date(input.value + 'T00:00:00');  
+ const step = deltaDays >= 0 ? 1 : -1;  
+ do {  
+ d.setDate(d.getDate() + step);  
+ } while (isBlockedDate(fmtDate(d)));  
+ input.value = fmtDate(d);  
+ bizTeamViewFilterChanged_();  
+}
+
+/* --- bizTeamViewFilterChanged_ --- */
+function bizTeamViewFilterChanged_(){  
+ const dateInput = document.getElementById('bizTeamViewDate');  
+ const newDate = dateInput.value || todayStr();  
+ // 토·일·공휴일은 사업팀 데이터가 없는 날이므로 선택하지 못하도록 막고, 이전에 선택돼 있던 날짜로 되돌린다.  
+ if (isBlockedDate(newDate)) {  
+ alert('토·일·공휴일은 선택할 수 없습니다. 평일을 선택해 주세요.');  
+ dateInput.value = BIZ_TEAM_VIEW_DATE_;  
+ return;  
+ }  
+ BIZ_TEAM_VIEW_DATE_ = newDate;  
+ BIZ_TEAM_VIEW_PRODUCT_ = document.getElementById('bizTeamViewProduct').value || '일반알람';  
+ BIZ_TEAM_STATUS_DATA_ = null;  
+ renderDashboard();  
+}
+
+/* --- bizTeamOrderedIndices_ --- */
+function bizTeamOrderedIndices_(branches){  
+ const order = branches.map(function(b, i){ return i; });  
+ const idx = branches.indexOf('북서울');  
+ if (idx > 0) { const v = order.splice(idx, 1)[0]; order.unshift(v); }  
+ return order;  
+}
+
+/* --- bizTeamFindRow_ --- */
+function bizTeamFindRow_(rows, label){  
+ return (rows || []).find(function(r){ return r.label === label; }) || null;  
+}
+
+/* --- bizTeamRankChartHtml_ --- */
+function bizTeamRankChartHtml_(title, branches, row){  
+ if (!row || !branches.length) {  
+ return '<div class="dash-section" style="flex:1 1 0; min-width:230px;"><div class="dash-section-title"><span>' + escHtml(title) + '</span></div><div style="padding:16px; color:#999; font-size:13px;">데이터 없음</div></div>';  
+ }  
+ const items = branches.map(function(b, i){ return { branch: b, value: bizTeamParseNum_(row.values[i]) }; });  
+ items.sort(function(a, b){  
+ if (b.value !== a.value) return b.value - a.value;  
+ if (a.branch === '북서울') return -1; // 동석차일 때 북서울을 해당 순위 그룹 맨 위로  
+ if (b.branch === '북서울') return 1;  
+ return 0;  
+ });  
+ const ranks = bizTeamComputeRanks_(items); // 동일 값은 동일 순위(1,1,1,4,4,4,4,8식)  
+ const maxVal = Math.max.apply(null, items.map(function(it){ return it.value; }).concat([1]));  
+ const myIdx = items.findIndex(function(it){ return it.branch === '북서울'; });  
+ const bars = items.map(function(it, idx){  
+ const isMine = it.branch === '북서울';  
+ const pct = maxVal > 0 ? Math.max(2, (it.value / maxVal) * 100) : 0;  
+ const barColor = isMine ? '#c0392b' : '#4a86e8';  
+ const tipText = escHtml(it.branch + ': ' + it.value.toFixed(0) + '%');  
+ return '<div class="biz-team-bar-row" data-tip="' + tipText + '" style="display:flex; align-items:center; gap:6px; margin:3px 0; cursor:pointer;">' +  
+ '<div style="width:18px; text-align:right; font-size:11px; color:#888;">' + ranks[idx] + '</div>' +  
+ '<div style="width:56px; font-size:12px; font-weight:' + (isMine ? '700' : '400') + '; color:' + (isMine ? '#c0392b' : '#333') + '; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(it.branch) + '</div>' +  
+ '<div style="flex:1; background:#eef1f4; border-radius:3px; overflow:hidden; height:14px;">' +  
+ '<div style="width:' + pct + '%; background:' + barColor + '; height:100%;"></div>' +  
+ '</div>' +  
+ '</div>';  
+ }).join('');  
+ const rankLabel = myIdx >= 0 ? ('북서울 ' + ranks[myIdx] + '위/' + items.length) : '';  
+ return '<div class="dash-section" style="flex:1 1 0; min-width:230px;"><div class="dash-section-title"><span>' + escHtml(title) + '</span>' +  
+ (rankLabel ? '<span style="font-size:12px; color:#c0392b; font-weight:700;">' + escHtml(rankLabel) + '</span>' : '') +  
+ '</div><div style="padding:8px 4px;">' + bars + '</div></div>';  
+}
+
+/* --- bizTeamDivergingChartHtml_ --- */
+function bizTeamDivergingChartHtml_(title, branches, row){  
+ if (!row || !branches.length) {  
+ return '<div class="dash-section" style="flex:1 1 0; min-width:230px;"><div class="dash-section-title"><span>' + escHtml(title) + '</span></div><div style="padding:16px; color:#999; font-size:13px;">데이터 없음</div></div>';  
+ }  
+ const items = branches.map(function(b, i){ return { branch: b, value: bizTeamParseNum_(row.values[i]) }; });  
+ items.sort(function(a, b){  
+ if (b.value !== a.value) return b.value - a.value;  
+ if (a.branch === '북서울') return -1; // 동석차일 때 북서울을 해당 순위 그룹 맨 위로  
+ if (b.branch === '북서울') return 1;  
+ return 0;  
+ });  
+ const ranks = bizTeamComputeRanks_(items); // 동일 값은 동일 순위(1,1,1,4,4,4,4,8식)  
+ const maxAbs = Math.max.apply(null, items.map(function(it){ return Math.abs(it.value); }).concat([1]));  
+ const myIdx = items.findIndex(function(it){ return it.branch === '북서울'; });  
+ const bars = items.map(function(it, idx){  
+ const isMine = it.branch === '북서울';  
+ const isNeg = it.value < 0;  
+ const halfPct = Math.min(100, (Math.abs(it.value) / maxAbs) * 100);  
+ const posColor = isMine ? '#c0392b' : '#4a86e8';  
+ const negColor = isMine ? '#d9a8a3' : '#b7c1d1'; // 채도를 낮춘 색상 — 마이너스(순감소) 느낌  
+ const barColor = isNeg ? negColor : posColor;  
+ const tipText = escHtml(it.branch + ': ' + (it.value > 0 ? '+' : '') + it.value.toFixed(0) + '%');  
+ return '<div class="biz-team-bar-row" data-tip="' + tipText + '" style="display:flex; align-items:center; gap:6px; margin:3px 0; cursor:pointer;">' +  
+ '<div style="width:18px; text-align:right; font-size:11px; color:#888;">' + ranks[idx] + '</div>' +  
+ '<div style="width:56px; font-size:12px; font-weight:' + (isMine ? '700' : '400') + '; color:' + (isMine ? '#c0392b' : '#333') + '; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + escHtml(it.branch) + '</div>' +  
+ '<div style="flex:1; display:flex; height:14px; position:relative;">' +  
+ '<div style="width:50%; display:flex; justify-content:flex-end; background:#eef1f4; overflow:hidden; border-radius:3px 0 0 3px;">' +  
+ (isNeg ? '<div style="width:' + halfPct + '%; height:100%; background:' + barColor + ';"></div>' : '') +  
+ '</div>' +  
+ '<div style="width:50%; background:#eef1f4; overflow:hidden; border-radius:0 3px 3px 0;">' +  
+ (!isNeg ? '<div style="width:' + halfPct + '%; height:100%; background:' + barColor + ';"></div>' : '') +  
+ '</div>' +  
+ '<div style="position:absolute; left:50%; top:0; bottom:0; width:1px; background:#8b96a3;"></div>' +  
+ '</div>' +  
+ '</div>';  
+ }).join('');  
+ const rankLabel = myIdx >= 0 ? ('북서울 ' + ranks[myIdx] + '위/' + items.length) : '';  
+ return '<div class="dash-section" style="flex:1 1 0; min-width:230px;"><div class="dash-section-title"><span>' + escHtml(title) + '</span>' +  
+ (rankLabel ? '<span style="font-size:12px; color:#c0392b; font-weight:700;">' + escHtml(rankLabel) + '</span>' : '') +  
+ '</div><div style="padding:8px 4px;">' + bars + '</div></div>';  
+}
+
+/* --- bizTeamGroupedTableHtml_ --- */
+function bizTeamGroupedTableHtml_(branches, rows, orderedIdx, productType){  
+ const groups = bizTeamGroupsForProduct_(productType);  
+ const th = 'padding:5px 7px; border:1px solid #0f1f36; background:#152a4a; color:#ffffff; font-size:12px; font-weight:700; white-space:nowrap;';  
+ const displayBranches = orderedIdx.map(function(i){ return branches[i]; });  
+ // 북서울 열은 셀마다 따로 박스를 두르지 않고, 헤더~마지막 행까지 열 전체를 하나의 굵은 외곽선으로 감싼다.  
+ const MINE_COLOR_ = '#c0392b';  
+ const totalRows = groups.reduce(function(sum, g){ return sum + g.subs.length; }, 0);  
+ let html = '<table style="border-collapse:collapse; width:100%; font-size:12px;"><thead><tr>' +  
+ '<th style="' + th + ' text-align:left;">구분</th>' +  
+ '<th style="' + th + ' text-align:left;">항목</th>' +  
+ displayBranches.map(function(b){  
+ const isMine = (b === '북서울');  
+ const mineBorder = isMine ? (' border-left:3px solid ' + MINE_COLOR_ + '; border-right:3px solid ' + MINE_COLOR_ + '; border-top:3px solid ' + MINE_COLOR_ + ';') : '';  
+ return '<th style="' + th + (isMine ? ' background:#c0392b;' : '') + mineBorder + '">' + escHtml(b) + '</th>';  
+ }).join('') +  
+ '</tr></thead><tbody>';  
+ let rowCounter_ = 0;  
+ groups.forEach(function(g){  
+ g.subs.forEach(function(sub, i){  
+ const row = bizTeamFindRow_(rows, sub.key);  
+ const isDaily = sub.label === '당일실적';  
+ const isLastRow = (rowCounter_ === totalRows - 1);  
+ html += '<tr>';  
+ if (i === 0) {  
+ html += '<td rowspan="' + g.subs.length + '" style="padding:5px 7px; border:1px solid #e2e6ea; font-weight:700; text-align:center; vertical-align:middle; background:' + g.color + ';">' + escHtml(g.group) + '</td>';  
+ }  
+ html += '<td style="padding:5px 7px; border:1px solid #e2e6ea; font-weight:700; white-space:nowrap; background:' + g.color + ';">' + escHtml(sub.label) + '</td>';  
+ html += orderedIdx.map(function(origI){  
+ const v = row && row.values ? row.values[origI] : '';  
+ const isMine = branches[origI] === '북서울';  
+ const fontColor = isDaily ? '#1a56db' : '#222';  
+ const cellBorder = isMine  
+ ? ('border-left:3px solid ' + MINE_COLOR_ + '; border-right:3px solid ' + MINE_COLOR_ + '; border-top:1px solid #e2e6ea; border-bottom:' + (isLastRow ? ('3px solid ' + MINE_COLOR_) : '1px solid #e2e6ea') + ';')  
+ : 'border:1px solid #e2e6ea;';  
+ return '<td style="padding:5px 7px; ' + cellBorder + ' text-align:right; font-weight:700; color:' + fontColor + '; background:' + g.color + ';">' + escHtml(v != null ? v : '') + '</td>';  
+ }).join('');  
+ html += '</tr>';  
+ rowCounter_++;  
+ });  
+ });  
+ html += '</tbody></table>';  
+ return html;  
+}
+
+/* --- bizTeamEnsureTooltip_ --- */
+function bizTeamEnsureTooltip_(){  
+ let tip = document.getElementById('bizTeamTooltip_');  
+ if (!tip) {  
+ tip = document.createElement('div');  
+ tip.id = 'bizTeamTooltip_';  
+ tip.style.cssText = 'position:fixed; z-index:9999; display:none; background:#152a4a; color:#fff; font-size:12px; font-weight:700; padding:4px 9px; border-radius:4px; pointer-events:none; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,.25);';  
+ document.body.appendChild(tip);  
+ // 막대가 아닌 다른 곳을 클릭하면 툴팁을 닫는다(터치/클릭 방식 지원).  
+ document.addEventListener('click', function(e){  
+ if (!e.target.closest || !e.target.closest('.biz-team-bar-row')) bizTeamHideTooltip_();  
+ });  
+ }  
+ return tip;  
+}
+
+/* --- bizTeamShowTooltip_ --- */
+function bizTeamShowTooltip_(evt, text){  
+ const tip = bizTeamEnsureTooltip_();  
+ tip.innerText = text;  
+ tip.style.left = (evt.clientX + 14) + 'px';  
+ tip.style.top = (evt.clientY + 14) + 'px';  
+ tip.style.display = 'block';  
+}
+
+/* --- bizTeamHideTooltip_ --- */
+function bizTeamHideTooltip_(){  
+ const tip = document.getElementById('bizTeamTooltip_');  
+ if (tip) tip.style.display = 'none';  
+}
+
+/* --- bizTeamBindBarTooltips_ --- */
+function bizTeamBindBarTooltips_(){  
+ document.querySelectorAll('.biz-team-bar-row').forEach(function(el){  
+ const tipText = el.getAttribute('data-tip') || '';  
+ el.addEventListener('mouseenter', function(e){ bizTeamShowTooltip_(e, tipText); });  
+ el.addEventListener('mousemove', function(e){ bizTeamShowTooltip_(e, tipText); });  
+ el.addEventListener('mouseleave', bizTeamHideTooltip_);  
+ el.addEventListener('click', function(e){ e.stopPropagation(); bizTeamShowTooltip_(e, tipText); });  
+ });  
+}
+
+/* --- bizTeamGroupsForProduct_ --- */
+function bizTeamGroupsForProduct_(productType){  
+ if (productType === '휴엔') return BIZ_TEAM_GROUPS_HYUEN_;  
+ if (productType === '디지털(정보보안)') return BIZ_TEAM_GROUPS_DIGITAL_;  
+ return BIZ_TEAM_GROUPS_; // 일반알람, 안전상품  
+}
+
+/* --- bizTeamComputeRanks_ --- */
+function bizTeamComputeRanks_(sortedItems){  
+ const ranks = [];  
+ let prevValue = null, prevRank = 0;  
+ sortedItems.forEach(function(it, idx){  
+ if (prevValue !== null && it.value === prevValue) {  
+ ranks.push(prevRank);  
+ } else {  
+ ranks.push(idx + 1);  
+ prevRank = idx + 1;  
+ }  
+ prevValue = it.value;  
+ });  
+ return ranks;  
+}
+
+/* --- bizTeamParseNum_ --- */
+function bizTeamParseNum_(v){  
+ const n = parseFloat(String(v || '').replace(/[^0-9.\-]/g, ''));  
+ return isNaN(n) ? 0 : n;  
 }
 
 /* ===================== 초기화 실행 ===================== */
