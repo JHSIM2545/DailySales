@@ -4379,7 +4379,7 @@ function selectTab(key){
  else if (key === 'ai_report') { loadAutoRegisterTab_(); }  
  else if (key === 'users') { selectUserMgmtView(USERMGMT_VIEW || 'info'); }  
  else if (key === 'target_input') { document.getElementById('toolbar-target').style.display = 'flex'; loadTargetInput(); }  
- else if (key === 'daily_report') { document.getElementById('toolbar-daily-report').style.display = 'flex'; loadDailyReport(); }  
+ else if (key === 'daily_report') { loadDailyReport(); }  
  else if (key === 'settings') { loadEditableLists_(); loadTaPortalUrlForSettings_(); }  
  else document.getElementById('content').innerHTML =  
  `<div class="placeholder"><h2>준비 중입니다</h2><p>"${TABS.find(t=>t.key===key).label}" 시트 필드 정의 완료 후 동일한 방식으로 탭이 활성화됩니다.</p></div>`;  
@@ -6620,109 +6620,508 @@ function saveTargetInput(){
 
 function getTargetInputYearMonth(){ return document.getElementById('targetYearMonthInput')?.value || todayStr().slice(0, 7); }
 
-/* ===================== 일일실적보고 탭 ===================== */
-function loadDailyReport(){
-  const ds = document.getElementById('dailyReportDate')?.value || document.getElementById('dailyReportDateInput')?.value || dailyReportDate || todayStr();
-  const el = document.getElementById('dailyReportDate');
-  if (el) el.value = ds;
-  const container = (document.getElementById('grid-daily-report') || document.getElementById('content'));
-  container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">일일실적보고 로드 중...</div></div>';
+/* ===================== 일일실적보고 (자동집계, 조회 전용) ===================== */  
+const DAILY_PANELS = [  
+ { title: '(알람)시스템 + 디지털', products: ['알람','정보보안'] },  
+ { title: '휴엔 / 블루스캔', products: ['휴엔','블루스캔'] }  
+];  
+const DAILY_PRODUCT_LABELS = { '알람':'알람', '정보보안':'정보보안(디지털)', '휴엔':'휴엔', '블루스캔':'블루스캔' };  
+const DAILY_COL_LABELS = { '알람':'알람', '정보보안':'디지털', '휴엔':'휴엔', '블루스캔':'블루스캔' };  
+const DAILY_REPORT_METRICS = [ { key:'수주', label:'수주' }, { key:'개시', label:'개시' }, { key:'유지증가', label:'유지증가' } ];  
+const DAILY_REPORT_SECTIONS = [  
+ { heading: '1.일반알람', product: '알람' },  
+ { heading: '2. 휴엔', product: '휴엔' },  
+ { heading: '3. 블루스캔', product: '블루스캔' },  
+ { heading: '4. 디지털', product: '정보보안' }  
+];  
+/** 통합 TEXT 보고창(직접수정 가능)에 쓰는 확장 섹션: 기존 4개 상품 + 안전상품 + AI도어캠 */  
+const FULL_REPORT_EXTRA_SECTIONS = [  
+ { heading: '5. 안전상품 * 목표의 50%', groupKey: '안전상품', metrics: [  
+ { key:'수주', label:'수주', unit:'천원' },  
+ { key:'매출', label:'매출', unit:'천원' }  
+ ] },  
+ { heading: '6. AI 도어캠', groupKey: 'AI도어캠', metrics: [  
+ { key:'판매량', label:'수주', unit:'대' }  
+ ] }  
+];  
+  
+var dailyReportDate = todayStr();  
+let DAILY_REPORT_DATA = null; // { [product]: item }  
+let DAILY_FORECAST_ORDERS = null; // 이 변수가 반드시 있어야 합니다!  
+let EXTRA_PRODUCT_DATA = null; // { 안전상품:{수주,매출}, AI도어캠:{판매량} }  
+let SAFETY_SUMMARY_DAILY = null; // 상품일보 기반 안전상품 월 목표/실적(천원) - getSafetyProductSummary  
+let FULL_REPORT_MODE = null; // '전망' | '마감' — 통합 TEXT 보고창(직접수정 가능)의 현재 모드, null이면 렌더 시 시각 기준 디폴트 적용  
+let FULL_REPORT_TEXT_EDITED = false; // 사용자가 통합 보고창을 직접 수정했는지 여부(수정 후에는 자동 재생성으로 덮어쓰지 않음)  
+  
+function shiftDailyReportDate(delta){  
+ dailyReportDate = addDaysStr(dailyReportDate, delta);  
+ loadDailyReport();  
+}  
+function dailyReportGoToday(){  
+ dailyReportDate = todayStr();  
+ loadDailyReport();  
+}  
+
+function onDailyReportDateInputChanged_(val){
+  if (val) {
+    dailyReportDate = val;
+    loadDailyReport();
+  }
+}
+
+function onDailyReportDateChange(){  
+ const el = document.getElementById('dailyReportDate');  
+ if (el && el.value) { dailyReportDate = el.value; loadDailyReport(); }  
+}  
+  
+function loadExtraProductReport_(cb){  
+ const cacheKey = 'extraProduct|' + dailyReportDate;  
+ const cached = cacheGet_(cacheKey);  
+ if (cached) { EXTRA_PRODUCT_DATA = cached; cb(); return; }  
+ google.script.run  
+ .withSuccessHandler(function(res){  
+ if (res && res.success) { EXTRA_PRODUCT_DATA = res; cacheSet_(cacheKey, res); } else { EXTRA_PRODUCT_DATA = null; }  
+ cb();  
+ })  
+ .withFailureHandler(function(){ EXTRA_PRODUCT_DATA = null; cb(); })  
+ .getExtraProductReport(SESSION.token, dailyReportDate);  
+}  
+  
+function loadSafetyProductSummaryForDaily_(cb){  
+ const ym = dailyReportDate.slice(0, 7);  
+ const cacheKey = 'safetySummaryDaily|' + ym;  
+ const cached = cacheGet_(cacheKey);  
+ if (cached) { SAFETY_SUMMARY_DAILY = cached; cb(); return; }  
+ google.script.run  
+ .withSuccessHandler(function(res){  
+ if (res && res.success) { SAFETY_SUMMARY_DAILY = res; cacheSet_(cacheKey, res); } else { SAFETY_SUMMARY_DAILY = null; }  
+ cb();  
+ })  
+ .withFailureHandler(function(){ SAFETY_SUMMARY_DAILY = null; cb(); })  
+ .getSafetyProductSummary(SESSION.token, ym);  
+}  
+  
+function applyDailyReportResult_(res){  
+ dailyReportDate = res.date;  
+ DAILY_REPORT_DATA = {};  
+ (res.items || []).forEach(function(it){ DAILY_REPORT_DATA[it.상품] = it; });  
+}  
+  
+function loadDailyReport(){  
+ FULL_REPORT_MODE = null;  
+ FULL_REPORT_TEXT_EDITED = false;  
+  
+ const cacheKey = 'dailyReport|' + dailyReportDate;  
+ const cached = cacheGet_(cacheKey);  
+ if (cached) {  
+ applyDailyReportResult_(cached);  
+ loadExtraProductReport_(function(){ loadSafetyProductSummaryForDaily_(function(){ renderDailyReport(); }); });  
+ return;  
+ }  
+  
+ showLoadingProgress_('content', '일일실적을 불러오는 중입니다...', 'loadDailyReport');  
+ setLoadingCursor(true);  
+ google.script.run  
+ .withSuccessHandler(function(res){  
+ if (res && res.error) { setLoadingCursor(false); showLogin(res.error); return; }  
+ if (!res || !res.success) { setLoadingCursor(false); document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + (res && res.error) + '</div>'; return; }  
+ cacheSet_(cacheKey, res);  
+ applyDailyReportResult_(res);  
+ loadExtraProductReport_(function(){ loadSafetyProductSummaryForDaily_(function(){ setLoadingCursor(false); renderDailyReport(); }); });  
+ })  
+ .withFailureHandler(function(err){ setLoadingCursor(false); document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + err + '</div>'; })  
+ .getDailyReportAuto(SESSION.token, dailyReportDate);  
+}  
+  
+function dailyAchieve(cum, target){  
+ if (!target) return 0;  
+ return Math.round((cum / target) * 100); // 소수점 없이 반올림  
+}  
+  
+function effectiveDailyItem(product, forecastOrders){  
+ const it = (DAILY_REPORT_DATA && DAILY_REPORT_DATA[product]) || {};  
+ if (forecastOrders && forecastOrders[product] != null) {  
+ const prev = Number(it.수주_전일누계) || 0;  
+ const forecastToday = Number(forecastOrders[product]) || 0;  
+ return Object.assign({}, it, { 수주_당일: forecastToday, 수주_누계: prev + forecastToday });  
+ }  
+ return it;  
+}  
+  
+function dailyPanelTableHtml(panel){  
+ const p1 = panel.products[0], p2 = panel.products[1];  
+ const l1 = DAILY_COL_LABELS[p1] || p1, l2 = DAILY_COL_LABELS[p2] || p2;  
+ const it1 = (DAILY_REPORT_DATA && DAILY_REPORT_DATA[p1]) || {};  
+ const it2 = (DAILY_REPORT_DATA && DAILY_REPORT_DATA[p2]) || {};  
+ let html = '<div class="status-target-title" style="margin-top:12px;">' + panel.title + '</div>';  
+ html += '<div class="grid-wrap" style="height:auto; overflow-x:auto;" data-no-auto-fit="1"><table class="status-summary daily-report-table">';  
+ html += '<thead><tr><th rowspan="2" style="width:60px; background:transparent;"></th><th rowspan="2" style="width:60px; background:transparent;"></th>' +  
+ '<th colspan="2" style="background:rgb(200,200,200);">전일까지</th>' +  
+ '<th colspan="2" style="background:rgb(255,200,255);">오늘합계</th>' +  
+ '<th colspan="2" style="background:rgb(255,150,255);">누계</th></tr>' +  
+ '<tr><th>' + l1 + '</th><th>' + l2 + '</th><th>' + l1 + ' 당일</th><th>' + l2 + ' 당일</th><th>' + l1 + ' 누계</th><th>' + l2 + ' 누계</th></tr></thead><tbody>';  
+  
+ DAILY_REPORT_METRICS.forEach(function(m){  
+ const t1 = Number(it1['목표_' + m.key]) || 0, t2 = Number(it2['목표_' + m.key]) || 0;  
+ const prev1 = Number(it1[m.key + '_전일누계']) || 0, today1 = Number(it1[m.key + '_당일']) || 0, cum1 = prev1 + today1;  
+ const prev2 = Number(it2[m.key + '_전일누계']) || 0, today2 = Number(it2[m.key + '_당일']) || 0, cum2 = prev2 + today2;  
+  
+ html += '<tr><th rowspan="3" style="vertical-align:middle;">' + m.label + '</th><th>목표</th>' +  
+ '<td class="num">' + fmtK(t1) + '</td><td class="num">' + fmtK(t2) + '</td>' +  
+ '<td class="num">' + fmtK(t1) + '</td><td class="num">' + fmtK(t2) + '</td>' +  
+ '<td class="num">' + fmtK(t1) + '</td><td class="num">' + fmtK(t2) + '</td></tr>';  
+ html += '<tr class="daily-actual-row"><th>실적</th>' +  
+ '<td class="num">' + fmtK(prev1) + '</td><td class="num">' + fmtK(prev2) + '</td>' +  
+ '<td class="num">' + fmtK(today1) + '</td><td class="num">' + fmtK(today2) + '</td>' +  
+ '<td class="num">' + fmtK(cum1) + '</td><td class="num">' + fmtK(cum2) + '</td></tr>';  
+ html += '<tr><th>달성률</th>' +  
+ '<td class="num">' + dailyAchieve(prev1, t1) + '%</td><td class="num">' + dailyAchieve(prev2, t2) + '%</td>' +  
+ '<td class="num">-</td><td class="num">-</td>' +  
+ '<td class="num">' + dailyAchieve(cum1, t1) + '%</td><td class="num">' + dailyAchieve(cum2, t2) + '%</td></tr>';  
+ });  
+  
+ html += '</tbody></table></div>';  
+ return html;  
+}  
+  
+/** 안전상품/AI도어캠 표(읽기전용) 공통 렌더러. rows: [{label, 목표, 전일누계, 당일, 누계, 단위}] */  
+function extraReadonlyTableHtml_(title, rows){  
+ let html = '<div class="status-target-title" style="margin-top:12px;">' + title + '</div>';  
+ html += '<div class="grid-wrap" style="height:auto; overflow-x:auto;" data-no-auto-fit="1"><table class="status-summary daily-report-table">';  
+ html += '<thead><tr><th rowspan="2" style="width:60px; background:transparent;"></th><th rowspan="2" style="width:60px; background:transparent;"></th>' +  
+ '<th style="background:rgb(200,200,200);">전일까지</th>' +  
+ '<th style="background:rgb(255,200,255);">오늘합계</th>' +  
+ '<th style="background:rgb(255,150,255);">누계</th></tr>' +  
+ '<tr><th>실적</th><th>당일</th><th>누계</th></tr></thead><tbody>';  
+ rows.forEach(function(r){  
+ const fmt = r.단위 === '대' ? (v => (Number(v)||0).toLocaleString('ko-KR')) : fmtK;  
+ html += '<tr><th rowspan="3" style="vertical-align:middle;">' + r.label + '</th><th>목표</th>' +  
+ '<td class="num">' + fmt(r.목표) + '</td><td class="num">' + fmt(r.목표) + '</td><td class="num">' + fmt(r.목표) + '</td></tr>';  
+ html += '<tr class="daily-actual-row"><th>실적</th>' +  
+ '<td class="num">' + fmt(r.전일누계) + '</td><td class="num">' + fmt(r.당일) + '</td><td class="num">' + fmt(r.누계) + '</td></tr>';  
+ html += '<tr><th>달성률</th>' +  
+ '<td class="num">' + dailyAchieve(r.전일누계, r.목표) + '%</td><td class="num">-</td><td class="num">' + dailyAchieve(r.누계, r.목표) + '%</td></tr>';  
+ });  
+ html += '</tbody></table></div>';  
+ return html;  
+}  
+function extraSafetyTableHtml(){  
+ const s = SAFETY_SUMMARY_DAILY || {};  
+ const tgt = s.목표 || {}, act = s.실적 || {};  
+ const ordT = Number(tgt.수주) || 0, saleT = Number(tgt.매출) || 0;  
+ const ordA = Number(act.수주) || 0, saleA = Number(act.매출) || 0;  
+ let html = '<div class="status-target-title" style="margin-top:12px;">안전상품 (자력, 단위: 천원)</div>';  
+ html += '<div class="grid-wrap" style="height:auto; overflow-x:auto;" data-no-auto-fit="1"><table class="status-summary daily-report-table">';  
+ html += '<thead><tr><th style="width:70px;"></th><th>수주</th><th>매출</th></tr></thead><tbody>';  
+ html += '<tr><th>목표</th><td class="num">' + fmtK(ordT) + '</td><td class="num">' + fmtK(saleT) + '</td></tr>';  
+ html += '<tr class="daily-actual-row"><th>실적</th><td class="num">' + fmtK(ordA) + '</td><td class="num">' + fmtK(saleA) + '</td></tr>';  
+ html += '<tr><th>달성률</th><td class="num">' + dailyAchieve(ordA, ordT) + '%</td><td class="num">' + dailyAchieve(saleA, saleT) + '%</td></tr>';  
+ html += '</tbody></table></div>';  
+ return html;  
+}  
+function extraDoorcamTableHtml(){
+  const d = (EXTRA_PRODUCT_DATA && EXTRA_PRODUCT_DATA.AI도어캠) || {};
+  const 판매량 = d.판매량 || {};
+  const tgt = (판매량.목표 != null && 판매량.목표 !== '') ? Number(판매량.목표) : 54;
+  const prev = (판매량.전일누계 != null && 판매량.전일누계 !== '') ? Number(판매량.전일누계) : 23;
+  const today = (판매량.당일 != null && 판매량.당일 !== '') ? Number(판매량.당일) : 0;
+  const cum = prev + today;
+  const rate = tgt ? Math.round((cum / tgt) * 100) : 0;
+  const prevRate = tgt ? Math.round((prev / tgt) * 100) : 0;
+
+  let html = '<div class="status-target-title" style="margin-top:16px; font-weight:700; color:#1c2f4a;">AI도어캠</div>';
+  html += '<div class="grid-wrap" style="height:auto; overflow-x:auto;" data-no-auto-fit="1"><table class="status-summary daily-report-table">';
+  html += '<thead><tr><th rowspan="2" style="width:70px; background:transparent;"></th><th rowspan="2" style="width:60px; background:transparent;"></th>' +
+    '<th style="background:rgb(200,200,200); font-weight:700;">전일까지</th>' +
+    '<th style="background:rgb(255,200,255); font-weight:700;">오늘합계</th>' +
+    '<th style="background:rgb(255,150,255); font-weight:700;">누계</th></tr>' +
+    '<tr><th style="font-weight:700;">실적</th><th style="font-weight:700;">당일</th><th style="font-weight:700;">누계</th></tr></thead><tbody>';
+
+  html += '<tr><th rowspan="3" style="vertical-align:middle; font-weight:700;">판매량(대)</th><th style="font-weight:700;">목표</th>' +
+    '<td><input type="number" id="dc_target" value="' + tgt + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
+    '<td class="num" id="dc_target_today" style="font-size:13px;">' + tgt + '</td>' +
+    '<td class="num" id="dc_target_cum" style="font-size:13px;">' + tgt + '</td></tr>';
+
+  html += '<tr class="daily-actual-row"><th style="font-weight:700;">실적</th>' +
+    '<td><input type="number" id="dc_prev" value="' + prev + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; color:#1155cc; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
+    '<td><input type="number" id="dc_today" value="' + today + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; color:#1155cc; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
+    '<td class="num" id="dc_cum" style="color:#1155cc; font-weight:700; font-size:13px;">' + cum + '</td></tr>';
+
+  html += '<tr><th style="font-weight:700;">달성률</th>' +
+    '<td class="num" id="dc_prev_rate" style="font-size:13px;">' + prevRate + '%</td>' +
+    '<td class="num">-</td>' +
+    '<td class="num" id="dc_cum_rate" style="font-size:13px;">' + rate + '%</td></tr>';
+
+  html += '</tbody></table></div>';
+  html += '<div style="margin-top:10px; display:flex; justify-content:flex-end;">' +
+    '<button onclick="saveDoorcamData_()" style="background:#8e2f4e; color:#fff; border:none; padding:7px 22px; border-radius:4px; font-weight:700; font-size:13px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.2);">저장</button>' +
+    '</div>';
+  return html;
+}
+
+function recalcDoorcamLive_(){
+  const tgt = Number(document.getElementById('dc_target')?.value || 0);
+  const prev = Number(document.getElementById('dc_prev')?.value || 0);
+  const today = Number(document.getElementById('dc_today')?.value || 0);
+  const cum = prev + today;
+  const rate = tgt ? Math.round((cum / tgt) * 100) : 0;
+  const prevRate = tgt ? Math.round((prev / tgt) * 100) : 0;
+
+  const tToday = document.getElementById('dc_target_today'); if (tToday) tToday.innerText = tgt;
+  const tCum = document.getElementById('dc_target_cum'); if (tCum) tCum.innerText = tgt;
+  const elCum = document.getElementById('dc_cum'); if (elCum) elCum.innerText = cum;
+  const elPRate = document.getElementById('dc_prev_rate'); if (elPRate) elPRate.innerText = prevRate + '%';
+  const elRate = document.getElementById('dc_cum_rate'); if (elRate) elRate.innerText = rate + '%';
+
+  if (!EXTRA_PRODUCT_DATA) EXTRA_PRODUCT_DATA = {};
+  if (!EXTRA_PRODUCT_DATA.AI도어캠) EXTRA_PRODUCT_DATA.AI도어캠 = {};
+  EXTRA_PRODUCT_DATA.AI도어캠.판매량 = { 목표: tgt, 전일누계: prev, 당일: today, 누계: cum };
+
+  const fullEl = document.getElementById('fullReportText');
+  if (fullEl && !FULL_REPORT_TEXT_EDITED) {
+    fullEl.innerHTML = buildFullDailyReportHtml_(FULL_REPORT_MODE || '전망');
+  }
+}
+
+function saveDoorcamData_(){
+  const tgt = Number(document.getElementById('dc_target')?.value || 0);
+  const prev = Number(document.getElementById('dc_prev')?.value || 0);
+  const today = Number(document.getElementById('dc_today')?.value || 0);
+  
+  const payload = {
+    AI도어캠_판매량_목표: tgt,
+    AI도어캠_판매량_전일누계: prev,
+    AI도어캠_판매량_당일: today
+  };
+
   setLoadingCursor(true);
   google.script.run
-    .withSuccessHandler(function(res){
+    .withSuccessHandler(function(){
       setLoadingCursor(false);
-      renderDailyReport(res);
+      alert('AI도어캠 실적이 성공적으로 저장되었습니다.');
+      delete CLIENT_CACHE_['extraProduct|' + dailyReportDate];
+      loadDailyReport();
     })
     .withFailureHandler(function(err){
       setLoadingCursor(false);
-      container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>';
+      alert('저장 실패: ' + err);
     })
-    .getDailyReportAuto(SESSION.token, ds);
-}
-
-function renderDailyReport(res){
-  const container = (document.getElementById('grid-daily-report') || document.getElementById('content'));
-  const items = res.items || [];
-  let html = '<div class="status-wrap"><h2>' + res.date + ' 일일실적보고</h2>';
-  html += '<table style="margin-top:10px;"><thead><tr>' +
-    '<th>상품</th><th>수주(당일)</th><th>수주(누계)</th><th>수주목표</th><th>개시(당일)</th><th>개시(누계)</th><th>개시목표</th><th>유증(당일)</th><th>유증(누계)</th><th>유증목표</th>' +
-    '</tr></thead><tbody>';
-  items.forEach(it => {
-    html += '<tr>' +
-      '<td>' + escHtml(it.상품) + '</td>' +
-      '<td class="num">' + it.수주_당일 + '</td><td class="num">' + it.수주_누계 + '</td><td class="num">' + it.목표_수주 + '</td>' +
-      '<td class="num">' + it.개시_당일 + '</td><td class="num">' + it.개시_누계 + '</td><td class="num">' + it.목표_개시 + '</td>' +
-      '<td class="num">' + it.유지증가_당일 + '</td><td class="num">' + it.유지증가_누계 + '</td><td class="num">' + it.목표_유지증가 + '</td>' +
-    '</tr>';
-  });
-  html += '</tbody></table></div>';
-  container.innerHTML = html;
-}
-
-/* ===================== 영업현황 탭 ===================== */
-function loadSalesStatus(){
-  const ym = todayStr().slice(0, 7);
-  const container = document.getElementById('salesStatusContent');
-  if (container) container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">영업현황 로드 중...</div></div>';
-  google.script.run
-    .withSuccessHandler(function(res){
-      renderSalesStatus(res);
-    })
-    .withFailureHandler(function(err){
-      if (container) container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>';
-    })
-    .getSalesStatus(SESSION.token, ym, '일반알람');
-}
-
-function renderSalesStatus(res){
-  const container = document.getElementById('salesStatusContent');
-  if (!container) return;
-  const t = res.target || {};
-  const a = res.actual || {};
-  let html = '<div class="status-summary">' +
-    '<div><b>수주:</b> 실적 ' + (a.수주||0).toLocaleString() + ' / 목표 ' + (t.목표_수주금액||0).toLocaleString() + '</div>' +
-    '<div><b>개시:</b> 실적 ' + (a.개시||0).toLocaleString() + ' / 목표 ' + (t.목표_개시금액||0).toLocaleString() + '</div>' +
-    '<div><b>유지감소:</b> 실적 ' + (a.유지감소||0).toLocaleString() + ' / 목표 ' + (t.목표_유지감소||0).toLocaleString() + '</div>' +
-    '<div><b>유지증가:</b> 실적 ' + (a.유지증가||0).toLocaleString() + ' / 목표 ' + (t.목표_유지증가||0).toLocaleString() + '</div>' +
-  '</div>';
-  container.innerHTML = html;
-}
-
-/* ===================== 엑셀/이미지/인쇄 기능 ===================== */
-function printGridData(type){ window.print(); }
-
-function exportGridToExcel(type, filename){
-  let rows = [];
-  if (type === 'order') rows = ROWS;
-  else if (type === 'cancel') rows = CANCEL_ROWS;
-  else if (type === 'price') rows = PRICE_ROWS;
-  else if (type === 'restart') rows = RESTART_ROWS;
-  else if (type === 'product_daily') rows = PRODUCT_DAILY_ROWS;
-  if (!rows.length) { alert('출력할 데이터가 없습니다.'); return; }
+    .saveExtraProductReport(SESSION.token, dailyReportDate, payload);
+}  
   
-  let csv = '﻿';
-  const headers = Object.keys(rows[0]).filter(k => k !== 'id');
-  csv += headers.join(',') + '\n';
-  rows.forEach(r => {
-    csv += headers.map(h => '"' + String(r[h] != null ? r[h] : '').replace(/"/g, '""') + '"').join(',') + '\n';
-  });
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = filename.replace('.xls', '.csv');
-  a.click();
-}
-
-function exportGridToImage(type){
-  const el = (document.getElementById('grid-order') || document.getElementById('content'));
-  if (!el) return;
-  html2canvas(el).then(canvas => {
-    const a = document.createElement('a');
-    a.href = canvas.toDataURL('image/png');
-    a.download = type + '_' + todayStr() + '.png';
-    a.click();
-  });
-}
+function fmtFullReportNum_(v, unit){  
+ return unit === '대' ? (Math.round(Number(v) || 0)).toLocaleString('ko-KR') : fmtK(Math.round(Number(v) || 0));  
+}  
+/** 전망(select) → '전망보고' / 마감(select) → '마감보고' */  
+function fullReportModeLabel_(mode){  
+ return mode === '전망' ? '전망보고' : '마감보고';  
+}  
+/** 현재 시각 기준 강조 대상: 12시 이전이면 전망보고, 12시 이후면 마감보고 */  
+function activeReportSide_(){  
+ return new Date().getHours() < 12 ? 'forecast' : 'closing';  
+}  
+/** 현재 시각(낮12시) 기준 통합 보고창 디폴트 모드: 12시 이전 전망 / 12시 이후 마감 */  
+function defaultFullReportMode_(){  
+ return activeReportSide_() === 'forecast' ? '전망' : '마감';  
+}  
+  
+/** 통합 TEXT 보고(직접수정 가능 박스) 생성: 1~4 상품군은 자동집계 실적, 5~6은 안전상품/AI도어캠 실적 데이터를 사용.  
+ * Index.html은 조회 전용이라 전망/마감 모두 실제 자동집계 데이터를 그대로 사용함(예상치 입력 기능 없음). */  
+function buildFullDailyReportText(mode){  
+ const modeLabel = fullReportModeLabel_(mode);  
+ const forecastOrders = (mode === '전망') ? DAILY_FORECAST_ORDERS : null;  
+ const parts = String(dailyReportDate).split('-');  
+ const month = Number(parts[1]) || 0, day = Number(parts[2]) || 0;  
+ const lines = [];  
+ lines.push('[북서울지사] ' + month + '月 ' + day + '日 ' + modeLabel);  
+ lines.push('');  
+ DAILY_REPORT_SECTIONS.forEach(function(sec){  
+ const it = effectiveDailyItem(sec.product, forecastOrders);  
+ lines.push(sec.heading);  
+ DAILY_REPORT_METRICS.forEach(function(m){  
+ const target = Math.round(Number(it['목표_' + m.key]) || 0);  
+ const today = Math.round(Number(it[m.key + '_당일']) || 0);  
+ const prev = Number(it[m.key + '_전일누계']) || 0;  
+ const cum = Math.round(prev + today);  
+ const rate = target ? Math.round((cum / target) * 100) : 0;  
+   
+// [수정] sec.product가 '알람'이고 m.key가 '수주'일 때만 (도전비 10%UP) 적용  
+ const extraLabel = (sec.product === '알람' && m.key === '수주') ? ' (도전비 10%UP)' : '';  
+   
+lines.push('□ ' + m.label + ' * 목표 ' + fmtK(target) + '천원' + extraLabel);  
+ lines.push('- 당일 : ' + fmtK(today) + '천원 / 누계 : ' + fmtK(cum) + '천원(' + rate + '%)');  
+ });  
+ lines.push('');  
+ });  
+ FULL_REPORT_EXTRA_SECTIONS.forEach(function(sec){  
+ lines.push(sec.heading);  
+ if (sec.groupKey === '안전상품') {  
+ // 안전상품은 상품일보 기반 자동집계(SAFETY_SUMMARY_DAILY)만 유지되며, 예전 수동입력 시트(EXTRA_PRODUCT_DATA)는 더 이상 갱신되지 않아  
+ // 그 값을 그대로 쓰면 항상 0으로 나온다. 또한 이 값은 "당일" 구분 없이 월 누계(자력 기준)만 제공된다.  
+ // 목표는 전체(자력+전략협력) 목표이며 자력 목표는 그 절반이므로, 자력 실적은 목표의 50%를 기준으로 달성률을 계산한다.  
+ const s = SAFETY_SUMMARY_DAILY || {};  
+ const tgt = s.목표 || {}, act = s.실적 || {};  
+ sec.metrics.forEach(function(m){  
+ const target = Math.round(Number(tgt[m.key]) || 0);  
+ const cum = Math.round(Number(act[m.key]) || 0);  
+ const today = Math.round(Number(act[m.key + '_당일']) || 0);  
+ const rate = target ? Math.round((cum / target) * 100) : 0;  
+ lines.push('□ ' + m.label + ' * 목표 ' + fmtFullReportNum_(target, m.unit) + m.unit);  
+ lines.push('- 당일 : ' + fmtFullReportNum_(today, m.unit) + m.unit + ' / 누계 : ' + fmtFullReportNum_(cum, m.unit) + m.unit + '(' + rate + '%)');  
+ });  
+ lines.push('');  
+ return;  
+ }  
+ const group = (EXTRA_PRODUCT_DATA && EXTRA_PRODUCT_DATA[sec.groupKey]) || {};  
+ sec.metrics.forEach(function(m){  
+ const it = group[m.key] || {};  
+ const target = Math.round(Number(it.목표) || 0);  
+ const today = Math.round(Number(it.당일) || 0);  
+ const prev = Number(it.전일누계) || 0;  
+ const cum = Math.round(prev + today);  
+ const rate = target ? Math.round((cum / target) * 100) : 0;  
+ lines.push('□ ' + m.label + ' * 목표 ' + fmtFullReportNum_(target, m.unit) + m.unit);  
+ lines.push('- 당일 : ' + fmtFullReportNum_(today, m.unit) + m.unit + ' / 누계 : ' + fmtFullReportNum_(cum, m.unit) + m.unit + '(' + rate + '%)');  
+ });  
+ lines.push('');  
+ });  
+ return lines.join('\n').replace(/\n+$/, '');  
+}  
+  
+/** buildFullDailyReportText()의 결과에서 "- 당일 : ..." 실적 라인만 파란색으로 강조해 표시용 HTML을 만든다. */  
+function buildFullDailyReportHtml_(mode){  
+ const text = buildFullDailyReportText(mode);  
+ // "- 당일 : 200천원 / 누계 : 2,691천원(72%)" 형식의 줄에서 당일 금액만 파란색 볼드,  
+ // 누계 금액+달성률만 빨간색 볼드로 강조하고 나머지(레이블/기호)는 검정 일반체로 남긴다.  
+ const m2 = /^(- 당일\s*:\s*)(.+?)(\s*\/\s*누계\s*:\s*)(.+?)(\([-\d]+%\))$/;  
+ return text.split('\n').map(function(line){  
+ const m = line.match(m2);  
+ if (m) {  
+ return escHtml(m[1]) +  
+ '<span style="color:#1a56db; font-weight:700;">' + escHtml(m[2]) + '</span>' +  
+ escHtml(m[3]) +  
+ '<span style="color:#c0392b; font-weight:700;">' + escHtml(m[4]) + escHtml(m[5]) + '</span>';  
+ }  
+ return escHtml(line);  
+ }).join('\n');  
+}  
+  
+function dailyReportTextBoxHtml(){  
+ return '<div class="report-box active-report" style="width:100%;">' +  
+ '<div class="status-target-title" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">일일실적보고 (전망/마감)' +  
+ '<select id="fullReportModeSelect" onchange="onFullReportModeChange_(this.value)" style="padding:3px 6px; font-size:16px;">' +  
+ '<option value="전망">전망</option>' +  
+ '<option value="마감">마감</option>' +  
+ '</select>' +  
+ '<button type="button" onclick="openForecastInput_()">예상치 입력</button>' +  
+ '<button type="button" onclick="regenerateFullReportText_()">다시생성</button>' +  
+ '<button type="button" onclick="copyReportText_(\'fullReportText\')">복사</button>' +  
+ '</div>' +  
+ '<div id="fullReportText" contenteditable="true" spellcheck="false" oninput="FULL_REPORT_TEXT_EDITED = true;" style="width:100%; font-family:\'Malgun Gothic\',Consolas,monospace; font-size:16px; line-height:1.6; white-space:pre-wrap; word-break:break-word; box-sizing:border-box; padding:10px; border:1px solid var(--grid-line);"></div>' +  
+ '</div>';  
+}  
+  
+function openForecastInput_(){  
+ const products = ['알람','정보보안','휴엔','블루스캔'];  
+ const vals = {};  
+ let canceled = false;  
+ for (let i = 0; i < products.length; i++) {  
+ const p = products[i];  
+ const cur = (DAILY_FORECAST_ORDERS && DAILY_FORECAST_ORDERS[p] != null)  
+ ? DAILY_FORECAST_ORDERS[p]  
+ : ((DAILY_REPORT_DATA && DAILY_REPORT_DATA[p] && DAILY_REPORT_DATA[p].수주_당일) || 0);  
+ const input = prompt('[' + (DAILY_COL_LABELS[p] || p) + '] 오늘 예상 수주 금액(천원)을 입력하세요.', String(cur));  
+ if (input === null) { canceled = true; break; }  
+ const num = Number(String(input).replace(/,/g, '').trim());  
+ vals[p] = isNaN(num) ? 0 : num;  
+ }  
+ if (canceled) return;  
+ DAILY_FORECAST_ORDERS = vals;  
+ FULL_REPORT_MODE = '전망';  
+ FULL_REPORT_TEXT_EDITED = false;  
+ const modeSelEl = document.getElementById('fullReportModeSelect');  
+ if (modeSelEl) modeSelEl.value = '전망';  
+ const fullEl = document.getElementById('fullReportText');  
+ if (fullEl) fullEl.innerHTML = buildFullDailyReportHtml_('전망');  
+}  
+  
+/** select(전망/마감) 변경 시 통합 보고창을 새 모드로 재생성(사용자 직접입력 내용은 덮어씀) */  
+function onFullReportModeChange_(mode){  
+ FULL_REPORT_MODE = mode;  
+ FULL_REPORT_TEXT_EDITED = false;  
+ const el = document.getElementById('fullReportText');  
+ if (el) el.innerHTML = buildFullDailyReportHtml_(mode);  
+}  
+  
+/** "다시생성" 버튼: 현재 select 값 기준으로 자동집계 데이터를 다시 반영해서 재생성(직접 수정한 내용은 사라짐) */  
+function regenerateFullReportText_(){  
+ const sel = document.getElementById('fullReportModeSelect');  
+ const mode = (sel && sel.value) || FULL_REPORT_MODE || defaultFullReportMode_();  
+ FULL_REPORT_MODE = mode;  
+ FULL_REPORT_TEXT_EDITED = false;  
+ const el = document.getElementById('fullReportText');  
+ if (el) el.innerHTML = buildFullDailyReportHtml_(mode);  
+}  
+  
+function copyReportText_(id){  
+ try {  
+ const el = document.getElementById(id);  
+ if (!el) return;  
+ const isTextarea = el.tagName === 'TEXTAREA';  
+ const text = isTextarea ? el.value : el.innerText;  
+ if (navigator.clipboard && navigator.clipboard.writeText) {  
+ navigator.clipboard.writeText(text).catch(function(){});  
+ return;  
+ }  
+ if (isTextarea) {  
+ el.focus();  
+ el.select();  
+ } else {  
+ const range = document.createRange();  
+ range.selectNodeContents(el);  
+ const sel = window.getSelection();  
+ sel.removeAllRanges();  
+ sel.addRange(range);  
+ }  
+ document.execCommand('copy');  
+ } catch (e) { /* 클립보드 접근 실패는 무시 */ }  
+}  
+  
+function renderDailyReport(){  
+ let html = `  
+ <div class="status-wrap daily-report-wrap">  
+ <div class="status-head">  
+ <button onclick="shiftDailyReportDate(-1)">◀</button>  
+ <h2>${dailyReportDate} 일일실적보고 (자동집계, 단위: 천원)</h2>  
+ <button onclick="shiftDailyReportDate(1)">▶</button>  
+ <input type="date" id="dailyReportDateInput" value="${dailyReportDate}" onchange="onDailyReportDateInputChanged_(this.value)" style="margin-left:8px; padding:3px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
+ <button onclick="dailyReportGoToday()">오늘</button>  
+ </div>  
+ <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">  
+ <div style="flex:1 1 700px; min-width:580px;">  
+ <div class="daily-panels-row">  
+ <div class="daily-panel-col">${dailyPanelTableHtml(DAILY_PANELS[0])}</div>  
+ <div class="daily-panel-col">${dailyPanelTableHtml(DAILY_PANELS[1])}</div>  
+ </div>  
+ <div class="daily-panels-row">  
+ <div class="daily-panel-col">${extraSafetyTableHtml()}</div>  
+ <div class="daily-panel-col">${extraDoorcamTableHtml()}</div>  
+ </div>  
+ </div>  
+ <div style="flex:0 0 520px; width:520px;">${dailyReportTextBoxHtml()}</div>  
+ </div>  
+ </div>`;  
+  
+ document.getElementById('content').innerHTML = html;  
+  
+ if (!FULL_REPORT_MODE) FULL_REPORT_MODE = defaultFullReportMode_();  
+ const modeSelEl = document.getElementById('fullReportModeSelect');  
+ if (modeSelEl) modeSelEl.value = FULL_REPORT_MODE;  
+ const fullEl = document.getElementById('fullReportText');  
+ if (fullEl && !FULL_REPORT_TEXT_EDITED) fullEl.innerHTML = buildFullDailyReportHtml_(FULL_REPORT_MODE);  
+}  
+  
+  
 
 
 /* ===================== 목표설정 & 일일실적보고 & 기타 툴바 헬퍼 ===================== */
@@ -6754,6 +7153,14 @@ function dailyReportGoToday(){
   const el = document.getElementById('dailyReportDate');
   if (el) el.value = dailyReportDate;
   loadDailyReport();
+}
+
+
+function onDailyReportDateInputChanged_(val){
+  if (val) {
+    dailyReportDate = val;
+    loadDailyReport();
+  }
 }
 
 function onDailyReportDateChange(){
