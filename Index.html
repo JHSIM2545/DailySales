@@ -1727,6 +1727,7 @@
  <button id="gaJungjiTopBtn" class="ai-report-topbtn" style="display:none; background:#c0392b; margin-right:10px;" onclick="openGaJungjiModal_()">가중지 정보</button>  
  <span id="whoami" style="display:none;"></span>  
  <a id="logoutLink" style="display:none;" onclick="logout()">로그아웃</a>  
+ <button id="fileStoreTopBtn" title="파일 저장소" style="background:#2c3e50; color:#ffca28; border:1px solid #4a5568; width:38px; height:34px; padding:0; border-radius:6px; font-size:18px; line-height:1; cursor:pointer; margin-right:10px; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.2);" onclick="openFileStoreModal_()">📁</button>
  <div class="sync-status ok" id="syncStatus" onclick="retryAllSync()">서버 연결</div>  
  </div>  
 </div>  
@@ -6635,6 +6636,319 @@ if (SESSION && SESSION.token) {
 } else {
   showLogin();
 }
+
+
+/* ===================== 파일 저장소 기능 (100% 원본 복원: 다중 선택/다운/삭제/중복체크/아이콘) ===================== */
+let FILE_STORE_CACHED_FILES = [];
+let FILE_STORE_SORT_DESC = true;
+
+function openFileStoreModal_(){
+  const overlay = document.getElementById('fileStoreModalOverlay');
+  if (overlay) {
+    overlay.classList.add('open');
+    fileStoreRefresh_(); // 모달 열자마자 즉시 저장된 파일 목록 로드!
+  }
+}
+
+function closeFileStoreModal_(){
+  const overlay = document.getElementById('fileStoreModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function getFileStoreIcon_(name) {
+  const ext = String(name || '').split('.').pop().toLowerCase();
+  if (ext === 'gs') return '🔧';
+  if (ext === 'html' || ext === 'htm') return '🌐';
+  if (ext === 'js') return '📜';
+  if (ext === 'json') return '📋';
+  if (ext === 'txt') return '📄';
+  if (ext === 'pdf') return '📕';
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return '📊';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return '🖼️';
+  return '📄';
+}
+
+function fmtFileStoreDateTime_(dt) {
+  if (!dt) return '-';
+  const d = new Date(dt);
+  if (isNaN(d.getTime())) return String(dt);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return y + '-' + m + '-' + day + ' ' + h + ':' + min;
+}
+
+function fileStoreRefresh_(){
+  const listEl = document.getElementById('fileStoreList');
+  if (listEl) listEl.innerHTML = '<div class="loading loading-spin" style="padding:40px;"><div class="loading-text">파일 목록을 불러오는 중입니다...</div></div>';
+  
+  google.script.run
+    .withSuccessHandler(function(res){
+      let files = (res && res.files) || [];
+      // 초기 기본 파일이 비어있는 경우 기본 샘플 파일 제공
+      if (!files.length && !localStorage.getItem('ADMIN_STORED_FILES_INITIALIZED')) {
+        files = [
+          { id: 'f_code_gs', name: 'Code.gs', size: '67.6 KB', createdDate: '2026-08-25 07:29', regDate: '2026-09-26 10:15', dataUrl: 'data:text/plain;charset=utf-8,// Code.gs' },
+          { id: 'f_index_html', name: 'Index.html', size: '77.2 KB', createdDate: '2026-08-25 07:29', regDate: '2026-09-26 10:15', dataUrl: 'data:text/html;charset=utf-8,<!-- Index.html -->' },
+          { id: 'f_admin_html', name: 'Admin.html', size: '85.4 KB', createdDate: '2026-08-25 07:29', regDate: '2026-09-26 10:14', dataUrl: 'data:text/html;charset=utf-8,<!-- Admin.html -->' }
+        ];
+        localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(files));
+        localStorage.setItem('ADMIN_STORED_FILES_INITIALIZED', 'true');
+      }
+      FILE_STORE_CACHED_FILES = files;
+      renderFileStoreTable_();
+    })
+    .adminListStoredFiles(SESSION ? SESSION.token : '');
+}
+
+function renderFileStoreTable_(){
+  const listEl = document.getElementById('fileStoreList');
+  if (!listEl) return;
+  
+  let files = FILE_STORE_CACHED_FILES.slice();
+  files.sort(function(a, b){
+    const da = a.regDate || a.date || '';
+    const db = b.regDate || b.date || '';
+    return FILE_STORE_SORT_DESC ? db.localeCompare(da) : da.localeCompare(db);
+  });
+
+  if (!files.length) {
+    listEl.innerHTML = '<div class="placeholder" style="padding:40px 20px; color:#888; text-align:center;">저장된 파일이 없습니다.<br><small style="font-size:12px; color:#aaa;">[+ 업로드] 버튼을 눌러 파일을 추가하세요.</small></div>';
+    updateFileStoreActionButtons_();
+    return;
+  }
+
+  let html = '<table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">' +
+    '<thead>' +
+      '<tr style="background:#102a45; color:#ffffff; user-select:none;">' +
+        '<th style="padding:10px 10px; width:38px; text-align:center;"><input type="checkbox" id="fileStoreSelectAll" onchange="fileStoreToggleAll_(this.checked)" style="cursor:pointer;"></th>' +
+        '<th style="padding:10px 12px; font-weight:700;">파일명</th>' +
+        '<th style="padding:10px 10px; width:85px; text-align:center; font-weight:700;">용량</th>' +
+        '<th style="padding:10px 12px; width:135px; text-align:center; font-weight:700;">생성일시</th>' +
+        '<th style="padding:10px 12px; width:145px; text-align:center; font-weight:700; cursor:pointer;" onclick="fileStoreToggleSort_()">' +
+          '등록일시 ' + (FILE_STORE_SORT_DESC ? '▼' : '▲') +
+        '</th>' +
+        '<th style="padding:10px 10px; width:95px; text-align:center; font-weight:700;"></th>' +
+      '</tr>' +
+    '</thead>' +
+    '<tbody>';
+
+  files.forEach(function(f){
+    const icon = getFileStoreIcon_(f.name);
+    const createdStr = f.createdDate || f.date || '-';
+    const regStr = f.regDate || f.date || '-';
+    html += '<tr style="border-bottom:1px solid #e2e8f0; background:#fff; transition:background 0.15s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">' +
+      '<td style="padding:8px 10px; text-align:center;"><input type="checkbox" class="file-store-cb" data-id="' + f.id + '" onchange="fileStoreOnCheck_()" style="cursor:pointer;"></td>' +
+      '<td style="padding:8px 12px; word-break:break-all;">' +
+        '<span style="margin-right:8px; font-size:15px; vertical-align:-1px;">' + icon + '</span>' +
+        '<a href="javascript:void(0)" onclick="downloadStoredFile_(\'' + f.id + '\')" style="color:#2563eb; text-decoration:underline; font-weight:500;">' + escHtml(f.name || '파일') + '</a>' +
+      '</td>' +
+      '<td style="padding:8px 10px; text-align:center; color:#111827; font-size:12px;">' + escHtml(f.size || '') + '</td>' +
+      '<td style="padding:8px 12px; text-align:center; color:#111827; font-size:12px;">' + escHtml(createdStr) + '</td>' +
+      '<td style="padding:8px 12px; text-align:center; color:#111827; font-size:12px;">' + escHtml(regStr) + '</td>' +
+      '<td style="padding:8px 10px; text-align:center; white-space:nowrap;">' +
+        '<button title="다운로드" onclick="downloadStoredFile_(\'' + f.id + '\')" style="padding:4px 8px; border:1px solid #3b82f6; background:#fff; color:#2563eb; border-radius:4px; cursor:pointer; font-size:13px; line-height:1; font-weight:700;">⬇</button>' +
+        '<button title="삭제" onclick="deleteStoredFile_(\'' + f.id + '\')" style="padding:4px 8px; border:1px solid #f87171; background:#fff; color:#ef4444; border-radius:4px; cursor:pointer; font-size:13px; line-height:1; margin-left:4px;">🗑</button>' +
+      '</td>' +
+    '</tr>';
+  });
+
+  html += '</tbody></table>';
+  listEl.innerHTML = html;
+  updateFileStoreActionButtons_();
+}
+
+function fileStoreToggleSort_(){
+  FILE_STORE_SORT_DESC = !FILE_STORE_SORT_DESC;
+  renderFileStoreTable_();
+}
+
+function fileStoreToggleAll_(checked){
+  const cbs = document.querySelectorAll('.file-store-cb');
+  cbs.forEach(function(cb){ cb.checked = checked; });
+  updateFileStoreActionButtons_();
+}
+
+function fileStoreOnCheck_(){
+  const cbs = document.querySelectorAll('.file-store-cb');
+  const allCb = document.getElementById('fileStoreSelectAll');
+  if (allCb && cbs.length) {
+    allCb.checked = Array.from(cbs).every(function(cb){ return cb.checked; });
+  }
+  updateFileStoreActionButtons_();
+}
+
+function updateFileStoreActionButtons_(){
+  const checked = document.querySelectorAll('.file-store-cb:checked');
+  const count = checked.length;
+  const btnDown = document.getElementById('fileStoreBtnMultiDownload');
+  const btnDel = document.getElementById('fileStoreBtnMultiDelete');
+  
+  if (btnDown) {
+    btnDown.disabled = (count === 0);
+    btnDown.style.opacity = (count === 0) ? '0.4' : '1';
+    btnDown.innerHTML = '<span style="font-weight:700;">⬇</span> 선택 다운로드' + (count > 0 ? ' (' + count + ')' : '');
+  }
+  if (btnDel) {
+    btnDel.disabled = (count === 0);
+    btnDel.style.opacity = (count === 0) ? '0.4' : '1';
+    btnDel.innerHTML = '<span>🗑</span> 선택 삭제' + (count > 0 ? ' (' + count + ')' : '');
+  }
+}
+
+function fileStoreUploadClick_(){
+  document.getElementById('fileStoreInput')?.click();
+}
+
+function fileStoreFileSelected_(e){
+  const files = e.target.files;
+  if (!files || !files.length) return;
+
+  const now = new Date();
+  const regDateStr = fmtFileStoreDateTime_(now);
+
+  // 1. 중복 파일명 체크
+  let validFiles = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const existing = FILE_STORE_CACHED_FILES.find(function(it){ return it.name === file.name; });
+    if (existing) {
+      const replace = confirm('동일한 이름의 파일 [' + file.name + '] 이(가) 이미 존재합니다.\n기존 파일을 덮어쓰시겠습니까?');
+      if (!replace) {
+        continue; // 덮어쓰기 취소 시 건너뜀
+      }
+    }
+    validFiles.push(file);
+  }
+
+  if (!validFiles.length) {
+    document.getElementById('fileStoreInput').value = '';
+    return;
+  }
+
+  let processed = 0;
+  validFiles.forEach(function(file){
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const lastMod = file.lastModified ? new Date(file.lastModified) : now;
+      const createdDateStr = fmtFileStoreDateTime_(lastMod);
+
+      // 기존 파일이 있으면 동일 id로 덮어쓰기
+      const existing = FILE_STORE_CACHED_FILES.find(function(it){ return it.name === file.name; });
+      const targetId = existing ? existing.id : ('file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+
+      const payload = {
+        id: targetId,
+        name: file.name,
+        size: (file.size < 1024) ? (file.size + ' B') : (file.size < 1048576) ? ((file.size / 1024).toFixed(1) + ' KB') : ((file.size / 1048576).toFixed(1) + ' MB'),
+        createdDate: createdDateStr,
+        regDate: regDateStr,
+        date: regDateStr,
+        dataUrl: evt.target.result
+      };
+
+      google.script.run
+        .withSuccessHandler(function(){
+          processed++;
+          if (processed === validFiles.length) {
+            fileStoreRefresh_();
+            document.getElementById('fileStoreInput').value = '';
+          }
+        })
+        .adminUploadStoredFile(SESSION ? SESSION.token : '', payload);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function downloadStoredFile_(id){
+  const f = FILE_STORE_CACHED_FILES.find(function(it){ return String(it.id) === String(id); });
+  if (!f || !f.dataUrl) { alert('다운로드할 파일 데이터를 찾을 수 없습니다.'); return; }
+  const a = document.createElement('a');
+  a.href = f.dataUrl;
+  a.download = f.name || 'download';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function deleteStoredFile_(id){
+  const f = FILE_STORE_CACHED_FILES.find(function(it){ return String(it.id) === String(id); });
+  const name = f ? f.name : '이 파일';
+  if (!confirm('정말 [' + name + '] 파일을 삭제하시겠습니까?')) return;
+  google.script.run
+    .withSuccessHandler(function(){ fileStoreRefresh_(); })
+    .adminDeleteStoredFile(SESSION ? SESSION.token : '', id);
+}
+
+function fileStoreMultiDownload_(){
+  const checked = Array.from(document.querySelectorAll('.file-store-cb:checked'));
+  if (!checked.length) { alert('다운로드할 파일을 선택하세요.'); return; }
+  
+  checked.forEach(function(cb, index){
+    setTimeout(function(){
+      downloadStoredFile_(cb.getAttribute('data-id'));
+    }, index * 250);
+  });
+}
+
+function fileStoreMultiDelete_(){
+  const checked = Array.from(document.querySelectorAll('.file-store-cb:checked'));
+  if (!checked.length) { alert('삭제할 파일을 선택하세요.'); return; }
+  if (!confirm('선택한 ' + checked.length + '개의 파일을 모두 삭제하시겠습니까?')) return;
+
+  const ids = checked.map(function(cb){ return cb.getAttribute('data-id'); });
+  let done = 0;
+  ids.forEach(function(id){
+    google.script.run
+      .withSuccessHandler(function(){
+        done++;
+        if (done === ids.length) {
+          fileStoreRefresh_();
+        }
+      })
+      .adminDeleteStoredFile(SESSION ? SESSION.token : '', id);
+  });
+}
+
+
+
 </script>
+
+
+<div class="modal-overlay" id="fileStoreModalOverlay">
+  <div class="modal" style="width:720px; max-width:96vw; position:relative; padding:24px 28px; border-radius:8px; background:#fff; box-shadow:0 10px 30px rgba(0,0,0,0.25);">
+    <button onclick="fileStoreRefresh_()" title="새로고침" style="position:absolute; top:20px; right:20px; width:28px; height:28px; border-radius:50%; border:1px solid #c7cfd8; background:#fff; color:#555; cursor:pointer; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center;">↻</button>
+    
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+      <span style="font-size:22px;">📁</span>
+      <h2 style="margin:0; font-size:19px; font-weight:700; color:#111827;">파일 저장소</h2>
+    </div>
+    <div style="color:#6b7280; font-size:13px; margin-bottom:14px;">파일당 최대 5MB까지 업로드할 수 있습니다.</div>
+    
+    <!-- 액션 툴바: 업로드, 선택 다운로드, 선택 삭제 -->
+    <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <button onclick="fileStoreUploadClick_()" style="padding:6px 14px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #c7cfd8; background:#fff; color:#111827; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+        <span style="font-weight:700; font-size:15px;">+</span> 업로드
+      </button>
+      <button id="fileStoreBtnMultiDownload" disabled onclick="fileStoreMultiDownload_()" style="padding:6px 12px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #3b82f6; background:#fff; color:#2563eb; cursor:pointer; display:inline-flex; align-items:center; gap:4px; opacity:0.4; transition:all 0.2s;">
+        <span style="font-weight:700;">⬇</span> 선택 다운로드
+      </button>
+      <button id="fileStoreBtnMultiDelete" disabled onclick="fileStoreMultiDelete_()" style="padding:6px 12px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #ef4444; background:#fff; color:#dc2626; cursor:pointer; display:inline-flex; align-items:center; gap:4px; opacity:0.4; transition:all 0.2s;">
+        <span>🗑</span> 선택 삭제
+      </button>
+      <input type="file" id="fileStoreInput" accept=".txt,.html,.htm,.gs,.js,.json,.xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,*.*" multiple style="display:none;" onchange="fileStoreFileSelected_(event)">
+    </div>
+
+    <!-- 파일 목록 테이블 -->
+    <div id="fileStoreList" style="max-height:420px; overflow-y:auto; border:1px solid #cfd6dc; border-radius:4px;"></div>
+
+    <div class="modal-actions" style="margin-top:16px; display:flex; justify-content:flex-end;">
+      <button onclick="closeFileStoreModal_()" style="padding:7px 24px; font-size:13px; border:1px solid #c7cfd8; background:#fff; color:#374151; border-radius:4px; cursor:pointer;">닫기</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
