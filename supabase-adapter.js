@@ -1568,12 +1568,20 @@
       const pt = productType || '일반알람';
       const { data } = await client.from('biz_team_data').select('*').eq('product_type', pt).order('report_date', { ascending: false }).limit(1).maybeSingle();
       if (!data) return { success: true, found: false };
+      let branches = data.branches_json || [];
+      if (typeof branches === 'string') {
+        try { branches = JSON.parse(branches); } catch(e){ branches = []; }
+      }
+      let rows = data.rows_json || [];
+      if (typeof rows === 'string') {
+        try { rows = JSON.parse(rows); } catch(e){ rows = []; }
+      }
       return {
         success: true, found: true,
         date: data.report_date,
         productType: data.product_type,
-        branches: data.branches_json || [],
-        rows: data.rows_json || [],
+        branches: branches,
+        rows: rows,
         registeredAt: data.created_at ? data.created_at.slice(0, 16).replace('T', ' ') : '',
         registeredBy: data.registered_by || ''
       };
@@ -1584,12 +1592,20 @@
       const pt = productType || '일반알람';
       const { data } = await client.from('biz_team_data').select('*').eq('product_type', pt).lte('report_date', dateStr).order('report_date', { ascending: false }).limit(1).maybeSingle();
       if (!data) return { success: true, found: false };
+      let branches = data.branches_json || [];
+      if (typeof branches === 'string') {
+        try { branches = JSON.parse(branches); } catch(e){ branches = []; }
+      }
+      let rows = data.rows_json || [];
+      if (typeof rows === 'string') {
+        try { rows = JSON.parse(rows); } catch(e){ rows = []; }
+      }
       return {
         success: true, found: true,
         date: data.report_date,
         productType: data.product_type,
-        branches: data.branches_json || [],
-        rows: data.rows_json || [],
+        branches: branches,
+        rows: rows,
         registeredAt: data.created_at ? data.created_at.slice(0, 16).replace('T', ' ') : '',
         registeredBy: data.registered_by || ''
       };
@@ -1600,10 +1616,18 @@
       const pt = productType || '일반알람';
       const { data } = await client.from('biz_team_data').select('*').eq('report_date', dateStr).eq('product_type', pt).maybeSingle();
       if (!data) return { success: true, found: false };
+      let branches = data.branches_json || [];
+      if (typeof branches === 'string') {
+        try { branches = JSON.parse(branches); } catch(e){ branches = []; }
+      }
+      let rows = data.rows_json || [];
+      if (typeof rows === 'string') {
+        try { rows = JSON.parse(rows); } catch(e){ rows = []; }
+      }
       return {
         success: true, found: true,
-        branches: data.branches_json || [],
-        rows: data.rows_json || [],
+        branches: branches,
+        rows: rows,
         rawText: data.raw_text || '',
         registeredAt: data.created_at ? data.created_at.slice(0, 16).replace('T', ' ') : '',
         registeredBy: data.registered_by || '',
@@ -1615,9 +1639,14 @@
       const client = getSupabase();
       const sess = getSession_();
       const pt = productType || '일반알람';
-      let bJson = [], rJson = [];
-      try { bJson = JSON.parse(branchesJson); } catch(e){}
-      try { rJson = JSON.parse(rowsJson); } catch(e){}
+      let bJson = branchesJson;
+      if (typeof branchesJson === 'string') {
+        try { bJson = JSON.parse(branchesJson); } catch(e){ bJson = []; }
+      }
+      let rJson = rowsJson;
+      if (typeof rowsJson === 'string') {
+        try { rJson = JSON.parse(rowsJson); } catch(e){ rJson = []; }
+      }
 
       const record = {
         report_date: dateStr,
