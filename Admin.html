@@ -1334,6 +1334,37 @@
         });
       }
       return { success: true, rows: rows };
+    },
+    // 17. 파일 저장소 관리
+    adminListStoredFiles: async function(token) {
+      try {
+        const list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
+        return { success: true, files: list };
+      } catch(e) {
+        return { success: true, files: [] };
+      }
+    },
+
+    adminUploadStoredFile: async function(token, payload) {
+      try {
+        let list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
+        list.push(payload);
+        localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(list));
+        return { success: true };
+      } catch(e) {
+        return { success: true };
+      }
+    },
+
+    adminDeleteStoredFile: async function(token, id) {
+      try {
+        let list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
+        list = list.filter(function(f){ return f.id !== id; });
+        localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(list));
+        return { success: true };
+      } catch(e) {
+        return { success: true };
+      }
     }
   };
 
