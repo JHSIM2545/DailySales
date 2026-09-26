@@ -3586,10 +3586,18 @@ function preloadAllTabsInBackground_(){
  preloadSilent_('fileStoreList_', function(cb){  
  google.script.run.withSuccessHandler(cb).withFailureHandler(function(){}).adminListStoredFiles(SESSION.token);  
  });  
- // 사업팀현황: 종합대시보드에서 버튼을 눌러 열었을 때 로딩 없이 바로 표시되도록 미리 캐시에 채워둠.  
- preloadSilent_('bizTeamStatusLatest_', function(cb){  
- google.script.run.withSuccessHandler(cb).withFailureHandler(function(){}).getLatestBizTeamData(SESSION.token);  
- });  
+ // 사업팀현황: 종합대시보드에서 버튼을 눌러 열었을 때 로딩 없이 바로 표시되도록 미리 캐시에 채워둠.
+  const bKey = (typeof bizTeamStatusCacheKey_ === 'function') ? bizTeamStatusCacheKey_() : ('bizTeamStatus|' + today + '|일반알람');
+  preloadSilent_(bKey, function(cb){  
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) {
+        BIZ_TEAM_STATUS_DATA_ = res;
+        cacheSet_('bizTeamStatusLatest_', res);
+        if (res.date && !isBlockedDate(res.date)) BIZ_TEAM_VIEW_DATE_ = res.date;
+      }
+      cb(res);
+    }).withFailureHandler(function(){ cb(null); }).getBizTeamDataNearestOnOrBefore(SESSION.token, (typeof BIZ_TEAM_VIEW_DATE_ !== 'undefined' ? BIZ_TEAM_VIEW_DATE_ : today), '일반알람');  
+  });  
  // 대시보드는 로그인 직후 기본 화면으로 이미 loadDashboard()가 정상 호출되어 캐시가 채워지므로 여기서는 제외.  
 }  
   
@@ -7661,7 +7669,9 @@ function selectUserMgmtView(view){
 
 /* ===================== 사용자 관리 탭 ===================== */
 function loadUsers(){
-  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-users') || document.getElementById('content'));
+  if (currentTab !== 'users') return;
+  const container = document.getElementById('userMgmtBody');
+  if (!container) return;
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">사용자 목록 로드 중...</div></div>';
   setLoadingCursor(true);
   google.script.run
@@ -7672,13 +7682,17 @@ function loadUsers(){
     })
     .withFailureHandler(function(err){
       setLoadingCursor(false);
-      container.innerHTML = '<div class="denied">사용자 목록 로드 실패: ' + escHtml(String(err)) + '</div>';
+      if (document.getElementById('userMgmtBody')) {
+        container.innerHTML = '<div class="denied">사용자 목록 로드 실패: ' + escHtml(String(err)) + '</div>';
+      }
     })
     .adminListUsers(SESSION.token);
 }
 
 function renderUsers(){
-  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-users') || document.getElementById('content'));
+  if (currentTab !== 'users') return;
+  const container = document.getElementById('userMgmtBody');
+  if (!container) return;
   if (!USER_ROWS.length) { container.innerHTML = '<div class="placeholder">등록된 사용자가 없습니다.</div>'; return; }
   let html = '<table><thead><tr>' +
     '<th>이름</th><th>전화번호</th><th>직무</th><th>권한</th><th>등록일시</th><th>최근접속</th><th>브라우저</th><th>기기</th><th>작업</th>' +
@@ -7694,8 +7708,8 @@ function renderUsers(){
       '<td>' + escHtml(u.브라우저) + '</td>' +
       '<td>' + escHtml(u.기기유형) + '</td>' +
       '<td class="actions">' +
-        '<button onclick="openUserEditModal(\'" + u.전화번호 + "\')">수정</button> ' +
-        '<button class="danger" onclick="deleteUser(\'" + u.전화번호 + "\')">삭제</button>' +
+        '<button onclick="openUserEditModal(\"' + u.전화번호 + '\")">수정</button> ' +
+        '<button class="danger" onclick="deleteUser(\"' + u.전화번호 + '\")">삭제</button>' +
       '</td>' +
     '</tr>';
   });
@@ -7739,10 +7753,13 @@ function deleteUser(phone){
 
 /* ===================== 사용내역(로그인/작업이력) ===================== */
 function loadLoginHistory(){
-  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-loginhistory') || document.getElementById('content'));
+  if (currentTab !== 'users') return;
+  const container = document.getElementById('userMgmtBody');
+  if (!container) return;
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">로그인 이력 로드 중...</div></div>';
   google.script.run
     .withSuccessHandler(function(res){
+      if (currentTab !== 'users' || !document.getElementById('userMgmtBody')) return;
       const rows = res.rows || [];
       if (!rows.length) { container.innerHTML = '<div class="placeholder">로그인 이력이 없습니다.</div>'; return; }
       let html = '<table><thead><tr><th>이름</th><th>전화번호</th><th>시간</th><th>액션</th></tr></thead><tbody>';
@@ -7750,28 +7767,38 @@ function loadLoginHistory(){
       html += '</tbody></table>';
       container.innerHTML = html;
     })
-    .withFailureHandler(function(err){ container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; })
+    .withFailureHandler(function(err){ 
+      if (document.getElementById('userMgmtBody')) {
+        container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; 
+      }
+    })
     .adminListLoginHistory(SESSION.token);
 }
 
 let USER_ACTION_HISTORY_ROWS = [];
 
 function loadUserActionHistory(){
-  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-userhistory') || document.getElementById('content'));
-  if (container) container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">작업 이력 로드 중...</div></div>';
+  if (currentTab !== 'users') return;
+  const container = document.getElementById('userMgmtBody');
+  if (!container) return;
+  container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">작업 이력 로드 중...</div></div>';
   google.script.run
     .withSuccessHandler(function(res){
+      if (currentTab !== 'users' || !document.getElementById('userMgmtBody')) return;
       USER_ACTION_HISTORY_ROWS = res.rows || [];
       renderUserActionHistory();
     })
     .withFailureHandler(function(err){ 
-      if (container) container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; 
+      if (document.getElementById('userMgmtBody')) {
+        container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; 
+      }
     })
     .adminListHistory(SESSION.token);
 }
 
 function renderUserActionHistory(){
-  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-userhistory') || document.getElementById('content'));
+  if (currentTab !== 'users') return;
+  const container = document.getElementById('userMgmtBody');
   if (!container) return;
   const q = (document.getElementById('userHistorySearchBox')?.value || '').trim().toLowerCase();
   let rows = USER_ACTION_HISTORY_ROWS || [];
@@ -8978,6 +9005,7 @@ function onDailyReportDateChange(){
 let LOGIN_HISTORY_ROWS = [];
 
 function onLoginHistoryModeChange(){
+  if (currentTab !== 'users') return;
   const mode = document.querySelector('input[name="lhMode"]:checked')?.value || 'day';
   const toWrap = document.getElementById('lhToWrap');
   if (toWrap) toWrap.style.display = (mode === 'range') ? 'inline' : 'none';
@@ -8985,6 +9013,7 @@ function onLoginHistoryModeChange(){
 }
 
 function onUserHistoryModeChange(){
+  if (currentTab !== 'users') return;
   const mode = document.querySelector('input[name="uhMode"]:checked')?.value || 'day';
   const toWrap = document.getElementById('uhToWrap');
   if (toWrap) toWrap.style.display = (mode === 'range') ? 'inline' : 'none';
@@ -8992,7 +9021,8 @@ function onUserHistoryModeChange(){
 }
 
 function renderLoginHistory(){
-  const container = (document.getElementById('userMgmtBody') || document.getElementById('grid-loginhistory') || document.getElementById('content'));
+  if (currentTab !== 'users') return;
+  const container = document.getElementById('userMgmtBody');
   if (!container) return;
   const q = (document.getElementById('loginHistorySearchBox')?.value || '').trim().toLowerCase();
   let rows = LOGIN_HISTORY_ROWS || [];
@@ -10017,18 +10047,30 @@ function renderBizTeamFullScreenView_(){
 
 /* --- ensureBizTeamStatusLoaded_ --- */
 function ensureBizTeamStatusLoaded_(cb){  
- if (BIZ_TEAM_STATUS_DATA_) return;  
- const cacheKey = bizTeamStatusCacheKey_();  
- const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
- if (cached) { BIZ_TEAM_STATUS_DATA_ = cached; if (cb) cb(); return; }  
- google.script.run  
- .withSuccessHandler(function(res){  
- BIZ_TEAM_STATUS_DATA_ = res || { success: false, error: '알 수 없는 오류' };  
- if (res && res.success) cacheSet_(cacheKey, res);  
- if (cb) cb();  
- })  
- .withFailureHandler(function(err){ BIZ_TEAM_STATUS_DATA_ = { success: false, error: String(err) }; if (cb) cb(); })  
- .getBizTeamDataNearestOnOrBefore(SESSION.token, BIZ_TEAM_VIEW_DATE_, BIZ_TEAM_VIEW_PRODUCT_);  
+  if (BIZ_TEAM_STATUS_DATA_) { if (cb) cb(); return; }  
+  const cacheKey = bizTeamStatusCacheKey_();  
+  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_) || cacheGet_('bizTeamStatusLatest_', GRID_CACHE_TTL_MS_);  
+  if (cached) { 
+    BIZ_TEAM_STATUS_DATA_ = cached; 
+    if (cached.date && !isBlockedDate(cached.date)) BIZ_TEAM_VIEW_DATE_ = cached.date;
+    if (cb) cb(); 
+    return; 
+  }  
+  google.script.run  
+    .withSuccessHandler(function(res){  
+      BIZ_TEAM_STATUS_DATA_ = res || { success: false, error: '알 수 없는 오류' };  
+      if (res && res.success) {
+        cacheSet_(cacheKey, res);  
+        cacheSet_('bizTeamStatusLatest_', res);
+        if (res.date && !isBlockedDate(res.date)) BIZ_TEAM_VIEW_DATE_ = res.date;
+      }
+      if (cb) cb();  
+    })  
+    .withFailureHandler(function(err){ 
+      BIZ_TEAM_STATUS_DATA_ = { success: false, error: String(err) }; 
+      if (cb) cb(); 
+    })  
+    .getBizTeamDataNearestOnOrBefore(SESSION.token, BIZ_TEAM_VIEW_DATE_, BIZ_TEAM_VIEW_PRODUCT_);  
 }
 
 
