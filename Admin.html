@@ -6063,7 +6063,7 @@ function getProductDailyYearMonth_(){
 }
 
 function loadProductDailyData(){
-  const container = document.getElementById('grid-product-daily');
+  const container = (document.getElementById('grid-product-daily') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">데이터를 불러오는 중입니다...</div></div>';
   setLoadingCursor(true);
   google.script.run
@@ -6084,7 +6084,7 @@ function loadProductDailyData(){
 }
 
 function renderProductDaily(){
-  const container = document.getElementById('grid-product-daily');
+  const container = (document.getElementById('grid-product-daily') || document.getElementById('content'));
   if (!PRODUCT_DAILY_ROWS.length) {
     container.innerHTML = '<div class="placeholder">등록된 상품일보 데이터가 없습니다.</div>';
     return;
@@ -6121,7 +6121,7 @@ function deleteProductDailyRow(id){
 
 /* ===================== 사용자 관리 탭 ===================== */
 function loadUsers(){
-  const container = document.getElementById('grid-users');
+  const container = (document.getElementById('grid-users') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">사용자 목록 로드 중...</div></div>';
   setLoadingCursor(true);
   google.script.run
@@ -6138,7 +6138,7 @@ function loadUsers(){
 }
 
 function renderUsers(){
-  const container = document.getElementById('grid-users');
+  const container = (document.getElementById('grid-users') || document.getElementById('content'));
   if (!USER_ROWS.length) { container.innerHTML = '<div class="placeholder">등록된 사용자가 없습니다.</div>'; return; }
   let html = '<table><thead><tr>' +
     '<th>이름</th><th>전화번호</th><th>직무</th><th>권한</th><th>등록일시</th><th>최근접속</th><th>브라우저</th><th>기기</th><th>작업</th>' +
@@ -6199,7 +6199,7 @@ function deleteUser(phone){
 
 /* ===================== 사용내역(로그인/작업이력) ===================== */
 function loadLoginHistory(){
-  const container = document.getElementById('grid-loginhistory');
+  const container = (document.getElementById('grid-loginhistory') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">로그인 이력 로드 중...</div></div>';
   google.script.run
     .withSuccessHandler(function(res){
@@ -6214,20 +6214,42 @@ function loadLoginHistory(){
     .adminListLoginHistory(SESSION.token);
 }
 
+let USER_ACTION_HISTORY_ROWS = [];
+
 function loadUserActionHistory(){
-  const container = document.getElementById('grid-userhistory');
-  container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">작업 이력 로드 중...</div></div>';
+  const container = (document.getElementById('grid-userhistory') || document.getElementById('content'));
+  if (container) container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">작업 이력 로드 중...</div></div>';
   google.script.run
     .withSuccessHandler(function(res){
-      const rows = res.rows || [];
-      if (!rows.length) { container.innerHTML = '<div class="placeholder">작업 이력이 없습니다.</div>'; return; }
-      let html = '<table><thead><tr><th>시간</th><th>사용자</th><th>계약번호</th><th>액션</th><th>필드</th><th>이전값</th><th>이후값</th></tr></thead><tbody>';
-      rows.forEach(r => { html += '<tr>' + r.map(c => '<td>' + escHtml(String(c||'')) + '</td>').join('') + '</tr>'; });
-      html += '</tbody></table>';
-      container.innerHTML = html;
+      USER_ACTION_HISTORY_ROWS = res.rows || [];
+      renderUserActionHistory();
     })
-    .withFailureHandler(function(err){ container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; })
+    .withFailureHandler(function(err){ 
+      if (container) container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; 
+    })
     .adminListHistory(SESSION.token);
+}
+
+function renderUserActionHistory(){
+  const container = (document.getElementById('grid-userhistory') || document.getElementById('content'));
+  if (!container) return;
+  const q = (document.getElementById('userHistorySearchBox')?.value || '').trim().toLowerCase();
+  let rows = USER_ACTION_HISTORY_ROWS || [];
+  if (q) {
+    rows = rows.filter(r => r.some(c => String(c||'').toLowerCase().includes(q)));
+  }
+  const countEl = document.getElementById('userHistoryCount');
+  if (countEl) countEl.innerText = '총 ' + rows.length + '건';
+  if (!rows.length) {
+    container.innerHTML = '<div class="placeholder">작업 이력이 없습니다.</div>';
+    return;
+  }
+  let html = '<div class="grid-wrap"><table><thead><tr><th>시간</th><th>사용자</th><th>계약번호</th><th>액션</th><th>필드</th><th>이전값</th><th>이후값</th></tr></thead><tbody>';
+  rows.forEach(r => {
+    html += '<tr>' + r.map(c => '<td>' + escHtml(String(c||'')) + '</td>').join('') + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
 }
 
 /* ===================== 목표설정 탭 ===================== */
@@ -6244,7 +6266,7 @@ function loadTargetInput(){
 }
 
 function renderTargetInput(res){
-  const container = document.getElementById('grid-target');
+  const container = (document.getElementById('grid-target') || document.getElementById('content'));
   const items = res.items || [];
   let html = '<div class="status-target"><div class="status-target-title">월별 영업목표 (' + res.yearMonth + ')</div>';
   items.forEach(it => {
@@ -6283,7 +6305,7 @@ function getTargetInputYearMonth(){ return document.getElementById('targetYearMo
 /* ===================== 일일실적보고 탭 ===================== */
 function loadDailyReport(){
   const ds = document.getElementById('dailyReportDateInput')?.value || todayStr();
-  const container = document.getElementById('grid-daily-report');
+  const container = (document.getElementById('grid-daily-report') || document.getElementById('content'));
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">일일실적보고 로드 중...</div></div>';
   setLoadingCursor(true);
   google.script.run
@@ -6299,7 +6321,7 @@ function loadDailyReport(){
 }
 
 function renderDailyReport(res){
-  const container = document.getElementById('grid-daily-report');
+  const container = (document.getElementById('grid-daily-report') || document.getElementById('content'));
   const items = res.items || [];
   let html = '<div class="status-wrap"><h2>' + res.date + ' 일일실적보고</h2>';
   html += '<table style="margin-top:10px;"><thead><tr>' +
@@ -6372,7 +6394,7 @@ function exportGridToExcel(type, filename){
 }
 
 function exportGridToImage(type){
-  const el = document.getElementById('grid-order');
+  const el = (document.getElementById('grid-order') || document.getElementById('content'));
   if (!el) return;
   html2canvas(el).then(canvas => {
     const a = document.createElement('a');
