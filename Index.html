@@ -3284,7 +3284,8 @@ function renderDashboard(){
  '<option value="" ' + (DASH_REP===''?'selected':'') + '>전체(지사)</option>' +  
  DASH_REP_LIST.map(function(rep){ return '<option value="' + rep + '" ' + (DASH_REP===rep?'selected':'') + '>' + rep + '</option>'; }).join('') +  
  '</select>' +  
- '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:auto; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
+ '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:12px; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
+  '<button id="bizTeamOpenModalBtn" onclick="openBizTeamModal_()" style="background:#1f6f4a; color:#fff; border-color:#154f34; margin-left:8px;">사업팀 데이터</button>' +  
  '</div>' +  
   
  '<div class="dash-scroll">' +  
@@ -3662,7 +3663,7 @@ function renderBizTeamFullScreenView_(){
  } else if (!res.success) {  
  bodyHtml = '<div class="denied">' + escHtml(res.error || '불러오기 실패') + '</div>';  
  } else if (!res.found) {  
- bodyHtml = '<div class="placeholder"><h2>등록된 사업팀 데이터가 없습니다</h2><p>관리자 화면에서 사업팀 데이터가 등록되면 이 화면에 표시됩니다.</p></div>';  
+  bodyHtml = '<div class="placeholder"><h2>등록된 사업팀 데이터가 없습니다</h2><p>관리자 화면에서 사업팀 데이터가 등록되면 이 화면에 표시됩니다.</p><div style="margin-top:16px;"><button type="button" onclick="openBizTeamModal_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; border-radius:4px; padding:8px 18px; font-size:14px; font-weight:700; cursor:pointer;">+ 사업팀 데이터 등록하기</button></div></div>';  
  } else {  
  const branches = res.branches || [];  
  const rows = res.rows || [];  
@@ -3691,6 +3692,7 @@ function renderBizTeamFullScreenView_(){
  '<select id="bizTeamViewProduct" onchange="bizTeamViewFilterChanged_()">' +  
  BIZ_TEAM_PRODUCT_TYPES_.map(function(p){ return '<option value="' + p + '"' + (p === BIZ_TEAM_VIEW_PRODUCT_ ? ' selected' : '') + '>' + escHtml(p) + '</option>'; }).join('') +  
  '</select>' +  
+  '<button type="button" id="btnOpenBizTeamDataModal" onclick="openBizTeamModal_()" style="margin-left:12px; background:#1f6f4a; color:#fff; border:1px solid #154f34; border-radius:4px; padding:6px 14px; font-size:13px; font-weight:700; cursor:pointer;">사업팀 데이터</button>' +  
  '</div>' +  
  '<div class="dash-scroll">' + bodyHtml + '</div>' +  
  '</div>';  
@@ -6635,6 +6637,261 @@ if (SESSION && SESSION.token) {
 } else {
   showLogin();
 }
+
+/* ===================== 사업팀 데이터 모달 & 분석기 ===================== */
+window.BIZ_TEAM_LAST_PARSED_ = null;
+
+const DEFAULT_BIZ_TEAM_BRANCHES_ = [
+  '강남광역', '강북광역', '서초', '영등포', '구로', '강서', '남양주', '송파',
+  '제주', '서울동부', '강동', '서강', '성북', '동서울', '서서울', '북서울'
+];
+
+function openBizTeamModal_(){
+  const overlay = document.getElementById('bizTeamModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+
+  const dateInput = document.getElementById('bizTeamDate');
+  if (dateInput) {
+    if (!dateInput.value) {
+      dateInput.value = (typeof BIZ_TEAM_VIEW_DATE_ !== 'undefined' && BIZ_TEAM_VIEW_DATE_) ? BIZ_TEAM_VIEW_DATE_ : todayStr();
+    }
+  }
+
+  const prodSel = document.getElementById('bizTeamProductSelect');
+  if (prodSel) {
+    const types = (typeof BIZ_TEAM_PRODUCT_TYPES_ !== 'undefined' && BIZ_TEAM_PRODUCT_TYPES_) 
+      ? BIZ_TEAM_PRODUCT_TYPES_ 
+      : ['일반알람', '휴엔', '안전상품', '디지털(정보보안)'];
+    const curVal = prodSel.value || (typeof BIZ_TEAM_VIEW_PRODUCT_ !== 'undefined' ? BIZ_TEAM_VIEW_PRODUCT_ : '일반알람');
+    prodSel.innerHTML = types.map(function(p){
+      return '<option value="' + p + '"' + (p === curVal ? ' selected' : '') + '>' + escHtml(p) + '</option>';
+    }).join('');
+  }
+
+  bizTeamDateChanged_();
+}
+
+function closeBizTeamModal_(){
+  const overlay = document.getElementById('bizTeamModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function bizTeamDateChanged_(){
+  const dtInput = document.getElementById('bizTeamDate');
+  const dt = dtInput ? dtInput.value : todayStr();
+  const dow = document.getElementById('bizTeamDateDow');
+  if (dow) dow.innerText = '(' + weekdayKo(dt) + ')';
+
+  const prod = document.getElementById('bizTeamProductSelect') ? document.getElementById('bizTeamProductSelect').value : '일반알람';
+  const statusLabel = document.getElementById('bizTeamStatusLabel');
+  if (statusLabel) statusLabel.innerHTML = '<span style="color:#666;">데이터 조회 중...</span>';
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      const inputEl = document.getElementById('bizTeamInput');
+      if (res && res.found) {
+        if (inputEl) inputEl.value = res.rawText || '';
+        if (statusLabel) {
+          statusLabel.innerHTML = '<span style="color:#0a7a2f; font-weight:600;">✓ ' + 
+            escHtml(res.registeredBy || '지사장') + ' · ' + escHtml(res.registeredAt || '') + ' 등록</span>';
+        }
+        if (res.branches && res.rows && res.branches.length && res.rows.length) {
+          window.BIZ_TEAM_LAST_PARSED_ = { branches: res.branches, rows: res.rows };
+          renderBizTeamParsedTable_(res.branches, res.rows);
+        } else {
+          bizTeamAnalyze_();
+        }
+      } else {
+        if (inputEl) inputEl.value = '';
+        if (statusLabel) statusLabel.innerHTML = '<span style="color:#888;">등록된 데이터 없음</span>';
+        const wrap = document.getElementById('bizTeamPreviewWrap');
+        if (wrap) wrap.innerHTML = '';
+        window.BIZ_TEAM_LAST_PARSED_ = null;
+      }
+    })
+    .withFailureHandler(function(err){
+      if (statusLabel) statusLabel.innerHTML = '<span style="color:#c00000;">조회 실패: ' + escHtml(err) + '</span>';
+    })
+    .getBizTeamDailyData(SESSION.token, dt, prod);
+}
+
+function bizTeamAnalyze_(){
+  const inputEl = document.getElementById('bizTeamInput');
+  const raw = (inputEl ? inputEl.value : '').trim();
+  const wrap = document.getElementById('bizTeamPreviewWrap');
+  if (!raw) {
+    if (wrap) wrap.innerHTML = '';
+    window.BIZ_TEAM_LAST_PARSED_ = null;
+    return;
+  }
+
+  const prod = document.getElementById('bizTeamProductSelect') ? document.getElementById('bizTeamProductSelect').value : '일반알람';
+  const groups = typeof bizTeamGroupsForProduct_ === 'function' ? bizTeamGroupsForProduct_(prod) : (typeof BIZ_TEAM_GROUPS_ !== 'undefined' ? BIZ_TEAM_GROUPS_ : []);
+  
+  const expectedRows = [];
+  groups.forEach(function(g){
+    (g.subs || []).forEach(function(s){
+      expectedRows.push({ key: s.key, label: s.label, group: g.group });
+    });
+  });
+
+  const lines = raw.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+  if (!lines.length) {
+    if (wrap) wrap.innerHTML = '';
+    window.BIZ_TEAM_LAST_PARSED_ = null;
+    return;
+  }
+
+  let branches = DEFAULT_BIZ_TEAM_BRANCHES_.slice();
+  let dataStartLine = 0;
+  
+  const firstLine = lines[0];
+  const knownBranchRegex = /광역|지사|서울|강남|강북|서초|영등포|구로|강서|남양주|송파|제주|강동|서강|성북|동서울/;
+  if (knownBranchRegex.test(firstLine)) {
+    let parsedBranches = firstLine.split(/\t+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (parsedBranches.length < 10) {
+      parsedBranches = firstLine.split(/\s{2,}/).map(function(s){ return s.trim(); }).filter(Boolean);
+    }
+    if (parsedBranches.length < 10) {
+      parsedBranches = firstLine.split(/\s+/).map(function(s){ return s.trim(); }).filter(Boolean);
+    }
+    if (parsedBranches.length >= 8) {
+      branches = parsedBranches;
+      dataStartLine = 1;
+    }
+  }
+
+  const parsedRows = [];
+  for (let i = dataStartLine; i < lines.length; i++) {
+    const line = lines[i];
+    let vals = line.split(/\t+/).map(function(s){ return s.trim(); });
+    if (vals.length < branches.length) {
+      vals = line.split(/\s{2,}/).map(function(s){ return s.trim(); });
+    }
+    if (vals.length < branches.length) {
+      vals = line.split(/\s+/).map(function(s){ return s.trim(); });
+    }
+    
+    const rowIdx = i - dataStartLine;
+    const expRow = expectedRows[rowIdx];
+    if (vals.length === branches.length + 1) {
+      vals.shift();
+    }
+    
+    const rowLabel = expRow ? expRow.key : ('항목' + (rowIdx + 1));
+    parsedRows.push({
+      label: rowLabel,
+      values: vals
+    });
+  }
+
+  window.BIZ_TEAM_LAST_PARSED_ = { branches: branches, rows: parsedRows };
+  renderBizTeamParsedTable_(branches, parsedRows);
+}
+
+function renderBizTeamParsedTable_(branches, rows){
+  const wrap = document.getElementById('bizTeamPreviewWrap');
+  if (!wrap) return;
+
+  if (!rows || !rows.length) {
+    wrap.innerHTML = '<div style="padding:15px; color:#888; text-align:center;">분석된 데이터가 없습니다.</div>';
+    return;
+  }
+
+  let tableHtml = '<table style="border-collapse:collapse; width:100%; min-width:1100px; font-size:12px; margin-top:8px; border:1px solid #1e293b;">' +
+    '<thead>' +
+      '<tr style="background:#0f1f36; color:#ffffff;">' +
+        '<th style="padding:7px 10px; border:1px solid #1e293b; text-align:center; font-weight:700; width:130px; white-space:nowrap;">구분</th>' +
+        branches.map(function(b){
+          const isMine = (b === '북서울');
+          return '<th style="padding:7px 8px; border:1px solid #1e293b; text-align:center; font-weight:700; white-space:nowrap;' + (isMine ? ' background:#1e3a5f; color:#ffdd57;' : '') + '">' + escHtml(b) + '</th>';
+        }).join('') +
+      '</tr>' +
+    '</thead>' +
+    '<tbody>';
+
+  rows.forEach(function(r, rIdx){
+    const bg = rIdx % 2 === 1 ? '#f8fafc' : '#ffffff';
+    tableHtml += '<tr style="background:' + bg + ';">' +
+      '<td style="padding:6px 10px; border:1px solid #c7cfd8; font-weight:700; color:#1c2f4a; white-space:nowrap; background:#f1f5f9;">' + escHtml(r.label) + '</td>';
+    
+    branches.forEach(function(b, bIdx){
+      const val = (r.values && r.values[bIdx] !== undefined) ? r.values[bIdx] : '';
+      const isMine = (b === '북서울');
+      tableHtml += '<td style="padding:6px 8px; border:1px solid #c7cfd8; text-align:right; font-weight:' + (isMine ? '700' : '500') + '; white-space:nowrap;' + (isMine ? ' background:#fff8e6;' : '') + '">' + escHtml(val) + '</td>';
+    });
+    tableHtml += '</tr>';
+  });
+
+  tableHtml += '</tbody></table>';
+  wrap.innerHTML = tableHtml;
+}
+
+function bizTeamSave_(){
+  const dt = document.getElementById('bizTeamDate') ? document.getElementById('bizTeamDate').value : '';
+  if (!dt) { alert('기준일자를 선택하세요.'); return; }
+  const prod = document.getElementById('bizTeamProductSelect') ? document.getElementById('bizTeamProductSelect').value : '일반알람';
+  const text = (document.getElementById('bizTeamInput') ? document.getElementById('bizTeamInput').value : '').trim();
+  if (!text) { alert('저장할 사업팀 텍스트를 입력하세요.'); return; }
+
+  if (!window.BIZ_TEAM_LAST_PARSED_ || !window.BIZ_TEAM_LAST_PARSED_.rows.length) {
+    bizTeamAnalyze_();
+  }
+  const parsed = window.BIZ_TEAM_LAST_PARSED_;
+  if (!parsed || !parsed.rows.length) {
+    alert('사업팀 데이터를 분석하지 못했습니다. 입력 형식을 확인해 주세요.');
+    return;
+  }
+
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      if (res && res.success) {
+        alert('사업팀 데이터가 성공적으로 저장되었습니다.');
+        closeBizTeamModal_();
+        if (typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined') BIZ_TEAM_STATUS_DATA_ = null;
+        if (typeof DASH_VIEW_ !== 'undefined' && DASH_VIEW_ === 'biz_team') {
+          BIZ_TEAM_VIEW_DATE_ = dt;
+          BIZ_TEAM_VIEW_PRODUCT_ = prod;
+          renderBizTeamFullScreenView_();
+        }
+      } else {
+        alert('저장 실패: ' + ((res && res.error) || '알 수 없는 오류'));
+      }
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('저장 실패: ' + err);
+    })
+    .saveBizTeamDailyData(SESSION.token, dt, JSON.stringify(parsed.branches), JSON.stringify(parsed.rows), text, prod);
+}
+
 </script>
+
+<div class="modal-overlay" id="bizTeamModalOverlay">  
+ <div class="modal" style="width:96vw; max-width:1400px;">  
+ <h2>사업팀 데이터</h2>  
+ <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">  
+ <label style="font-size:13px; color:#555;">기준일자:  
+ <input type="date" id="bizTeamDate" onchange="bizTeamDateChanged_()" style="margin-left:6px; padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px;">  
+ <span id="bizTeamDateDow" style="margin-left:4px; font-weight:700; color:#374151;"></span>  
+ </label>  
+ <label style="font-size:13px; color:#555;">상품종류:  
+ <select id="bizTeamProductSelect" onchange="bizTeamDateChanged_()" style="margin-left:6px; padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px;"></select>  
+ </label>  
+ <span id="bizTeamStatusLabel" style="font-size:12px; color:#888;"></span>  
+ </div>  
+ <div style="color:#888; font-size:12px; margin-bottom:6px;">엑셀에서 지사명(1행) + 데이터(계약/개시/유지감소/유지증가 순) 행을 그대로 복사해 아래에 붙여넣어 주세요. 지사명 행 없이 데이터만 붙여넣으면 기본 16개 지사 순서로 인식합니다.</div>  
+ <textarea id="bizTeamInput" rows="6" oninput="bizTeamAnalyze_()" placeholder="엑셀에서 표를 그대로 복사해 붙여넣으세요" style="width:100%; padding:10px; border:1px solid #c7cfd8; border-radius:6px; font-size:13px; font-family:inherit; box-sizing:border-box;"></textarea>  
+ <div id="bizTeamPreviewWrap" style="margin-top:10px; overflow-x:auto;"></div>  
+ <div id="bizTeamResult" style="margin-top:8px;"></div>  
+ <div class="modal-actions">  
+ <button onclick="closeBizTeamModal_()">닫기</button>  
+ <button class="primary" onclick="bizTeamSave_()">저장</button>  
+ </div>  
+ </div>  
+</div>
 </body>
 </html>
