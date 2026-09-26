@@ -7132,56 +7132,659 @@ function renderUserActionHistory(){
   container.innerHTML = html;
 }
 
-/* ===================== 목표설정 탭 ===================== */
+/* ===================== 목표설정 탭 (완벽 복원) ===================== */
+var TARGET_INPUT_STATE = null;
+var TARGET_REP_RATIOS = {}; // { [prod]: { [rep]: { 수주: %, 개시: %, 유지감소: % } } }
+var TARGET_REP_DIRTY = false;
+
+const TARGET_DEFAULT_REPS = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+const TARGET_DEFAULT_RATIOS = {
+  '최영국': { 수주: 30.0, 개시: 30.0, 유지감소: 30.0 },
+  '이수열': { 수주: 25.0, 개시: 25.0, 유지감소: 25.0 },
+  '박광춘': { 수주: 20.0, 개시: 20.0, 유지감소: 20.0 },
+  '임영민': { 수주: 15.0, 개시: 15.0, 유지감소: 15.0 },
+  '정문재': { 수주: 10.0, 개시: 10.0, 유지감소: 10.0 }
+};
+
+function getTargetInputYearMonth(){
+  return targetYearMonth || todayStr().slice(0, 7);
+}
+
+function updateTargetMonthLabel_(){
+  const el = document.getElementById('targetMonthLabel');
+  if (el) {
+    const ym = getTargetInputYearMonth();
+    const [y, m] = ym.split('-').map(Number);
+    el.innerText = y + '.' + String(m).padStart(2, '0');
+  }
+}
+
+function shiftTargetMonth(delta){
+  if (TARGET_REP_DIRTY) {
+    if (confirm('목표 및 계획에 저장하지 않은 변경사항이 있습니다. 저장하시겠습니까?')) {
+      saveTargetInput(function(){ doShiftTargetMonth_(delta); });
+      return;
+    }
+    TARGET_REP_DIRTY = false;
+  }
+  doShiftTargetMonth_(delta);
+}
+
+function doShiftTargetMonth_(delta){
+  const cur = getTargetInputYearMonth();
+  const parts = cur.split('-').map(Number);
+  const d = new Date(parts[0], parts[1] - 1 + delta, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  targetYearMonth = y + '-' + m;
+  updateTargetMonthLabel_();
+  loadTargetInput();
+}
+
 function loadTargetInput(){
   updateTargetMonthLabel_();
   const ym = getTargetInputYearMonth();
+  if (typeof showLoadingProgress_ === 'function') {
+    showLoadingProgress_('content', '목표 데이터를 불러오는 중입니다...', 'loadTargetInput');
+  }
   setLoadingCursor(true);
+
   google.script.run
-    .withSuccessHandler(function(res){
-      setLoadingCursor(false);
-      renderTargetInput(res);
+    .withSuccessHandler(function(res1){
+      const items = (res1 && res1.success) ? (res1.items || []) : [];
+      google.script.run
+        .withSuccessHandler(function(res2){
+          const repItems = (res2 && res2.success) ? (res2.items || {}) : {};
+          google.script.run
+            .withSuccessHandler(function(res3){
+              setLoadingCursor(false);
+              const safetyItem = (res3 && res3.success) ? res3.item : {};
+              
+              TARGET_INPUT_STATE = {
+                yearMonth: ym,
+                items: items,
+                repItems: repItems,
+                safetyItem: safetyItem
+              };
+              
+              // Initialize ratios
+              initTargetRatios_(items, repItems);
+              TARGET_REP_DIRTY = false;
+              renderTargetInput();
+            })
+            .withFailureHandler(function(err){
+              setLoadingCursor(false);
+              alert('안전상품 목표 로드 실패: ' + err);
+            })
+            .getSalesTargetSafety(SESSION.token, ym);
+        })
+        .withFailureHandler(function(err){
+          setLoadingCursor(false);
+          alert('컨설턴트별 목표 로드 실패: ' + err);
+        })
+        .getSalesTargetByRep(SESSION.token, ym);
     })
-    .withFailureHandler(function(err){ setLoadingCursor(false); alert('목표 로드 실패: ' + err); })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('상품별 목표 로드 실패: ' + err);
+    })
     .getSalesTargetByProduct(SESSION.token, ym);
 }
 
-function renderTargetInput(res){
-  const container = (document.getElementById('grid-target') || document.getElementById('content'));
-  const items = res.items || [];
-  let html = '<div class="status-target"><div class="status-target-title">월별 영업목표 (' + res.yearMonth + ')</div>';
-  items.forEach(it => {
-    html += '<div class="status-target-row">' +
-      '<span class="label">' + escHtml(it.상품종류) + '</span> ' +
-      '목표_수주: <input type="number" id="tgt_ord_' + it.상품종류 + '" value="' + (it.목표_수주금액||0) + '"> ' +
-      '목표_개시: <input type="number" id="tgt_start_' + it.상품종류 + '" value="' + (it.목표_개시금액||0) + '"> ' +
-      '목표_유지감소: <input type="number" id="tgt_dec_' + it.상품종류 + '" value="' + (it.목표_유지감소||0) + '">' +
-    '</div>';
+function initTargetRatios_(items, repItems){
+  TARGET_REP_RATIOS = {};
+  const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
+  const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : TARGET_DEFAULT_REPS;
+
+  PRODUCTS.forEach(p => {
+    TARGET_REP_RATIOS[p] = {};
+    const prodItem = items.find(it => it.상품종류 === p) || {};
+    const tgtOrd = Number(prodItem.목표_수주금액) || 0;
+    const tgtStart = Number(prodItem.목표_개시금액) || 0;
+    const tgtDec = Number(prodItem.목표_유지감소) || 0;
+
+    reps.forEach(rep => {
+      const saved = (repItems[rep] && repItems[rep][p]) || null;
+      const def = TARGET_DEFAULT_RATIOS[rep] || { 수주: 20.0, 개시: 20.0, 유지감소: 20.0 };
+
+      if (saved) {
+        TARGET_REP_RATIOS[p][rep] = {
+          수주: (tgtOrd > 0 && saved.목표_수주금액 != null) ? Number((saved.목표_수주금액 / tgtOrd * 100).toFixed(2)) : def.수주,
+          개시: (tgtStart > 0 && saved.목표_개시금액 != null) ? Number((saved.목표_개시금액 / tgtStart * 100).toFixed(2)) : def.개시,
+          유지감소: (tgtDec > 0 && saved.목표_유지감소 != null) ? Number((saved.목표_유지감소 / tgtDec * 100).toFixed(2)) : def.유지감소
+        };
+      } else {
+        TARGET_REP_RATIOS[p][rep] = {
+          수주: def.수주,
+          개시: def.개시,
+          유지감소: def.유지감소
+        };
+      }
+    });
   });
-  html += '<div style="margin-top:10px;"><button class="save" onclick="saveTargetInput()">저장</button></div></div>';
+}
+
+function renderTargetInput(){
+  const container = document.getElementById('content');
+  if (!container || !TARGET_INPUT_STATE) return;
+
+  const ym = TARGET_INPUT_STATE.yearMonth;
+  const [y, m] = ym.split('-').map(Number);
+  const items = TARGET_INPUT_STATE.items;
+  const safety = TARGET_INPUT_STATE.safetyItem || {};
+  const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
+  const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : TARGET_DEFAULT_REPS;
+
+  const fmt = v => {
+    if (v === '' || v == null) return '0';
+    const n = Number(String(v).replace(/,/g, ''));
+    return isNaN(n) ? '0' : n.toLocaleString('ko-KR');
+  };
+
+  const getProdVal = (p, cat, f) => {
+    const it = items.find(x => x.상품종류 === p);
+    if (!it) return 0;
+    const key = cat + '_' + f + (f === '유지감소' ? '' : '금액');
+    return Number(it[key]) || 0;
+  };
+
+  // Top Table Rows
+  let prodRowsHtml = '';
+  PRODUCTS.forEach(p => {
+    const ordTgt = getProdVal(p, '목표', '수주');
+    const startTgt = getProdVal(p, '목표', '개시');
+    const decTgt = getProdVal(p, '목표', '유지감소');
+    const incTgt = startTgt - decTgt;
+
+    const ordPln = getProdVal(p, '계획', '수주');
+    const startPln = getProdVal(p, '계획', '개시');
+    const decPln = getProdVal(p, '계획', '유지감소');
+    const incPln = startPln - decPln;
+
+    prodRowsHtml += `
+      <tr>
+        <td rowspan="2" style="border:1px solid #dce3ea; font-weight:700; text-align:center; vertical-align:middle; background:#fff; font-size:13px; color:#1c2f4a;">${p}</td>
+        <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; background:#fff; font-size:13px; color:#333;">목표</td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="tgt_ord_${p}" value="${fmt(ordTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="tgt_start_${p}" value="${fmt(startTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="tgt_dec_${p}" value="${fmt(decTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:600; color:#333; font-size:13px;" id="tgt_inc_disp_${p}">${fmt(incTgt)}</td>
+      </tr>
+      <tr>
+        <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; background:#fff; font-size:13px; color:#333;">계획</td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="pln_ord_${p}" value="${fmt(ordPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="pln_start_${p}" value="${fmt(startPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="pln_dec_${p}" value="${fmt(decPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:600; color:#333; font-size:13px;" id="pln_inc_disp_${p}">${fmt(incPln)}</td>
+      </tr>
+    `;
+  });
+
+  // Calculate Initial Totals for Top Table
+  let totOrdTgt = 0, totStartTgt = 0, totDecTgt = 0;
+  let totOrdPln = 0, totStartPln = 0, totDecPln = 0;
+  PRODUCTS.forEach(p => {
+    totOrdTgt += getProdVal(p, '목표', '수주');
+    totStartTgt += getProdVal(p, '목표', '개시');
+    totDecTgt += getProdVal(p, '목표', '유지감소');
+
+    totOrdPln += getProdVal(p, '계획', '수주');
+    totStartPln += getProdVal(p, '계획', '개시');
+    totDecPln += getProdVal(p, '계획', '유지감소');
+  });
+
+  const totIncTgt = totStartTgt - totDecTgt;
+  const totIncPln = totStartPln - totDecPln;
+
+  // Build Consultant Panels HTML
+  let panelsHtml = '';
+  PRODUCTS.forEach(p => {
+    const tgtOrd = getProdVal(p, '목표', '수주');
+    const tgtStart = getProdVal(p, '목표', '개시');
+    const tgtDec = getProdVal(p, '목표', '유지감소');
+    const tgtInc = tgtStart - tgtDec;
+
+    let repRows = '';
+    let sumRatioOrd = 0, sumRatioStart = 0, sumRatioDec = 0;
+    let sumAmtOrd = 0, sumAmtStart = 0, sumAmtDec = 0, sumAmtInc = 0;
+
+    reps.forEach(rep => {
+      const rMap = (TARGET_REP_RATIOS[p] && TARGET_REP_RATIOS[p][rep]) || { 수주: 20.0, 개시: 20.0, 유지감소: 20.0 };
+      const rOrd = Number(rMap.수주) || 0;
+      const rStart = Number(rMap.개시) || 0;
+      const rDec = Number(rMap.유지감소) || 0;
+
+      const amtOrd = Math.round(tgtOrd * rOrd / 100);
+      const amtStart = Math.round(tgtStart * rStart / 100);
+      const amtDec = Math.round(tgtDec * rDec / 100);
+      const amtInc = amtStart - amtDec;
+
+      sumRatioOrd += rOrd;
+      sumRatioStart += rStart;
+      sumRatioDec += rDec;
+
+      sumAmtOrd += amtOrd;
+      sumAmtStart += amtStart;
+      sumAmtDec += amtDec;
+      sumAmtInc += amtInc;
+
+      repRows += `
+        <tr>
+          <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; padding:6px 8px; font-size:13px; color:#1c2f4a;">${rep}</td>
+          <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:center;">
+            <div style="display:inline-flex; align-items:center; justify-content:center; gap:2px;">
+              <input type="text" class="tgt-ratio-input" id="ratio_${p}_${rep}_수주" value="${rOrd.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '수주');">
+              <span style="font-size:12px; color:#555;">%</span>
+            </div>
+            <div style="font-size:11px; color:#888; margin-top:2px;" id="amt_${p}_${rep}_수주">${fmt(amtOrd)}천원</div>
+          </td>
+          <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:center;">
+            <div style="display:inline-flex; align-items:center; justify-content:center; gap:2px;">
+              <input type="text" class="tgt-ratio-input" id="ratio_${p}_${rep}_개시" value="${rStart.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '개시');">
+              <span style="font-size:12px; color:#555;">%</span>
+            </div>
+            <div style="font-size:11px; color:#888; margin-top:2px;" id="amt_${p}_${rep}_개시">${fmt(amtStart)}천원</div>
+          </td>
+          <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:center;">
+            <div style="display:inline-flex; align-items:center; justify-content:center; gap:2px;">
+              <input type="text" class="tgt-ratio-input" id="ratio_${p}_${rep}_유지감소" value="${rDec.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '유지감소');">
+              <span style="font-size:12px; color:#555;">%</span>
+            </div>
+            <div style="font-size:11px; color:#888; margin-top:2px;" id="amt_${p}_${rep}_유지감소">${fmt(amtDec)}천원</div>
+          </td>
+          <td style="border:1px solid #dce3ea; text-align:right; font-weight:600; padding:6px 10px; font-size:13px; color:#333;" id="amt_${p}_${rep}_유지증가">${fmt(amtInc)}</td>
+        </tr>
+      `;
+    });
+
+    const diffOrd = sumAmtOrd - tgtOrd;
+    const diffStart = sumAmtStart - tgtStart;
+    const diffDec = sumAmtDec - tgtDec;
+    const diffInc = sumAmtInc - tgtInc;
+
+    const diffFmt = d => {
+      const cls = d === 0 ? 'diff-zero' : 'diff-warn';
+      const text = d > 0 ? ('+' + fmt(d)) : fmt(d);
+      return `<span class="${cls}">${text}</span>`;
+    };
+
+    panelsHtml += `
+      <div style="background:#fff; border:1px solid #dce3ea; border-radius:6px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); min-width:440px; flex:0 0 auto;">
+        <div style="font-size:15px; font-weight:700; color:#1c2f4a; margin-bottom:4px;">${p}</div>
+        <div style="font-size:11px; color:#667; line-height:1.4; margin-bottom:10px;">상품 목표 대비 배분 비율(%)을 입력하세요. 비율 합계가 100.00%가 되면, 그 비율대로 천원 단위로 반올림되어 자동 배분됩니다.</div>
+        <table style="border-collapse:collapse; width:100%; font-size:12px;">
+          <thead>
+            <tr style="background:#f5e8ea; color:#701f3a;">
+              <th style="border:1px solid #dce3ea; padding:6px 8px; font-weight:700;">영업담당</th>
+              <th style="border:1px solid #dce3ea; padding:6px 8px; font-weight:700;">수주 비율(%)</th>
+              <th style="border:1px solid #dce3ea; padding:6px 8px; font-weight:700;">개시 비율(%)</th>
+              <th style="border:1px solid #dce3ea; padding:6px 8px; font-weight:700;">유지감소 비율(%)</th>
+              <th style="border:1px solid #dce3ea; padding:6px 8px; font-weight:700;">유지증가<br><span style="font-size:10px; font-weight:normal;">(자동)</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${repRows}
+            <tr style="background:#fafbfc; font-weight:700;">
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;">비율합계</td>
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;" id="sum_ratio_${p}_수주">${sumRatioOrd.toFixed(2)}%</td>
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;" id="sum_ratio_${p}_개시">${sumRatioStart.toFixed(2)}%</td>
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;" id="sum_ratio_${p}_유지감소">${sumRatioDec.toFixed(2)}%</td>
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;"></td>
+            </tr>
+            <tr style="background:#fafbfc; font-weight:700;">
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;">합계(천원)</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="sum_amt_${p}_수주">${fmt(sumAmtOrd)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="sum_amt_${p}_개시">${fmt(sumAmtStart)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="sum_amt_${p}_유지감소">${fmt(sumAmtDec)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="sum_amt_${p}_유지증가">${fmt(sumAmtInc)}</td>
+            </tr>
+            <tr style="background:#fafbfc; font-weight:700;">
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;">${p} 목표</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="ref_tgt_${p}_수주">${fmt(tgtOrd)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="ref_tgt_${p}_개시">${fmt(tgtStart)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="ref_tgt_${p}_유지감소">${fmt(tgtDec)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="ref_tgt_${p}_유지증가">${fmt(tgtInc)}</td>
+            </tr>
+            <tr style="background:#fafbfc; font-weight:700;">
+              <td style="border:1px solid #dce3ea; text-align:center; padding:6px 8px;">차이(합계-상품목표)</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="diff_${p}_수주">${diffFmt(diffOrd)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="diff_${p}_개시">${diffFmt(diffStart)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="diff_${p}_유지감소">${diffFmt(diffDec)}</td>
+              <td style="border:1px solid #dce3ea; text-align:right; padding:6px 10px;" id="diff_${p}_유지증가">${diffFmt(diffInc)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  // Assemble full HTML
+  let html = `
+    <style>
+      .tgt-num-input { width: 72px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 13px; font-weight: 500; font-family: inherit; }
+      .tgt-num-input:focus { border-color: #701f3a; outline: none; box-shadow: 0 0 0 2px rgba(112,31,58,0.12); }
+      .tgt-ratio-input { width: 48px; padding: 3px 4px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: right; font-size: 12px; font-weight: 500; font-family: inherit; }
+      .tgt-ratio-input:focus { border-color: #701f3a; outline: none; }
+      .diff-zero { color: #27ae60; font-style: italic; font-weight: 700; }
+      .diff-warn { color: #c0392b; font-style: italic; font-weight: 700; }
+    </style>
+
+    <div style="padding:16px 20px; max-width:1400px; margin:0 auto;">
+      <!-- Title -->
+      <div style="font-size:16px; font-weight:700; color:#5c1c2f; margin-bottom:12px;">${y}.${m}월 상품종류별 목표/계획 (단위: 천원)</div>
+
+      <!-- Top Two Cards -->
+      <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:28px;">
+        <!-- Left: Product Targets Table Card -->
+        <div style="background:#fff; border:1px solid #dce3ea; border-radius:6px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); overflow-x:auto;">
+          <table style="border-collapse:collapse; font-size:13px; white-space:nowrap;">
+            <thead>
+              <tr style="background:#f5e8ea; color:#701f3a;">
+                <th style="border:1px solid #dce3ea; padding:8px 14px; font-weight:700;">상품종류</th>
+                <th style="border:1px solid #dce3ea; padding:8px 14px; font-weight:700;">구분</th>
+                <th style="border:1px solid #dce3ea; padding:8px 14px; font-weight:700;">수주</th>
+                <th style="border:1px solid #dce3ea; padding:8px 14px; font-weight:700;">개시</th>
+                <th style="border:1px solid #dce3ea; padding:8px 14px; font-weight:700;">유지감소</th>
+                <th style="border:1px solid #dce3ea; padding:8px 14px; font-weight:700;">유지증가<br><span style="font-size:11px; font-weight:normal;">(자동)</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${prodRowsHtml}
+              <!-- 합계 Row -->
+              <tr>
+                <td rowspan="2" style="border:1px solid #dce3ea; font-weight:700; text-align:center; vertical-align:middle; background:#fff; font-size:13px; color:#1c2f4a;">합계</td>
+                <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; background:#fff; font-size:13px; color:#333;">목표</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_tgt_ord">${fmt(totOrdTgt)}</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_tgt_start">${fmt(totStartTgt)}</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_tgt_dec">${fmt(totDecTgt)}</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_tgt_inc">${fmt(totIncTgt)}</td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; background:#fff; font-size:13px; color:#333;">계획</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_pln_ord">${fmt(totOrdPln)}</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_pln_start">${fmt(totStartPln)}</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_pln_dec">${fmt(totDecPln)}</td>
+                <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a;" id="tot_pln_inc">${fmt(totIncPln)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Right: Safety Target Table Card -->
+        <div style="background:#fff; border:1px solid #dce3ea; border-radius:6px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05); min-width:250px;">
+          <div style="font-size:14px; font-weight:700; color:#1c2f4a; margin-bottom:8px;">안전상품</div>
+          <table style="border-collapse:collapse; font-size:13px; width:100%;">
+            <thead>
+              <tr style="background:#f5e8ea; color:#701f3a;">
+                <th style="border:1px solid #dce3ea; padding:8px; font-weight:700;"></th>
+                <th style="border:1px solid #dce3ea; padding:8px 12px; font-weight:700;">수주</th>
+                <th style="border:1px solid #dce3ea; padding:8px 12px; font-weight:700;">매출</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; padding:6px; background:#fff;">목표</td>
+                <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="safety_tgt_ord" value="${fmt(safety.목표_수주)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+                <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="safety_tgt_sales" value="${fmt(safety.목표_매출)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+              </tr>
+              <tr>
+                <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; padding:6px; background:#fff;">계획</td>
+                <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="safety_pln_ord" value="${fmt(safety.계획_수주)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+                <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right;"><input type="text" class="tgt-num-input" id="safety_pln_sales" value="${fmt(safety.계획_매출)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Bottom Section: Consultant Target Panels -->
+      <div style="font-size:16px; font-weight:700; color:#1c2f4a; margin-bottom:12px;">컨설턴트별 목표 입력</div>
+      <div style="display:flex; gap:16px; overflow-x:auto; padding-bottom:16px;">
+        ${panelsHtml}
+      </div>
+    </div>
+  `;
+
   container.innerHTML = html;
 }
 
-function saveTargetInput(){
-  const ym = getTargetInputYearMonth();
-  const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
-  const items = PRODUCTS.map(p => ({
-    상품종류: p,
-    목표_수주금액: Number(document.getElementById('tgt_ord_' + p).value) || 0,
-    목표_개시금액: Number(document.getElementById('tgt_start_' + p).value) || 0,
-    목표_유지감소: Number(document.getElementById('tgt_dec_' + p).value) || 0,
-    계획_수주금액: Number(document.getElementById('tgt_ord_' + p).value) || 0,
-    계획_개시금액: Number(document.getElementById('tgt_start_' + p).value) || 0,
-    계획_유지감소: Number(document.getElementById('tgt_dec_' + p).value) || 0
-  }));
-  setLoadingCursor(true);
-  google.script.run
-    .withSuccessHandler(function(){ setLoadingCursor(false); alert('목표가 저장되었습니다.'); loadTargetInput(); })
-    .withFailureHandler(function(err){ setLoadingCursor(false); alert('저장 실패: ' + err); })
-    .saveSalesTargetByProduct(SESSION.token, ym, items);
+function markTargetDirty_(){
+  TARGET_REP_DIRTY = true;
 }
 
-function getTargetInputYearMonth(){ return document.getElementById('targetYearMonthInput')?.value || todayStr().slice(0, 7); }
+function parseTgtNum_(id){
+  const el = document.getElementById(id);
+  if (!el) return 0;
+  return Number(String(el.value).replace(/[^0-9.-]/g, '')) || 0;
+}
+
+function onTargetProductChange_(prod){
+  markTargetDirty_();
+  const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
+  const fmt = v => Math.round(Number(v)||0).toLocaleString('ko-KR');
+
+  // Recalc product inc
+  const ordTgt = parseTgtNum_('tgt_ord_' + prod);
+  const startTgt = parseTgtNum_('tgt_start_' + prod);
+  const decTgt = parseTgtNum_('tgt_dec_' + prod);
+  const incTgt = startTgt - decTgt;
+
+  const ordPln = parseTgtNum_('pln_ord_' + prod);
+  const startPln = parseTgtNum_('pln_start_' + prod);
+  const decPln = parseTgtNum_('pln_dec_' + prod);
+  const incPln = startPln - decPln;
+
+  const incTgtEl = document.getElementById('tgt_inc_disp_' + prod);
+  if (incTgtEl) incTgtEl.innerText = fmt(incTgt);
+
+  const incPlnEl = document.getElementById('pln_inc_disp_' + prod);
+  if (incPlnEl) incPlnEl.innerText = fmt(incPln);
+
+  // Recalc totals for top table
+  let totOrdTgt = 0, totStartTgt = 0, totDecTgt = 0;
+  let totOrdPln = 0, totStartPln = 0, totDecPln = 0;
+  PRODUCTS.forEach(p => {
+    totOrdTgt += parseTgtNum_('tgt_ord_' + p);
+    totStartTgt += parseTgtNum_('tgt_start_' + p);
+    totDecTgt += parseTgtNum_('tgt_dec_' + p);
+
+    totOrdPln += parseTgtNum_('pln_ord_' + p);
+    totStartPln += parseTgtNum_('pln_start_' + p);
+    totDecPln += parseTgtNum_('pln_dec_' + p);
+  });
+
+  const totIncTgt = totStartTgt - totDecTgt;
+  const totIncPln = totStartPln - totDecPln;
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = fmt(val); };
+  setEl('tot_tgt_ord', totOrdTgt);
+  setEl('tot_tgt_start', totStartTgt);
+  setEl('tot_tgt_dec', totDecTgt);
+  setEl('tot_tgt_inc', totIncTgt);
+
+  setEl('tot_pln_ord', totOrdPln);
+  setEl('tot_pln_start', totStartPln);
+  setEl('tot_pln_dec', totDecPln);
+  setEl('tot_pln_inc', totIncPln);
+
+  // Recalc bottom consultant panel for this product
+  recalcRepPanel_(prod);
+}
+
+function onRepRatioChange_(prod, rep, field){
+  markTargetDirty_();
+  const el = document.getElementById(`ratio_${prod}_${rep}_${field}`);
+  if (!el) return;
+  const val = Number(String(el.value).replace(/[^0-9.-]/g, '')) || 0;
+  if (!TARGET_REP_RATIOS[prod]) TARGET_REP_RATIOS[prod] = {};
+  if (!TARGET_REP_RATIOS[prod][rep]) TARGET_REP_RATIOS[prod][rep] = {};
+  TARGET_REP_RATIOS[prod][rep][field] = val;
+
+  recalcRepPanel_(prod);
+}
+
+function recalcRepPanel_(prod){
+  const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : TARGET_DEFAULT_REPS;
+  const fmt = v => Math.round(Number(v)||0).toLocaleString('ko-KR');
+
+  const tgtOrd = parseTgtNum_('tgt_ord_' + prod);
+  const tgtStart = parseTgtNum_('tgt_start_' + prod);
+  const decTgt = parseTgtNum_('tgt_dec_' + prod);
+  const tgtInc = tgtStart - decTgt;
+
+  let sumRatioOrd = 0, sumRatioStart = 0, sumRatioDec = 0;
+  let sumAmtOrd = 0, sumAmtStart = 0, sumAmtDec = 0, sumAmtInc = 0;
+
+  reps.forEach(rep => {
+    const rOrd = Number(document.getElementById(`ratio_${prod}_${rep}_수주`)?.value) || 0;
+    const rStart = Number(document.getElementById(`ratio_${prod}_${rep}_개시`)?.value) || 0;
+    const rDec = Number(document.getElementById(`ratio_${prod}_${rep}_유지감소`)?.value) || 0;
+
+    const amtOrd = Math.round(tgtOrd * rOrd / 100);
+    const amtStart = Math.round(tgtStart * rStart / 100);
+    const amtDec = Math.round(decTgt * rDec / 100);
+    const amtInc = amtStart - amtDec;
+
+    sumRatioOrd += rOrd;
+    sumRatioStart += rStart;
+    sumRatioDec += rDec;
+
+    sumAmtOrd += amtOrd;
+    sumAmtStart += amtStart;
+    sumAmtDec += amtDec;
+    sumAmtInc += amtInc;
+
+    const elAmtOrd = document.getElementById(`amt_${prod}_${rep}_수주`);
+    if (elAmtOrd) elAmtOrd.innerText = fmt(amtOrd) + '천원';
+
+    const elAmtStart = document.getElementById(`amt_${prod}_${rep}_개시`);
+    if (elAmtStart) elAmtStart.innerText = fmt(amtStart) + '천원';
+
+    const elAmtDec = document.getElementById(`amt_${prod}_${rep}_유지감소`);
+    if (elAmtDec) elAmtDec.innerText = fmt(amtDec) + '천원';
+
+    const elAmtInc = document.getElementById(`amt_${prod}_${rep}_유지증가`);
+    if (elAmtInc) elAmtInc.innerText = fmt(amtInc);
+  });
+
+  // Summary rows
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+  setEl(`sum_ratio_${prod}_수주`, sumRatioOrd.toFixed(2) + '%');
+  setEl(`sum_ratio_${prod}_개시`, sumRatioStart.toFixed(2) + '%');
+  setEl(`sum_ratio_${prod}_유지감소`, sumRatioDec.toFixed(2) + '%');
+
+  setEl(`sum_amt_${prod}_수주`, fmt(sumAmtOrd));
+  setEl(`sum_amt_${prod}_개시`, fmt(sumAmtStart));
+  setEl(`sum_amt_${prod}_유지감소`, fmt(sumAmtDec));
+  setEl(`sum_amt_${prod}_유지증가`, fmt(sumAmtInc));
+
+  setEl(`ref_tgt_${prod}_수주`, fmt(tgtOrd));
+  setEl(`ref_tgt_${prod}_개시`, fmt(tgtStart));
+  setEl(`ref_tgt_${prod}_유지감소`, fmt(decTgt));
+  setEl(`ref_tgt_${prod}_유지증가`, fmt(tgtInc));
+
+  const diffOrd = sumAmtOrd - tgtOrd;
+  const diffStart = sumAmtStart - tgtStart;
+  const diffDec = sumAmtDec - decTgt;
+  const diffInc = sumAmtInc - tgtInc;
+
+  const diffFmt = d => {
+    const cls = d === 0 ? 'diff-zero' : 'diff-warn';
+    const text = d > 0 ? ('+' + fmt(d)) : fmt(d);
+    return `<span class="${cls}">${text}</span>`;
+  };
+
+  const setHtml = (id, val) => { const el = document.getElementById(id); if (el) el.innerHTML = val; };
+  setHtml(`diff_${prod}_수주`, diffFmt(diffOrd));
+  setHtml(`diff_${prod}_개시`, diffFmt(diffStart));
+  setHtml(`diff_${prod}_유지감소`, diffFmt(diffDec));
+  setHtml(`diff_${prod}_유지증가`, diffFmt(diffInc));
+}
+
+function saveTargetInput(cb){
+  const ym = getTargetInputYearMonth();
+  const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
+  const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : TARGET_DEFAULT_REPS;
+
+  // 1. Collect product targets
+  const prodItems = PRODUCTS.map(p => ({
+    상품종류: p,
+    목표_수주금액: parseTgtNum_('tgt_ord_' + p),
+    목표_개시금액: parseTgtNum_('tgt_start_' + p),
+    목표_유지감소: parseTgtNum_('tgt_dec_' + p),
+    계획_수주금액: parseTgtNum_('pln_ord_' + p),
+    계획_개시금액: parseTgtNum_('pln_start_' + p),
+    계획_유지감소: parseTgtNum_('pln_dec_' + p)
+  }));
+
+  // 2. Collect safety target
+  const safetyData = {
+    목표_수주: parseTgtNum_('safety_tgt_ord'),
+    목표_매출: parseTgtNum_('safety_tgt_sales'),
+    계획_수주: parseTgtNum_('safety_pln_ord'),
+    계획_매출: parseTgtNum_('safety_pln_sales')
+  };
+
+  // 3. Collect consultant targets
+  const repItems = [];
+  PRODUCTS.forEach(p => {
+    const tgtOrd = parseTgtNum_('tgt_ord_' + p);
+    const tgtStart = parseTgtNum_('tgt_start_' + p);
+    const tgtDec = parseTgtNum_('tgt_dec_' + p);
+
+    reps.forEach(rep => {
+      const rOrd = Number(document.getElementById(`ratio_${p}_${rep}_수주`)?.value) || 0;
+      const rStart = Number(document.getElementById(`ratio_${p}_${rep}_개시`)?.value) || 0;
+      const rDec = Number(document.getElementById(`ratio_${p}_${rep}_유지감소`)?.value) || 0;
+
+      repItems.push({
+        영업담당: rep,
+        상품종류: p,
+        목표_수주금액: Math.round(tgtOrd * rOrd / 100),
+        목표_개시금액: Math.round(tgtStart * rStart / 100),
+        목표_유지감소: Math.round(tgtDec * rDec / 100)
+      });
+    });
+  });
+
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(){
+      google.script.run
+        .withSuccessHandler(function(){
+          google.script.run
+            .withSuccessHandler(function(){
+              setLoadingCursor(false);
+              TARGET_REP_DIRTY = false;
+              if (cb) {
+                cb();
+              } else {
+                alert('전체 목표 및 계획이 정상 저장되었습니다.');
+                loadTargetInput();
+              }
+            })
+            .withFailureHandler(function(err){
+              setLoadingCursor(false);
+              alert('컨설턴트별 목표 저장 실패: ' + err);
+            })
+            .saveSalesTargetByRepBulk(SESSION.token, ym, repItems);
+        })
+        .withFailureHandler(function(err){
+          setLoadingCursor(false);
+          alert('안전상품 목표 저장 실패: ' + err);
+        })
+        .saveSalesTargetSafety(SESSION.token, ym, safetyData);
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('상품별 목표 저장 실패: ' + err);
+    })
+    .saveSalesTargetByProduct(SESSION.token, ym, prodItems);
+}
+window.saveTargetInput = saveTargetInput;
+window.loadTargetInput = loadTargetInput;
+window.shiftTargetMonth = shiftTargetMonth;
+
 
 /* ===================== 일일실적보고 (자동집계, 조회 전용) ===================== */  
 const DAILY_PANELS = [  
@@ -7687,23 +8290,7 @@ function renderDailyReport(){
   
 
 
-/* ===================== 목표설정 & 일일실적보고 & 기타 툴바 헬퍼 ===================== */
-function shiftTargetMonth(delta){
-  const cur = targetYearMonth || todayStr().slice(0, 7);
-  const parts = cur.split('-').map(Number);
-  const d = new Date(parts[0], parts[1] - 1 + delta, 1);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  targetYearMonth = y + '-' + m;
-  updateTargetMonthLabel_();
-  loadTargetInput();
-}
-
-function updateTargetMonthLabel_(){
-  const el = document.getElementById('targetMonthLabel');
-  if (el) el.innerText = targetYearMonth || todayStr().slice(0, 7);
-}
-
+/* ===================== 일일실적보고 날짜 헬퍼 ===================== */
 function shiftDailyReportDate(delta){
   dailyReportDate = addDaysStr(dailyReportDate || todayStr(), delta);
   const el = document.getElementById('dailyReportDate');
