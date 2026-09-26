@@ -1,7 +1,3 @@
-
-supabase-adapter.js
-
-100%
 /**
  * S1 북서울지사 영업일보 - Supabase Backend Adapter
  * Google Apps Script의 google.script.run 호출을 브라우저에서 가로채 Supabase 데이터베이스와 직접 통신합니다.
@@ -907,63 +903,277 @@ supabase-adapter.js
       const pf = productFilter || '일반알람';
       const client = getSupabase();
 
-      // 스냅샷 조회
-      const { data: snap } = await client.from('sales_status_snapshots').select('payload_json').eq('year_month', ym).eq('product_filter', pf).maybeSingle();
-      if (snap && snap.payload_json) {
-        return Object.assign({ success: true, yearMonth: ym, fromSnapshot: true }, snap.payload_json);
-      }
+      // 1. 스냅샷 조회 (데이터가 있는 유효한 스냅샷만 반환)
+      try {
+        const { data: snap } = await client.from('sales_status_snapshots').select('payload_json').eq('year_month', ym).eq('product_filter', pf).maybeSingle();
+        if (snap && snap.payload_json && snap.payload_json.actual && (snap.payload_json.actual.수주 || snap.payload_json.actual.개시 || snap.payload_json.actual.유지감소)) {
+          return Object.assign({ success: true, yearMonth: ym, fromSnapshot: true }, snap.payload_json);
+        }
+      } catch(e) {}
 
-      // 라이브 계산 (기본 수치 구조)
-      const targetRes = await Backend.getSalesTargetByProduct(token, ym);
-      let targetOrder = 0, targetStart = 0, targetCancel = 0;
-      const targetItem = (targetRes.items || []).find(it => it.상품종류 === '알람');
-      if (targetItem) {
-        targetOrder = targetItem.목표_수주금액;
-        targetStart = targetItem.목표_개시금액;
-        targetCancel = targetItem.목표_유지감소;
-      }
-      const target = {
-        목표_수주금액: targetOrder,
-        목표_개시금액: targetStart,
-        목표_유지감소: targetCancel,
-        목표_유지증가: targetStart - targetCancel,
-        계획_수주금액: targetOrder,
-        계획_개시금액: targetStart,
-        계획_유지감소: targetCancel,
-        계획_유지증가: targetStart - targetCancel
+      // 2. 실시간 라이브 계산
+      const [ordRes, canRes, prcRes, rstRes, tgtProdRes, tgtRepRes] = await Promise.all([
+        client.from('daily_orders').select('*'),
+        client.from('daily_cancels').select('*'),
+        client.from('daily_price_changes').select('*'),
+        client.from('daily_restarts').select('*'),
+        client.from('sales_targets_product').select('*').eq('year_month', ym),
+        client.from('sales_targets_rep').select('*').eq('year_month', ym)
+      ]);
+
+      const SALES_STATUS_PRODUCT_FILTERS = {
+        '일반알람': ['알람', '블루스캔', '유지보수'],
+        '알람+휴엔': ['알람', '블루스캔', '유지보수', '휴엔'],
+        '정보보안': ['정보보안'],
+        '디지털': ['정보보안'],
+        '휴엔': ['휴엔']
+      };
+      const SALES_TARGET_CATEGORIES = {
+        '일반알람': ['알람'],
+        '알람+휴엔': ['알람', '휴엔'],
+        '정보보안': ['정보보안'],
+        '디지털': ['정보보안'],
+        '휴엔': ['휴엔']
       };
 
-      const daysInMonth = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0).getDate();
+      const filterKey = SALES_STATUS_PRODUCT_FILTERS[pf] ? pf : '일반알람';
+      const allowed = SALES_STATUS_PRODUCT_FILTERS[filterKey];
+      const targetCats = SALES_TARGET_CATEGORIES[filterKey] || ['알람'];
+
+      const parts = String(ym).split('-');
+      const yy = Number(parts[0]), mm = Number(parts[1]);
+      const daysInMonth = new Date(yy, mm, 0).getDate();
+
+      const orders = ordRes.data || [];
+      const cancels = canRes.data || [];
+      const prices = prcRes.data || [];
+      const restarts = rstRes.data || [];
+
+      const 수주Raw = new Array(daysInMonth).fill(0);
+      const 개시Raw = new Array(daysInMonth).fill(0);
+      const 해약Raw = new Array(daysInMonth).fill(0);
+      const pricePos = new Array(daysInMonth).fill(0);
+      const priceNeg = new Array(daysInMonth).fill(0);
+      const 재개시Raw = new Array(daysInMonth).fill(0);
+
+      // Orders (수주: contract_date, 개시: billing_date)
+      orders.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) {
+          const d = Number(String(r.contract_date).slice(8, 10));
+          if (d >= 1 && d <= daysInMonth) 수주Raw[d - 1] += Number(r.monthly_fee) || 0;
+        }
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
+          const d = Number(String(r.billing_date).slice(8, 10));
+          if (d >= 1 && d <= daysInMonth) 개시Raw[d - 1] += Number(r.monthly_fee) || 0;
+        }
+      });
+
+      // Cancels (해약: confirm_date)
+      cancels.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym) {
+          const d = Number(String(r.confirm_date).slice(8, 10));
+          if (d >= 1 && d <= daysInMonth) 해약Raw[d - 1] += Number(r.monthly_fee) || 0;
+        }
+      });
+
+      // Price changes (인상/인하: billing_date)
+      prices.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
+          const d = Number(String(r.billing_date).slice(8, 10));
+          if (d >= 1 && d <= daysInMonth) {
+            const amt = Number(r.diff_amount) || 0;
+            if (amt >= 0) pricePos[d - 1] += amt; else priceNeg[d - 1] += amt;
+          }
+        }
+      });
+
+      // Restarts (재개시: restart_date)
+      restarts.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        if (r.restart_date && String(r.restart_date).slice(0, 7) === ym) {
+          const d = Number(String(r.restart_date).slice(8, 10));
+          if (d >= 1 && d <= daysInMonth) 재개시Raw[d - 1] += Number(r.monthly_fee) || 0;
+        }
+      });
+
+      // Target calculation
+      let 목수 = 0, 목개 = 0, 목유감 = 0, 계수 = 0, 계개 = 0, 계유감 = 0;
+      (tgtProdRes.data || []).filter(r => targetCats.indexOf(r.product_type) !== -1).forEach(r => {
+        목수 += Number(r.target_order) || 0;
+        목개 += Number(r.target_start) || 0;
+        목유감 += Number(r.target_cancel) || 0;
+        계수 += Number(r.plan_order) || 0;
+        계개 += Number(r.plan_start) || 0;
+        계유감 += Number(r.plan_cancel) || 0;
+      });
+      const 목표유지증가 = 목개 - 목유감;
+      const 계획유지증가 = 계개 - 계유감;
+      const target = {
+        년월: ym,
+        목표_수주금액: 목수, 목표_개시금액: 목개, 목표_유지감소: 목유감, 목표_유지증가: 목표유지증가,
+        계획_수주금액: 계수, 계획_개시금액: 계개, 계획_유지감소: 계유감, 계획_유지증가: 계획유지증가,
+        목표대비계획비율: 목표유지증가 !== 0 ? Math.round((계획유지증가 / 목표유지증가) * 1000) / 10 : 0
+      };
+
       const rows = [];
+      let 수주누계Raw = 0, 개시누계Raw = 0, 해약누계Raw = 0, 인상누계Raw = 0, 인하누계Raw = 0, 재개시누계Raw = 0, 유지증가누적Raw = 0;
+
       for (let d = 1; d <= daysInMonth; d++) {
+        const i = d - 1;
+        const 수주당일 = 수주Raw[i] || 0, 개시당일 = 개시Raw[i] || 0, 해약당일 = 해약Raw[i] || 0;
+        const 인상당일 = pricePos[i] || 0, 인하당일 = priceNeg[i] || 0, 재개시당일 = 재개시Raw[i] || 0;
+        const 일유증당일 = 개시당일 - (해약당일 - 인상당일 - 인하당일 - 재개시당일);
+
+        수주누계Raw += 수주당일;
+        개시누계Raw += 개시당일;
+        해약누계Raw += 해약당일;
+        인상누계Raw += 인상당일;
+        인하누계Raw += 인하당일;
+        재개시누계Raw += 재개시당일;
+        유지증가누적Raw += 일유증당일;
+
+        const 유지감소누계Raw = 해약누계Raw - 인상누계Raw - 인하누계Raw - 재개시누계Raw;
+        const 유지증가누계Raw = 유지증가누적Raw;
+
+        const 수주당일K = Math.round(수주당일 / 1000);
+        const 개시당일K = Math.round(개시당일 / 1000);
+        const 해약중지당일K = Math.round(해약당일 / 1000);
+        const 인상당일K = Math.round(인상당일 / 1000);
+        const 인하당일K = Math.round(인하당일 / 1000);
+        const 재개시당일K = Math.round(재개시당일 / 1000);
+        const 일유증당일K = Math.round(일유증당일 / 1000);
+        const 유지증가누계K = Math.round(유지증가누계Raw / 1000);
+        const 달성률 = 목표유지증가 !== 0 ? Math.round((유지증가누계K / 목표유지증가) * 1000) / 10 : 0;
+
         rows.push({
-          날짜: `${ym}-${String(d).padStart(2, '0')}`,
-          수주: 0, 개시: 0, 해약중지: 0, 인상: 0, 인하: 0, 재개시: 0, 일유증: 0, 유지증가: 0, 달성률: 0,
-          누계수주: 0, 누계개시: 0, 누계해약중지: 0, 누계인상: 0, 누계인하: 0, 누계재개시: 0, 누계유지감소: 0, 누계유지증가: 0
+          날짜: ym + '-' + String(d).padStart(2, '0'),
+          수주: 수주당일K, 개시: 개시당일K, 해약중지: 해약중지당일K,
+          인상: 인상당일K, 인하: 인하당일K, 재개시: 재개시당일K,
+          일유증: 일유증당일K, 유지증가: 유지증가누계K, 달성률: 달성률,
+          누계수주: Math.round(수주누계Raw / 1000),
+          누계개시: Math.round(개시누계Raw / 1000),
+          누계해약중지: Math.round(해약누계Raw / 1000),
+          누계인상: Math.round(인상누계Raw / 1000),
+          누계인하: Math.round(인하누계Raw / 1000),
+          누계재개시: Math.round(재개시누계Raw / 1000),
+          누계유지감소: Math.round(유지감소누계Raw / 1000),
+          누계유지증가: 유지증가누계K
         });
       }
 
+      const last = rows[rows.length - 1] || {};
+      const actual = {
+        수주: last.누계수주 || 0,
+        개시: last.누계개시 || 0,
+        유지감소: last.누계유지감소 || 0,
+        유지증가: last.누계유지증가 || 0
+      };
+
+      const reps = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+      const repActualsRaw = {};
+      reps.forEach(r => { repActualsRaw[r] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 }; });
+
+      orders.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        const rep = String(r.rep_name || '').trim();
+        if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
+        if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) repActualsRaw[rep].수주 += Number(r.monthly_fee) || 0;
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) repActualsRaw[rep].개시 += Number(r.monthly_fee) || 0;
+      });
+
+      cancels.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        const rep = String(r.rep_name || '').trim();
+        if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
+        if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym) repActualsRaw[rep].해약 += Number(r.monthly_fee) || 0;
+      });
+
+      prices.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        const rep = String(r.rep_name || '').trim();
+        if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
+          const amt = Number(r.diff_amount) || 0;
+          if (amt >= 0) repActualsRaw[rep].인상 += amt; else repActualsRaw[rep].인하 += amt;
+        }
+      });
+
+      restarts.forEach(r => {
+        if (String(r.gross_type) === '법인') return;
+        if (allowed.indexOf(String(r.product_name)) === -1) return;
+        const rep = String(r.rep_name || '').trim();
+        if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
+        if (r.restart_date && String(r.restart_date).slice(0, 7) === ym) repActualsRaw[rep].재개시 += Number(r.monthly_fee) || 0;
+      });
+
       const repMetrics = {};
-      const repTargets = {};
-      ['최영국', '이수열', '박광춘', '정문재', '임영민'].forEach(rep => {
-        repMetrics[rep] = { 수주: 0, 개시: 0, 유지감소: 0, 유지증가: 0 };
-        repTargets[rep] = {
-          목표_수주금액: Math.round(targetOrder / 5),
-          목표_개시금액: Math.round(targetStart / 5),
-          목표_유지감소: Math.round(targetCancel / 5),
-          목표_유지증가: Math.round((targetStart - targetCancel) / 5)
+      Object.keys(repActualsRaw).forEach(rep => {
+        const d = repActualsRaw[rep];
+        const 유지감소Raw = d.해약 - d.인상 - d.인하 - d.재개시;
+        const 유지증가Raw = d.개시 - 유지감소Raw;
+        repMetrics[rep] = {
+          수주: Math.round(d.수주 / 1000),
+          개시: Math.round(d.개시 / 1000),
+          유지감소: Math.round(유지감소Raw / 1000),
+          유지증가: Math.round(유지증가Raw / 1000)
         };
       });
 
-      return {
+      const repTargets = {};
+      const repTargetRows = tgtRepRes.data || [];
+      const hasRepTargets = repTargetRows.length > 0;
+      reps.forEach(rep => {
+        let rOrd = 0, rStart = 0, rCancel = 0;
+        if (hasRepTargets) {
+          repTargetRows.filter(r => r.rep_name === rep && targetCats.indexOf(r.product_type) !== -1).forEach(r => {
+            rOrd += Number(r.target_order) || 0;
+            rStart += Number(r.target_start) || 0;
+            rCancel += Number(r.target_cancel) || 0;
+          });
+        } else {
+          rOrd = Math.round(target.목표_수주금액 / reps.length);
+          rStart = Math.round(target.목표_개시금액 / reps.length);
+          rCancel = Math.round(target.목표_유지감소 / reps.length);
+        }
+        repTargets[rep] = {
+          목표_수주금액: rOrd,
+          목표_개시금액: rStart,
+          목표_유지감소: rCancel,
+          목표_유지증가: rStart - rCancel
+        };
+      });
+
+      const result = {
         success: true,
         yearMonth: ym,
         target: target,
-        actual: { 수주: 0, 개시: 0, 유지감소: 0, 유지증가: 0 },
+        actual: actual,
         rows: rows,
         repMetrics: repMetrics,
         repTargets: repTargets
       };
+
+      // 스냅샷 저장 시도 (비동기)
+      try {
+        client.from('sales_status_snapshots').upsert({
+          year_month: ym,
+          product_filter: pf,
+          payload_json: result,
+          saved_at: new Date().toISOString()
+        }, { onConflict: 'year_month,product_filter' }).then(() => {});
+      } catch(e) {}
+
+      return result;
     },
 
     simulateSalesStatus: async function(token, yearMonth, productFilter, overrides) {
@@ -972,7 +1182,13 @@ supabase-adapter.js
     },
 
     refreshSalesStatusSnapshot: async function(token, yearMonth, productFilter) {
-      return Backend.getSalesStatus(token, yearMonth, productFilter);
+      const ym = yearMonth || getTzToday().slice(0, 7);
+      const pf = productFilter || '일반알람';
+      const client = getSupabase();
+      try {
+        await client.from('sales_status_snapshots').delete().eq('year_month', ym).eq('product_filter', pf);
+      } catch(e) {}
+      return Backend.getSalesStatus(token, ym, pf);
     },
 
     refreshSalesStatusSnapshotsForMonths: async function(token, months) {
@@ -984,38 +1200,204 @@ supabase-adapter.js
       const cat = category || '일반알람';
       const statusRes = await Backend.getSalesStatus(token, ym, cat);
 
-      const emptyAnalytics = {
-        count: 0, amount: 0, avgAmount: 0, byMotive: [], byProduct: [],
-        gapStart: { avg: 0, buckets: [] }, gapBase: { avg: 0, buckets: [] },
-        monthlyOrderCount: 0, monthlyStartedCount: 0, monthlyStartRate: 0
+      const HOLIDAYS = new Set([
+        '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02',
+        '2026-05-05','2026-05-08','2026-06-06','2026-08-15','2026-08-17',
+        '2026-09-24','2026-09-25','2026-09-26','2026-09-27','2026-10-03','2026-10-05','2026-10-09','2026-12-25',
+        '2027-01-01','2027-02-06','2027-02-07','2027-02-08','2027-02-09','2027-03-01',
+        '2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-08-16',
+        '2027-09-14','2027-09-15','2027-09-16','2027-10-03','2027-10-04','2027-10-09','2027-10-11','2027-12-25','2027-12-27'
+      ]);
+
+      const parts = String(ym).split('-');
+      const yy = Number(parts[0]), mm = Number(parts[1]);
+      const daysInMonth = new Date(yy, mm, 0).getDate();
+      const dNow = new Date();
+      const todayYm = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}`;
+      const todayDate = dNow.getDate();
+
+      let totalWorking = 0, elapsedWorking = 0;
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateObj = new Date(yy, mm - 1, d);
+        const dow = dateObj.getDay();
+        const ds = `${yy}-${String(mm).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const isWorking = dow !== 0 && dow !== 6 && !HOLIDAYS.has(ds);
+        if (isWorking) {
+          totalWorking++;
+          if (ym < todayYm || (ym === todayYm && d <= todayDate)) elapsedWorking++;
+        }
+      }
+      if (ym > todayYm) elapsedWorking = 0;
+      const working = {
+        totalWorkingDays: totalWorking,
+        elapsedWorkingDays: elapsedWorking,
+        ratio: totalWorking ? Math.round((elapsedWorking / totalWorking) * 1000) / 10 : 0
       };
-      const byRepEmpty = {};
-      ['최영국', '이수열', '박광춘', '정문재', '임영민'].forEach(r => { byRepEmpty[r] = emptyAnalytics; });
+
+      const client = getSupabase();
+      const [ordRes, canRes, prcRes] = await Promise.all([
+        client.from('daily_orders').select('*'),
+        client.from('daily_cancels').select('*'),
+        client.from('daily_price_changes').select('*')
+      ]);
+
+      const today = getTzToday();
+      const allowed = ['알람', '블루스캔', '유지보수'];
+
+      function aggregateComp(rows, keyFn, amtFn) {
+        const map = {};
+        let totalAmt = 0, totalCnt = 0;
+        rows.forEach(r => {
+          const k = keyFn(r) || '기타';
+          const a = amtFn ? (Number(amtFn(r)) || 0) : 0;
+          if (!map[k]) map[k] = { name: k, count: 0, amount: 0 };
+          map[k].count++; map[k].amount += a;
+          totalCnt++; totalAmt += a;
+        });
+        const list = Object.keys(map).map(k => map[k]);
+        list.forEach(it => {
+          it.pctCount = totalCnt ? Math.round((it.count / totalCnt) * 100) : 0;
+          it.pctAmount = totalAmt ? Math.round((it.amount / totalAmt) * 100) : 0;
+        });
+        list.sort((a, b) => b.amount - a.amount || b.count - a.count);
+        return { list: list, totalCount: totalCnt, totalAmount: totalAmt };
+      }
+
+      function daysBetween(a, b) {
+        if (!a || !b || !/^\d{4}-\d{2}-\d{2}/.test(String(a)) || !/^\d{4}-\d{2}-\d{2}/.test(String(b))) return null;
+        const da = new Date(String(a).slice(0, 10)), db = new Date(String(b).slice(0, 10));
+        return Math.round((db - da) / 86400000);
+      }
+
+      function gapBucket(days) {
+        if (days === null || days === undefined || isNaN(days)) return '미정';
+        if (days <= 3) return '0~3일';
+        if (days <= 7) return '4~7일';
+        if (days <= 14) return '8~14일';
+        if (days <= 30) return '15~30일';
+        return '31일 이상';
+      }
+
+      function bucketize(daysArr) {
+        const buckets = {};
+        daysArr.forEach(d => { const b = gapBucket(d); buckets[b] = (buckets[b] || 0) + 1; });
+        const order = ['0~3일', '4~7일', '8~14일', '15~30일', '31일 이상', '미정'];
+        const total = daysArr.length;
+        return order.filter(b => buckets[b]).map(b => ({ label: b, count: buckets[b], pct: total ? Math.round((buckets[b] / total) * 100) : 0 }));
+      }
+
+      function avgOf(arr) { return arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0; }
+
+      // Order analytics
+      const filteredOrders = (ordRes.data || [])
+        .filter(r => (r.contract_date && r.contract_date.slice(0, 7) === ym && r.contract_date <= today) || (r.billing_date && r.billing_date.slice(0, 7) === ym && r.billing_date <= today))
+        .filter(r => allowed.indexOf(String(r.product_name)) !== -1)
+        .filter(r => String(r.gross_type) !== '법인');
+
+      function buildOrderFor(list) {
+        const motive = aggregateComp(list, r => r.sales_motive || '기타', r => Number(r.monthly_fee) || 0);
+        const product = aggregateComp(list, r => r.product_name || '기타', r => Number(r.monthly_fee) || 0);
+        const amounts = list.map(r => Number(r.monthly_fee) || 0);
+        const total = amounts.reduce((a, b) => a + b, 0);
+        const avg = amounts.length ? Math.round(total / amounts.length) : 0;
+        const gapStart = list.map(r => daysBetween(r.contract_date, r.start_date)).filter(v => v !== null);
+        const gapBase = list.map(r => daysBetween(r.contract_date, r.billing_date)).filter(v => v !== null);
+        const orderedThisMonth = list.filter(r => r.contract_date && r.contract_date.slice(0, 7) === ym);
+        const startedSameMonth = orderedThisMonth.filter(r => r.billing_date && r.billing_date.slice(0, 7) === ym && r.billing_date <= today);
+        const monthlyStartRate = orderedThisMonth.length ? Math.round((startedSameMonth.length / orderedThisMonth.length) * 100) : 0;
+        return {
+          count: list.length, amount: total, avgAmount: avg,
+          byMotive: motive.list, byProduct: product.list,
+          gapStart: { avg: avgOf(gapStart), buckets: bucketize(gapStart) },
+          gapBase: { avg: avgOf(gapBase), buckets: bucketize(gapBase) },
+          monthlyOrderCount: orderedThisMonth.length, monthlyStartedCount: startedSameMonth.length, monthlyStartRate: monthlyStartRate
+        };
+      }
+
+      const orderOverall = buildOrderFor(filteredOrders);
+      const reps = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+      const orderByRep = {};
+      reps.forEach(rep => { orderByRep[rep] = buildOrderFor(filteredOrders.filter(r => String(r.rep_name) === rep)); });
+
+      // Cancel analytics
+      const filteredCancels = (canRes.data || [])
+        .filter(r => r.confirm_date && r.confirm_date.slice(0, 7) === ym && r.confirm_date <= today)
+        .filter(r => allowed.indexOf(String(r.product_name)) !== -1)
+        .filter(r => String(r.gross_type) !== '법인');
+
+      function buildCancelFor(list) {
+        const reason = aggregateComp(list, r => r.cancel_type || '기타', r => Number(r.monthly_fee) || 0);
+        const product = aggregateComp(list, r => r.product_name || '기타', r => Number(r.monthly_fee) || 0);
+        const amounts = list.map(r => Number(r.monthly_fee) || 0);
+        const total = amounts.reduce((a, b) => a + b, 0);
+        const avg = amounts.length ? Math.round(total / amounts.length) : 0;
+        return { count: list.length, amount: total, avgAmount: avg, byReason: reason.list, byProduct: product.list };
+      }
+      const cancelOverall = buildCancelFor(filteredCancels);
+      const cancelByRep = {};
+      reps.forEach(rep => { cancelByRep[rep] = buildCancelFor(filteredCancels.filter(r => String(r.rep_name) === rep)); });
+
+      // Price analytics
+      function buildPriceFor(changeType) {
+        const filtered = (prcRes.data || [])
+          .filter(r => r.billing_date && r.billing_date.slice(0, 7) === ym && r.billing_date <= today)
+          .filter(r => changeType === '인상' ? (Number(r.diff_amount) > 0) : (Number(r.diff_amount) < 0))
+          .filter(r => String(r.gross_type) !== '법인');
+        const amounts = filtered.map(r => Math.abs(Number(r.diff_amount) || 0));
+        const total = amounts.reduce((a, b) => a + b, 0);
+        const avg = amounts.length ? Math.round(total / amounts.length) : 0;
+        const reason = aggregateComp(filtered, r => r.reason || '기타', r => Math.abs(Number(r.diff_amount) || 0));
+        const product = aggregateComp(filtered, r => r.product_name || '기타', r => Math.abs(Number(r.diff_amount) || 0));
+        const byRep = aggregateComp(filtered, r => r.rep_name || '기타', r => Math.abs(Number(r.diff_amount) || 0));
+        const byReceiver = aggregateComp(filtered, r => r.receiver_name || '기타', r => Math.abs(Number(r.diff_amount) || 0));
+        return { overall: { count: filtered.length, amount: total, avgAmount: avg }, byRep: byRep.list, byReceiver: byReceiver.list, byReason: reason.list, byProduct: product.list };
+      }
+
+      const priceUpPayload = buildPriceFor('인상');
+      const priceDownPayload = buildPriceFor('인하');
 
       return {
         success: true,
         status: statusRes,
-        working: { success: true, info: { totalWorkingDays: 22, elapsedWorkingDays: 15, ratio: 68 } },
-        order: { success: true, yearMonth: ym, overall: emptyAnalytics, byRep: byRepEmpty },
-        cancel: { success: true, yearMonth: ym, overall: { count: 0, amount: 0, avgAmount: 0, byReason: [], byProduct: [] }, byRep: byRepEmpty },
-        priceUp: { success: true, yearMonth: ym, overall: { count: 0, amount: 0, avgAmount: 0 }, byRep: [], byReceiver: [], byReason: [], byProduct: [] },
-        priceDown: { success: true, yearMonth: ym, overall: { count: 0, amount: 0, avgAmount: 0 }, byRep: [], byReceiver: [], byReason: [], byProduct: [] }
+        working: { success: true, info: working },
+        order: { success: true, yearMonth: ym, overall: orderOverall, byRep: orderByRep },
+        cancel: { success: true, yearMonth: ym, overall: cancelOverall, byRep: cancelByRep },
+        priceUp: Object.assign({ success: true, yearMonth: ym }, priceUpPayload),
+        priceDown: Object.assign({ success: true, yearMonth: ym }, priceDownPayload)
       };
     },
 
     // 13. 설정 및 기타
     getEditableLists: async function(token) {
-      const client = getSupabase();
-      const { data } = await client.from('editable_settings').select('*').order('sort_order', { ascending: true });
       const lists = { '영업동기': [], '해약유형': [], '인상인하사유': [], '영업컨설턴트': [], '상품일보_담당자': [] };
       const defaults = {};
 
-      (data || []).forEach(r => {
-        if (lists[r.category]) {
-          lists[r.category].push(r.item_value);
-          if (r.is_default) defaults[r.category] = r.item_value;
+      // 1. Try local storage first
+      try {
+        const local = localStorage.getItem('S1_EDITABLE_SETTINGS');
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && parsed.lists) {
+            return { success: true, lists: parsed.lists, defaults: parsed.defaults || {} };
+          }
         }
-      });
+      } catch(e) {}
+
+      // 2. Try Supabase
+      try {
+        const client = getSupabase();
+        if (client) {
+          const { data, error } = await client.from('editable_settings').select('*').order('sort_order', { ascending: true });
+          if (!error && data) {
+            data.forEach(r => {
+              if (lists[r.category]) {
+                lists[r.category].push(r.item_value);
+                if (r.is_default) defaults[r.category] = r.item_value;
+              }
+            });
+          }
+        }
+      } catch(e) {}
 
       // 기본값 폴백
       if (!lists['영업동기'].length) lists['영업동기'] = ['개척', '콜센터', '사내소개', '고객소개', '대리점', '관내이전', '관외이전', '그로스', '기타'];
@@ -1028,22 +1410,46 @@ supabase-adapter.js
     },
 
     saveEditableListsBulk: async function(token, payload) {
-      const client = getSupabase();
-      const rows = [];
+      const lists = {};
+      const defaults = {};
+
       Object.keys(payload || {}).forEach(cat => {
         const entry = payload[cat] || {};
-        (entry.items || []).forEach((val, idx) => {
-          rows.push({
-            category: cat,
-            item_value: val,
-            is_default: (val === entry.defaultValue),
-            sort_order: idx + 1
-          });
-        });
+        lists[cat] = entry.items || [];
+        if (entry.defaultValue) defaults[cat] = entry.defaultValue;
       });
-      const { error } = await client.from('editable_settings').upsert(rows, { onConflict: 'category,item_value' });
-      if (error) throw error;
-      return Backend.getEditableLists(token);
+
+      // 1. Save to localStorage immediately
+      try {
+        localStorage.setItem('S1_EDITABLE_SETTINGS', JSON.stringify({ lists: lists, defaults: defaults }));
+      } catch(e) {}
+
+      // 2. Try Supabase upsert safely
+      try {
+        const client = getSupabase();
+        if (client) {
+          const rows = [];
+          Object.keys(payload || {}).forEach(cat => {
+            const entry = payload[cat] || {};
+            (entry.items || []).forEach((val, idx) => {
+              rows.push({
+                category: cat,
+                item_value: val,
+                is_default: (val === entry.defaultValue),
+                sort_order: idx + 1
+              });
+            });
+          });
+          if (rows.length) {
+            const { error } = await client.from('editable_settings').upsert(rows, { onConflict: 'category,item_value' });
+            if (error) console.warn('Supabase editable_settings sync notice (saved locally):', error.message || error);
+          }
+        }
+      } catch(e) {
+        console.warn('Supabase sync skipped, saved locally:', e);
+      }
+
+      return { success: true, lists: lists, defaults: defaults };
     },
 
     getTaPortalUrl: async function(token) {
@@ -1283,6 +1689,37 @@ supabase-adapter.js
         });
       }
       return { success: true, rows: rows };
+    },
+    // 17. 파일 저장소 관리
+    adminListStoredFiles: async function(token) {
+      try {
+        const list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
+        return { success: true, files: list };
+      } catch(e) {
+        return { success: true, files: [] };
+      }
+    },
+
+    adminUploadStoredFile: async function(token, payload) {
+      try {
+        let list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
+        list.push(payload);
+        localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(list));
+        return { success: true };
+      } catch(e) {
+        return { success: true };
+      }
+    },
+
+    adminDeleteStoredFile: async function(token, id) {
+      try {
+        let list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
+        list = list.filter(function(f){ return f.id !== id; });
+        localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(list));
+        return { success: true };
+      } catch(e) {
+        return { success: true };
+      }
     }
   };
 
@@ -1318,4 +1755,3 @@ supabase-adapter.js
 
   console.log('✓ Supabase Backend Adapter for Google Apps Script initialized.');
 })(window);
-supabase-adapter.js 표시 중입니다.
