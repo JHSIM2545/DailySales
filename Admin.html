@@ -550,21 +550,41 @@
     // 8. 카드매출
     getCardSales: async function(token, yearMonth) {
       const client = getSupabase();
-      const { data } = await client.from('card_sales').select('amount').eq('year_month', yearMonth).maybeSingle();
-      return { success: true, yearMonth: yearMonth, amount: (data && data.amount) ? Number(data.amount) : 0 };
+      try {
+        const { data, error } = await client.from('card_sales').select('amount').eq('year_month', yearMonth).maybeSingle();
+        if (!error && data && data.amount != null) {
+          return { success: true, yearMonth: yearMonth, amount: Number(data.amount) };
+        }
+      } catch (e) {
+        console.warn('getCardSales Supabase lookup error:', e);
+      }
+      const local = localStorage.getItem('CARD_SALES_' + yearMonth);
+      return { success: true, yearMonth: yearMonth, amount: local ? Number(local) : 0 };
     },
 
     saveCardSales: async function(token, yearMonth, amount) {
       const client = getSupabase();
       const sess = getSession_();
       const amt = Number(String(amount || 0).replace(/,/g, ''));
-      const { error } = await client.from('card_sales').upsert({
-        year_month: yearMonth,
-        amount: amt,
-        created_by: sess ? sess.name : '지사장'
-      }, { onConflict: 'year_month' });
-      if (error) throw error;
-      return { success: true, yearMonth: yearMonth, amount: amt };
+      // 항상 로컬에도 안전하게 백업
+      localStorage.setItem('CARD_SALES_' + yearMonth, String(amt));
+
+      try {
+        const { error } = await client.from('card_sales').upsert({
+          year_month: yearMonth,
+          amount: amt,
+          created_by: sess ? sess.name : '지사장'
+        }, { onConflict: 'year_month' });
+        if (error) throw error;
+        return { success: true, yearMonth: yearMonth, amount: amt };
+      } catch (err) {
+        console.error('saveCardSales Supabase error:', err);
+        const errMsg = (err && (err.message || err.details || err.hint)) || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+        if (err && (err.code === '42P01' || String(errMsg).includes('does not exist'))) {
+          throw new Error('Supabase에 card_sales 테이블이 아직 생성되지 않았습니다. SQL Editor에서 테이블 생성 쿼리를 실행해 주세요. (임시 로컬 브라우저 저장 완료)');
+        }
+        throw new Error(errMsg);
+      }
     },
 
     // 9. 사용자 관리
@@ -1255,7 +1275,15 @@
       ]);
 
       const today = getTzToday();
-      const allowed = ['알람', '블루스캔', '유지보수'];
+      const SALES_STATUS_PRODUCT_FILTERS = {
+        '일반알람': ['알람', '블루스캔', '유지보수'],
+        '알람+휴엔': ['알람', '블루스캔', '유지보수', '휴엔'],
+        '정보보안': ['정보보안'],
+        '디지털': ['정보보안'],
+        '휴엔': ['휴엔']
+      };
+      const filterKey = SALES_STATUS_PRODUCT_FILTERS[cat] ? cat : '일반알람';
+      const allowed = SALES_STATUS_PRODUCT_FILTERS[filterKey] || ['알람', '블루스캔', '유지보수'];
 
       function aggregateComp(rows, keyFn, amtFn) {
         const map = {};
@@ -1303,7 +1331,14 @@
 
       // Order analytics
       const filteredOrders = (ordRes.data || [])
-        .filter(r => (r.contract_date && r.contract_date.slice(0, 7) === ym && r.contract_date <= today) || (r.billing_date && r.billing_date.slice(0, 7) === ym && r.billing_date <= today))
+        .filter(r => {
+          const isOrderInMonth = (r.order_ym === ym || (r.contract_date && String(r.contract_date).slice(0, 7) === ym));
+          const isStartInMonth = (r.start_ym === ym || (r.start_date && String(r.start_date).slice(0, 7) === ym) || (r.billing_date && String(r.billing_date).slice(0, 7) === ym));
+          const isOrderBeforeToday = (!r.contract_date || String(r.contract_date).slice(0, 10) <= today);
+          const isStartBeforeToday = (!r.start_date || String(r.start_date).slice(0, 10) <= today);
+          const isBillingBeforeToday = (!r.billing_date || String(r.billing_date).slice(0, 10) <= today);
+          return (isOrderInMonth && isOrderBeforeToday) || (isStartInMonth && (isStartBeforeToday || isBillingBeforeToday));
+        })
         .filter(r => allowed.indexOf(String(r.product_name)) !== -1)
         .filter(r => String(r.gross_type) !== '법인');
 
@@ -1330,7 +1365,7 @@
       const orderOverall = buildOrderFor(filteredOrders);
       const reps = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
       const orderByRep = {};
-      reps.forEach(rep => { orderByRep[rep] = buildOrderFor(filteredOrders.filter(r => String(r.rep_name) === rep)); });
+      reps.forEach(rep => { orderByRep[rep] = buildOrderFor(filteredOrders.filter(r => String(r.rep_name || '').trim() === rep)); });
 
       // Cancel analytics
       const filteredCancels = (canRes.data || [])
@@ -1348,7 +1383,7 @@
       }
       const cancelOverall = buildCancelFor(filteredCancels);
       const cancelByRep = {};
-      reps.forEach(rep => { cancelByRep[rep] = buildCancelFor(filteredCancels.filter(r => String(r.rep_name) === rep)); });
+      reps.forEach(rep => { cancelByRep[rep] = buildCancelFor(filteredCancels.filter(r => String(r.rep_name || '').trim() === rep)); });
 
       // Price analytics
       function buildPriceFor(changeType) {
@@ -1780,7 +1815,11 @@
           if (typeof fn === 'function') {
             fn.apply(Backend, args)
               .then(res => { if (successHandler) successHandler(res); })
-              .catch(err => { if (failureHandler) failureHandler(err); else console.error('Supabase RPC Error [' + prop + ']:', err); });
+              .catch(err => {
+                const errMsg = (err && (err.message || err.details || err.hint)) || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+                if (failureHandler) failureHandler(errMsg);
+                else console.error('Supabase RPC Error [' + prop + ']:', err);
+              });
           } else {
             console.warn('Unhandled Supabase RPC call:', prop);
             if (successHandler) successHandler({ success: true });
@@ -2055,7 +2094,7 @@
  .chart-card { background: #fff; border: 1px solid #c7cfd8; border-radius: 6px; padding: 10px; }  
  .chart-card-title { font-size: 13px; font-weight: bold; color: #1c2f4a; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; display: flex; justify-content: space-between;}  
  .bar-row { display: flex; align-items: center; margin-bottom: 6px; gap: 6px; }  
- .bar-name { width: 45px; font-size: 12px; color: #555; white-space: nowrap; font-weightition:absolute: 600;}  
+ .bar-name { width: 45px; font-size: 12px; color: #555; white-space: nowrap; font-weight: 600;}  
  .bar-track { flex: 1; height: 14px; background: #eef1f4; border-radius: 3px; overflow: hidden; position: relative;}  
  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }  
  .bar-pct { width: 35px; font-size: 11px; text-align: right; color: #333; font-weight: bold; }  
@@ -4097,7 +4136,8 @@ function dashGaugeAxisMax_(pctList){
 // repTargets는 getSalesStatus() 응답의 repTargets(=담당자별 목표, "컨설턴트별 목표 입력" 비율 배분 반영)를 그대로 전달받는다.  
 function dashRepTargetFor_(repTargets, rep, metricKey){  
  const t = repTargets && repTargets[rep];  
- return t ? (Number(t[REP_TARGET_FIELD_[metricKey]]) || 0) : 0;  
+ if (!t) return 0;
+ return Number(t[REP_TARGET_FIELD_[metricKey]] || t['목표_' + metricKey + '금액'] || t['목표_' + metricKey] || 0);  
 }  
   
 function dashGaugeSectionHtml_(title, metricKey, targetTotal, planTotal, actualTotal, repMetrics, repTargets, workingInfo, lowerIsBetter, showHundredLine){  
@@ -7143,7 +7183,7 @@ function onCardSalesChange_(val){
   renderProductDaily();
   google.script.run
     .withSuccessHandler(function(){})
-    .withFailureHandler(function(err){ alert('카드매출 저장 실패: ' + err); })
+    .withFailureHandler(function(err){ alert('카드매출 저장 실패: ' + (err && err.message ? err.message : err)); })
     .saveCardSales(SESSION.token, productDailySummaryYm, num);
 }
 
