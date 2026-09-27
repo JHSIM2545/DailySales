@@ -3921,13 +3921,13 @@ function bizTeamStatusCacheKey_(){
 /** 아직 못 불러왔을 때만 서버(또는 캐시)에서 [선택한 날짜 이전이거나 같은 날짜 중 가장 최신] 사업팀 데이터를  
  * 받아온 뒤 cb를 호출한다. 이미 불러온 상태면 즉시 리턴(불필요한 재조회/재귀 렌더 방지). */  
 function ensureBizTeamStatusLoaded_(cb){  
-  if (BIZ_TEAM_STATUS_DATA_) { if (cb) cb(); return; }  
+  if (BIZ_TEAM_STATUS_DATA_) { return; } // 이미 데이터가 로드된 경우 재귀/중복 호출 방지  
   const cacheKey = bizTeamStatusCacheKey_();  
   const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_) || cacheGet_('bizTeamStatusLatest_', GRID_CACHE_TTL_MS_);  
   if (cached) { 
     BIZ_TEAM_STATUS_DATA_ = cached; 
     if (cached.date && !isBlockedDate(cached.date)) BIZ_TEAM_VIEW_DATE_ = cached.date;
-    if (cb) cb(); 
+    if (cb) setTimeout(cb, 0); // 비동기로 안전하게 실행하여 콜스택 중첩 방지
     return; 
   }  
   google.script.run  
@@ -4243,8 +4243,10 @@ function renderBizTeamFullScreenView_(){
  '</div>';  
  contentEl.innerHTML = html;  
  bizTeamBindBarTooltips_();  
- if (!res) { showLoadingProgress_('bizTeamLoadingBody', '사업팀 현황 데이터를 불러오는 중입니다...'); }  
- ensureBizTeamStatusLoaded_(renderDashboard); // 아직 못 불러왔으면 받아온 뒤 이 화면을 다시 그림  
+ if (!res) {
+  showLoadingProgress_('bizTeamLoadingBody', '사업팀 현황 데이터를 불러오는 중입니다...');
+  ensureBizTeamStatusLoaded_(renderDashboard); // 아직 못 불러왔을 때만 비동기로 받아온 뒤 화면을 다시 그림
+ }  
 }  
   
   
