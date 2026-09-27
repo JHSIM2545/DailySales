@@ -685,9 +685,13 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_orders').insert([record]).select('id').single();
-        if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const { data, error } = await client.from('daily_orders').insert([record]).select();
+        if (error) {
+          console.error('[daily_orders insert error]', error);
+          throw new Error(error.message || JSON.stringify(error));
+        }
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 

@@ -70,7 +70,7 @@
       const client = getSupabase();
       if (!client) return;
       const sess = getSession_();
-      const userName = (sess && sess.name) ? sess.name : '지사장';
+      const userName = (sess && sess.name) ? sess.name : '일반사용자';
       const userRole = (sess && sess.role) ? sess.role : '';
       const userPhone = (sess && sess.phone) ? sess.phone : '';
       const d = details || {};
@@ -697,16 +697,17 @@
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
-        window.logUserAction_('수주개시 수정', '수주개시', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '수주개시 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('해약중지 수정', '해약중지', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '해약중지 수정: ' + (fields['계약처명'] || '') });
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_orders').insert([record]).select('id').single();
-        if (error) throw error;
-        window.logUserAction_('수주개시 등록', '수주개시', String(data.id), { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '신규 수주 등록: ' + (fields['계약처명'] || '') + ' (' + (fields['용역료'] || 0) + '원)' });
-        return { success: true, id: String(data.id) };
+        const { data, error } = await client.from('daily_orders').insert([record]).select();
+        if (error) {
+          console.error('[daily_orders insert error]', error);
+          throw new Error(error.message || JSON.stringify(error));
+        }
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -717,7 +718,6 @@
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
-      window.logUserAction_('수주개시 삭제', '수주개시', id, { desc: '수주개시 항목 삭제' });
       return { success: true };
     },
 
@@ -802,15 +802,12 @@
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
-        window.logUserAction_('수주개시 수정', '수주개시', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '수주개시 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('해약중지 수정', '해약중지', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '해약중지 수정: ' + (fields['계약처명'] || '') });
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
         const { data, error } = await client.from('daily_cancels').insert([record]).select('id').single();
         if (error) throw error;
-        window.logUserAction_('해약중지 등록', '해약중지', String(data.id), { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '신규 해약/중지 등록: ' + (fields['계약처명'] || '') + ' (' + (fields['해약유형'] || '') + ')' });
         return { success: true, id: String(data.id) };
       }
     },
@@ -822,7 +819,6 @@
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
-      window.logUserAction_('해약중지 삭제', '해약중지', id, { desc: '해약중지 항목 삭제' });
       return { success: true };
     },
 
@@ -910,16 +906,12 @@
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
-        window.logUserAction_('수주개시 수정', '수주개시', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '수주개시 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('해약중지 수정', '해약중지', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '해약중지 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('인상인하 수정', '인상인하', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '인상인하 수정: ' + (fields['계약처명'] || '') });
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
         const { data, error } = await client.from('daily_price_changes').insert([record]).select('id').single();
         if (error) throw error;
-        window.logUserAction_('인상인하 등록', '인상인하', String(data.id), { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '신규 인상/인하 등록: ' + (fields['계약처명'] || '') + ' (' + diffAmt + '원)' });
         return { success: true, id: String(data.id) };
       }
     },
@@ -931,7 +923,6 @@
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
-      window.logUserAction_('인상인하 삭제', '인상인하', id, { desc: '인상인하 항목 삭제' });
       return { success: true };
     },
 
@@ -1004,16 +995,12 @@
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
-        window.logUserAction_('수주개시 수정', '수주개시', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '수주개시 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('해약중지 수정', '해약중지', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '해약중지 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('재개시 수정', '재개시', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '재개시 수정: ' + (fields['계약처명'] || '') });
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
         const { data, error } = await client.from('daily_restarts').insert([record]).select('id').single();
         if (error) throw error;
-        window.logUserAction_('재개시 등록', '재개시', String(data.id), { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '신규 재개시 등록: ' + (fields['계약처명'] || '') });
         return { success: true, id: String(data.id) };
       }
     },
@@ -1025,7 +1012,6 @@
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
-      window.logUserAction_('재개시 삭제', '재개시', id, { desc: '재개시 항목 삭제' });
       return { success: true };
     },
 
@@ -1080,16 +1066,12 @@
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
-        window.logUserAction_('수주개시 수정', '수주개시', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '수주개시 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('해약중지 수정', '해약중지', payload.id, { contractNo: fields['계약번호'], company: fields['계약처명'], desc: '해약중지 수정: ' + (fields['계약처명'] || '') });
-        window.logUserAction_('상품일보 수정', '상품일보', payload.id, { contractNo: fields['계약번호'], company: fields['서비스제공처'], desc: '상품일보 수정: ' + (fields['서비스제공처'] || '') });
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
         const { data, error } = await client.from('daily_product_reports').insert([record]).select('id').single();
         if (error) throw error;
-        window.logUserAction_('상품일보 등록', '상품일보', String(data.id), { contractNo: fields['계약번호'], company: fields['서비스제공처'], desc: '신규 상품일보 등록: ' + (fields['서비스제공처'] || '') });
         return { success: true, id: String(data.id) };
       }
     },
@@ -1101,7 +1083,6 @@
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
-      window.logUserAction_('상품일보 삭제', '상품일보', id, { desc: '상품일보 항목 삭제' });
       return { success: true };
     },
 
@@ -1211,34 +1192,20 @@
 
     adminListHistory: async function(token, from, to) {
       const client = getSupabase();
-      if (!client) return { success: true, rows: [] };
       let q = client.from('activity_logs').select('*').order('created_at', { ascending: false });
       if (from) q = q.gte('created_at', from + 'T00:00:00');
       if (to) q = q.lte('created_at', to + 'T23:59:59');
-      if (!from && !to) q = q.limit(300);
       const { data, error } = await q;
       if (error) return { success: true, rows: [] };
-      const rows = (data || []).map(r => {
-        let ch = r.changes;
-        if (typeof ch === 'string') {
-          try { ch = JSON.parse(ch); } catch(e){}
-        }
-        const scope = (ch && ch.scope) || '';
-        const field = (ch && ch.field) || '';
-        const beforeVal = (ch && ch.before !== undefined) ? String(ch.before) : '';
-        const afterVal = (ch && ch.after !== undefined) ? String(ch.after) : '';
-        const desc = (ch && ch.desc) || (field ? (field + ': ' + beforeVal + ' → ' + afterVal) : (typeof ch === 'string' ? ch : ''));
-        return [
-          r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '', // 0: 일시
-          r.consultant || '', // 1: 사용자
-          scope || r.company || '-', // 2: 화면/구분
-          r.action || '', // 3: 액션
-          r.lead_id || '-', // 4: 계약번호
-          r.company || '-', // 5: 계약처명
-          field || '-', // 6: 필드
-          desc || '-' // 7: 상세 내용
-        ];
-      });
+      const rows = (data || []).map(r => [
+        r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '',
+        r.consultant || '',
+        r.lead_id || '',
+        r.action || '',
+        '',
+        '',
+        JSON.stringify(r.changes || '')
+      ]);
       return { success: true, rows: rows };
     },
 
@@ -2612,7 +2579,6 @@
 
   console.log('✓ Supabase Backend Adapter for Google Apps Script initialized.');
 })(window);
-
 </script>
   
 <!-- 대시보드 "이미지로 저장"/"PDF로 저장" 기능에 사용(외부 CDN, 화면 캡처/파일생성은 전부 브라우저 내에서 처리되며 서버로 전송되지 않음) -->  
@@ -6467,7 +6433,7 @@ function renderAiParsedPreview_(res){
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><input type="text" id="ai_f_prod" value="' + escAttr(f['상품'] || '알람') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">영업동기:</label><input type="text" id="ai_f_reason" value="' + escAttr(f['영업동기'] || '개척') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 보고일 (메시지 등록일):</label><input type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 계약일 (보고일):</label><input type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
       '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">🚀 개시일자 (개시일):</label><input type="date" id="ai_f_start_date" value="' + escAttr(f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" onchange="onAiStartDateChange_(this.value)"></div>' +
       '<div><label style="color:#6d28d9; font-weight:700; display:block; margin-bottom:3px;">📌 기산일:</label><input type="date" id="ai_f_accrual_date" value="' + escAttr(f['기산일'] || f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="this.dataset.userEdited=1"></div>' +
     '</div>';
@@ -6522,10 +6488,12 @@ function commitAiParsedRow_(){
   }
 
   if (res.type === 'order_start') {
-    if (document.getElementById('ai_f_report_date')) f['보고일'] = document.getElementById('ai_f_report_date').value;
+    const reportDate = document.getElementById('ai_f_report_date') ? document.getElementById('ai_f_report_date').value : todayStr();
+    f['보고일'] = reportDate;
+    f['계약일'] = reportDate; // 보고일이 계약일!
     if (document.getElementById('ai_f_start_date')) f['개시일'] = document.getElementById('ai_f_start_date').value;
     if (document.getElementById('ai_f_accrual_date')) f['기산일'] = document.getElementById('ai_f_accrual_date').value;
-    f['계약일'] = f['보고일'] || todayStr();
+    if (!f['기산일']) f['기산일'] = f['개시일'] || reportDate;
   } else if (res.type === 'cancel') {
     if (document.getElementById('ai_f_date1')) f['접수일'] = document.getElementById('ai_f_date1').value;
     if (document.getElementById('ai_f_date2')) f['확정일'] = document.getElementById('ai_f_date2').value;
@@ -6640,7 +6608,7 @@ function loadPendingAiReports_(){
           '<td style="max-width:380px; white-space:pre-wrap; font-family:monospace; font-size:12.5px; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;">' + escHtml(it.text || '') + '</td>' +
           '<td style="white-space:nowrap;">' +
             '<button class="primary" data-id="' + escAttr(it.id) + '" onclick="autoRegisterAiInboxItem_(this.dataset.id)" style="background:#16a34a; border-color:#16a34a; padding:5px 10px; font-size:12px; font-weight:700; margin-right:4px;" title="단톡방 내용을 분석하여 영업일보에 즉시 자동등록합니다">⚡ 즉시등록</button>' +
-            '<button class="primary" data-id="' + escAttr(it.id) + '" onclick="processAiInboxItem_(this.dataset.id)" style="padding:5px 10px; font-size:12px; margin-right:4px;" title="필드 분석 결과를 미리 확인하고 수정 후 등록합니다">🔍 상세검토</button>' +
+            '<button class="primary" data-id="' + escAttr(it.id) + '" onclick="processAiInboxItem_(this.dataset.id)" style="padding:5px 10px; font-size:12px; margin-right:4px;" title="단톡방 내용을 분석하여 입력필드에 반영한 뒤 검토 후 저장합니다">🔍 분석/입력필드 반영</button>' +
             '<button class="danger" data-id="' + escAttr(it.id) + '" onclick="dismissAiInboxItem_(this.dataset.id)" style="padding:5px 8px; font-size:12px;" title="이 접수 건을 무시(삭제) 처리합니다">무시</button>' +
           '</td>' +
         '</tr>';
