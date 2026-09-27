@@ -129,6 +129,79 @@ const SUPABASE_URL = 'https://gpqlximhoqdybcewdfde.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_xUnGxyLCc5TB5nv4keVQVw__grqGJkP';
 const sbClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
+// ==========================================
+// TA 관리 표준 SHA-256 해시 함수
+// ==========================================
+async function sha256(str) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ==========================================
+// TA 관리 표준 비밀번호 검증 규칙
+// ==========================================
+function validatePassword(pwd) {
+  if (!pwd || pwd.length < 8 || pwd.length > 10) {
+    return "비밀번호는 8자 이상 10자 이하로 입력해주세요.";
+  }
+  var hasLetter = /[a-zA-Z]/.test(pwd);
+  var hasNumber = /[0-9]/.test(pwd);
+  var hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd);
+
+  if (!hasLetter || !hasNumber || !hasSpecial) {
+    return "비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 합니다.";
+  }
+  return null;
+}
+
+// ==========================================
+// TA 관리 표준 다중 해시 변형 검증 (전화번호:비밀번호, 전화번호비밀번호, 비밀번호 단독 모두 지원)
+// ==========================================
+async function verifyUserPassword(phone, pw, dbHash) {
+  if (!pw || !dbHash) return false;
+  const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+  const cleanPw = String(pw).trim();
+  const target = String(dbHash).trim().toLowerCase();
+
+  // 지사장 마스터 비밀번호 긴급 프리패스 (TA 관리 동일)
+  if (cleanPw === 'sy0928@@' || cleanPw === 'S1_nowon_master_2026') {
+    return true;
+  }
+
+  // 010 및 10 형태 모두 준비
+  const pNoZero = cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone;
+  const pWithZero = cleanPhone.startsWith('0') ? cleanPhone : ('0' + cleanPhone);
+
+  // 구글 시트 / Apps Script Code.gs 표준 해시 공식 및 모든 파생 조합 전수 검사
+  // 1순위: phone + ':' + pw (예: 01027042545:sy0928@@ -> 완벽 일치)
+  // 2순위: 10phone + ':' + pw
+  // 3순위: pw 단독 (sha256(pw))
+  // 4순위: phone + pw (콜론 제외)
+  const candidateInputs = [
+    `${pWithZero}:${cleanPw}`,
+    `${pNoZero}:${cleanPw}`,
+    `${cleanPhone}:${cleanPw}`,
+    cleanPw,
+    `${pWithZero}${cleanPw}`,
+    `${pNoZero}${cleanPw}`,
+    `${cleanPhone}${cleanPw}`
+  ];
+
+  for (const c of candidateInputs) {
+    const h = await sha256(c);
+    if (h.toLowerCase() === target) {
+      return true;
+    }
+  }
+
+  // 평문 일치 폴백
+  if (target === cleanPw.toLowerCase()) {
+    return true;
+  }
+
+  return false;
+}
+
 function togglePwVisibility_(inputId, btn){
   const el = document.getElementById(inputId);
   if (!el) return;
@@ -150,18 +223,6 @@ function setBusy_(busy, btnId, label){
   if (btn) { btn.disabled = busy; btn.innerText = busy ? '처리 중...' : label; }
 }
 
-function isValidPasswordClient(pw){
-  if (!pw || pw.length < 8 || pw.length > 10) return false;
-  return /[a-zA-Z]/.test(pw) && /[0-9]/.test(pw) && /[^a-zA-Z0-9]/.test(pw);
-}
-
-async function hashPassword(password, phone) {
-  const p = String(phone || '').replace(/[^0-9]/g, '');
-  const data = new TextEncoder().encode(p + ':' + String(password));
-  const hashBuf = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 function detectDeviceInfo_(){
   const ua = navigator.userAgent || '';
   let browser = '기타';
@@ -174,114 +235,221 @@ function detectDeviceInfo_(){
   return { browser: browser, deviceType: isMobile ? '모바일' : 'PC' };
 }
 
+// 세션 저장 및 화면 이동 (TA 관리 세션 키 호환)
 function goToDestination_(session){
-  try { sessionStorage.removeItem('s1_admin_session_v1'); } catch(e){}
-  try { sessionStorage.removeItem('s1_session_v1'); } catch(e){}
-  try { sessionStorage.setItem('s1_admin_session_v1', JSON.stringify(session)); } catch(e){}
-  try { sessionStorage.setItem('s1_session_v1', JSON.stringify(session)); } catch(e){}
+  try {
+    sessionStorage.setItem('s1_admin_session_v1', JSON.stringify(session));
+    sessionStorage.setItem('s1_session_v1', JSON.stringify(session));
+    sessionStorage.setItem('S1_TA_PORTAL_AUTH_SESSION', JSON.stringify(session));
+    sessionStorage.setItem('s1_user', JSON.stringify(session));
+  } catch(e){}
+
+  // 다음 로그인 편의를 위해 아이디(전화번호) 보관 (TA 관리 동일)
+  if (session.phone && session.phone !== 'admin') {
+    localStorage.setItem('S1_LAST_LOGIN_PHONE', session.phone);
+  }
+
   document.getElementById('loadingOverlay').classList.add('show');
   window.location.href = session.isAdmin ? 'Admin.html' : 'Index.html';
 }
 
+// ==========================================
+// TA 관리 동일 로그인 함수
+// ==========================================
 async function doLogin(){
   if (BUSY) return;
-  const phone = document.getElementById('login_phone').value.trim();
-  const password = document.getElementById('login_password').value;
+  const phone = (document.getElementById('login_phone').value || '').replace(/[^0-9]/g, '');
+  const password = (document.getElementById('login_password').value || '').trim();
   const errEl = document.getElementById('login_err');
   errEl.innerText = '';
-  if (!phone || !password) { errEl.innerText = '전화번호와 비밀번호를 입력하세요.'; return; }
+
+  if (!phone || !password) {
+    errEl.innerText = '전화번호와 비밀번호를 모두 입력하세요.';
+    return;
+  }
 
   setBusy_(true, 'loginBtn', '로그인');
   try {
-    const p = phone.replace(/[^0-9]/g, '');
-    const { data, error } = await sbClient.from('app_users').select('*').eq('phone', p).maybeSingle();
-    if (error || !data) {
+    // 010 및 10 형태 유연 조회 (TA 관리 표준)
+    const pNoZero = phone.startsWith('0') ? phone.slice(1) : phone;
+    const pWithZero = phone.startsWith('0') ? phone : ('0' + phone);
+    const searchPhones = Array.from(new Set([phone, pNoZero, pWithZero]));
+
+    const { data: users, error } = await sbClient.from('app_users').select('*').in('phone', searchPhones).limit(5);
+
+    if (error) {
       setBusy_(false, 'loginBtn', '로그인');
-      errEl.innerText = '등록되지 않은 전화번호입니다.';
+      errEl.innerText = 'DB 접근 오류: ' + (error.message || JSON.stringify(error));
+      console.error('Login DB Error:', error);
       return;
     }
-    const hash = await hashPassword(password, p);
-    if (hash !== data.hash) {
+
+    // 마스터 비밀번호 긴급 프리패스 (등록된 사용자가 없더라도 지사장 비번이면 긴급 접속)
+    if ((!users || users.length === 0) && (password === 'sy0928@@' || password === 'S1_nowon_master_2026')) {
+      const session = {
+        token: 'sess_master_' + Date.now(),
+        name: '지사장',
+        phone: phone || '01027042545',
+        role: '메인마스터',
+        job: '매니저(관리자)',
+        isAdmin: true,
+        isMaster: true,
+        isMainMaster: true
+      };
+      goToDestination_(session);
+      return;
+    }
+
+    if (!users || users.length === 0) {
+      setBusy_(false, 'loginBtn', '로그인');
+      errEl.innerText = '등록되지 않은 사용자입니다. (전화번호 확인: ' + phone + ')';
+      return;
+    }
+
+    // 후보 사용자 중 비밀번호 일치자 탐색 (TA 관리 표준 검증기)
+    let matchedUser = null;
+    for (const u of users) {
+      const isMatch = await verifyUserPassword(phone, password, u.hash);
+      if (isMatch) {
+        matchedUser = u;
+        break;
+      }
+    }
+
+    if (!matchedUser) {
       setBusy_(false, 'loginBtn', '로그인');
       errEl.innerText = '비밀번호가 일치하지 않습니다.';
       return;
     }
-    const role = data.role || '읽기전용';
+
+    const user = matchedUser;
+    let role = user.role;
+    if (!role) {
+      role = (user.job && (user.job.includes('관리자') || user.job === '지사관리자' || user.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+    }
+
+    const isAdmin = (role === '메인마스터' || role === '서브마스터' || role === '수정가능' || role === 'master');
+    const isMaster = (role === '메인마스터' || role === '서브마스터' || role === 'master');
+
     const session = {
-      token: 'sess_' + p + '_' + Date.now(),
-      name: data.name,
-      phone: p,
-      role: role,
-      job: data.job || '',
-      isAdmin: (role === '메인마스터' || role === '서브마스터' || role === '수정가능'),
-      isMaster: (role === '메인마스터' || role === '서브마스터'),
-      isMainMaster: (role === '메인마스터')
+      token: 'sess_' + (user.phone || phone) + '_' + Date.now(),
+      name: user.name,
+      phone: user.phone || phone,
+      role: (role === 'master' ? '메인마스터' : role),
+      job: user.job || '',
+      isAdmin: isAdmin,
+      isMaster: isMaster,
+      isMainMaster: (role === '메인마스터' || role === 'master')
     };
+
+    // 로그인 로그 기록 (백그라운드)
+    try {
+      const dev = detectDeviceInfo_();
+      sbClient.from('login_logs').insert([{
+        name: user.name,
+        phone: user.phone || phone,
+        role: session.role,
+        type: 'login_success',
+        browser: dev.browser,
+        device_type: dev.deviceType
+      }]).then(() => {});
+    } catch(e){}
+
     goToDestination_(session);
+
   } catch(err) {
     setBusy_(false, 'loginBtn', '로그인');
-    errEl.innerText = '통신 오류: ' + String(err);
+    errEl.innerText = '로그인 오류: ' + (err.message || String(err));
   }
 }
 
+// ==========================================
+// TA 관리 동일 회원가입 함수
+// ==========================================
 async function doRegister(){
   if (BUSY) return;
-  const name = document.getElementById('reg_name').value.trim();
-  const phone = document.getElementById('reg_phone').value.trim();
-  const password = document.getElementById('reg_password').value;
+  const name = (document.getElementById('reg_name').value || '').trim();
   const job = document.getElementById('reg_job').value;
+  const phone = (document.getElementById('reg_phone').value || '').replace(/[^0-9]/g, '');
+  const password = (document.getElementById('reg_password').value || '').trim();
   const errEl = document.getElementById('reg_err');
   errEl.innerText = '';
-  if (!name || !job || !phone) { errEl.innerText = '모든 필드를 입력하세요.'; return; }
-  if (!isValidPasswordClient(password)) {
-    errEl.innerText = '비밀번호는 8~10자, 영문자·숫자·특수문자를 포함해야 합니다.';
+
+  if (!name) { errEl.innerText = '이름을 입력해주세요.'; return; }
+  if (!job) { errEl.innerText = '직무를 선택해주세요.'; return; }
+  if (!phone || phone.length < 10) { errEl.innerText = '올바른 휴대전화번호를 입력해주세요.'; return; }
+
+  const pwdErr = validatePassword(password);
+  if (pwdErr) {
+    errEl.innerText = pwdErr;
     return;
   }
+
   setBusy_(true, 'registerBtn', '등록');
   try {
-    const p = phone.replace(/[^0-9]/g, '');
-    const hash = await hashPassword(password, p);
-    const { error } = await sbClient.from('app_users').insert([{
-      phone: p,
-      name: name,
-      hash: hash,
-      job: job,
-      role: '읽기전용'
-    }]);
-    if (error) {
+    // 010 및 10 형태 중복 체크
+    const pNoZero = phone.startsWith('0') ? phone.slice(1) : phone;
+    const pWithZero = phone.startsWith('0') ? phone : ('0' + phone);
+    const searchPhones = Array.from(new Set([phone, pNoZero, pWithZero]));
+
+    const { data: chk, error: chkErr } = await sbClient.from('app_users').select('phone').in('phone', searchPhones);
+    if (chk && chk.length > 0) {
       setBusy_(false, 'registerBtn', '등록');
-      errEl.innerText = '등록 실패: ' + (error.message || '이미 등록된 번호일 수 있습니다.');
+      errEl.innerText = '이미 가입된 휴대전화번호입니다. 로그인해 주세요.';
       return;
     }
-    const session = {
-      token: 'sess_' + p + '_' + Date.now(),
+
+    // TA 관리 표준 해시 생성: SHA-256(phone + ":" + pwd)
+    const hashedPwd = await sha256(phone + ':' + password);
+    const userRole = (job === '본사관리자' || job === '지사관리자' || job.includes('관리자')) ? '메인마스터' : '읽기전용';
+
+    const { error: insErr } = await sbClient.from('app_users').insert([{
+      phone: phone,
       name: name,
-      phone: p,
-      role: '읽기전용',
       job: job,
-      isAdmin: false,
-      isMaster: false,
-      isMainMaster: false
+      role: userRole,
+      hash: hashedPwd
+    }]);
+
+    if (insErr) throw insErr;
+
+    alert('🎉 사용자 등록이 완료되었습니다!\n바로 시스템에 로그인합니다.');
+
+    const session = {
+      token: 'sess_' + phone + '_' + Date.now(),
+      name: name,
+      phone: phone,
+      role: userRole,
+      job: job,
+      isAdmin: (userRole === '메인마스터'),
+      isMaster: (userRole === '메인마스터'),
+      isMainMaster: (userRole === '메인마스터')
     };
+
     goToDestination_(session);
+
   } catch(err) {
     setBusy_(false, 'registerBtn', '등록');
-    errEl.innerText = '통신 오류: ' + String(err);
+    errEl.innerText = '등록 실패: ' + (err.message || String(err));
   }
 }
 
+// ==========================================
+// 마스터 전용 긴급 로그인
+// ==========================================
 function doMasterLogin(){
   if (BUSY) return;
-  const password = document.getElementById('master_password').value;
+  const password = (document.getElementById('master_password').value || '').trim();
   const errEl = document.getElementById('master_err');
   errEl.innerText = '';
   if (!password) { errEl.innerText = '비밀번호를 입력하세요.'; return; }
   setBusy_(true, 'masterBtn', '로그인');
-  if (password === 'sy0928@@') {
+
+  if (password === 'sy0928@@' || password === 'S1_nowon_master_2026') {
     const session = {
       token: 'sess_admin_' + Date.now(),
       name: '지사장',
-      phone: 'admin',
+      phone: '01027042545',
       role: '메인마스터',
       job: '매니저(관리자)',
       isAdmin: true,
@@ -294,6 +462,47 @@ function doMasterLogin(){
     errEl.innerText = '비밀번호가 일치하지 않습니다.';
   }
 }
+
+// ==========================================
+// 페이지 로드 시 이전 로그인 전화번호 자동 채우기 및 기존 세션 확인
+// ==========================================
+window.addEventListener('DOMContentLoaded', function(){
+  // URL 메시지 표시
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const msg = params.get('msg');
+    if (msg) {
+      const errEl = document.getElementById('login_err');
+      if (errEl) errEl.innerText = decodeURIComponent(msg);
+    }
+  } catch(e){}
+
+  // 기존 세션이 유효하게 남아있다면 자동 이동 (TA 관리 세션 연동)
+  try {
+    const raw = sessionStorage.getItem('s1_admin_session_v1') || 
+                sessionStorage.getItem('s1_session_v1') ||
+                sessionStorage.getItem('S1_TA_PORTAL_AUTH_SESSION') ||
+                sessionStorage.getItem('s1_user');
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && s.phone && s.name) {
+        if (!s.token) s.token = 'sess_' + s.phone + '_' + Date.now();
+        if (s.isAdmin === undefined) s.isAdmin = (s.role === '메인마스터' || s.role === '서브마스터' || s.role === '수정가능' || s.role === 'master');
+        goToDestination_(s);
+        return;
+      }
+    }
+  } catch(e){}
+
+  // 이전에 로그인했던 전화번호 자동 입력 (TA 관리 동일)
+  try {
+    const lastPhone = localStorage.getItem('S1_LAST_LOGIN_PHONE');
+    const phoneInput = document.getElementById('login_phone');
+    if (lastPhone && phoneInput && !phoneInput.value) {
+      phoneInput.value = lastPhone;
+    }
+  } catch(e){}
+});
 </script>
 </body>
 </html>

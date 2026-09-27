@@ -34,6 +34,56 @@
     } catch(e) { return null; }
   }
 
+  // --- 사용자 작업이력 로깅 엔진 (모든 추가/수정/삭제/인쇄/내보내기 자동 기록) ---
+  function scopeNameKor_(scope) {
+    if (scope === 'order' || scope === 'order_start') return '수주개시';
+    if (scope === 'cancel') return '해약중지';
+    if (scope === 'price' || scope === 'price_change') return '인상인하';
+    if (scope === 'restart') return '재개시';
+    if (scope === 'productdaily' || scope === 'product_daily') return '상품일보';
+    if (scope === 'dashboard') return '대시보드';
+    if (scope === 'gajungji') return '가중지';
+    if (scope === 'filestore') return '파일저장소';
+    if (scope === 'users') return '사용자관리';
+    if (scope === 'targets') return '목표관리';
+    return scope || '-';
+  }
+
+  window.logUserAction_ = async function(action, scope, targetId, details) {
+    try {
+      const client = getSupabase();
+      if (!client) return;
+      const sess = getSession_();
+      const userName = (sess && sess.name) ? sess.name : '일반사용자';
+      const userRole = (sess && sess.role) ? sess.role : '';
+      const userPhone = (sess && sess.phone) ? sess.phone : '';
+      const d = details || {};
+      const korScope = scopeNameKor_(scope);
+
+      const record = {
+        consultant: userName,
+        action: action,
+        company: d.company || korScope,
+        lead_id: d.contractNo || (targetId ? String(targetId) : '-'),
+        changes: {
+          scope: korScope,
+          field: d.field || '',
+          before: d.before !== undefined ? d.before : '',
+          after: d.after !== undefined ? d.after : '',
+          desc: d.desc || '',
+          role: userRole,
+          phone: userPhone
+        },
+        created_at: new Date().toISOString()
+      };
+
+      client.from('activity_logs').insert([record]).then(() => {});
+    } catch(e) {
+      console.warn('[ActivityLog] 기록 실패:', e);
+    }
+  };
+
+
   // --- 비즈니스 로직 구현체 (Code.gs 1:1 매핑) ---
     // --- 자연어 문장 분석 규칙 헬퍼 함수들 ---
   const AI_REPORT_HEADER_LINES_ = ['수주보고', '신규보고', '수주', '해약보고', '중지보고', '해약', '인상보고', '인하보고', '인상인하보고', '보고'];
