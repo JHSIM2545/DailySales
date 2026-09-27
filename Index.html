@@ -2841,6 +2841,19 @@
  border-radius:8px 8px 0 0; flex-shrink:0; }  
 .float-win-title button{ background:transparent; border:none; color:#fff; font-size:16px; cursor:pointer; line-height:1; padding:0 4px; }  
 .float-win-body{ padding:14px 16px; overflow:auto; flex:1; }  
+
+/* 그리드 내 모든 드롭박스(select)의 브라우저 기본 삼각 아이콘(화살표) 제거 및 드롭박스 기능 유지 */
+.grid-wrap td select, td select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: none !important;
+  cursor: pointer;
+}
+.grid-wrap td select::-ms-expand, td select::-ms-expand {
+  display: none !important;
+}
+
 </style>  
 </head>  
 <body>  

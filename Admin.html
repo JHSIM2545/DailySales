@@ -3080,19 +3080,32 @@
 }
 
 
- /* 이름(영업담당) 칸 드롭박스 삼각버튼 제거 */
- td.rep-col select, select.rep-select, select.no-arrow {
-   -webkit-appearance: none !important;
-   -moz-appearance: none !important;
-   appearance: none !important;
-   background-image: none !important;
-   cursor: pointer;
- }
- td.rep-col select::-ms-expand, select.rep-select::-ms-expand, select.no-arrow::-ms-expand {
-   display: none !important;
- }
- .date-pick-btn, .date-pick-hidden { display: none !important; }
+ /* 그리드 내 모든 드롭박스(select)의 브라우저 기본 삼각 아이콘(화살표) 제거 및 드롭박스 기능 유지 */
+.grid-wrap td select, td select {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: none !important;
+  cursor: pointer;
+}
+.grid-wrap td select::-ms-expand, td select::-ms-expand {
+  display: none !important;
+}
 
+/* 날짜 셀 달력 버튼(📅) 숨김 및 숨김 date input 위치 지정 */
+.date-pick-btn { display: none !important; }
+.date-pick-hidden {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
 </style>  
 </head>  
 <body>  
@@ -4050,50 +4063,61 @@ function endColResize(e) {
 }  
   
 /* ---- 그리드 날짜 셀(편집형): M/D로 보여주고 포커스 시 원본(YYYY-MM-DD) 표시. 팝업 캘린더 아이콘으로도 입력 가능 ---- */  
+/* ---- 그리드 날짜 셀(편집형): M/D로 보여주고, 클릭 시 달력 선택창(showPicker) 팝업, 키보드 직접 입력도 지원 ---- */  
 const DATE_CELL_HANDLERS = {};  
 function dateCellInputHtml(scope, id, field, val){  
- const raw = String(val === null || val === undefined ? '' : val).trim();  
- return '<input type="text" style="text-align:right;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
- ' title="' + escAttr(raw) + '"' +  
- ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
- ' onblur="onDateCellBlur(this,\'' + scope + '\',\'' + id + '\',\'' + field + '\')">';  
+  const raw = String(val === null || val === undefined ? '' : val).trim();  
+  return '<span class="datecell-wrap" style="position:relative; display:inline-flex; align-items:center; width:100%;">' +  
+    '<input type="text" style="text-align:right; width:100%; cursor:pointer;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
+    ' title="' + escAttr(raw) + '"' +  
+    ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
+    ' onclick="openDateCellPicker_(this)"' +  
+    ' onblur="onDateCellBlur(this,\'' + scope + '\',\'' + id + '\',\'' + field + '\')">' +  
+    '<input type="date" class="date-pick-hidden"' +  
+    ' data-scope="' + scope + '" data-id="' + id + '" data-field="' + field + '"' +  
+    ' onchange="onDatePickerChange_(this)">' +  
+    '</span>';  
+}  
+function openDateCellPicker_(textEl) {  
+  const wrap = textEl.closest('.datecell-wrap');  
+  if (!wrap) return;  
+  const hiddenEl = wrap.querySelector('input[type="date"]');  
+  if (!hiddenEl) return;  
+  const raw = (textEl && textEl.dataset.raw) || '';  
+  hiddenEl.value = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';  
+  if (typeof hiddenEl.showPicker === 'function') {  
+    try {  
+      hiddenEl.showPicker();  
+      return;  
+    } catch(e) {}  
+  }  
 }  
 function onDateCellBlur(el, scope, id, field){  
- const raw = el.dataset.raw || '';  
- const typed = String(el.value || '').trim();  
- if (typed === raw) { el.value = fmtMD(raw); return; }  
- const parsed = parseDateInput(typed);  
- if (parsed === null) {  
- alert('날짜는 YYYY-MM-DD 또는 M/D 형식으로 입력하세요. ("미정" 등 지정어는 그대로 입력 가능)');  
- el.value = fmtMD(raw);  
- return;  
- }  
- el.dataset.raw = parsed;  
- el.value = fmtMD(parsed);  
- el.title = parsed;  
- const fn = DATE_CELL_HANDLERS[scope];  
- if (fn) fn(id, field, parsed);  
+  const raw = el.dataset.raw || '';  
+  const typed = String(el.value || '').trim();  
+  if (typed === raw || typed === fmtMD(raw)) { el.value = fmtMD(raw); return; }  
+  const parsed = parseDateInput(typed);  
+  if (parsed === null) {  
+    alert('날짜는 YYYY-MM-DD 또는 M/D 형식으로 입력하세요. ("미정" 등 지정어는 그대로 입력 가능)');  
+    el.value = fmtMD(raw);  
+    return;  
+  }  
+  el.dataset.raw = parsed;  
+  el.value = fmtMD(parsed);  
+  el.title = parsed;  
+  const fn = DATE_CELL_HANDLERS[scope];  
+  if (fn) fn(id, field, parsed);  
 }  
-/** 달력 아이콘 클릭 시 숨겨진 \&lt;input type=date\&gt;의 네이티브 팝업 캘린더를 연다 */  
-function prepDatePicker_(hiddenEl) {  
- const wrap = hiddenEl.closest('.datecell-wrap');  
- if (!wrap) return;  
- const textEl = wrap.querySelector('input[type="text"]');  
- const raw = (textEl && textEl.dataset.raw) || '';  
- hiddenEl.value = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';  
- if (hiddenEl.showPicker) { try { hiddenEl.showPicker(); } catch(e) {} }  
-}  
-/** 팝업 캘린더에서 날짜를 고르면 텍스트 셀에 반영하고 저장 핸들러를 호출 */  
 function onDatePickerChange_(hiddenEl){  
- const wrap = hiddenEl.closest('.datecell-wrap');  
- if (!wrap) return;  
- const textEl = wrap.querySelector('input[type="text"]');  
- const scope = hiddenEl.dataset.scope, id = hiddenEl.dataset.id, field = hiddenEl.dataset.field;  
- const parsed = hiddenEl.value;  
- if (!parsed) return;  
- if (textEl) { textEl.dataset.raw = parsed; textEl.value = fmtMD(parsed); textEl.title = parsed; }  
- const fn = DATE_CELL_HANDLERS[scope];  
- if (fn) fn(id, field, parsed);  
+  const wrap = hiddenEl.closest('.datecell-wrap');  
+  if (!wrap) return;  
+  const textEl = wrap.querySelector('input[type="text"]');  
+  const scope = hiddenEl.dataset.scope, id = hiddenEl.dataset.id, field = hiddenEl.dataset.field;  
+  const parsed = hiddenEl.value;  
+  if (!parsed) return;  
+  if (textEl) { textEl.dataset.raw = parsed; textEl.value = fmtMD(parsed); textEl.title = parsed; }  
+  const fn = DATE_CELL_HANDLERS[scope];  
+  if (fn) fn(id, field, parsed);  
 }  
   
   
