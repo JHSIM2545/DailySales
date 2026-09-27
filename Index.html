@@ -67,10 +67,28 @@
       } catch(e) { return []; }
     },
 
-    // 2. 시트 버전 체크
+    // 2. 시트 버전 체크 (테이블별 최신 ID를 기준으로 변경 감지 - 불필요한 반복 새로고침 및 연결 차단 방지)
     getSheetVersions: async function(token) {
-      const now = Date.now();
-      return { order: now, cancel: now, price: now, restart: now, productdaily: now };
+      const client = getSupabase();
+      if (!client) return { order: 0, cancel: 0, price: 0, restart: 0, productdaily: 0 };
+      try {
+        const [ord, can, prc, rst, prd] = await Promise.all([
+          client.from('daily_orders').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_cancels').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_price_changes').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_restarts').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_product_reports').select('id').order('id', { ascending: false }).limit(1)
+        ]);
+        return {
+          order: (ord.data && ord.data[0]) ? Number(ord.data[0].id) : 0,
+          cancel: (can.data && can.data[0]) ? Number(can.data[0].id) : 0,
+          price: (prc.data && prc.data[0]) ? Number(prc.data[0].id) : 0,
+          restart: (rst.data && rst.data[0]) ? Number(rst.data[0].id) : 0,
+          productdaily: (prd.data && prd.data[0]) ? Number(prd.data[0].id) : 0
+        };
+      } catch(e) {
+        return { order: 0, cancel: 0, price: 0, restart: 0, productdaily: 0 };
+      }
     },
 
     // 3. 수주개시
@@ -622,6 +640,7 @@
       if (updates.이름) patch.name = updates.이름;
       if (updates.권한) patch.role = updates.권한;
       if (updates.직무) patch.job = updates.직무;
+      if (updates.비밀번호) patch.password = updates.비밀번호;
       const { error } = await client.from('app_users').update(patch).eq('phone', phone);
       if (error) throw error;
       return { success: true };
@@ -1023,13 +1042,7 @@
       const pf = productFilter || '일반알람';
       const client = getSupabase();
 
-      // 1. 스냅샷 조회 (데이터가 있는 유효한 스냅샷만 반환)
-      try {
-        const { data: snap } = await client.from('sales_status_snapshots').select('payload_json').eq('year_month', ym).eq('product_filter', pf).maybeSingle();
-        if (snap && snap.payload_json && snap.payload_json.actual && (snap.payload_json.actual.수주 || snap.payload_json.actual.개시 || snap.payload_json.actual.유지감소)) {
-          return Object.assign({ success: true, yearMonth: ym, fromSnapshot: true }, snap.payload_json);
-        }
-      } catch(e) {}
+      // 1. 실시간 라이브 계산 수행 (스냅샷 불일치 및 401 권한오류 방지)
 
       // 2. 실시간 라이브 계산
       const [ordRes, canRes, prcRes, rstRes, tgtProdRes, tgtRepRes] = await Promise.all([
@@ -1283,15 +1296,7 @@
         repTargets: repTargets
       };
 
-      // 스냅샷 저장 시도 (비동기)
-      try {
-        client.from('sales_status_snapshots').upsert({
-          year_month: ym,
-          product_filter: pf,
-          payload_json: result,
-          saved_at: new Date().toISOString()
-        }, { onConflict: 'year_month,product_filter' }).then(() => {});
-      } catch(e) {}
+      // 라이브 결과 반환 (불필요한 스냅샷 쓰기 제거)
 
       return result;
     },
@@ -1305,9 +1310,7 @@
       const ym = yearMonth || getTzToday().slice(0, 7);
       const pf = productFilter || '일반알람';
       const client = getSupabase();
-      try {
-        await client.from('sales_status_snapshots').delete().eq('year_month', ym).eq('product_filter', pf);
-      } catch(e) {}
+      // 라이브 재조회
       return Backend.getSalesStatus(token, ym, pf);
     },
 
