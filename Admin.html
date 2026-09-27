@@ -8889,12 +8889,12 @@ function selectUserMgmtView(view){
   const isLogin = USERMGMT_VIEW === 'login';
   const isAction = USERMGMT_VIEW === 'action';
 
-  content.innerHTML = '<div style="background:#f8fafc; padding:10px 20px; border-bottom:1px solid #e2e8f0; display:flex; gap:8px;">' +
-    '<button class="' + (isInfo ? 'primary' : '') + '" onclick="selectUserMgmtView(\'info\')" style="padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">👥 사용자 정보</button>' +
-    '<button class="' + (isLogin ? 'primary' : '') + '" onclick="selectUserMgmtView(\'login\')" style="padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">🔑 로그인 이력</button>' +
-    '<button class="' + (isAction ? 'primary' : '') + '" onclick="selectUserMgmtView(\'action\')" style="padding:6px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;">📋 작업 변경 이력</button>' +
+  content.innerHTML = '<div style="background:#f1f5f9; padding:10px 16px; border-bottom:1px solid #cbd5e1; display:flex; gap:8px;">' +
+    '<button class="' + (isInfo ? 'primary' : '') + '" onclick="selectUserMgmtView(\'info\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">👥 사용자 정보</button>' +
+    '<button class="' + (isLogin ? 'primary' : '') + '" onclick="selectUserMgmtView(\'login\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">🔑 로그인 이력</button>' +
+    '<button class="' + (isAction ? 'primary' : '') + '" onclick="selectUserMgmtView(\'action\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">📋 작업 변경 이력</button>' +
   '</div>' +
-  '<div id="userMgmtBody" style="padding:24px 16px; display:flex; justify-content:center; background:#f1f5f9; min-height:calc(100vh - 160px);"></div>';
+  '<div id="userMgmtBody"></div>';
 
   if (isLogin) {
     const tb = document.getElementById('toolbar-loginhistory');
@@ -8931,42 +8931,81 @@ function loadUsers(){
     .adminListUsers(SESSION.token);
 }
 
-function formatPhoneDashes_(p) {
-  if (!p) return '';
-  const clean = String(p).replace(/[^0-9]/g, '');
-  if (clean.length === 11) {
-    return clean.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
-  } else if (clean.length === 10) {
-    return clean.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-  }
-  return p;
+function formatDeviceDisplay_(browser, device) {
+  const b = browser && browser !== '-' ? browser : '-';
+  const d = device && device !== '-' ? device : '-';
+  return b + ' / ' + d;
 }
 
-function getJobBadgeHtml_(job) {
-  const j = String(job || '').trim();
-  let label = j;
-  let bg = '#f8fafc', color = '#64748b', border = '#e2e8f0';
+function formatJobDisplay_(j) {
+  const job = String(j || '').trim();
+  if (job === '컨설턴트(영업)') return '컨설턴트';
+  if (job === '엔지니어(기술)') return '기술';
+  if (job === '서비스(CS)') return 'CS관리자';
+  if (job === 'Staff(지원)') return '본사스탭';
+  if (job === '매니저(관리자)') return '본사관리자';
+  return job || '-';
+}
 
-  if (j.includes('관리자') || j === '매니저(관리자)' || j === '지사관리자' || j === '본사관리자') {
-    label = j.includes('지사') ? '지사관리자' : '본사관리자';
-    bg = '#f5f3ff'; color = '#7c3aed'; border = '#ddd6fe';
-  } else if (j.includes('기술') || j.includes('엔지니어')) {
-    label = '기술사원';
-    bg = '#ecfdf5'; color = '#059669'; border = '#a7f3d0';
-  } else if (j.includes('컨설턴트') || j.includes('영업')) {
-    label = '컨설턴트';
-    bg = '#eff6ff'; color = '#2563eb'; border = '#bfdbfe';
-  } else if (j.includes('CS') || j.includes('서비스')) {
-    label = j.includes('근무자') ? 'CS근무자' : 'CS관리자';
-    bg = '#fff7ed'; color = '#ea580c'; border = '#fed7aa';
-  } else if (j.includes('스탭') || j.includes('Staff') || j.includes('지원')) {
-    label = '본사스탭';
-    bg = '#f1f5f9'; color = '#475569'; border = '#cbd5e1';
-  } else if (!j) {
-    label = '미지정';
+function getSessionEndTime_(lastLoginStr) {
+  if (!lastLoginStr) return '-';
+  try {
+    const d = new Date(lastLoginStr.replace(' ', 'T') + (lastLoginStr.length === 16 ? ':00' : ''));
+    if (isNaN(d.getTime())) return '-';
+    d.setHours(d.getHours() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return yyyy + '-' + mm + '-' + dd + ' ' + hh + ':' + mi;
+  } catch(e) {
+    return '-';
   }
+}
 
-  return '<span style="background:' + bg + '; color:' + color + '; border:1px solid ' + border + '; border-radius:6px; padding:3px 10px; font-size:12.5px; font-weight:600; display:inline-block; letter-spacing:-0.2px;">' + escHtml(label) + '</span>';
+function getSessionStatus_(lastLoginStr) {
+  if (!lastLoginStr) {
+    return {
+      onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
+      sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
+      endTime: '-'
+    };
+  }
+  try {
+    const d = new Date(lastLoginStr.replace(' ', 'T') + (lastLoginStr.length === 16 ? ':00' : ''));
+    if (isNaN(d.getTime())) {
+      return {
+        onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
+        sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
+        endTime: '-'
+      };
+    }
+    const endMs = d.getTime() + 60 * 60 * 1000;
+    const nowMs = Date.now();
+    const endTimeStr = getSessionEndTime_(lastLoginStr);
+    const isAlive = (nowMs < endMs);
+
+    if (isAlive) {
+      return {
+        onlineText: '<span style="color:#16a34a; font-weight:600;"><span style="color:#16a34a;">●</span> 온라인</span>',
+        sessionText: '<span style="color:#16a34a; font-weight:600;"><span style="color:#16a34a;">●</span> 유지중</span>',
+        endTime: endTimeStr
+      };
+    } else {
+      return {
+        onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
+        sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
+        endTime: endTimeStr
+      };
+    }
+  } catch(e) {
+    return {
+      onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
+      sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
+      endTime: '-'
+    };
+  }
 }
 
 function renderUsers(){
@@ -8974,56 +9013,58 @@ function renderUsers(){
   const container = document.getElementById('userMgmtBody');
   if (!container) return;
   if (!USER_ROWS.length) { 
-    container.innerHTML = '<div style="background:#fff; border-radius:14px; border:1px solid #e2e8f0; padding:40px; text-align:center; color:#64748b; width:100%; max-width:760px;">등록된 사용자가 없습니다.</div>'; 
+    container.innerHTML = '<div class="placeholder">등록된 사용자가 없습니다.</div>'; 
     return; 
   }
 
-  // Korean alphabetical sort by name (가나다순)
-  const sorted = USER_ROWS.slice().sort(function(a, b){
-    return String(a.이름 || '').localeCompare(String(b.이름 || ''), 'ko');
-  });
-
   let rowsHtml = '';
-  sorted.forEach(function(u){
-    rowsHtml += '<tr style="border-bottom:1px solid #f1f5f9; transition:background 0.15s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#ffffff\'">' +
-      '<td style="padding:14px 16px; font-weight:600; color:#1e293b; font-size:14px;">' + escHtml(u.이름) + '</td>' +
-      '<td style="padding:14px 16px; color:#475569; font-size:14px; font-family:\'Segoe UI\', sans-serif;">' + escHtml(formatPhoneDashes_(u.전화번호)) + '</td>' +
-      '<td style="padding:14px 16px;">' + getJobBadgeHtml_(u.직무) + '</td>' +
-      '<td style="padding:14px 16px; text-align:center; white-space:nowrap;">' +
-        '<button style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:4px; padding:5px 12px; font-size:13px; font-weight:600; cursor:pointer; margin-right:6px; transition:all 0.15s;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#eff6ff\'" data-phone="' + escAttr(u.전화번호) + '" onclick="openUserEditModal(this.dataset.phone)">수정</button>' +
-        '<button style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; border-radius:4px; padding:5px 12px; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.background=\'#fee2e2\'" onmouseout="this.style.background=\'#fef2f2\'" data-phone="' + escAttr(u.전화번호) + '" onclick="deleteUser(this.dataset.phone)">삭제</button>' +
+  USER_ROWS.forEach(function(u){
+    const sess = getSessionStatus_(u.최근접속일시);
+    rowsHtml += '<tr style="border-bottom:1px solid #cfd6dc; transition:background 0.12s;" onmouseover="this.style.background=\'#f4f8fd\'" onmouseout="this.style.background=\'#ffffff\'">' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; font-weight:500; text-align:left;">' + escHtml(u.이름) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:left;">' + escHtml(u.전화번호) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.등록일시) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.최근접속일시) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(formatDeviceDisplay_(u.브라우저, u.기기유형)) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + sess.onlineText + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + sess.sessionText + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(sess.endTime) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.권한) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(formatJobDisplay_(u.직무)) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center; white-space:nowrap;">' +
+        '<button style="border:1px solid #bfdbfe; background:#fff; color:#2563eb; border-radius:3px; padding:3px 8px; font-size:12px; font-weight:600; cursor:pointer; margin-right:4px;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#fff\'" data-phone="' + escAttr(u.전화번호) + '" onclick="openUserEditModal(this.dataset.phone)">수정</button>' +
+        '<button style="border:1px solid #fecaca; background:#fff; color:#dc2626; border-radius:3px; padding:3px 8px; font-size:12px; font-weight:600; cursor:pointer;" onmouseover="this.style.background=\'#fef2f2\'" onmouseout="this.style.background=\'#fff\'" data-phone="' + escAttr(u.전화번호) + '" onclick="deleteUser(this.dataset.phone)">삭제</button>' +
       '</td>' +
     '</tr>';
   });
 
-  let html = '<div style="background:#ffffff; border-radius:14px; border:1px solid #e2e8f0; box-shadow:0 4px 12px rgba(0,0,0,0.06); width:100%; max-width:760px; padding:20px 24px; align-self:flex-start;">' +
-    '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">' +
-      '<h2 style="margin:0; font-size:18px; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px;">' +
-        '<span style="font-size:20px;">👥</span> 사용자 관리' +
-      '</h2>' +
-      '<button onclick="selectTab(\'dashboard\')" title="닫기" style="background:transparent; border:none; color:#94a3b8; font-size:20px; cursor:pointer; line-height:1; padding:2px 6px; border-radius:4px;" onmouseover="this.style.color=\'#1e293b\'" onmouseout="this.style.color=\'#94a3b8\'">✕</button>' +
-    '</div>' +
-    '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; font-size:14px; color:#475569;">' +
-      '<div>총 사용자: <b style="color:#2563eb; font-size:15px;">' + sorted.length + '명</b></div>' +
-      '<button onclick="loadUsers()" style="background:#f0f7ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:6px; padding:6px 14px; font-weight:600; cursor:pointer; font-size:13px; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s;" onmouseover="this.style.background=\'#dbeafe\'" onmouseout="this.style.background=\'#f0f7ff\'">' +
-        '<span style="font-size:14px;">🔄</span> 새로고침' +
-      '</button>' +
-    '</div>' +
-    '<div style="max-height:520px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; background:#fff;">' +
-      '<table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px;">' +
-        '<thead style="position:sticky; top:0; background:#f8fafc; z-index:2; border-bottom:1px solid #e2e8f0;">' +
-          '<tr>' +
-            '<th style="padding:12px 16px; font-weight:600; color:#475569; font-size:13.5px; width:22%;">이름</th>' +
-            '<th style="padding:12px 16px; font-weight:600; color:#475569; font-size:13.5px; width:33%;">전화번호(아이디)</th>' +
-            '<th style="padding:12px 16px; font-weight:600; color:#475569; font-size:13.5px; width:25%;">직무</th>' +
-            '<th style="padding:12px 16px; font-weight:600; color:#475569; font-size:13.5px; text-align:center; width:20%;">관리</th>' +
-          '</tr>' +
-        '</thead>' +
-        '<tbody>' +
-          rowsHtml +
-        '</tbody>' +
-      '</table>' +
-    '</div>' +
+  let html = '<div style="background:#fff; padding:10px 16px; border-bottom:1px solid #cfd6dc; display:flex; justify-content:space-between; align-items:center;">' +
+    '<div style="font-size:13px; color:#475569;">총 사용자: <b style="color:#2563eb; font-size:14px;">' + USER_ROWS.length + '명</b></div>' +
+    '<button onclick="loadUsers()" style="background:#f0f7ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:5px; padding:5px 12px; font-weight:600; cursor:pointer; font-size:13px; display:inline-flex; align-items:center; gap:4px;">' +
+      '<span>🔄</span> 새로고침' +
+    '</button>' +
+  '</div>' +
+  '<div class="grid-wrap" style="overflow:auto; background:#fff; height:calc(100vh - 195px);">' +
+    '<table style="border-collapse:collapse; width:100%; white-space:nowrap; font-size:13px;">' +
+      '<thead style="position:sticky; top:0; z-index:2;">' +
+        '<tr style="background:#4a86e8; color:#ffffff;">' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">사용자명</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">전화번호</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">등록일시</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">최근접속일시</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">접속기기</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">실시간 접속</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">세션 상태</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">세션 종료 시각</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">권한</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">직무</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">관리</th>' +
+        '</tr>' +
+      '</thead>' +
+      '<tbody>' +
+        rowsHtml +
+      '</tbody>' +
+    '</table>' +
   '</div>';
 
   container.innerHTML = html;
