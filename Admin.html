@@ -3701,23 +3701,26 @@ function getSession_() {
 <div class="modal-overlay" id="bizTeamModalOverlay">  
  <div class="modal" style="width:96vw; max-width:1400px;">  
  <h2>사업팀 데이터</h2>  
- <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">  
- <label style="font-size:13px; color:#555;">기준일자:  
- <input type="date" id="bizTeamDate" onchange="bizTeamDateChanged_()" style="margin-left:6px; padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px;">  
- <span id="bizTeamDateDow" style="margin-left:4px; font-weight:700; color:#374151;"></span>  
+ <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">  
+ <label style="font-size:13px; color:#555; display:flex; align-items:center; gap:4px;">기준일자:  
+ <button type="button" onclick="bizTeamShiftModalDate_(-1)" style="padding:3px 8px; border:1px solid #c7cfd8; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;" title="하루 전">◀</button>
+ <input type="date" id="bizTeamDate" onchange="bizTeamDateChanged_()" style="padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
+ <span id="bizTeamDateDow" style="font-weight:700; color:#374151; font-size:13px;"></span>  
+ <button type="button" onclick="bizTeamShiftModalDate_(1)" style="padding:3px 8px; border:1px solid #c7cfd8; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;" title="하루 후">▶</button>
  </label>  
- <label style="font-size:13px; color:#555;">상품종류:  
- <select id="bizTeamProductSelect" onchange="bizTeamDateChanged_()" style="margin-left:6px; padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px;"></select>  
+ <label style="font-size:13px; color:#555; margin-left:8px;">상품종류:  
+ <select id="bizTeamProductSelect" onchange="bizTeamDateChanged_()" style="margin-left:4px; padding:4px 8px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;"></select>  
  </label>  
- <span id="bizTeamStatusLabel" style="font-size:12px; color:#888;"></span>  
+ <span id="bizTeamStatusLabel" style="font-size:12px; color:#888; margin-left:8px;"></span>  
  </div>  
  <div style="color:#888; font-size:12px; margin-bottom:6px;">엑셀에서 지사명(1행) + 데이터(계약/개시/유지감소/유지증가 순) 행을 그대로 복사해 아래에 붙여넣어 주세요. 지사명 행 없이 데이터만 붙여넣으면 기본 16개 지사 순서로 인식합니다.</div>  
  <textarea id="bizTeamInput" rows="6" oninput="bizTeamAnalyze_()" placeholder="엑셀에서 표를 그대로 복사해 붙여넣으세요" style="width:100%; padding:10px; border:1px solid #c7cfd8; border-radius:6px; font-size:13px; font-family:inherit; box-sizing:border-box;"></textarea>  
  <div id="bizTeamPreviewWrap" style="margin-top:10px; overflow-x:auto;"></div>  
  <div id="bizTeamResult" style="margin-top:8px;"></div>  
- <div class="modal-actions">  
- <button onclick="closeBizTeamModal_()">닫기</button>  
- <button class="primary" onclick="bizTeamSave_()">저장</button>  
+ <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">  
+ <button type="button" onclick="closeBizTeamModal_()" style="padding:7px 16px; border:1px solid #c7cfd8; background:#fff; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">닫기</button>  
+ <button type="button" class="primary" onclick="bizTeamSave_(false)" style="background:#2563eb; color:#fff; border:1px solid #1d4ed8; padding:7px 18px; border-radius:4px; font-size:13px; font-weight:700; cursor:pointer;" title="저장 후 창을 닫지 않고 추가 데이터를 계속 입력합니다">💾 저장</button>  
+ <button type="button" class="primary" onclick="bizTeamSave_(true)" style="background:#5c1c2f; color:#fff; border:1px solid #4a1525; padding:7px 18px; border-radius:4px; font-size:13px; font-weight:700; cursor:pointer;" title="저장 후 창을 닫습니다">💾 저장하고 닫기</button>  
  </div>  
  </div>  
 </div>  
@@ -11360,6 +11363,20 @@ function closeBizTeamModal_(){
   if (overlay) overlay.classList.remove('open');
 }
 
+
+function bizTeamShiftModalDate_(deltaDays){
+  const input = document.getElementById('bizTeamDate');
+  const curVal = (input && input.value) || todayStr();
+  const d = new Date(curVal + 'T00:00:00');
+  const step = deltaDays >= 0 ? 1 : -1;
+  do {
+    d.setDate(d.getDate() + step);
+  } while (isBlockedDate(fmtDate(d)));
+  const nextDate = fmtDate(d);
+  if (input) input.value = nextDate;
+  bizTeamDateChanged_();
+}
+
 function bizTeamDateChanged_(){
   const dtInput = document.getElementById('bizTeamDate');
   const dt = dtInput ? dtInput.value : todayStr();
@@ -11511,7 +11528,7 @@ function renderBizTeamParsedTable_(branches, rows){
   wrap.innerHTML = tableHtml;
 }
 
-function bizTeamSave_(){
+function bizTeamSave_(closeAfter){
   const dt = document.getElementById('bizTeamDate') ? document.getElementById('bizTeamDate').value : '';
   if (!dt) { alert('기준일자를 선택하세요.'); return; }
   const prod = document.getElementById('bizTeamProductSelect') ? document.getElementById('bizTeamProductSelect').value : '일반알람';
@@ -11532,13 +11549,33 @@ function bizTeamSave_(){
     .withSuccessHandler(function(res){
       setLoadingCursor(false);
       if (res && res.success) {
-        alert('사업팀 데이터가 성공적으로 저장되었습니다.');
-        closeBizTeamModal_();
+        alert(`[${prod}] 사업팀 데이터가 성공적으로 저장되었습니다.`);
         if (typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined') BIZ_TEAM_STATUS_DATA_ = null;
         if (typeof DASH_VIEW_ !== 'undefined' && DASH_VIEW_ === 'biz_team') {
           BIZ_TEAM_VIEW_DATE_ = dt;
           BIZ_TEAM_VIEW_PRODUCT_ = prod;
           renderBizTeamFullScreenView_();
+        }
+        if (closeAfter) {
+          closeBizTeamModal_();
+        } else {
+          // 저장 완료 후 창을 유지하고 추가 데이터를 입력할 수 있도록 텍스트창 정리 및 안내
+          const inp = document.getElementById('bizTeamInput');
+          if (inp) {
+            inp.value = '';
+            inp.focus();
+          }
+          const prevWrap = document.getElementById('bizTeamPreviewWrap');
+          if (prevWrap) prevWrap.innerHTML = '';
+          const resEl = document.getElementById('bizTeamResult');
+          if (resEl) {
+            resEl.innerHTML = `<div style="padding:10px 14px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px; color:#15803d; font-size:13px; font-weight:700;">✅ [${prod}] ${dt} 데이터가 성공적으로 저장되었습니다! 상품종류를 변경하거나 다음 데이터를 계속 입력하세요.</div>`;
+          }
+          window.BIZ_TEAM_LAST_PARSED_ = null;
+          const statusLabel = document.getElementById('bizTeamStatusLabel');
+          if (statusLabel) {
+            statusLabel.innerHTML = '<span style="color:#16a34a; font-weight:600;">(방금 저장됨)</span>';
+          }
         }
       } else {
         alert('저장 실패: ' + ((res && res.error) || '알 수 없는 오류'));
@@ -11983,29 +12020,27 @@ function renderBizTeamFullScreenView_(){
 /* --- ensureBizTeamStatusLoaded_ --- */
 let BIZ_TEAM_LOADING_PROMISE_ = null;
 function ensureBizTeamStatusLoaded_(cb){  
-  if (BIZ_TEAM_STATUS_DATA_) { return; } // 이미 데이터가 있으면 절대 재귀 호출하지 않음
+  if (BIZ_TEAM_STATUS_DATA_) { return; }
   const cacheKey = bizTeamStatusCacheKey_();  
-  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_) || cacheGet_('bizTeamStatusLatest_', GRID_CACHE_TTL_MS_);  
+  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
   if (cached) { 
     BIZ_TEAM_STATUS_DATA_ = cached; 
-    if (cached.date && !isBlockedDate(cached.date)) BIZ_TEAM_VIEW_DATE_ = cached.date;
-    if (cb) setTimeout(cb, 0); // 비동기 안전 실행으로 콜스택 초과 원천 차단
+    if (cb) setTimeout(cb, 0);
     return; 
   }  
-  // 이미 백그라운드 요청 중인 경우 중복 네트워크 호출 방지 및 완료 대기
   if (BIZ_TEAM_LOADING_PROMISE_) {
     if (cb) BIZ_TEAM_LOADING_PROMISE_.then(function(){ setTimeout(cb, 0); });
     return;
   }
+  const targetDate = BIZ_TEAM_VIEW_DATE_;
+  const targetProd = BIZ_TEAM_VIEW_PRODUCT_;
   BIZ_TEAM_LOADING_PROMISE_ = new Promise(function(resolve){
     google.script.run  
       .withSuccessHandler(function(res){  
         BIZ_TEAM_LOADING_PROMISE_ = null;
-        BIZ_TEAM_STATUS_DATA_ = res || { success: false, error: '알 수 없는 오류' };  
-        if (res && res.success) {
+        BIZ_TEAM_STATUS_DATA_ = res || { success: true, found: false };  
+        if (res && res.success && res.found) {
           cacheSet_(cacheKey, res);  
-          cacheSet_('bizTeamStatusLatest_', res);
-          if (res.date && !isBlockedDate(res.date)) BIZ_TEAM_VIEW_DATE_ = res.date;
         }
         resolve();
         if (cb) setTimeout(cb, 0);  
@@ -12016,7 +12051,7 @@ function ensureBizTeamStatusLoaded_(cb){
         resolve();
         if (cb) setTimeout(cb, 0); 
       })  
-      .getBizTeamDataNearestOnOrBefore(SESSION.token, BIZ_TEAM_VIEW_DATE_, BIZ_TEAM_VIEW_PRODUCT_);  
+      .getBizTeamDailyData(SESSION.token, targetDate, targetProd);  
   });
 }
 
@@ -12062,13 +12097,15 @@ function bizTeamStatusCacheKey_(){
 /* --- bizTeamShiftViewDate_ --- */
 function bizTeamShiftViewDate_(deltaDays){  
  const input = document.getElementById('bizTeamViewDate');  
- if (!input || !input.value) return;  
- const d = new Date(input.value + 'T00:00:00');  
+ const curVal = (input && input.value) || BIZ_TEAM_VIEW_DATE_ || todayStr();  
+ const d = new Date(curVal + 'T00:00:00');  
  const step = deltaDays >= 0 ? 1 : -1;  
  do {  
- d.setDate(d.getDate() + step);  
+   d.setDate(d.getDate() + step);  
  } while (isBlockedDate(fmtDate(d)));  
- input.value = fmtDate(d);  
+ const nextDate = fmtDate(d);
+ if (input) input.value = nextDate;  
+ BIZ_TEAM_VIEW_DATE_ = nextDate;
  bizTeamViewFilterChanged_();  
 }
 
