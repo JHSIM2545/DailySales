@@ -2110,7 +2110,8 @@
     getTaPortalUrl: async function(token) {
       const client = getSupabase();
       const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'TA_PORTAL_URL').maybeSingle();
-      return { success: true, url: data ? data.setting_value : 'https://script.google.com/macros/s/AKfycbzQVU3_smTlMsGqUoXB47p7oVP-6VPTZgskAzU0YiPu-VSYTkVE-a-YX8BxX1ce76UExA/exec' };
+      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/TA-Manager/';
+      return { success: true, url: u };
     },
 
     saveTaPortalUrl: async function(token, url) {
@@ -2352,10 +2353,16 @@
         const lineCompanyName = ruleParseGuessCompanyFromLines_(raw0, motiveList);
         const companyName = contractLineCompanyName || lineCompanyName || ruleParseFindCompanyName_(t) || '미확인';
 
-        const sess = getSession_();
-        const defaultReporter = sess ? sess.name : '지사장';
-        const reporter = (repList.indexOf(String(reporterName || '').trim()) !== -1) ? String(reporterName).trim() : defaultReporter;
-        const rep = ruleParseFindFromList_(t, repList) || (repList.indexOf(reporter) !== -1 ? reporter : '최영국');
+        const cleanSender = String(reporterName || '').trim();
+        const textRep = ruleParseFindFromList_(t, repList);
+        let rep = '최영국';
+        if (textRep) {
+          rep = textRep;
+        } else if (repList.indexOf(cleanSender) !== -1) {
+          rep = cleanSender;
+        } else {
+          rep = '최영국';
+        }
         const product = ruleParseFindProduct_(t);
         const car = ruleParseFindCar_(t) || '127';
         const gross = /법인/.test(t) ? '법인' : '일반';
@@ -2369,31 +2376,21 @@
 
         let fields = {};
         if (type === 'order_start') {
+          const 보고일 = today;
           const 계약일 = today;
           const usedDateIdx_ = [];
-          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시', '공사'], today, usedDateIdx_);
-          const 기산Explicit = ruleParseKeywordDate_(t, ['기산', '반영', '확정'], today, usedDateIdx_);
-          let 개시일, 기산일;
-          if (기산Explicit) {
-            개시일 = (개시Info ? 개시Info.date : 계약일);
-            기산일 = 기산Explicit;
-          } else if (개시Info) {
-            const isDayOnly = /^\d{1,2}\s*일$/.test(개시Info.raw) && !/[\/.월]/.test(개시Info.raw);
-            if (isDayOnly) {
-              개시일 = 개시Info.date;
-              기산일 = 개시Info.date;
-            } else {
-              기산일 = 개시Info.date;
-              개시일 = ruleParseAddDays_(개시Info.date, -1);
-            }
-          } else {
-            개시일 = 계약일;
-            기산일 = 계약일;
-          }
+          // 개시일자: 메시지에 있는 개시날짜(개시일:9/16 등)를 그대로 개시일에 반영
+          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시일', '개시', '공사일', '공사'], today, usedDateIdx_);
+          // 기산일: 메시지에 별도로 '기산', '확정', '반영' 날짜가 있다면 그 날짜로 하고, 없다면 개시일과 동일한 날짜로 디폴트 세팅
+          const 기산Explicit = ruleParseKeywordDate_(t, ['기산일', '기산', '확정일', '확정', '반영일', '반영'], today, usedDateIdx_);
+          
+          let 개시일 = 개시Info ? 개시Info.date : 계약일;
+          let 기산일 = 기산Explicit ? 기산Explicit : 개시일;
+
           fields = {
             계약번호: contractNo, 계약처명: companyName,
             영업담당: rep, 영업동기: ruleParseFindFromList_(t, motiveList) || '개척',
-            담당차량: car, 보고일: today, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
+            담당차량: car, 보고일: 보고일, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
             용역료: amount !== null ? String(amount) : '',
             상품: product, 그로스: gross, 유형: '자동등록', 비고: 비고LabelText
           };
@@ -4269,7 +4266,7 @@ const JOB_DISPLAY_LABELS_ = {
 function jobLabel_(job){ return JOB_DISPLAY_LABELS_[job] || job || ''; }  
 function taPortalVisible_(){ return !!(SESSION && (SESSION.isMainMaster || SESSION.job === JOB_CONSULTANT_)); }  
 // TA 관리 포털 URL은 처음 클릭할 때 한 번만 서버에서 받아와 캐시해 둔다(설정에서 저장하면 즉시 갱신됨).  
-let TA_PORTAL_BASE_URL_ = '';  
+let TA_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/TA-Manager/';  
 function detectDeviceType_(){  
  const ua = navigator.userAgent || '';  
  return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';  
@@ -4277,36 +4274,79 @@ function detectDeviceType_(){
 /** win: window.open()으로 미리 열어둔(동기적으로 열어야 팝업 차단을 피할 수 있음) 빈 창.  
  * URL이 준비되면 그 창의 위치만 옮긴다. win이 없으면(팝업이 차단됐던 경우) 새로 열어본다. */  
 function openTaPortalWithUrl_(baseUrl, win){  
- const url = String(baseUrl || '').trim();  
- if (!url) {  
- if (win && !win.closed) { try { win.close(); } catch(e){} }  
- alert('TA 관리 포털 링크가 아직 설정되지 않았습니다. 관리자에게 문의해 주세요.');  
- return;  
- }  
- const sep = url.indexOf('?') === -1 ? '?' : '&';  
- // 메인마스터는 master=1\&view=dashboard\&device=pc로 접속하고, 그 외(컨설턴트 직군의 서브마스터 포함) 사용자는  
- // 일반 사용자와 동일하게 로그인한 본인 이름으로 접속한다.  
- const finalUrl = SESSION.isMainMaster  
- ? (url + sep + 'master=1\&view=dashboard\&device=pc')  
- : (url + sep + 'agent=' + encodeURIComponent(SESSION.name || '') + '\&device=' + detectDeviceType_());  
- if (win && !win.closed) { win.location.href = finalUrl; } else { window.open(finalUrl, '_blank'); }  
+  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/TA-Manager/';  
+  if (url.indexOf('script.google.com') !== -1) {  
+    url = 'https://jhsim2545.github.io/TA-Manager/';  
+  }  
+
+  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);  
+  const userName = (sess && sess.name) ? sess.name : '지사장';  
+  const userPhone = (sess && sess.phone) ? sess.phone : '01027042545';  
+  const userJob = (sess && sess.job) ? sess.job : '컨설턴트';  
+  const isMaster = (sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master'));  
+  const userRole = isMaster ? 'master' : 'user';  
+
+  // TA 관리 포털 규격 세션 데이터 생성 및 브라우저 세션 스토리지에 동기화
+  const taSessionData = {  
+    phone: userPhone,  
+    name: userName,  
+    job: userJob,  
+    role: userRole,  
+    screen: isMaster ? 'master' : userName,  
+    modal: null,  
+    savedAt: Date.now()  
+  };  
+
+  const taUserData = {  
+    phone: userPhone,  
+    name: userName,  
+    job: userJob,  
+    role: userRole  
+  };  
+
+  try {  
+    sessionStorage.setItem('S1_TA_PORTAL_AUTH_SESSION', JSON.stringify(taSessionData));  
+    sessionStorage.setItem('s1_user', JSON.stringify(taUserData));  
+    localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);  
+    localStorage.setItem('S1_TA_SSO_SESSION', JSON.stringify(taSessionData));  
+  } catch(e) {  
+    console.warn('[TA SSO] 세션 저장 실패:', e);  
+  }  
+
+  if (typeof logUserAction_ === 'function') {  
+    logUserAction_('TA 포털 이동', '외부연동', '', { desc: userName + ' TA 관리 포털 바로가기 접속' });  
+  }  
+
+  // SSO URL 파라미터 조합
+  const sep = url.indexOf('?') === -1 ? '?' : '&';  
+  const devType = (typeof detectDeviceType_ === 'function' ? detectDeviceType_() : 'pc');  
+
+  const ssoParams = [  
+    'sso=1',  
+    'name=' + encodeURIComponent(userName),  
+    'phone=' + encodeURIComponent(userPhone),  
+    'job=' + encodeURIComponent(userJob),  
+    'role=' + encodeURIComponent(userRole),  
+    'master=' + (isMaster ? '1' : '0'),  
+    'agent=' + encodeURIComponent(userName),  
+    'device=' + devType,  
+    (isMaster ? 'view=dashboard' : '')  
+  ].filter(Boolean).join('&');  
+
+  const finalUrl = url.replace(/\/+$/, '') + '/' + sep + ssoParams;  
+
+  if (win && !win.closed) {   
+    win.location.href = finalUrl;   
+  } else {   
+    window.open(finalUrl, '_blank');   
+  }  
 }  
-/** 서버에서 URL을 받아오는 동안(비동기) window.open을 나중에 호출하면 대부분의 브라우저가 사용자 클릭과  
- * 무관한 팝업으로 간주해 차단하거나, 빈 탭만 뜬 채 아무 화면도 나오지 않고 멈춘 것처럼 보이는 문제가 있었다.  
- * 이를 피하기 위해 클릭한 바로 그 순간(동기)에 빈 창을 먼저 열어두고, URL이 준비되면 그 창의 위치만 옮긴다. */  
+
 function openTaPortal_(){  
- const win = window.open('', '_blank');  
- if (TA_PORTAL_BASE_URL_) { openTaPortalWithUrl_(TA_PORTAL_BASE_URL_, win); return; }  
- google.script.run  
- .withSuccessHandler(function(res){  
- TA_PORTAL_BASE_URL_ = (res && res.success) ? (res.url || '') : '';  
- openTaPortalWithUrl_(TA_PORTAL_BASE_URL_, win);  
- })  
- .withFailureHandler(function(err){  
- if (win && !win.closed) { try { win.close(); } catch(e){} }  
- alert('TA 관리 포털 링크를 불러오지 못했습니다: ' + err);  
- })  
- .getTaPortalUrl(SESSION.token);  
+  const win = window.open('', '_blank');  
+  const targetUrl = 'https://jhsim2545.github.io/TA-Manager/';  
+  TA_PORTAL_BASE_URL_ = targetUrl;  
+  openTaPortalWithUrl_(targetUrl, win);  
 }  
 /* ===================== 종합 대시보드 ===================== */  
 let DASH_YM = todayStr().slice(0,7);  

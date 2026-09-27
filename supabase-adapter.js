@@ -2094,7 +2094,8 @@
     getTaPortalUrl: async function(token) {
       const client = getSupabase();
       const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'TA_PORTAL_URL').maybeSingle();
-      return { success: true, url: data ? data.setting_value : 'https://script.google.com/macros/s/AKfycbzQVU3_smTlMsGqUoXB47p7oVP-6VPTZgskAzU0YiPu-VSYTkVE-a-YX8BxX1ce76UExA/exec' };
+      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/TA-Manager/';
+      return { success: true, url: u };
     },
 
     saveTaPortalUrl: async function(token, url) {
@@ -2336,10 +2337,16 @@
         const lineCompanyName = ruleParseGuessCompanyFromLines_(raw0, motiveList);
         const companyName = contractLineCompanyName || lineCompanyName || ruleParseFindCompanyName_(t) || '미확인';
 
-        const sess = getSession_();
-        const defaultReporter = sess ? sess.name : '지사장';
-        const reporter = (repList.indexOf(String(reporterName || '').trim()) !== -1) ? String(reporterName).trim() : defaultReporter;
-        const rep = ruleParseFindFromList_(t, repList) || (repList.indexOf(reporter) !== -1 ? reporter : '최영국');
+        const cleanSender = String(reporterName || '').trim();
+        const textRep = ruleParseFindFromList_(t, repList);
+        let rep = '최영국';
+        if (textRep) {
+          rep = textRep;
+        } else if (repList.indexOf(cleanSender) !== -1) {
+          rep = cleanSender;
+        } else {
+          rep = '최영국';
+        }
         const product = ruleParseFindProduct_(t);
         const car = ruleParseFindCar_(t) || '127';
         const gross = /법인/.test(t) ? '법인' : '일반';
@@ -2353,31 +2360,21 @@
 
         let fields = {};
         if (type === 'order_start') {
+          const 보고일 = today;
           const 계약일 = today;
           const usedDateIdx_ = [];
-          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시', '공사'], today, usedDateIdx_);
-          const 기산Explicit = ruleParseKeywordDate_(t, ['기산', '반영', '확정'], today, usedDateIdx_);
-          let 개시일, 기산일;
-          if (기산Explicit) {
-            개시일 = (개시Info ? 개시Info.date : 계약일);
-            기산일 = 기산Explicit;
-          } else if (개시Info) {
-            const isDayOnly = /^\d{1,2}\s*일$/.test(개시Info.raw) && !/[\/.월]/.test(개시Info.raw);
-            if (isDayOnly) {
-              개시일 = 개시Info.date;
-              기산일 = 개시Info.date;
-            } else {
-              기산일 = 개시Info.date;
-              개시일 = ruleParseAddDays_(개시Info.date, -1);
-            }
-          } else {
-            개시일 = 계약일;
-            기산일 = 계약일;
-          }
+          // 개시일자: 메시지에 있는 개시날짜(개시일:9/16 등)를 그대로 개시일에 반영
+          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시일', '개시', '공사일', '공사'], today, usedDateIdx_);
+          // 기산일: 메시지에 별도로 '기산', '확정', '반영' 날짜가 있다면 그 날짜로 하고, 없다면 개시일과 동일한 날짜로 디폴트 세팅
+          const 기산Explicit = ruleParseKeywordDate_(t, ['기산일', '기산', '확정일', '확정', '반영일', '반영'], today, usedDateIdx_);
+          
+          let 개시일 = 개시Info ? 개시Info.date : 계약일;
+          let 기산일 = 기산Explicit ? 기산Explicit : 개시일;
+
           fields = {
             계약번호: contractNo, 계약처명: companyName,
             영업담당: rep, 영업동기: ruleParseFindFromList_(t, motiveList) || '개척',
-            담당차량: car, 보고일: today, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
+            담당차량: car, 보고일: 보고일, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
             용역료: amount !== null ? String(amount) : '',
             상품: product, 그로스: gross, 유형: '자동등록', 비고: 비고LabelText
           };

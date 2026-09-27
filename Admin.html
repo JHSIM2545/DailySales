@@ -2147,7 +2147,8 @@
     getTaPortalUrl: async function(token) {
       const client = getSupabase();
       const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'TA_PORTAL_URL').maybeSingle();
-      return { success: true, url: data ? data.setting_value : 'https://script.google.com/macros/s/AKfycbzQVU3_smTlMsGqUoXB47p7oVP-6VPTZgskAzU0YiPu-VSYTkVE-a-YX8BxX1ce76UExA/exec' };
+      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/TA-Manager/';
+      return { success: true, url: u };
     },
 
     saveTaPortalUrl: async function(token, url) {
@@ -2389,10 +2390,16 @@
         const lineCompanyName = ruleParseGuessCompanyFromLines_(raw0, motiveList);
         const companyName = contractLineCompanyName || lineCompanyName || ruleParseFindCompanyName_(t) || '미확인';
 
-        const sess = getSession_();
-        const defaultReporter = sess ? sess.name : '지사장';
-        const reporter = (repList.indexOf(String(reporterName || '').trim()) !== -1) ? String(reporterName).trim() : defaultReporter;
-        const rep = ruleParseFindFromList_(t, repList) || (repList.indexOf(reporter) !== -1 ? reporter : '최영국');
+        const cleanSender = String(reporterName || '').trim();
+        const textRep = ruleParseFindFromList_(t, repList);
+        let rep = '최영국';
+        if (textRep) {
+          rep = textRep;
+        } else if (repList.indexOf(cleanSender) !== -1) {
+          rep = cleanSender;
+        } else {
+          rep = '최영국';
+        }
         const product = ruleParseFindProduct_(t);
         const car = ruleParseFindCar_(t) || '127';
         const gross = /법인/.test(t) ? '법인' : '일반';
@@ -2406,31 +2413,21 @@
 
         let fields = {};
         if (type === 'order_start') {
+          const 보고일 = today;
           const 계약일 = today;
           const usedDateIdx_ = [];
-          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시', '공사'], today, usedDateIdx_);
-          const 기산Explicit = ruleParseKeywordDate_(t, ['기산', '반영', '확정'], today, usedDateIdx_);
-          let 개시일, 기산일;
-          if (기산Explicit) {
-            개시일 = (개시Info ? 개시Info.date : 계약일);
-            기산일 = 기산Explicit;
-          } else if (개시Info) {
-            const isDayOnly = /^\d{1,2}\s*일$/.test(개시Info.raw) && !/[\/.월]/.test(개시Info.raw);
-            if (isDayOnly) {
-              개시일 = 개시Info.date;
-              기산일 = 개시Info.date;
-            } else {
-              기산일 = 개시Info.date;
-              개시일 = ruleParseAddDays_(개시Info.date, -1);
-            }
-          } else {
-            개시일 = 계약일;
-            기산일 = 계약일;
-          }
+          // 개시일자: 메시지에 있는 개시날짜(개시일:9/16 등)를 그대로 개시일에 반영
+          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시일', '개시', '공사일', '공사'], today, usedDateIdx_);
+          // 기산일: 메시지에 별도로 '기산', '확정', '반영' 날짜가 있다면 그 날짜로 하고, 없다면 개시일과 동일한 날짜로 디폴트 세팅
+          const 기산Explicit = ruleParseKeywordDate_(t, ['기산일', '기산', '확정일', '확정', '반영일', '반영'], today, usedDateIdx_);
+          
+          let 개시일 = 개시Info ? 개시Info.date : 계약일;
+          let 기산일 = 기산Explicit ? 기산Explicit : 개시일;
+
           fields = {
             계약번호: contractNo, 계약처명: companyName,
             영업담당: rep, 영업동기: ruleParseFindFromList_(t, motiveList) || '개척',
-            담당차량: car, 보고일: today, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
+            담당차량: car, 보고일: 보고일, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
             용역료: amount !== null ? String(amount) : '',
             상품: product, 그로스: gross, 유형: '자동등록', 비고: 비고LabelText
           };
@@ -3193,6 +3190,12 @@
   padding: 0;
   margin: 0;
 }
+
+/* 전체 폰트 맑은 고딕 통일 */
+* {
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
 </style>  
 </head>  
 <body>  
@@ -4901,7 +4904,7 @@ const JOB_DISPLAY_LABELS_ = {
 function jobLabel_(job){ return JOB_DISPLAY_LABELS_[job] || job || ''; }  
 function taPortalVisible_(){ return !!(SESSION && (SESSION.isMainMaster || SESSION.job === JOB_CONSULTANT_)); }  
 // TA 관리 포털 URL은 처음 클릭할 때 한 번만 서버에서 받아와 캐시해 둔다(설정에서 저장하면 즉시 갱신됨).  
-let TA_PORTAL_BASE_URL_ = '';  
+let TA_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/TA-Manager/';  
 function detectDeviceType_(){  
  const ua = navigator.userAgent || '';  
  return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';  
@@ -4909,36 +4912,79 @@ function detectDeviceType_(){
 /** win: window.open()으로 미리 열어둔(동기적으로 열어야 팝업 차단을 피할 수 있음) 빈 창.  
  * URL이 준비되면 그 창의 위치만 옮긴다. win이 없으면(팝업이 차단됐던 경우) 새로 열어본다. */  
 function openTaPortalWithUrl_(baseUrl, win){  
- const url = String(baseUrl || '').trim();  
- if (!url) {  
- if (win && !win.closed) { try { win.close(); } catch(e){} }  
- alert('TA 관리 포털 링크가 아직 설정되지 않았습니다. "설정" 메뉴에서 등록해 주세요.');  
- return;  
- }  
- const sep = url.indexOf('?') === -1 ? '?' : '&';  
- // 메인마스터는 master=1\&view=dashboard\&device=pc로 접속하고, 그 외(컨설턴트 직군의 서브마스터 포함) 사용자는  
- // 일반 사용자와 동일하게 로그인한 본인 이름으로 접속한다.  
- const finalUrl = SESSION.isMainMaster  
- ? (url + sep + 'master=1\&view=dashboard\&device=pc')  
- : (url + sep + 'agent=' + encodeURIComponent(SESSION.name || '') + '\&device=' + detectDeviceType_());  
- if (win && !win.closed) { win.location.href = finalUrl; } else { window.open(finalUrl, '_blank'); }  
+  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/TA-Manager/';  
+  if (url.indexOf('script.google.com') !== -1) {  
+    url = 'https://jhsim2545.github.io/TA-Manager/';  
+  }  
+
+  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);  
+  const userName = (sess && sess.name) ? sess.name : '지사장';  
+  const userPhone = (sess && sess.phone) ? sess.phone : '01027042545';  
+  const userJob = (sess && sess.job) ? sess.job : '컨설턴트';  
+  const isMaster = (sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master'));  
+  const userRole = isMaster ? 'master' : 'user';  
+
+  // TA 관리 포털 규격 세션 데이터 생성 및 브라우저 세션 스토리지에 동기화
+  const taSessionData = {  
+    phone: userPhone,  
+    name: userName,  
+    job: userJob,  
+    role: userRole,  
+    screen: isMaster ? 'master' : userName,  
+    modal: null,  
+    savedAt: Date.now()  
+  };  
+
+  const taUserData = {  
+    phone: userPhone,  
+    name: userName,  
+    job: userJob,  
+    role: userRole  
+  };  
+
+  try {  
+    sessionStorage.setItem('S1_TA_PORTAL_AUTH_SESSION', JSON.stringify(taSessionData));  
+    sessionStorage.setItem('s1_user', JSON.stringify(taUserData));  
+    localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);  
+    localStorage.setItem('S1_TA_SSO_SESSION', JSON.stringify(taSessionData));  
+  } catch(e) {  
+    console.warn('[TA SSO] 세션 저장 실패:', e);  
+  }  
+
+  if (typeof logUserAction_ === 'function') {  
+    logUserAction_('TA 포털 이동', '외부연동', '', { desc: userName + ' TA 관리 포털 바로가기 접속' });  
+  }  
+
+  // SSO URL 파라미터 조합
+  const sep = url.indexOf('?') === -1 ? '?' : '&';  
+  const devType = (typeof detectDeviceType_ === 'function' ? detectDeviceType_() : 'pc');  
+
+  const ssoParams = [  
+    'sso=1',  
+    'name=' + encodeURIComponent(userName),  
+    'phone=' + encodeURIComponent(userPhone),  
+    'job=' + encodeURIComponent(userJob),  
+    'role=' + encodeURIComponent(userRole),  
+    'master=' + (isMaster ? '1' : '0'),  
+    'agent=' + encodeURIComponent(userName),  
+    'device=' + devType,  
+    (isMaster ? 'view=dashboard' : '')  
+  ].filter(Boolean).join('&');  
+
+  const finalUrl = url.replace(/\/+$/, '') + '/' + sep + ssoParams;  
+
+  if (win && !win.closed) {   
+    win.location.href = finalUrl;   
+  } else {   
+    window.open(finalUrl, '_blank');   
+  }  
 }  
-/** 서버에서 URL을 받아오는 동안(비동기) window.open을 나중에 호출하면 대부분의 브라우저가 사용자 클릭과  
- * 무관한 팝업으로 간주해 차단하거나, 빈 탭만 뜬 채 아무 화면도 나오지 않고 멈춘 것처럼 보이는 문제가 있었다.  
- * 이를 피하기 위해 클릭한 바로 그 순간(동기)에 빈 창을 먼저 열어두고, URL이 준비되면 그 창의 위치만 옮긴다. */  
+
 function openTaPortal_(){  
- const win = window.open('', '_blank');  
- if (TA_PORTAL_BASE_URL_) { openTaPortalWithUrl_(TA_PORTAL_BASE_URL_, win); return; }  
- google.script.run  
- .withSuccessHandler(function(res){  
- TA_PORTAL_BASE_URL_ = (res && res.success) ? (res.url || '') : '';  
- openTaPortalWithUrl_(TA_PORTAL_BASE_URL_, win);  
- })  
- .withFailureHandler(function(err){  
- if (win && !win.closed) { try { win.close(); } catch(e){} }  
- alert('TA 관리 포털 링크를 불러오지 못했습니다: ' + err);  
- })  
- .getTaPortalUrl(SESSION.token);  
+  const win = window.open('', '_blank');  
+  const targetUrl = 'https://jhsim2545.github.io/TA-Manager/';  
+  TA_PORTAL_BASE_URL_ = targetUrl;  
+  openTaPortalWithUrl_(targetUrl, win);  
 }  
   
 /* ===================== 종합 대시보드 ===================== */  
@@ -6362,6 +6408,19 @@ function parseAndPreviewAiReport_(){
     .parseSalesReportText(SESSION.token, text, reporter);
 }
 
+function fmtMoneyInput_(el){
+  if (!el) return;
+  const v = el.value.replace(/[^0-9]/g, '');
+  el.value = v ? Number(v).toLocaleString() : '';
+}
+
+function onAiStartDateChange_(val){
+  const acc = document.getElementById('ai_f_accrual_date');
+  if (acc && !acc.dataset.userEdited) {
+    acc.value = val;
+  }
+}
+
 function renderAiParsedPreview_(res){
   const previewEl = document.getElementById('aiParsePreview');
   if (!previewEl) return;
@@ -6381,20 +6440,59 @@ function renderAiParsedPreview_(res){
   const badgeColor = typeColorMap[res.type] || '#1c2f4a';
   const f = res.fields || {};
 
-  let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">' +
-    '<span style="font-size:15px; font-weight:700; color:' + badgeColor + '; background:#f1f5f9; padding:4px 10px; border-radius:6px; border:1px solid #cbd5e1;">🎯 분석 결과: [' + typeName + ']</span>' +
-    '<button class="primary" onclick="commitAiParsedRow_()" style="padding:8px 22px; font-weight:700; font-size:14px; background:' + badgeColor + '; border-color:' + badgeColor + ';">✓ ' + typeName + ' 일보에 바로 등록</button>' +
-  '</div>' +
-  '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; font-size:13px; background:#fff; padding:14px; border-radius:6px; border:1px solid #e2e8f0;">' +
-    '<div><span style="color:#64748b;">계약처명:</span> <input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:4px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">계약번호:</span> <input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || '') + '" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">영업담당:</span> <input type="text" id="ai_f_rep" value="' + escAttr(f['영업담당'] || '') + '" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">담당차량:</span> <input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '') + '" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">금액/용역료:</span> <input type="text" id="ai_f_fee" value="' + escAttr(f['용역료'] || f['금액'] || '') + '" style="width:100%; padding:4px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">상품:</span> <input type="text" id="ai_f_prod" value="' + escAttr(f['상품'] || '알람') + '" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">일자:</span> <input type="date" id="ai_f_date" value="' + escAttr(f['개시일'] || f['확정일'] || f['기산일'] || f['보고일'] || '') + '" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
-    '<div><span style="color:#64748b;">사유/유형:</span> <input type="text" id="ai_f_reason" value="' + escAttr(f['사유'] || f['해약유형'] || f['영업동기'] || '') + '" style="width:100%; padding:4px; border:1px solid #cbd5e1; border-radius:4px;"></div>' +
+  const reps = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+  const curRep = f['영업담당'] || '최영국';
+  let repOptions = reps.map(r => '<option value="' + r + '"' + (r === curRep ? ' selected' : '') + '>' + r + '</option>').join('');
+
+  const rawFee = String(f['용역료'] || f['금액'] || '').replace(/[^0-9-]/g, '');
+  const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
+
+  let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; font-family:Malgun Gothic,sans-serif;">' +
+    '<span style="font-size:15px; font-weight:700; color:' + badgeColor + '; background:#f1f5f9; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1;">🎯 분석 결과: [' + typeName + ']</span>' +
+    '<button class="primary" onclick="commitAiParsedRow_()" style="padding:9px 24px; font-weight:700; font-size:14px; background:' + badgeColor + '; border-color:' + badgeColor + '; font-family:Malgun Gothic,sans-serif;">✓ ' + typeName + ' 일보에 바로 등록</button>' +
   '</div>';
+
+  html += '<div style="background:#fff; padding:16px; border-radius:8px; border:1px solid #cbd5e1; font-family:Malgun Gothic,sans-serif; box-shadow:0 2px 4px rgba(0,0,0,0.03);">';
+
+  if (res.type === 'order_start') {
+    // 수주개시 전용: 보고일, 개시일자, 기산일 명확히 분리 표시
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당 (컨설턴트):</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;">' + repOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">금액/용역료:</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+    '</div>';
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><input type="text" id="ai_f_prod" value="' + escAttr(f['상품'] || '알람') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">영업동기:</label><input type="text" id="ai_f_reason" value="' + escAttr(f['영업동기'] || '개척') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 보고일 (메시지 등록일):</label><input type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">🚀 개시일자 (개시일):</label><input type="date" id="ai_f_start_date" value="' + escAttr(f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" onchange="onAiStartDateChange_(this.value)"></div>' +
+      '<div><label style="color:#6d28d9; font-weight:700; display:block; margin-bottom:3px;">📌 기산일:</label><input type="date" id="ai_f_accrual_date" value="' + escAttr(f['기산일'] || f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="this.dataset.userEdited=1"></div>' +
+    '</div>';
+  } else {
+    const date1Label = res.type === 'cancel' ? '접수일(보고일):' : (res.type === 'price_change' ? '접수일(보고일):' : '중지일:');
+    const date2Label = res.type === 'cancel' ? '확정일(해약일):' : (res.type === 'price_change' ? '기산일:' : '재개시일:');
+    const reasonLabel = res.type === 'cancel' ? '해약유형:' : (res.type === 'price_change' ? '사유:' : '비고:');
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당 (컨설턴트):</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;">' + repOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">금액/용역료:</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+    '</div>';
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><input type="text" id="ai_f_prod" value="' + escAttr(f['상품'] || '알람') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">' + reasonLabel + '</label><input type="text" id="ai_f_reason" value="' + escAttr(f['해약유형'] || f['사유'] || f['영업동기'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">' + date1Label + '</label><input type="date" id="ai_f_date1" value="' + escAttr(f['보고일'] || f['접수일'] || f['중지일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">' + date2Label + '</label><input type="date" id="ai_f_date2" value="' + escAttr(f['확정일'] || f['기산일'] || f['재개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+    '</div>';
+  }
+
+  html += '</div>';
   previewEl.innerHTML = html;
 }
 
@@ -6404,28 +6502,39 @@ function commitAiParsedRow_(){
   const f = Object.assign({}, res.fields);
 
   // 화면에서 수정한 필드 값 반영
-  if (document.getElementById('ai_f_company')) f['계약처명'] = document.getElementById('ai_f_company').value;
-  if (document.getElementById('ai_f_contract')) f['계약번호'] = document.getElementById('ai_f_contract').value;
+  if (document.getElementById('ai_f_company')) f['계약처명'] = document.getElementById('ai_f_company').value.trim();
+  if (document.getElementById('ai_f_contract')) f['계약번호'] = document.getElementById('ai_f_contract').value.trim();
   if (document.getElementById('ai_f_rep')) f['영업담당'] = document.getElementById('ai_f_rep').value;
-  if (document.getElementById('ai_f_car')) f['담당차량'] = document.getElementById('ai_f_car').value;
+  if (document.getElementById('ai_f_car')) f['담당차량'] = document.getElementById('ai_f_car').value.trim();
+  if (document.getElementById('ai_f_prod')) f['상품'] = document.getElementById('ai_f_prod').value.trim();
+
   if (document.getElementById('ai_f_fee')) {
     const feeVal = document.getElementById('ai_f_fee').value.replace(/[^0-9-]/g, '');
     if (res.type === 'price_change') f['금액'] = feeVal;
     else f['용역료'] = feeVal;
   }
-  if (document.getElementById('ai_f_prod')) f['상품'] = document.getElementById('ai_f_prod').value;
-  if (document.getElementById('ai_f_date')) {
-    const dt = document.getElementById('ai_f_date').value;
-    if (res.type === 'order_start') { f['개시일'] = dt; f['기산일'] = dt; }
-    else if (res.type === 'cancel') f['확정일'] = dt;
-    else if (res.type === 'price_change') f['기산일'] = dt;
-    else if (res.type === 'restart') f['재개시일'] = dt;
-  }
+
   if (document.getElementById('ai_f_reason')) {
-    const rVal = document.getElementById('ai_f_reason').value;
+    const rVal = document.getElementById('ai_f_reason').value.trim();
     if (res.type === 'cancel') f['해약유형'] = rVal;
     else if (res.type === 'price_change') f['사유'] = rVal;
     else if (res.type === 'order_start') f['영업동기'] = rVal;
+  }
+
+  if (res.type === 'order_start') {
+    if (document.getElementById('ai_f_report_date')) f['보고일'] = document.getElementById('ai_f_report_date').value;
+    if (document.getElementById('ai_f_start_date')) f['개시일'] = document.getElementById('ai_f_start_date').value;
+    if (document.getElementById('ai_f_accrual_date')) f['기산일'] = document.getElementById('ai_f_accrual_date').value;
+    f['계약일'] = f['보고일'] || todayStr();
+  } else if (res.type === 'cancel') {
+    if (document.getElementById('ai_f_date1')) f['접수일'] = document.getElementById('ai_f_date1').value;
+    if (document.getElementById('ai_f_date2')) f['확정일'] = document.getElementById('ai_f_date2').value;
+  } else if (res.type === 'price_change') {
+    if (document.getElementById('ai_f_date1')) f['접수일'] = document.getElementById('ai_f_date1').value;
+    if (document.getElementById('ai_f_date2')) f['기산일'] = document.getElementById('ai_f_date2').value;
+  } else if (res.type === 'restart') {
+    if (document.getElementById('ai_f_date1')) f['중지일'] = document.getElementById('ai_f_date1').value;
+    if (document.getElementById('ai_f_date2')) f['재개시일'] = document.getElementById('ai_f_date2').value;
   }
 
   setLoadingCursor(true);
@@ -6450,6 +6559,17 @@ function commitAiParsedRow_(){
     const prev = document.getElementById('aiParsePreview');
     if (prev) prev.style.display = 'none';
     CURRENT_PARSED_AI_DATA = null;
+
+    if (CURRENT_INBOX_ITEM_ID) {
+      const finishedId = CURRENT_INBOX_ITEM_ID;
+      CURRENT_INBOX_ITEM_ID = null;
+      google.script.run
+        .withSuccessHandler(function(){ loadPendingAiReports_(); updatePendingAiBadge_(); })
+        .markAiReportMessageProcessed(SESSION.token, finishedId, res.type);
+    } else {
+      loadPendingAiReports_();
+      updatePendingAiBadge_();
+    }
     invalidateScopeCache_(res.type === 'cancel' ? 'cancel' : (res.type === 'price_change' ? 'price' : (res.type === 'restart' ? 'restart' : 'order')));
   }
 
@@ -6457,6 +6577,26 @@ function commitAiParsedRow_(){
     setLoadingCursor(false);
     alert('등록 실패: ' + err);
   }
+}
+
+let CURRENT_INBOX_ITEM_ID = null;
+
+function updatePendingAiBadge_(){
+  if (typeof SESSION === 'undefined' || !SESSION || !SESSION.token) return;
+  google.script.run
+    .withSuccessHandler(function(res){
+      const items = (res && res.items) || [];
+      const badge = document.getElementById('tab_badge_ai_report');
+      if (badge) {
+        if (items.length > 0) {
+          badge.textContent = items.length;
+          badge.style.display = 'inline-block';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
+    })
+    .listPendingAiReportMessages(SESSION.token);
 }
 
 function loadPendingAiReports_(){
@@ -6467,19 +6607,41 @@ function loadPendingAiReports_(){
   google.script.run
     .withSuccessHandler(function(res){
       const items = (res && res.items) || [];
+      updatePendingAiBadge_();
       if (!items.length) {
-        listEl.innerHTML = '<div class="placeholder" style="padding:24px 0;">대기 중인 영업보고 접수 건이 없습니다.</div>';
+        listEl.innerHTML = '<div class="placeholder" style="padding:24px 0; color:#64748b; text-align:center;">📬 현재 카카오톡 단톡방에서 접수된 대기 영업보고가 없습니다.</div>';
         return;
       }
-      let html = '<div class="grid-wrap"><table><thead><tr><th>접수시간</th><th>제출자</th><th>보고 내용</th><th>관리</th></tr></thead><tbody>';
+      let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">' +
+        '<div style="font-size:13px; font-weight:700; color:#1e40af;">⚡ 대기 중인 카톡 보고: 총 ' + items.length + '건</div>' +
+        '<div style="display:flex; gap:8px;">' +
+          '<button class="primary" onclick="batchAutoRegisterAiInbox_()" style="background:#16a34a; border-color:#16a34a; font-weight:700; padding:6px 16px; font-size:13px;">⚡ 전체 일괄 자동등록 (' + items.length + '건)</button>' +
+        '</div>' +
+      '</div>';
+
+      html += '<div class="grid-wrap"><table><thead><tr>' +
+        '<th style="width:110px;">접수시간</th>' +
+        '<th style="width:90px;">출처</th>' +
+        '<th style="width:80px;">보고자</th>' +
+        '<th>단톡방 수주/영업보고 원문</th>' +
+        '<th style="width:190px;">관리 / 자동등록</th>' +
+      '</tr></thead><tbody>';
+
       items.forEach(it => {
+        const isKakao = String(it.source || '').indexOf('카카오') !== -1;
+        const srcBadge = isKakao 
+          ? '<span style="background:#fee500; color:#3c1e1e; font-weight:700; padding:2px 7px; border-radius:4px; font-size:11px; border:1px solid #e6cf00;">💬 카톡단톡</span>'
+          : '<span style="background:#e2e8f0; color:#475569; font-weight:600; padding:2px 7px; border-radius:4px; font-size:11px;">수동접수</span>';
+
         html += '<tr>' +
-          '<td>' + escHtml(String(it.submittedAt || '').slice(0, 16)) + '</td>' +
-          '<td>' + escHtml(it.submittedBy || '사용자') + '</td>' +
-          '<td style="max-width:400px; white-space:pre-wrap;">' + escHtml(it.text || '') + '</td>' +
-          '<td>' +
-            '<button class="primary" onclick="processAiInboxItem_(\'' + it.id + '\')" style="padding:4px 10px; font-size:12px;">분석/등록</button>' +
-            '<button class="danger" onclick="dismissAiInboxItem_(\'' + it.id + '\')" style="padding:4px 10px; font-size:12px; margin-left:4px;">무시</button>' +
+          '<td style="font-size:12px; white-space:nowrap;">' + escHtml(String(it.submittedAt || '').slice(0, 16)) + '</td>' +
+          '<td style="text-align:center;">' + srcBadge + '</td>' +
+          '<td style="font-weight:700; color:#1c2f4a;">' + escHtml(it.submittedBy || '사용자') + '</td>' +
+          '<td style="max-width:380px; white-space:pre-wrap; font-family:monospace; font-size:12.5px; background:#f8fafc; padding:8px; border-radius:4px; border:1px solid #e2e8f0;">' + escHtml(it.text || '') + '</td>' +
+          '<td style="white-space:nowrap;">' +
+            '<button class="primary" data-id="' + escAttr(it.id) + '" onclick="autoRegisterAiInboxItem_(this.dataset.id)" style="background:#16a34a; border-color:#16a34a; padding:5px 10px; font-size:12px; font-weight:700; margin-right:4px;" title="단톡방 내용을 분석하여 영업일보에 즉시 자동등록합니다">⚡ 즉시등록</button>' +
+            '<button class="primary" data-id="' + escAttr(it.id) + '" onclick="processAiInboxItem_(this.dataset.id)" style="padding:5px 10px; font-size:12px; margin-right:4px;" title="필드 분석 결과를 미리 확인하고 수정 후 등록합니다">🔍 상세검토</button>' +
+            '<button class="danger" data-id="' + escAttr(it.id) + '" onclick="dismissAiInboxItem_(this.dataset.id)" style="padding:5px 8px; font-size:12px;" title="이 접수 건을 무시(삭제) 처리합니다">무시</button>' +
           '</td>' +
         '</tr>';
       });
@@ -6492,7 +6654,73 @@ function loadPendingAiReports_(){
     .listPendingAiReportMessages(SESSION.token);
 }
 
+function autoRegisterAiInboxItem_(id){
+  if (!confirm('이 카카오톡 수주/영업보고를 분석하여 영업일보에 즉시 자동등록하시겠습니까?')) return;
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      if (!res || !res.success) {
+        alert('자동등록 실패: ' + ((res && res.error) || '알 수 없는 오류'));
+        return;
+      }
+      const typeLabel = res.type === 'cancel' ? '해약중지' : (res.type === 'price_change' ? '인상인하' : (res.type === 'restart' ? '재개시' : '수주개시'));
+      alert('✓ [' + (res.company || '미확인') + '] ' + typeLabel + ' 일보에 성공적으로 자동등록되었습니다!');
+      loadPendingAiReports_();
+      updatePendingAiBadge_();
+      invalidateScopeCache_(res.type === 'cancel' ? 'cancel' : (res.type === 'price_change' ? 'price' : (res.type === 'restart' ? 'restart' : 'order')));
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('자동등록 오류: ' + err);
+    })
+    .autoCommitAiInboxItem(SESSION.token, id);
+}
+
+function batchAutoRegisterAiInbox_(){
+  google.script.run
+    .withSuccessHandler(function(res){
+      const items = (res && res.items) || [];
+      if (!items.length) { alert('대기 중인 접수 건이 없습니다.'); return; }
+      if (!confirm('대기 중인 카카오톡 영업보고 총 ' + items.length + '건을 일괄 분석하여 영업일보에 자동등록하시겠습니까?')) return;
+
+      setLoadingCursor(true);
+      let successCount = 0;
+      let failCount = 0;
+      let idx = 0;
+
+      function doNextBatch_(){
+        if (idx >= items.length) {
+          setLoadingCursor(false);
+          alert('✓ 일괄 자동등록 완료!\n- 등록 성공: ' + successCount + '건' + (failCount > 0 ? '\n- 실패/보류: ' + failCount + '건' : ''));
+          loadPendingAiReports_();
+          updatePendingAiBadge_();
+          invalidateScopeCache_('order');
+          invalidateScopeCache_('cancel');
+          invalidateScopeCache_('price');
+          invalidateScopeCache_('restart');
+          return;
+        }
+        const curId = items[idx++].id;
+        google.script.run
+          .withSuccessHandler(function(r){
+            if (r && r.success) successCount++;
+            else failCount++;
+            doNextBatch_();
+          })
+          .withFailureHandler(function(){
+            failCount++;
+            doNextBatch_();
+          })
+          .autoCommitAiInboxItem(SESSION.token, curId);
+      }
+      doNextBatch_();
+    })
+    .listPendingAiReportMessages(SESSION.token);
+}
+
 function processAiInboxItem_(id){
+  CURRENT_INBOX_ITEM_ID = id;
   google.script.run
     .withSuccessHandler(function(res){
       const items = (res && res.items) || [];
@@ -6513,7 +6741,10 @@ function processAiInboxItem_(id){
 function dismissAiInboxItem_(id){
   if (!confirm('이 접수 건을 무시(삭제) 처리하시겠습니까?')) return;
   google.script.run
-    .withSuccessHandler(function(){ loadPendingAiReports_(); })
+    .withSuccessHandler(function(){ 
+      loadPendingAiReports_(); 
+      updatePendingAiBadge_();
+    })
     .dismissAiReportMessage(SESSION.token, id);
 }
 
