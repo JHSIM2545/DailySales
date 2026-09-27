@@ -3719,8 +3719,7 @@ function getSession_() {
  <div id="bizTeamResult" style="margin-top:8px;"></div>  
  <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:8px;">  
  <button type="button" onclick="closeBizTeamModal_()" style="padding:7px 16px; border:1px solid #c7cfd8; background:#fff; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">닫기</button>  
- <button type="button" class="primary" onclick="bizTeamSave_(false)" style="background:#2563eb; color:#fff; border:1px solid #1d4ed8; padding:7px 18px; border-radius:4px; font-size:13px; font-weight:700; cursor:pointer;" title="저장 후 창을 닫지 않고 추가 데이터를 계속 입력합니다">💾 저장</button>  
- <button type="button" class="primary" onclick="bizTeamSave_(true)" style="background:#5c1c2f; color:#fff; border:1px solid #4a1525; padding:7px 18px; border-radius:4px; font-size:13px; font-weight:700; cursor:pointer;" title="저장 후 창을 닫습니다">💾 저장하고 닫기</button>  
+ <button type="button" class="primary" onclick="bizTeamSave_()" style="background:#5c1c2f; color:#fff; border:1px solid #4a1525; padding:7px 18px; border-radius:4px; font-size:13px; font-weight:700; cursor:pointer;" title="사업팀 데이터를 저장합니다">저장</button>  
  </div>  
  </div>  
 </div>  
@@ -11528,7 +11527,7 @@ function renderBizTeamParsedTable_(branches, rows){
   wrap.innerHTML = tableHtml;
 }
 
-function bizTeamSave_(closeAfter){
+function bizTeamSave_(){
   const dt = document.getElementById('bizTeamDate') ? document.getElementById('bizTeamDate').value : '';
   if (!dt) { alert('기준일자를 선택하세요.'); return; }
   const prod = document.getElementById('bizTeamProductSelect') ? document.getElementById('bizTeamProductSelect').value : '일반알람';
@@ -11556,26 +11555,15 @@ function bizTeamSave_(closeAfter){
           BIZ_TEAM_VIEW_PRODUCT_ = prod;
           renderBizTeamFullScreenView_();
         }
-        if (closeAfter) {
-          closeBizTeamModal_();
-        } else {
-          // 저장 완료 후 창을 유지하고 추가 데이터를 입력할 수 있도록 텍스트창 정리 및 안내
-          const inp = document.getElementById('bizTeamInput');
-          if (inp) {
-            inp.value = '';
-            inp.focus();
-          }
-          const prevWrap = document.getElementById('bizTeamPreviewWrap');
-          if (prevWrap) prevWrap.innerHTML = '';
-          const resEl = document.getElementById('bizTeamResult');
-          if (resEl) {
-            resEl.innerHTML = `<div style="padding:10px 14px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px; color:#15803d; font-size:13px; font-weight:700;">✅ [${prod}] ${dt} 데이터가 성공적으로 저장되었습니다! 상품종류를 변경하거나 다음 데이터를 계속 입력하세요.</div>`;
-          }
-          window.BIZ_TEAM_LAST_PARSED_ = null;
-          const statusLabel = document.getElementById('bizTeamStatusLabel');
-          if (statusLabel) {
-            statusLabel.innerHTML = '<span style="color:#16a34a; font-weight:600;">(방금 저장됨)</span>';
-          }
+        
+        // 데이터 유지: 화면이 닫히지 않고 입력창과 미리보기 표가 초기화되지 않고 그대로 유지됩니다.
+        const resEl = document.getElementById('bizTeamResult');
+        if (resEl) {
+          resEl.innerHTML = `<div style="padding:10px 14px; background:#f0fdf4; border:1px solid #86efac; border-radius:6px; color:#15803d; font-size:13px; font-weight:700;">✅ [${prod}] ${dt} 데이터가 성공적으로 저장되었습니다.</div>`;
+        }
+        const statusLabel = document.getElementById('bizTeamStatusLabel');
+        if (statusLabel) {
+          statusLabel.innerHTML = '<span style="color:#16a34a; font-weight:600;">(저장 완료)</span>';
         }
       } else {
         alert('저장 실패: ' + ((res && res.error) || '알 수 없는 오류'));
