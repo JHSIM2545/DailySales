@@ -3079,6 +3079,20 @@
   box-shadow: 0 0 0 2px rgba(112, 31, 58, 0.15) !important;
 }
 
+
+ /* 이름(영업담당) 칸 드롭박스 삼각버튼 제거 */
+ td.rep-col select, select.rep-select, select.no-arrow {
+   -webkit-appearance: none !important;
+   -moz-appearance: none !important;
+   appearance: none !important;
+   background-image: none !important;
+   cursor: pointer;
+ }
+ td.rep-col select::-ms-expand, select.rep-select::-ms-expand, select.no-arrow::-ms-expand {
+   display: none !important;
+ }
+ .date-pick-btn, .date-pick-hidden { display: none !important; }
+
 </style>  
 </head>  
 <body>  
@@ -4039,15 +4053,10 @@ function endColResize(e) {
 const DATE_CELL_HANDLERS = {};  
 function dateCellInputHtml(scope, id, field, val){  
  const raw = String(val === null || val === undefined ? '' : val).trim();  
- return '<span class="datecell-wrap" style="position:relative;">' +  
- '<input type="text" style="text-align:right;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
+ return '<input type="text" style="text-align:right;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
  ' title="' + escAttr(raw) + '"' +  
  ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
- ' onblur="onDateCellBlur(this,\'' + scope + '\',\'' + id + '\',\'' + field + '\')">' +  
- '<button type="button" class="date-pick-btn" title="달력에서 선택">📅</button>' +  
- '<input type="date" class="date-pick-hidden" data-scope="' + scope + '" data-id="' + id + '" data-field="' + field + '"' +  
- ' onclick="prepDatePicker_(this)" onchange="onDatePickerChange_(this)">' +  
- '</span>';  
+ ' onblur="onDateCellBlur(this,\'' + scope + '\',\'' + id + '\',\'' + field + '\')">';  
 }  
 function onDateCellBlur(el, scope, id, field){  
  const raw = el.dataset.raw || '';  
@@ -6842,6 +6851,7 @@ function orderCellClass(row, field, val, allRows){
  let cls = '';  
  if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  else if (field === '계약처명') cls = 'name-cell';  
+ else if (field === '영업담당') cls = 'rep-col';  
  else if (field === '용역료') cls = 'fee money';  
  else if (field === '담당차량') cls = 'center center-cell narrow';  
  else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol';  
@@ -6860,7 +6870,8 @@ function fieldCellHtml(row, field, allRows){
  let inner;  
  if (type === 'select') {  
  const options = FIELD_OPTIONS[field];  
- inner = `<select onchange="onFieldChange('${row.id}','${field}',this.value)">  
+ const repCls = (field === '영업담당') ? ' class="rep-select no-arrow"' : '';  
+ inner = `<select${repCls} onchange="onFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
@@ -7315,7 +7326,8 @@ function fieldCellHtmlCancel(row, field, allRows){
  let inner;  
  if (type === 'select') {  
  const options = CANCEL_FIELD_OPTIONS[field];  
- inner = `<select onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
+ const repCls = (field === '영업담당') ? ' class="rep-select no-arrow"' : '';  
+ inner = `<select${repCls} onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
@@ -7712,10 +7724,11 @@ function fieldCellHtmlPrice(row, field, allRows){
  const type = PRICE_FIELD_TYPE[field];  
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
  let inner, cls = '';  
- if (field === '영업담당') {  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
- <option value="">선택</option>${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
- </select>`;  
+  if (field === '영업담당') {  
+    cls += ' rep-col';  
+    inner = `<select class="rep-select no-arrow" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+    <option value="">선택</option>${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
+    </select>`;  
  } else if (field === '접수자') {  
  inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>${USER_NAMES.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
@@ -8071,7 +8084,8 @@ function fieldCellHtmlRestart(row, field, allRows){
  if (field === '현상태') {  
  inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_STATUS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '영업담당') {  
- inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="rep-select no-arrow" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ cls += ' rep-col';  
  } else if (field === '담당차량') {  
  inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}</select>`;  
  cls = 'center';  
