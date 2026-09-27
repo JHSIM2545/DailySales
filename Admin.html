@@ -7515,7 +7515,7 @@ const LIST_CANCEL_TYPE = ['폐업','타사전환','관외이전','관내이전',
 const CANCEL_FIELD_TYPE = {  
  계약번호:'text', 계약처명:'text', 영업담당:'select', 담당차량:'select',  
  접수일:'date', 확정일:'text', 용역료:'number', 상품:'select', 그로스:'select',  
- 해약유형:'datalist', 유형:'select', 사유:'text'  
+ 해약유형:'select', 유형:'select', 사유:'text'  
 };  
 const CANCEL_FIELD_OPTIONS = {  
  영업담당:LIST_CANCEL_SALES_REP, 담당차량:LIST_CANCEL_CAR, 상품:LIST_PRODUCT, 그로스:LIST_GROSS,  
@@ -7650,11 +7650,13 @@ function fieldCellHtmlCancel(row, field, allRows){
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
  let inner;  
  if (type === 'select') {  
- const options = CANCEL_FIELD_OPTIONS[field];  
+ const options = CANCEL_FIELD_OPTIONS[field] || [];  
  const repCls = (field === '영업담당') ? ' class="rep-select no-arrow"' : '';  
+ const hasVal = val && !options.includes(val);  
  inner = `<select${repCls} onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
+ ${hasVal ? `<option value="${escAttr(val)}" selected>${escAttr(val)}</option>` : ''}  
  </select>`;  
  } else if (type === 'datalist') {  
  const options = CANCEL_FIELD_OPTIONS[field];  
@@ -7767,7 +7769,7 @@ const CANCEL_FIELD_DEFS = [
  { key:'용역료', label:'용역료(원)', type:'money' },  
  { key:'상품', label:'상품', type:'select', options:LIST_PRODUCT },  
  { key:'그로스', label:'그로스', type:'select', options:LIST_GROSS },  
- { key:'해약유형', label:'해약유형', type:'datalist', options:LIST_CANCEL_TYPE, placeholder:'목록에서 선택하거나 직접 입력' },  
+ { key:'해약유형', label:'해약유형', type:'select', options:LIST_CANCEL_TYPE },  
  { key:'유형', label:'유형', type:'select', options:LIST_REG_TYPE },  
  { key:'사유', label:'사유', type:'textarea', full:true }  
 ];  
@@ -7942,7 +7944,7 @@ const LIST_PRICE_REASON = ['변추가인상','순수인상','서비스추가','�
 const PRICE_FIELD_TYPE = {  
  계약번호:'text', 계약처명:'text', 영업담당:'select', 접수자:'select', 담당차량:'select',  
  접수일:'date', 기산일:'text', 금액:'number', 現용역료:'number',  
- 사유:'datalist', 상품:'select', 그로스:'select', 유형:'select', 비고:'text'  
+ 사유:'select', 상품:'select', 그로스:'select', 유형:'select', 비고:'text'  
 };  
   
 let PRICE_ROWS = [];  
@@ -8070,9 +8072,13 @@ function fieldCellHtmlPrice(row, field, allRows){
  } else if (field === '유형') {  
  inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_REG_TYPE.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '사유') {  
- const dlid = 'pdl_reason';  
- inner = `<input list="${dlid}" value="${String(val).replace(/"/g,'\&quot;')}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
- <datalist id="${dlid}">${LIST_PRICE_REASON.map(o => `<option value="${o}">`).join('')}</datalist>`;  
+ const options = LIST_PRICE_REASON || [];  
+ const hasVal = val && !options.includes(val);  
+ inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ <option value="">선택</option>  
+ ${options.map(o => `<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
+ ${hasVal ? `<option value="${escAttr(val)}" selected>${escAttr(val)}</option>` : ''}  
+ </select>`;  
  } else if (PRICE_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('price', row.id, field, val);  
  } else if (field === '금액') {  
@@ -8206,9 +8212,7 @@ function buildPriceForm(){
  <div class="field"><label>기산일</label><input type="date" id="pf_기산일" value="${defaultBaseDate}"><div class="err" id="pferr_기산일"></div></div>  
  <div class="field"><label>금액(원, 인하는 음수)</label><input type="text" inputmode="numeric" class="money-in" id="pf_금액" oninput="formatSignedMoneyInput(this)"><div class="err" id="pferr_금액"></div></div>  
  <div class="field"><label>변경전 용역료(원)</label><input type="text" inputmode="numeric" class="money-in" id="pf_現용역료" oninput="formatMoneyInput(this)"></div>  
- <div class="field"><label>사유</label><input id="pf_사유" list="pf_reason_list" placeholder="목록에서 선택하거나 직접 입력">  
- <datalist id="pf_reason_list">${LIST_PRICE_REASON.map(o=>`<option value="${o}">`).join('')}</datalist>  
- </div>  
+ <div class="field"><label>사유</label><select id="pf_사유"><option value="">선택</option>${LIST_PRICE_REASON.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
  <div class="field"><label>상품</label><select id="pf_상품">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
  <div class="field"><label>그로스</label><select id="pf_그로스">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
  <div class="field"><label>유형</label><select id="pf_유형">${LIST_REG_TYPE.map(o=>`<option value="${o}" ${o==='직접등록'?'selected':''}>${o}</option>`).join('')}</select></div>  
