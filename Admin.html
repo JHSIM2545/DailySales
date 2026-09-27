@@ -8937,14 +8937,31 @@ function formatDeviceDisplay_(browser, device) {
   return b + ' / ' + d;
 }
 
-function formatJobDisplay_(j) {
-  const job = String(j || '').trim();
-  if (job === '컨설턴트(영업)') return '컨설턴트';
-  if (job === '엔지니어(기술)') return '기술';
-  if (job === '서비스(CS)') return 'CS관리자';
-  if (job === 'Staff(지원)') return '본사스탭';
-  if (job === '매니저(관리자)') return '본사관리자';
-  return job || '-';
+function getJobBadgeHtml_(job) {
+  const j = String(job || '').trim();
+  let label = j;
+  let bg = '#f8fafc', color = '#64748b', border = '#e2e8f0';
+
+  if (j.includes('관리자') || j === '매니저(관리자)' || j === '본사관리자' || j === '지사관리자') {
+    label = j.includes('지사') ? '지사관리자' : '본사관리자';
+    bg = '#f3e8ff'; color = '#6b21a8'; border = '#d8b4fe';
+  } else if (j.includes('기술') || j.includes('엔지니어')) {
+    label = '기술사원';
+    bg = '#d1fae5'; color = '#065f46'; border = '#a7f3d0';
+  } else if (j.includes('컨설턴트') || j.includes('영업')) {
+    label = '컨설턴트';
+    bg = '#dbeafe'; color = '#1d4ed8'; border = '#bfdbfe';
+  } else if (j.includes('CS') || j.includes('서비스')) {
+    label = j.includes('근무자') ? 'CS근무자' : 'CS관리자';
+    bg = '#ffedd5'; color = '#c2410c'; border = '#fed7aa';
+  } else if (j.includes('스탭') || j.includes('Staff') || j.includes('지원')) {
+    label = '본사스탭';
+    bg = '#f1f5f9'; color = '#475569'; border = '#cbd5e1';
+  } else if (!j) {
+    label = '미지정';
+  }
+
+  return '<span style="display:inline-block; padding:3px 10px; font-size:12.5px; font-weight:600; border-radius:5px; border:1px solid ' + border + '; background:' + bg + '; color:' + color + '; letter-spacing:-0.2px;">' + escHtml(label) + '</span>';
 }
 
 function getSessionEndTime_(lastLoginStr) {
@@ -9030,7 +9047,7 @@ function renderUsers(){
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + sess.sessionText + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(sess.endTime) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.권한) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(formatJobDisplay_(u.직무)) + '</td>' +
+      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + getJobBadgeHtml_(u.직무) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center; white-space:nowrap;">' +
         '<button style="border:1px solid #bfdbfe; background:#fff; color:#2563eb; border-radius:3px; padding:3px 8px; font-size:12px; font-weight:600; cursor:pointer; margin-right:4px;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#fff\'" data-phone="' + escAttr(u.전화번호) + '" onclick="openUserEditModal(this.dataset.phone)">수정</button>' +
         '<button style="border:1px solid #fecaca; background:#fff; color:#dc2626; border-radius:3px; padding:3px 8px; font-size:12px; font-weight:600; cursor:pointer;" onmouseover="this.style.background=\'#fef2f2\'" onmouseout="this.style.background=\'#fff\'" data-phone="' + escAttr(u.전화번호) + '" onclick="deleteUser(this.dataset.phone)">삭제</button>' +
