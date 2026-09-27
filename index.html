@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>에스원 북서울지사 영업일보</title>
+  <script>
+    (function() {
+      try {
+        var adminSess = sessionStorage.getItem('s1_admin_session_v1');
+        if (adminSess) {
+          var a = JSON.parse(adminSess);
+          if (a && (a.token || a.phone)) {
+            window.location.replace('Admin.html');
+            return;
+          }
+        }
+        var userSess = sessionStorage.getItem('s1_session_v1');
+        if (userSess) {
+          var u = JSON.parse(userSess);
+          if (u && (u.token || u.phone)) {
+            var isAdmin = (u.isAdmin || u.role === '메인마스터' || u.role === '서브마스터' || u.role === 'master' || u.role === '지사관리자' || u.role === '본사관리자');
+            window.location.replace(isAdmin ? 'Admin.html' : 'User.html');
+            return;
+          }
+        }
+      } catch(e) {}
+      // 세션이 없으면 로그인 화면으로 이동
+      window.location.replace('Login.html');
+    })();
+  </script>
+</head>
+<body style="font-family:'Malgun Gothic',sans-serif; background:#f4f6f8; display:flex; align-items:center; justify-content:center; height:100vh; margin:0;">
+  <div style="text-align:center; color:#5c1c2f; font-weight:700; font-size:16px;">
+    에스원 북서울지사 영업일보 접속 중...
+  </div>
+</body>
+</html>
