@@ -2799,7 +2799,9 @@
  .status-wrap table{ font-size:16px; }  
  .status-wrap td.num{ text-align:right; }  
  .status-wrap tr.holiday-row td{ background:#e3e5e8; }  
- .status-wrap tr.today-row td{ background:rgb(198,239,206); color:rgb(0,97,0); font-weight:600; }  
+ .status-wrap tr.today-row td{ background:#c6efce !important; color:#006100 !important; font-weight:700 !important; border-top:2px solid #2e7d32 !important; border-bottom:2px solid #2e7d32 !important; }  
+.today-row td:first-child{ border-left:3px solid #2e7d32 !important; font-weight:800 !important; }  
+.today-row td:last-child{ border-right:3px solid #2e7d32 !important; }  
  .status-wrap th.gap-left, .status-wrap td.gap-left{ border-left:22px solid #eef1f4; }  
  body.loading-cursor, body.loading-cursor *{ cursor:wait !important; }  
  td.actions{ text-align:center; }  
@@ -6207,9 +6209,13 @@ function renderSalesStatus(){
   const today = todayStr();
   rows.forEach(r => {
     let rowCls = isBlockedDate(r.날짜) ? 'holiday-row' : '';
-    if (r.날짜 === today) rowCls = 'today-row';
-    html += `<tr class="${rowCls}">
-      <td class="datecell${isBlockedDate(r.날짜)?' holi':''}">${fmtStatusDate(r.날짜)}</td>
+    let rowIdAttr = '';
+    if (r.날짜 === today) {
+      rowCls = 'today-row';
+      rowIdAttr = ' id="statusTodayRow"';
+    }
+    html += `<tr class="${rowCls}"${rowIdAttr}>
+<td class="datecell${isBlockedDate(r.날짜)?' holi':''}">${fmtStatusDate(r.날짜)}</td>
       <td class="num">${fmtK(r.수주)}</td><td class="num">${fmtK(r.개시)}</td><td class="num">${fmtK(r.해약중지)}</td>
       <td class="num">${fmtK(r.인상)}</td><td class="num">${fmtK(r.인하)}</td><td class="num">${fmtK(r.재개시)}</td>
       <td class="num">${fmtK(r.일유증)}</td><td class="num">${fmtK(r.유지증가)}</td><td class="num">${r.달성률}%</td>
@@ -6235,6 +6241,35 @@ function renderSalesStatus(){
   if (c) c.innerHTML = html;
   if (typeof fitTwoRowStickyHeader_ === 'function') fitTwoRowStickyHeader_('.status-wrap .grid-wrap table');
   if (typeof fitGridWrapToViewport_ === 'function') fitGridWrapToViewport_();
+  if (typeof scrollSalesStatusToToday_ === 'function') scrollSalesStatusToToday_();
+}
+
+function scrollSalesStatusToToday_(){
+  setTimeout(function(){
+    const todayRow = document.getElementById('statusTodayRow') || document.querySelector('.status-wrap tr.today-row');
+    if (!todayRow) return;
+
+    const gridWrap = todayRow.closest('.grid-wrap');
+    if (gridWrap) {
+      const thead = gridWrap.querySelector('thead');
+      const theadH = thead ? thead.offsetHeight : 60;
+      const rowTop = todayRow.offsetTop;
+      const visibleH = gridWrap.clientHeight - theadH;
+      const targetScroll = Math.max(0, rowTop - theadH - Math.max(20, Math.floor(visibleH * 0.25)));
+
+      gridWrap.scrollTo({
+        top: targetScroll,
+        behavior: 'smooth'
+      });
+    }
+
+    if (gridWrap) {
+      const rect = gridWrap.getBoundingClientRect();
+      if (rect.top > window.innerHeight - 120) {
+        gridWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }, 120);
 }
 window.renderSalesStatus = renderSalesStatus;
 
@@ -8917,12 +8952,12 @@ function headerCellProductDaily(h){
 
 function productDailyContractBad(val, allRows){  
   const s = String(val === null || val === undefined ? '' : val).trim();  
-  if (!s) return false;  
-  if (s === 'T') return false;  
-  if (!PRODUCT_DAILY_CONTRACT_RE.test(s)) return true;  
+  if (!s || s === 'T' || s === 'N') return false;  
+  const sUpper = s.toUpperCase();  
   let cnt = 0;  
   for (let i = 0; i < allRows.length; i++) {  
-    if (String(allRows[i].계약번호 === null || allRows[i].계약번호 === undefined ? '' : allRows[i].계약번호).trim() === s) cnt++;  
+    const other = String(allRows[i].계약번호 === null || allRows[i].계약번호 === undefined ? '' : allRows[i].계약번호).trim().toUpperCase();  
+    if (other && other !== 'T' && other !== 'N' && other === sUpper) cnt++;  
     if (cnt > 1) return true;  
   }  
   return false;  
