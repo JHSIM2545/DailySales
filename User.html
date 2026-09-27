@@ -2602,7 +2602,21 @@
  }  
  * { box-sizing:border-box; }  
  body{ font-family:'Malgun Gothic','Segoe UI',sans-serif; margin:0; background:#eef1f4; color:#222; font-size:12pt; }  
- .topbar{ background:#1c2f4a; color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }  
+ .topbar {
+  background-color: #1c2f4a;
+  background-image: url('영업일보 사용자페이지 타이틀바.png'), url('user_title_bar.png'), url('data:image/png;base64,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');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.topbar h1 { text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+.topbar p { text-shadow: 0 1px 3px rgba(0,0,0,0.5); }  
  .topbar h1{ margin:0; font-size:17px; font-weight:600; }  
  .topbar p{ margin:4px 0 0; font-size:16px; color:#c7d2e0; }  
  .ai-report-topbtn{ background:#2563eb; color:#fff; border:none; padding:9px 26px; border-radius:6px; font-size:15px; font-weight:700; cursor:pointer; }  

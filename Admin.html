@@ -2591,7 +2591,21 @@
  }  
  * { box-sizing:border-box; }  
  body{ font-family:'Malgun Gothic','Segoe UI',sans-serif; margin:0; background:#eef1f4; color:#222; font-size:12pt; }  
- .topbar{ background:#5c1c2f; color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }  
+ .topbar {
+  background-color: #5c1c2f;
+  background-image: url('영업일보 관리자페이지 타이틀바.png'), url('admin_title_bar.png'), url('data:image/png;base64,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');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+.topbar h1 { text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
+.topbar p { text-shadow: 0 1px 3px rgba(0,0,0,0.5); }  
  .topbar h1{ margin:0; font-size:17px; font-weight:600; }  
  .topbar p{ margin:4px 0 0; font-size:16px; color:#e7c7d2; }  
  .sync-status{ font-size:16px; padding:4px 10px; border-radius:4px; white-space:nowrap; transition: all 0.3s; user-select:none; }  
