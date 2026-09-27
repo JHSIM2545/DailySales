@@ -342,17 +342,46 @@ async function doLogin(){
       isMainMaster: (role === '메인마스터' || role === 'master')
     };
 
-    // 로그인 로그 기록 (백그라운드)
+    // 로그인 로그 및 실시간 하트비트 즉시 기록 (백그라운드)
     try {
       const dev = detectDeviceInfo_();
+      const p = String(user.phone || phone).trim();
+      const nowIso = new Date().toISOString();
+
+      // 1. login_logs 누적 기록
       sbClient.from('login_logs').insert([{
         name: user.name,
-        phone: user.phone || phone,
+        phone: p,
         role: session.role,
         type: 'login_success',
         browser: dev.browser,
         device_type: dev.deviceType
       }]).then(() => {});
+
+      // 2. system_settings 실시간 생존신호 즉시 등록 (온라인 표시)
+      sbClient.from('system_settings').upsert({
+        setting_key: 'HEARTBEAT_' + p,
+        setting_value: JSON.stringify({
+          phone: p,
+          name: user.name,
+          role: session.role,
+          browser: dev.browser,
+          device: dev.deviceType,
+          login_at: nowIso,
+          ping_at: Date.now(),
+          last_activity: Date.now(),
+          online: true
+        })
+      }).then(() => {});
+
+      // 3. app_users 테이블 지원 시 업데이트
+      try {
+        sbClient.from('app_users').update({
+          last_login_at: nowIso,
+          browser: dev.browser,
+          device_type: dev.deviceType
+        }).eq('phone', p).then(() => {});
+      } catch(e){}
     } catch(e){}
 
     goToDestination_(session);

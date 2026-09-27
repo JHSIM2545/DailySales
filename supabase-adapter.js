@@ -1120,22 +1120,131 @@
       return { success: true, names: names.length ? names : ['최영국', '이수열', '박광춘', '정문재', '임영민'] };
     },
 
-    adminListUsers: async function(token) {
+        adminListUsers: async function(token) {
       const client = getSupabase();
-      const { data, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
+      const { data: rawUsers, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
       if (error) throw error;
-      const users = (data || []).map(u => ({
-        이름: u.name,
-        전화번호: u.phone,
-        등록일시: u.created_at ? u.created_at.slice(0, 16).replace('T', ' ') : '',
-        최근접속일시: u.last_login_at ? u.last_login_at.slice(0, 16).replace('T', ' ') : '',
-        권한: u.role || '읽기전용',
-        직무: u.job || '',
-        브라우저: u.browser || '-',
-        기기유형: u.device_type || '-',
-        세션유지중: true,
-        접속중: true
-      }));
+
+      // 1. 로그인 로그에서 사용자별 최신 접속기록 추출
+      const logsByPhone = {};
+      const logsByName = {};
+      try {
+        const { data: logs } = await client
+          .from('login_logs')
+          .select('phone, name, browser, device_type, created_at')
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (logs && logs.length) {
+          logs.forEach(l => {
+            const p = String(l.phone || '').trim();
+            const n = String(l.name || '').trim();
+            if (p && !logsByPhone[p]) logsByPhone[p] = l;
+            if (n && !logsByName[n]) logsByName[n] = l;
+          });
+        }
+      } catch(e) {
+        console.warn('[adminListUsers] login_logs 조회 실패:', e);
+      }
+
+      // 2. 실시간 생존신호(Heartbeat) 조회
+      const heartbeatsByPhone = {};
+      const heartbeatsByName = {};
+      try {
+        const { data: hbSettings } = await client
+          .from('system_settings')
+          .select('setting_key, setting_value')
+          .like('setting_key', 'HEARTBEAT_%');
+
+        if (hbSettings && hbSettings.length) {
+          hbSettings.forEach(s => {
+            try {
+              const val = JSON.parse(s.setting_value);
+              if (val && val.phone) heartbeatsByPhone[String(val.phone).trim()] = val;
+              if (val && val.name) heartbeatsByName[String(val.name).trim()] = val;
+            } catch(err){}
+          });
+        }
+      } catch(e) {
+        console.warn('[adminListUsers] heartbeats 조회 실패:', e);
+      }
+
+      const nowMs = Date.now();
+      const ONLINE_THRESHOLD_MS = 2.5 * 60 * 1000; // 2.5분 이내 핑이면 실시간 온라인
+      const SESSION_TTL_MS = 60 * 60 * 1000;       // 1시간 세션 유지
+
+      function toKstStr(isoOrMs) {
+        if (!isoOrMs) return '';
+        try {
+          const d = new Date(isoOrMs);
+          if (isNaN(d.getTime())) return '';
+          // UTC를 KST (UTC+9)로 변환
+          const kst = new Date(d.getTime() + (9 * 60 + d.getTimezoneOffset()) * 60 * 1000);
+          const y = kst.getFullYear();
+          const m = String(kst.getMonth() + 1).padStart(2, '0');
+          const day = String(kst.getDate()).padStart(2, '0');
+          const hh = String(kst.getHours()).padStart(2, '0');
+          const mm = String(kst.getMinutes()).padStart(2, '0');
+          return `${y}-${m}-${day} ${hh}:${mm}`;
+        } catch(e) { return ''; }
+      }
+
+      const users = (rawUsers || []).map(u => {
+        const p = String(u.phone || '').trim();
+        const n = String(u.name || '').trim();
+        const log = logsByPhone[p] || logsByName[n] || {};
+        const hb = heartbeatsByPhone[p] || heartbeatsByName[n] || null;
+
+        // 최근접속일시: 최신 login_logs 또는 app_users 또는 하트비트
+        const rawLoginAt = (log && log.created_at) || u.last_login_at || (hb && hb.login_at) || null;
+        const recentLoginStr = toKstStr(rawLoginAt) || toKstStr(u.created_at);
+
+        // 접속기기: log 또는 hb 또는 u
+        const browser = (log && log.browser) || (hb && hb.browser) || u.browser || '-';
+        const deviceType = (log && log.device_type) || (hb && hb.device) || u.device_type || '-';
+
+        // 실시간 접속 여부 판정
+        let isOnline = false;
+        let isSessionAlive = false;
+        let sessionEndTimeStr = '-';
+
+        if (hb && hb.ping_at) {
+          const diff = nowMs - Number(hb.ping_at);
+          if (diff >= 0 && diff < ONLINE_THRESHOLD_MS && hb.online !== false) {
+            isOnline = true;
+          }
+          const actDiff = nowMs - Number(hb.last_activity || hb.ping_at);
+          if (actDiff >= 0 && actDiff < SESSION_TTL_MS && hb.online !== false) {
+            isSessionAlive = true;
+            const endD = new Date(Number(hb.last_activity || hb.ping_at) + SESSION_TTL_MS);
+            sessionEndTimeStr = toKstStr(endD);
+          }
+        } else if (rawLoginAt) {
+          const loginTime = new Date(rawLoginAt).getTime();
+          if (!isNaN(loginTime)) {
+            const diff = nowMs - loginTime;
+            if (diff >= 0 && diff < SESSION_TTL_MS) {
+              isSessionAlive = true;
+              sessionEndTimeStr = toKstStr(new Date(loginTime + SESSION_TTL_MS));
+            }
+          }
+        }
+
+        return {
+          이름: u.name,
+          전화번호: u.phone,
+          등록일시: toKstStr(u.created_at),
+          최근접속일시: recentLoginStr || '-',
+          권한: u.role || '읽기전용',
+          직무: u.job || '',
+          브라우저: browser,
+          기기유형: deviceType,
+          is_online: isOnline,
+          세션유지중: isSessionAlive,
+          세션종료예정: sessionEndTimeStr
+        };
+      });
+
       return { success: true, users: users };
     },
 
@@ -2306,9 +2415,62 @@
       return { success: true };
     },
 
-    // 16. 세션 및 일반
-    pingSession: async function(token) { return { success: true }; },
-    extendSession: async function(token) { return { success: true }; },
+    // 16. 세션 및 일반 (실시간 생존신호 및 세션 연장 기록)
+    pingSession: async function(token) {
+      try {
+        const client = getSupabase();
+        if (!client) return { success: true };
+        const sess = getSession_();
+        if (!sess || !sess.phone) return { success: true };
+        const phone = String(sess.phone).trim();
+        const dev = (typeof detectDeviceInfo_ === 'function') ? detectDeviceInfo_() : { browser:'Chrome', deviceType:'PC' };
+        const key = 'HEARTBEAT_' + phone;
+        const payload = {
+          phone: phone,
+          name: sess.name || '',
+          role: sess.role || '',
+          browser: dev.browser || '기타',
+          device: dev.deviceType || 'PC',
+          ping_at: Date.now(),
+          last_activity: (typeof LAST_RAW_ACTIVITY_AT_ !== 'undefined' ? LAST_RAW_ACTIVITY_AT_ : Date.now()),
+          online: true
+        };
+        client.from('system_settings').upsert({
+          setting_key: key,
+          setting_value: JSON.stringify(payload)
+        }).then(() => {});
+      } catch(e) {
+        console.warn('[pingSession] heartbeat error:', e);
+      }
+      return { success: true };
+    },
+
+    extendSession: async function(token) {
+      try {
+        const client = getSupabase();
+        if (!client) return { success: true };
+        const sess = getSession_();
+        if (!sess || !sess.phone) return { success: true };
+        const phone = String(sess.phone).trim();
+        const dev = (typeof detectDeviceInfo_ === 'function') ? detectDeviceInfo_() : { browser:'Chrome', deviceType:'PC' };
+        const key = 'HEARTBEAT_' + phone;
+        const payload = {
+          phone: phone,
+          name: sess.name || '',
+          role: sess.role || '',
+          browser: dev.browser || '기타',
+          device: dev.deviceType || 'PC',
+          ping_at: Date.now(),
+          last_activity: Date.now(),
+          online: true
+        };
+        client.from('system_settings').upsert({
+          setting_key: key,
+          setting_value: JSON.stringify(payload)
+        }).then(() => {});
+      } catch(e) {}
+      return { success: true };
+    },
     getWebAppUrl: async function() { return window.location.href; },
 
         // ===================== 문장 분석 엔진 (영업보고 & 가중지보고 완벽 구현) =====================

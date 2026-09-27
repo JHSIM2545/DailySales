@@ -43,7 +43,20 @@
     return `${y}-${m}-${day}`;
   }
 
-  function getSession_() {
+  function detectDeviceInfo_(){
+  const ua = navigator.userAgent || '';
+  let browser = '기타';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/Whale\//.test(ua)) browser = 'Whale';
+  else if (/SamsungBrowser\//.test(ua)) browser = '삼성인터넷';
+  else if (/Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  return { browser: browser, deviceType: isMobile ? '모바일' : 'PC' };
+}
+
+function getSession_() {
     try {
       const raw = sessionStorage.getItem('s1_admin_session_v1') || sessionStorage.getItem('s1_session_v1');
       return raw ? JSON.parse(raw) : null;
@@ -1136,22 +1149,131 @@
       return { success: true, names: names.length ? names : ['최영국', '이수열', '박광춘', '정문재', '임영민'] };
     },
 
-    adminListUsers: async function(token) {
+        adminListUsers: async function(token) {
       const client = getSupabase();
-      const { data, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
+      const { data: rawUsers, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
       if (error) throw error;
-      const users = (data || []).map(u => ({
-        이름: u.name,
-        전화번호: u.phone,
-        등록일시: u.created_at ? u.created_at.slice(0, 16).replace('T', ' ') : '',
-        최근접속일시: u.last_login_at ? u.last_login_at.slice(0, 16).replace('T', ' ') : '',
-        권한: u.role || '읽기전용',
-        직무: u.job || '',
-        브라우저: u.browser || '-',
-        기기유형: u.device_type || '-',
-        세션유지중: true,
-        접속중: true
-      }));
+
+      // 1. 로그인 로그에서 사용자별 최신 접속기록 추출
+      const logsByPhone = {};
+      const logsByName = {};
+      try {
+        const { data: logs } = await client
+          .from('login_logs')
+          .select('phone, name, browser, device_type, created_at')
+          .order('created_at', { ascending: false })
+          .limit(500);
+
+        if (logs && logs.length) {
+          logs.forEach(l => {
+            const p = String(l.phone || '').trim();
+            const n = String(l.name || '').trim();
+            if (p && !logsByPhone[p]) logsByPhone[p] = l;
+            if (n && !logsByName[n]) logsByName[n] = l;
+          });
+        }
+      } catch(e) {
+        console.warn('[adminListUsers] login_logs 조회 실패:', e);
+      }
+
+      // 2. 실시간 생존신호(Heartbeat) 조회
+      const heartbeatsByPhone = {};
+      const heartbeatsByName = {};
+      try {
+        const { data: hbSettings } = await client
+          .from('system_settings')
+          .select('setting_key, setting_value')
+          .like('setting_key', 'HEARTBEAT_%');
+
+        if (hbSettings && hbSettings.length) {
+          hbSettings.forEach(s => {
+            try {
+              const val = JSON.parse(s.setting_value);
+              if (val && val.phone) heartbeatsByPhone[String(val.phone).trim()] = val;
+              if (val && val.name) heartbeatsByName[String(val.name).trim()] = val;
+            } catch(err){}
+          });
+        }
+      } catch(e) {
+        console.warn('[adminListUsers] heartbeats 조회 실패:', e);
+      }
+
+      const nowMs = Date.now();
+      const ONLINE_THRESHOLD_MS = 2.5 * 60 * 1000; // 2.5분 이내 핑이면 실시간 온라인
+      const SESSION_TTL_MS = 60 * 60 * 1000;       // 1시간 세션 유지
+
+      function toKstStr(isoOrMs) {
+        if (!isoOrMs) return '';
+        try {
+          const d = new Date(isoOrMs);
+          if (isNaN(d.getTime())) return '';
+          // UTC를 KST (UTC+9)로 변환
+          const kst = new Date(d.getTime() + (9 * 60 + d.getTimezoneOffset()) * 60 * 1000);
+          const y = kst.getFullYear();
+          const m = String(kst.getMonth() + 1).padStart(2, '0');
+          const day = String(kst.getDate()).padStart(2, '0');
+          const hh = String(kst.getHours()).padStart(2, '0');
+          const mm = String(kst.getMinutes()).padStart(2, '0');
+          return `${y}-${m}-${day} ${hh}:${mm}`;
+        } catch(e) { return ''; }
+      }
+
+      const users = (rawUsers || []).map(u => {
+        const p = String(u.phone || '').trim();
+        const n = String(u.name || '').trim();
+        const log = logsByPhone[p] || logsByName[n] || {};
+        const hb = heartbeatsByPhone[p] || heartbeatsByName[n] || null;
+
+        // 최근접속일시: 최신 login_logs 또는 app_users 또는 하트비트
+        const rawLoginAt = (log && log.created_at) || u.last_login_at || (hb && hb.login_at) || null;
+        const recentLoginStr = toKstStr(rawLoginAt) || toKstStr(u.created_at);
+
+        // 접속기기: log 또는 hb 또는 u
+        const browser = (log && log.browser) || (hb && hb.browser) || u.browser || '-';
+        const deviceType = (log && log.device_type) || (hb && hb.device) || u.device_type || '-';
+
+        // 실시간 접속 여부 판정
+        let isOnline = false;
+        let isSessionAlive = false;
+        let sessionEndTimeStr = '-';
+
+        if (hb && hb.ping_at) {
+          const diff = nowMs - Number(hb.ping_at);
+          if (diff >= 0 && diff < ONLINE_THRESHOLD_MS && hb.online !== false) {
+            isOnline = true;
+          }
+          const actDiff = nowMs - Number(hb.last_activity || hb.ping_at);
+          if (actDiff >= 0 && actDiff < SESSION_TTL_MS && hb.online !== false) {
+            isSessionAlive = true;
+            const endD = new Date(Number(hb.last_activity || hb.ping_at) + SESSION_TTL_MS);
+            sessionEndTimeStr = toKstStr(endD);
+          }
+        } else if (rawLoginAt) {
+          const loginTime = new Date(rawLoginAt).getTime();
+          if (!isNaN(loginTime)) {
+            const diff = nowMs - loginTime;
+            if (diff >= 0 && diff < SESSION_TTL_MS) {
+              isSessionAlive = true;
+              sessionEndTimeStr = toKstStr(new Date(loginTime + SESSION_TTL_MS));
+            }
+          }
+        }
+
+        return {
+          이름: u.name,
+          전화번호: u.phone,
+          등록일시: toKstStr(u.created_at),
+          최근접속일시: recentLoginStr || '-',
+          권한: u.role || '읽기전용',
+          직무: u.job || '',
+          브라우저: browser,
+          기기유형: deviceType,
+          is_online: isOnline,
+          세션유지중: isSessionAlive,
+          세션종료예정: sessionEndTimeStr
+        };
+      });
+
       return { success: true, users: users };
     },
 
@@ -2322,9 +2444,62 @@
       return { success: true };
     },
 
-    // 16. 세션 및 일반
-    pingSession: async function(token) { return { success: true }; },
-    extendSession: async function(token) { return { success: true }; },
+    // 16. 세션 및 일반 (실시간 생존신호 및 세션 연장 기록)
+    pingSession: async function(token) {
+      try {
+        const client = getSupabase();
+        if (!client) return { success: true };
+        const sess = getSession_();
+        if (!sess || !sess.phone) return { success: true };
+        const phone = String(sess.phone).trim();
+        const dev = (typeof detectDeviceInfo_ === 'function') ? detectDeviceInfo_() : { browser:'Chrome', deviceType:'PC' };
+        const key = 'HEARTBEAT_' + phone;
+        const payload = {
+          phone: phone,
+          name: sess.name || '',
+          role: sess.role || '',
+          browser: dev.browser || '기타',
+          device: dev.deviceType || 'PC',
+          ping_at: Date.now(),
+          last_activity: (typeof LAST_RAW_ACTIVITY_AT_ !== 'undefined' ? LAST_RAW_ACTIVITY_AT_ : Date.now()),
+          online: true
+        };
+        client.from('system_settings').upsert({
+          setting_key: key,
+          setting_value: JSON.stringify(payload)
+        }).then(() => {});
+      } catch(e) {
+        console.warn('[pingSession] heartbeat error:', e);
+      }
+      return { success: true };
+    },
+
+    extendSession: async function(token) {
+      try {
+        const client = getSupabase();
+        if (!client) return { success: true };
+        const sess = getSession_();
+        if (!sess || !sess.phone) return { success: true };
+        const phone = String(sess.phone).trim();
+        const dev = (typeof detectDeviceInfo_ === 'function') ? detectDeviceInfo_() : { browser:'Chrome', deviceType:'PC' };
+        const key = 'HEARTBEAT_' + phone;
+        const payload = {
+          phone: phone,
+          name: sess.name || '',
+          role: sess.role || '',
+          browser: dev.browser || '기타',
+          device: dev.deviceType || 'PC',
+          ping_at: Date.now(),
+          last_activity: Date.now(),
+          online: true
+        };
+        client.from('system_settings').upsert({
+          setting_key: key,
+          setting_value: JSON.stringify(payload)
+        }).then(() => {});
+      } catch(e) {}
+      return { success: true };
+    },
     getWebAppUrl: async function() { return window.location.href; },
 
         // ===================== 문장 분석 엔진 (영업보고 & 가중지보고 완벽 구현) =====================
@@ -9159,17 +9334,45 @@ function buildProductDailyForm(){
   const ymFormatted = ymNow.slice(0, 4) + '년 ' + ymNow.slice(5, 7) + '월';
 
   container.innerHTML = `
-    <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" placeholder="T8588826"></div>
+    <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" placeholder="T8588826" onfocus="setTimeout(()=>this.select(),0)"></div>
     <div class="field"><label>서비스제공처</label><input type="text" id="pdf_서비스제공처" placeholder="고객사/서비스처 명칭"></div>
     <div class="field"><label>보고일</label><input type="date" id="pdf_보고일" value="${today}"></div>
     <div class="field"><label>계약담당자</label><select id="pdf_계약담당자">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
-    <div class="field"><label>매출예상</label><input type="text" id="pdf_매출예상" value="${ymFormatted}" placeholder="2026년 09월"></div>
+    <div class="field">
+      <label>매출예상</label>
+      <div style="position:relative; display:flex; align-items:center; width:100%;">
+        <input type="text" id="pdf_매출예상" value="${ymFormatted}" placeholder="2026년 09월" style="width:100%; padding-right:38px; cursor:pointer;" onclick="openMonthPickerForModal_(this)">
+        <span style="position:absolute; right:10px; pointer-events:none; font-size:16px;">📅</span>
+        <input type="month" id="pdf_매출예상_hidden" value="${ymNow}" style="position:absolute; right:4px; top:50%; transform:translateY(-50%); width:28px; height:28px; opacity:0; cursor:pointer; z-index:2;" onchange="onModalMonthPicked_(this)">
+      </div>
+    </div>
     <div class="field"><label>계약동기</label><select id="pdf_계약동기">${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
-    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" value="0" inputmode="numeric" oninput="formatMoneyInput(this)"></div>
-    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" value="0" inputmode="numeric" oninput="formatMoneyInput(this)"></div>
+    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" class="money-in" value="0" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" class="money-in" value="0" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
     <div class="field"><label>구분</label><select id="pdf_구분">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
     <div class="field"><label>매출여부</label><select id="pdf_매출여부">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
   `;
+}
+
+function openMonthPickerForModal_(el){
+  const hiddenInp = document.getElementById('pdf_매출예상_hidden');
+  if (hiddenInp) {
+    if (hiddenInp.showPicker) {
+      try { hiddenInp.showPicker(); } catch(e) { hiddenInp.click(); }
+    } else {
+      hiddenInp.click();
+    }
+  }
+}
+
+function onModalMonthPicked_(inp){
+  if (!inp.value) return;
+  const parts = inp.value.split('-');
+  if (parts.length === 2) {
+    const formatted = parts[0] + '년 ' + parts[1] + '월';
+    const textInp = document.getElementById('pdf_매출예상');
+    if (textInp) textInp.value = formatted;
+  }
 }
 
 function openAddProductDailyModal(){
@@ -9321,48 +9524,26 @@ function getSessionEndTime_(lastLoginStr) {
   }
 }
 
-function getSessionStatus_(lastLoginStr) {
-  if (!lastLoginStr) {
-    return {
-      onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
-      sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
-      endTime: '-'
-    };
-  }
-  try {
-    const d = new Date(lastLoginStr.replace(' ', 'T') + (lastLoginStr.length === 16 ? ':00' : ''));
-    if (isNaN(d.getTime())) {
-      return {
-        onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
-        sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
-        endTime: '-'
-      };
-    }
-    const endMs = d.getTime() + 60 * 60 * 1000;
-    const nowMs = Date.now();
-    const endTimeStr = getSessionEndTime_(lastLoginStr);
-    const isAlive = (nowMs < endMs);
+function getSessionStatus_(u) {
+  const userObj = (typeof u === 'object' && u !== null) ? u : { 최근접속일시: u };
+  const lastLoginStr = userObj.최근접속일시 || '';
+  const isOnline = !!userObj.is_online;
+  const isSessionActive = !!userObj.세션유지중;
+  const endTimeStr = userObj.세션종료예정 || getSessionEndTime_(lastLoginStr);
 
-    if (isAlive) {
-      return {
-        onlineText: '<span style="color:#16a34a; font-weight:600;"><span style="color:#16a34a;">●</span> 온라인</span>',
-        sessionText: '<span style="color:#16a34a; font-weight:600;"><span style="color:#16a34a;">●</span> 유지중</span>',
-        endTime: endTimeStr
-      };
-    } else {
-      return {
-        onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
-        sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
-        endTime: endTimeStr
-      };
-    }
-  } catch(e) {
-    return {
-      onlineText: '<span style="color:#64748b;">○ 오프라인</span>',
-      sessionText: '<span style="color:#64748b;">○ 종료됨</span>',
-      endTime: '-'
-    };
-  }
+  const onlineText = isOnline
+    ? '<span style="color:#16a34a; font-weight:700;"><span style="color:#16a34a; font-size:14px;">●</span> 온라인</span>'
+    : '<span style="color:#64748b;">○ 오프라인</span>';
+
+  const sessionText = isSessionActive
+    ? '<span style="color:#2563eb; font-weight:700;"><span style="color:#2563eb; font-size:14px;">●</span> 유지중</span>'
+    : '<span style="color:#64748b;">○ 종료됨</span>';
+
+  return {
+    onlineText: onlineText,
+    sessionText: sessionText,
+    endTime: endTimeStr || '-'
+  };
 }
 
 function renderUsers(){
@@ -9376,7 +9557,7 @@ function renderUsers(){
 
   let rowsHtml = '';
   USER_ROWS.forEach(function(u){
-    const sess = getSessionStatus_(u.최근접속일시);
+    const sess = getSessionStatus_(u);
     rowsHtml += '<tr style="border-bottom:1px solid #cfd6dc; transition:background 0.12s;" onmouseover="this.style.background=\'#f4f8fd\'" onmouseout="this.style.background=\'#ffffff\'">' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; font-weight:500; text-align:left;">' + escHtml(u.이름) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:left;">' + escHtml(u.전화번호) + '</td>' +
@@ -12148,6 +12329,37 @@ if (SESSION && SESSION.token && SESSION.isAdmin) {
 } else {
   showLogin();
 }
+
+// 숫자/금액 입력창 포커스 시 '0'을 포함한 전체 텍스트 자동 선택 (타이핑 시 즉시 덮어쓰기)
+document.addEventListener('focus', function(e){
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT') return;
+  if (t.classList.contains('money-in') || t.getAttribute('inputmode') === 'numeric' || t.id === 'pdf_계약설치비' || t.id === 'pdf_계약기기비') {
+    setTimeout(function(){
+      try { t.select(); } catch(err){}
+    }, 15);
+  }
+}, true);
+
+document.addEventListener('mouseup', function(e){
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT') return;
+  if (t.classList.contains('money-in') || t.getAttribute('inputmode') === 'numeric' || t.id === 'pdf_계약설치비' || t.id === 'pdf_계약기기비') {
+    if (!t.dataset.focusedOnce) {
+      t.dataset.focusedOnce = '1';
+      setTimeout(function(){
+        try { t.select(); } catch(err){}
+      }, 15);
+    }
+  }
+}, true);
+
+document.addEventListener('blur', function(e){
+  const t = e.target;
+  if (t && t.tagName === 'INPUT') {
+    delete t.dataset.focusedOnce;
+  }
+}, true);
 </script>
 </body>
 </html>

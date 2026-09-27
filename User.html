@@ -56,7 +56,20 @@
     return `${y}-${m}-${day}`;
   }
 
-  function getSession_() {
+  function detectDeviceInfo_(){
+  const ua = navigator.userAgent || '';
+  let browser = '기타';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/Whale\//.test(ua)) browser = 'Whale';
+  else if (/SamsungBrowser\//.test(ua)) browser = '삼성인터넷';
+  else if (/Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  return { browser: browser, deviceType: isMobile ? '모바일' : 'PC' };
+}
+
+function getSession_() {
     try {
       const raw = sessionStorage.getItem('s1_admin_session_v1') || sessionStorage.getItem('s1_session_v1');
       return raw ? JSON.parse(raw) : null;
@@ -2335,9 +2348,62 @@
       return { success: true };
     },
 
-    // 16. 세션 및 일반
-    pingSession: async function(token) { return { success: true }; },
-    extendSession: async function(token) { return { success: true }; },
+    // 16. 세션 및 일반 (실시간 생존신호 및 세션 연장 기록)
+    pingSession: async function(token) {
+      try {
+        const client = getSupabase();
+        if (!client) return { success: true };
+        const sess = getSession_();
+        if (!sess || !sess.phone) return { success: true };
+        const phone = String(sess.phone).trim();
+        const dev = (typeof detectDeviceInfo_ === 'function') ? detectDeviceInfo_() : { browser:'Chrome', deviceType:'PC' };
+        const key = 'HEARTBEAT_' + phone;
+        const payload = {
+          phone: phone,
+          name: sess.name || '',
+          role: sess.role || '',
+          browser: dev.browser || '기타',
+          device: dev.deviceType || 'PC',
+          ping_at: Date.now(),
+          last_activity: (typeof LAST_RAW_ACTIVITY_AT_ !== 'undefined' ? LAST_RAW_ACTIVITY_AT_ : Date.now()),
+          online: true
+        };
+        client.from('system_settings').upsert({
+          setting_key: key,
+          setting_value: JSON.stringify(payload)
+        }).then(() => {});
+      } catch(e) {
+        console.warn('[pingSession] heartbeat error:', e);
+      }
+      return { success: true };
+    },
+
+    extendSession: async function(token) {
+      try {
+        const client = getSupabase();
+        if (!client) return { success: true };
+        const sess = getSession_();
+        if (!sess || !sess.phone) return { success: true };
+        const phone = String(sess.phone).trim();
+        const dev = (typeof detectDeviceInfo_ === 'function') ? detectDeviceInfo_() : { browser:'Chrome', deviceType:'PC' };
+        const key = 'HEARTBEAT_' + phone;
+        const payload = {
+          phone: phone,
+          name: sess.name || '',
+          role: sess.role || '',
+          browser: dev.browser || '기타',
+          device: dev.deviceType || 'PC',
+          ping_at: Date.now(),
+          last_activity: Date.now(),
+          online: true
+        };
+        client.from('system_settings').upsert({
+          setting_key: key,
+          setting_value: JSON.stringify(payload)
+        }).then(() => {});
+      } catch(e) {}
+      return { success: true };
+    },
     getWebAppUrl: async function() { return window.location.href; },
 
         // ===================== 문장 분석 엔진 (영업보고 & 가중지보고 완벽 구현) =====================
@@ -8124,6 +8190,37 @@ if (SESSION && SESSION.token) {
 } else {
   showLogin();
 }
+
+// 숫자/금액 입력창 포커스 시 '0'을 포함한 전체 텍스트 자동 선택 (타이핑 시 즉시 덮어쓰기)
+document.addEventListener('focus', function(e){
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT') return;
+  if (t.classList.contains('money-in') || t.getAttribute('inputmode') === 'numeric') {
+    setTimeout(function(){
+      try { t.select(); } catch(err){}
+    }, 15);
+  }
+}, true);
+
+document.addEventListener('mouseup', function(e){
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT') return;
+  if (t.classList.contains('money-in') || t.getAttribute('inputmode') === 'numeric') {
+    if (!t.dataset.focusedOnce) {
+      t.dataset.focusedOnce = '1';
+      setTimeout(function(){
+        try { t.select(); } catch(err){}
+      }, 15);
+    }
+  }
+}, true);
+
+document.addEventListener('blur', function(e){
+  const t = e.target;
+  if (t && t.tagName === 'INPUT') {
+    delete t.dataset.focusedOnce;
+  }
+}, true);
 </script>
 </body>
 </html>
