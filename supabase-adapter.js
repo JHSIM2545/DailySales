@@ -35,6 +35,262 @@
   }
 
   // --- 비즈니스 로직 구현체 (Code.gs 1:1 매핑) ---
+    // --- 자연어 문장 분석 규칙 헬퍼 함수들 ---
+  const AI_REPORT_HEADER_LINES_ = ['수주보고', '신규보고', '수주', '해약보고', '중지보고', '해약', '인상보고', '인하보고', '인상인하보고', '보고'];
+  const AI_REPORT_PRODUCT_ALIAS_ = { '디지털': '정보보안' };
+  const HOLIDAY_SET_ = new Set([
+    '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02',
+    '2026-05-05','2026-05-08','2026-06-06','2026-08-15','2026-08-17',
+    '2026-09-24','2026-09-25','2026-09-26','2026-09-27','2026-10-03','2026-10-05','2026-10-09','2026-12-25',
+    '2027-01-01','2027-02-06','2027-02-07','2027-02-08','2027-02-09','2027-03-01',
+    '2027-05-05','2027-05-13','2027-06-06','2027-08-15','2027-08-16',
+    '2027-09-14','2027-09-15','2027-09-16','2027-10-03','2027-10-04','2027-10-09','2027-10-11','2027-12-25','2027-12-27'
+  ]);
+
+  function ruleParseToday_() { return getTzToday(); }
+  function ruleParseAddDays_(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  function ruleParseWeekStart_(baseDateStr) {
+    const base = new Date(baseDateStr + 'T00:00:00');
+    const offsetFromMonday = (base.getDay() + 6) % 7;
+    return ruleParseAddDays_(baseDateStr, -offsetFromMonday);
+  }
+  function ruleParseWeekdayInWeek_(baseDateStr, weekdayKor, weekOffset) {
+    const MON_BASED = { '월':0, '화':1, '수':2, '목':3, '금':4, '토':5, '일':6 };
+    const weekStart = ruleParseWeekStart_(baseDateStr);
+    return ruleParseAddDays_(weekStart, weekOffset * 7 + MON_BASED[weekdayKor]);
+  }
+  function ruleParseNearestFutureWeekday_(baseDateStr, weekday) {
+    const base = new Date(baseDateStr + 'T00:00:00');
+    let diff = (weekday - base.getDay() + 7) % 7;
+    if (diff === 0) diff = 7;
+    return ruleParseAddDays_(baseDateStr, diff);
+  }
+  function ruleParseFindDate_(text, today) {
+    const SUN_BASED = { '일':0, '월':1, '화':2, '수':3, '목':4, '금':5, '토':6 };
+    if (/오늘/.test(text)) return today;
+    if (/어제/.test(text)) return ruleParseAddDays_(today, -1);
+    if (/내일/.test(text)) return ruleParseAddDays_(today, 1);
+    if (/모레/.test(text)) return ruleParseAddDays_(today, 2);
+    let m = text.match(/(다음\s*주|담\s*주|차주)\s*([일월화수목금토])요일/);
+    if (m) return ruleParseWeekdayInWeek_(today, m[2], 1);
+    m = text.match(/(이번\s*주)\s*([일월화수목금토])요일/);
+    if (m) return ruleParseWeekdayInWeek_(today, m[2], 0);
+    m = text.match(/([일월화수목금토])요일/);
+    if (m) return ruleParseNearestFutureWeekday_(today, SUN_BASED[m[1]]);
+    m = text.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+    if (m) return m[1] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0');
+    m = text.match(/(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (m) return m[1] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0');
+    m = text.match(/(?<!\d)(\d{2})\s*년\s*(\d{1,2})[\/.](\d{1,2})/);
+    if (m) { const yy = Number(m[1]); const yyyy = (yy <= 50 ? 2000 : 1900) + yy; return yyyy + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0'); }
+    m = text.match(/(?<!\d)(\d{2})[-.\/](\d{1,2})[-.\/](\d{1,2})(?!\d)/);
+    if (m) { const yy = Number(m[1]); const yyyy = (yy <= 50 ? 2000 : 1900) + yy; return yyyy + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0'); }
+    m = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if (m) return today.slice(0,4) + '-' + String(m[1]).padStart(2,'0') + '-' + String(m[2]).padStart(2,'0');
+    m = text.match(/(?<!\d)(\d{1,2})[\/.](\d{1,2})(?!\d)/);
+    if (m) return today.slice(0,4) + '-' + String(m[1]).padStart(2,'0') + '-' + String(m[2]).padStart(2,'0');
+    m = text.match(/(?<!\d)(\d{1,2})\s*일(?!\d)/);
+    if (m) return today.slice(0,4) + '-' + today.slice(5,7) + '-' + String(m[1]).padStart(2,'0');
+    return null;
+  }
+  function ruleParseAllDateMatches_(text, today) {
+    const results = [];
+    let m;
+    const reAbs4 = /(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/g;
+    while ((m = reAbs4.exec(text)) !== null) results.push({ idx: m.index, len: m[0].length, date: m[1] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0') });
+    const reYearKrFull = /(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일/g;
+    while ((m = reYearKrFull.exec(text)) !== null) results.push({ idx: m.index, len: m[0].length, date: m[1] + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0') });
+    const reYearKr = /(?<!\d)(\d{2})\s*년\s*(\d{1,2})[\/.](\d{1,2})/g;
+    while ((m = reYearKr.exec(text)) !== null) { const yy = Number(m[1]); const yyyy = (yy <= 50 ? 2000 : 1900) + yy; results.push({ idx: m.index, len: m[0].length, date: yyyy + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0') }); }
+    const reAbs2 = /(?<!\d)(\d{2})[-.\/](\d{1,2})[-.\/](\d{1,2})(?!\d)/g;
+    while ((m = reAbs2.exec(text)) !== null) {
+      const overlap0 = results.some(function(r){ return m.index < r.idx + r.len && m.index + m[0].length > r.idx; });
+      if (overlap0) continue;
+      const yy = Number(m[1]); const yyyy = (yy <= 50 ? 2000 : 1900) + yy; results.push({ idx: m.index, len: m[0].length, date: yyyy + '-' + String(m[2]).padStart(2,'0') + '-' + String(m[3]).padStart(2,'0') });
+    }
+    const reMdKr = /(\d{1,2})\s*월\s*(\d{1,2})\s*일/g;
+    while ((m = reMdKr.exec(text)) !== null) results.push({ idx: m.index, len: m[0].length, date: today.slice(0,4) + '-' + String(m[1]).padStart(2,'0') + '-' + String(m[2]).padStart(2,'0') });
+    const reMd = /(?<!\d)(\d{1,2})[\/.](\d{1,2})(?!\d)/g;
+    while ((m = reMd.exec(text)) !== null) {
+      const overlap = results.some(function(r){ return m.index < r.idx + r.len && m.index + m[0].length > r.idx; });
+      if (!overlap) results.push({ idx: m.index, len: m[0].length, date: today.slice(0,4) + '-' + String(m[1]).padStart(2,'0') + '-' + String(m[2]).padStart(2,'0') });
+    }
+    const reDayOnly = /(?<!\d)(\d{1,2})\s*일(?!\d)/g;
+    while ((m = reDayOnly.exec(text)) !== null) {
+      const overlap2 = results.some(function(r){ return m.index < r.idx + r.len && m.index + m[0].length > r.idx; });
+      if (!overlap2) results.push({ idx: m.index, len: m[0].length, date: today.slice(0,4) + '-' + today.slice(5,7) + '-' + String(m[1]).padStart(2,'0') });
+    }
+    return results;
+  }
+  function ruleParseKeywordDate_(text, keywords, today, usedIdx) {
+    for (let i = 0; i < keywords.length; i++) {
+      const re = new RegExp(keywords[i] + '\\s*[:：]\\s*([^\\n]{1,14})');
+      const m = re.exec(text);
+      if (!m) continue;
+      const d = ruleParseFindDate_(m[1], today);
+      if (!d) continue;
+      const valueStart = m.index + (m[0].length - m[1].length);
+      if (usedIdx && usedIdx.indexOf(valueStart) !== -1) continue;
+      if (usedIdx) usedIdx.push(valueStart);
+      return d;
+    }
+    const dates = ruleParseAllDateMatches_(text, today).filter(function(d){ return !usedIdx || usedIdx.indexOf(d.idx) === -1; });
+    if (!dates.length) return null;
+    let best = null, bestDist = Infinity;
+    keywords.forEach(function(kw){
+      let from = 0, idx;
+      while ((idx = text.indexOf(kw, from)) !== -1) {
+        from = idx + 1;
+        dates.forEach(function(d){
+          const dist = (d.idx >= idx + kw.length) ? (d.idx - (idx + kw.length)) : (idx - (d.idx + d.len));
+          const absDist = Math.abs(dist);
+          if (absDist < bestDist) { bestDist = absDist; best = d; }
+        });
+      }
+    });
+    if (!best) return null;
+    if (usedIdx) usedIdx.push(best.idx);
+    return best.date;
+  }
+  function ruleParseKeywordDateInfo_(text, keywords, today, usedIdx) {
+    for (let i = 0; i < keywords.length; i++) {
+      const re = new RegExp(keywords[i] + '\\s*[:：]\\s*([^\\n]{1,14})');
+      const m = re.exec(text);
+      if (!m) continue;
+      const d = ruleParseFindDate_(m[1], today);
+      if (!d) continue;
+      const valueStart = m.index + (m[0].length - m[1].length);
+      if (usedIdx && usedIdx.indexOf(valueStart) !== -1) continue;
+      if (usedIdx) usedIdx.push(valueStart);
+      return { date: d, raw: m[1].trim() };
+    }
+    const dates = ruleParseAllDateMatches_(text, today).filter(function(d){ return !usedIdx || usedIdx.indexOf(d.idx) === -1; });
+    if (!dates.length) return null;
+    let best = null, bestDist = Infinity;
+    keywords.forEach(function(kw){
+      let from = 0, idx;
+      while ((idx = text.indexOf(kw, from)) !== -1) {
+        from = idx + 1;
+        dates.forEach(function(d){
+          const dist = (d.idx >= idx + kw.length) ? (d.idx - (idx + kw.length)) : (idx - (d.idx + d.len));
+          const absDist = Math.abs(dist);
+          if (absDist < bestDist) { bestDist = absDist; best = d; }
+        });
+      }
+    });
+    if (!best) return null;
+    if (usedIdx) usedIdx.push(best.idx);
+    return { date: best.date, raw: text.substr(best.idx, best.len) };
+  }
+  function ruleParseFindCar_(text) {
+    const re = /0*([0-9]{1,3})\s*호/g;
+    let m;
+    const cars = [26, 27, 28, 127, 160];
+    while ((m = re.exec(text)) !== null) {
+      const n = Number(m[1]);
+      if (cars.indexOf(n) !== -1) return String(n);
+    }
+    return '';
+  }
+  function ruleParseFindProduct_(text) {
+    for (const key in AI_REPORT_PRODUCT_ALIAS_) { if (text.indexOf(key) !== -1) return AI_REPORT_PRODUCT_ALIAS_[key]; }
+    return ruleParseFindFromList_(text, ['알람', '휴엔', '정보보안', '블루스캔', '유지보수']) || '알람';
+  }
+  function ruleParseGuessCompanyFromLines_(rawText, motiveList) {
+    const lines = rawText.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+    if (lines.length < 2) return '';
+    const cars = [26, 27, 28, 127, 160];
+    const candidates = lines.filter(function(line){
+      const lastTok_ = line.split(/\s+/).pop();
+      if (AI_REPORT_HEADER_LINES_.indexOf(line) !== -1 || AI_REPORT_HEADER_LINES_.indexOf(lastTok_) !== -1) return false;
+      if (/^[0-9][0-9,]*\s*(원|천원|만원|억원?)?$/.test(line)) return false;
+      const carM = line.match(/^0*([0-9]{1,3})\s*호$/);
+      if (carM && cars.indexOf(Number(carM[1])) !== -1) return false;
+      if (motiveList.some(function(mv){ return mv && line.indexOf(mv) === 0; })) return false;
+      if (/개시|기산|공사|반영|확정/.test(line) && /\d/.test(line)) return false;
+      return true;
+    });
+    return candidates.join(' ');
+  }
+  function ruleParseCompanyNameByContractLine_(rawText) {
+    const stripLabel = function(s){ return s.replace(/^상호명?\s*[:：]\s*/, '').trim(); };
+    const lines = rawText.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/(?:^|[\s\t])(N\d{7,8})[\t ]+(.*)$/);
+      if (!m) continue;
+      if (m[2] && m[2].trim()) return stripLabel(m[2].trim());
+      if (i + 1 < lines.length) return stripLabel(lines[i + 1]);
+      return '';
+    }
+    return '';
+  }
+  function ruleParseFindAmount_(text) {
+    let m = text.match(/([0-9][0-9,]*)\s*억\s*([0-9][0-9,]*)?\s*만?\s*원?/);
+    if (m) { const eok = Number(m[1].replace(/,/g,'')); const man = m[2] ? Number(m[2].replace(/,/g,'')) : 0; return eok*100000000 + man*10000; }
+    m = text.match(/([0-9][0-9,]*)\s*만\s*원?/);
+    if (m) return Number(m[1].replace(/,/g,'')) * 10000;
+    m = text.match(/([0-9][0-9,]*)\s*천\s*원?/);
+    if (m) return Number(m[1].replace(/,/g,'')) * 1000;
+    m = text.match(/([0-9][0-9,]{2,})\s*원/);
+    if (m) return Number(m[1].replace(/,/g,''));
+    return null;
+  }
+  function ruleParsePriceArrow_(text) {
+    const m = text.match(/([0-9][0-9,]*\s*(?:억|만|천)?\s*원?)\s*(?:→|->|-->|=>|>)\s*([0-9][0-9,]*\s*(?:억|만|천)?\s*원?)/);
+    if (!m) return null;
+    const before = ruleParseFindAmount_(m[1]);
+    const after = ruleParseFindAmount_(m[2]);
+    if (before === null || after === null) return null;
+    return { before: before, after: after, delta: after - before };
+  }
+  function ruleParseFindFromListLoose_(text, list) {
+    const compact = text.replace(/\s+/g, '');
+    for (let i = 0; i < list.length; i++) {
+      if (list[i] && compact.indexOf(String(list[i]).replace(/\s+/g, '')) !== -1) return String(list[i]);
+    }
+    return '';
+  }
+  function ruleParseFindCompanyName_(text) {
+    let m = text.match(/([가-힣A-Za-z0-9]{2,}(?:빌딩|타워|상가|센터|APT|아파트|빌라|사옥|플라자|의원|약국|마트|점|병원|매장|지점))/);
+    if (m) return m[1];
+    return '';
+  }
+  function ruleParseFindFromList_(text, list) {
+    for (let i = 0; i < list.length; i++) { if (list[i] && text.indexOf(String(list[i])) !== -1) return String(list[i]); }
+    return '';
+  }
+  function ruleParseFindFromListStandalone_(text, list) {
+    for (let i = 0; i < list.length; i++) {
+      const v = list[i];
+      if (!v) continue;
+      let from = 0, idx;
+      while ((idx = text.indexOf(v, from)) !== -1) {
+        from = idx + 1;
+        const after = text.slice(idx + v.length, idx + v.length + 2);
+        if (!/^(일|보고)/.test(after)) return v;
+      }
+    }
+    return '';
+  }
+  function nextWorkingDay_(dateStr) {
+    if (!dateStr) return dateStr;
+    let d = dateStr;
+    for (let i = 0; i < 14; i++) {
+      const dow = new Date(d + 'T00:00:00').getDay();
+      if (dow !== 0 && dow !== 6 && !HOLIDAY_SET_.has(d)) return d;
+      d = ruleParseAddDays_(d, 1);
+    }
+    return d;
+  }
+
+
   const Backend = {
     // 1. 깃발 관리
     getGlobalFlags: async function() {
@@ -54,10 +310,28 @@
       } catch(e) { return []; }
     },
 
-    // 2. 시트 버전 체크
+    // 2. 시트 버전 체크 (테이블별 최신 ID를 기준으로 변경 감지 - 불필요한 반복 새로고침 및 연결 차단 방지)
     getSheetVersions: async function(token) {
-      const now = Date.now();
-      return { order: now, cancel: now, price: now, restart: now, productdaily: now };
+      const client = getSupabase();
+      if (!client) return { order: 0, cancel: 0, price: 0, restart: 0, productdaily: 0 };
+      try {
+        const [ord, can, prc, rst, prd] = await Promise.all([
+          client.from('daily_orders').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_cancels').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_price_changes').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_restarts').select('id').order('id', { ascending: false }).limit(1),
+          client.from('daily_product_reports').select('id').order('id', { ascending: false }).limit(1)
+        ]);
+        return {
+          order: (ord.data && ord.data[0]) ? Number(ord.data[0].id) : 0,
+          cancel: (can.data && can.data[0]) ? Number(can.data[0].id) : 0,
+          price: (prc.data && prc.data[0]) ? Number(prc.data[0].id) : 0,
+          restart: (rst.data && rst.data[0]) ? Number(rst.data[0].id) : 0,
+          productdaily: (prd.data && prd.data[0]) ? Number(prd.data[0].id) : 0
+        };
+      } catch(e) {
+        return { order: 0, cancel: 0, price: 0, restart: 0, productdaily: 0 };
+      }
     },
 
     // 3. 수주개시
@@ -609,6 +883,7 @@
       if (updates.이름) patch.name = updates.이름;
       if (updates.권한) patch.role = updates.권한;
       if (updates.직무) patch.job = updates.직무;
+      if (updates.비밀번호) patch.password = updates.비밀번호;
       const { error } = await client.from('app_users').update(patch).eq('phone', phone);
       if (error) throw error;
       return { success: true };
@@ -1010,13 +1285,7 @@
       const pf = productFilter || '일반알람';
       const client = getSupabase();
 
-      // 1. 스냅샷 조회 (데이터가 있는 유효한 스냅샷만 반환)
-      try {
-        const { data: snap } = await client.from('sales_status_snapshots').select('payload_json').eq('year_month', ym).eq('product_filter', pf).maybeSingle();
-        if (snap && snap.payload_json && snap.payload_json.actual && (snap.payload_json.actual.수주 || snap.payload_json.actual.개시 || snap.payload_json.actual.유지감소)) {
-          return Object.assign({ success: true, yearMonth: ym, fromSnapshot: true }, snap.payload_json);
-        }
-      } catch(e) {}
+      // 1. 실시간 라이브 계산 수행 (스냅샷 불일치 및 401 권한오류 방지)
 
       // 2. 실시간 라이브 계산
       const [ordRes, canRes, prcRes, rstRes, tgtProdRes, tgtRepRes] = await Promise.all([
@@ -1270,15 +1539,7 @@
         repTargets: repTargets
       };
 
-      // 스냅샷 저장 시도 (비동기)
-      try {
-        client.from('sales_status_snapshots').upsert({
-          year_month: ym,
-          product_filter: pf,
-          payload_json: result,
-          saved_at: new Date().toISOString()
-        }, { onConflict: 'year_month,product_filter' }).then(() => {});
-      } catch(e) {}
+      // 라이브 결과 반환 (불필요한 스냅샷 쓰기 제거)
 
       return result;
     },
@@ -1292,9 +1553,7 @@
       const ym = yearMonth || getTzToday().slice(0, 7);
       const pf = productFilter || '일반알람';
       const client = getSupabase();
-      try {
-        await client.from('sales_status_snapshots').delete().eq('year_month', ym).eq('product_filter', pf);
-      } catch(e) {}
+      // 라이브 재조회
       return Backend.getSalesStatus(token, ym, pf);
     },
 
@@ -1789,58 +2048,193 @@
     extendSession: async function(token) { return { success: true }; },
     getWebAppUrl: async function() { return window.location.href; },
 
-    // 17. 텍스트 파서 (클라이언트 즉시 실행)
+        // ===================== 문장 분석 엔진 (영업보고 & 가중지보고 완벽 구현) =====================
     parseSalesReportText: async function(token, text, reporterName, reportDateOverride) {
-      const t = String(text || '').trim();
-      let type = 'order_start';
-      if (/해약|중지|폐업/.test(t)) type = 'cancel';
-      else if (/인상|인하/.test(t)) type = 'price_change';
-      else if (/재개시/.test(t)) type = 'restart';
+      const raw0 = String(text || '').trim();
+      if (!raw0) return { success: false, error: '분석할 내용이 없습니다.' };
+      try {
+        const today = (/^\d{4}-\d{2}-\d{2}$/.test(String(reportDateOverride || ''))) ? reportDateOverride : ruleParseToday_();
+        const t = raw0.replace(/\s+/g, ' ');
+        const tNoParens = t.replace(/\([^)]*\)/g, ' ');
+        const repList = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+        const motiveList = ['개척', '콜센터', '사내소개', '고객소개', '대리점', '관내이전', '관외이전', '그로스', '기타'];
+        const cancelTypeList = ['폐업', '타사전환', '관외이전', '관내이전', '통합', '공사', '경비절감', '고객사망', '중지'];
+        const priceReasonList = ['변추가인상', '순수인상', '서비스추가', '경비구역축소', '약정기간', '해약방어인하', '법인인하'];
 
-      const fields = {
-        계약번호: (t.match(/N\d{7,8}/) || ['N'])[0],
-        계약처명: (t.match(/([가-힣A-Za-z0-9]+(?:빌딩|타워|상가|의원|점|마트|약국|센터|아파트))/ ) || [''])[0],
-        영업담당: reporterName || '최영국',
-        담당차량: '127',
-        보고일: getTzToday(),
-        계약일: getTzToday(),
-        개시일: getTzToday(),
-        기산일: getTzToday(),
-        용역료: (t.match(/(\d+)만/) ? Number(t.match(/(\d+)만/)[1]) * 10000 : 80000),
-        상품: '알람',
-        그로스: '일반',
-        유형: '자동등록'
-      };
-      return { success: true, type: type, fields: fields };
+        let type = null;
+        if (/수주\s*보고|신규\s*보고/.test(t)) type = 'order_start';
+        else if (/해약\s*보고|중지\s*보고/.test(t)) type = 'cancel';
+        else if (/인상\s*보고|인하\s*보고|인상인하\s*보고/.test(t)) type = 'price_change';
+        if (!type) {
+          if (/해약|중지|폐업|철수/.test(t)) type = 'cancel';
+          else if (/인상|인하/.test(t)) type = 'price_change';
+          else type = 'order_start';
+        }
+        if (type === 'cancel' && /재개시/.test(t)) type = 'restart';
+
+        const contractNoM = tNoParens.match(/N\d{7,8}/);
+        const contractNo = contractNoM ? contractNoM[0] : 'N';
+        const contractLineCompanyName = ruleParseCompanyNameByContractLine_(raw0);
+        const lineCompanyName = ruleParseGuessCompanyFromLines_(raw0, motiveList);
+        const companyName = contractLineCompanyName || lineCompanyName || ruleParseFindCompanyName_(t) || '미확인';
+
+        const sess = getSession_();
+        const defaultReporter = sess ? sess.name : '지사장';
+        const reporter = (repList.indexOf(String(reporterName || '').trim()) !== -1) ? String(reporterName).trim() : defaultReporter;
+        const rep = ruleParseFindFromList_(t, repList) || (repList.indexOf(reporter) !== -1 ? reporter : '최영국');
+        const product = ruleParseFindProduct_(t);
+        const car = ruleParseFindCar_(t) || '127';
+        const gross = /법인/.test(t) ? '법인' : '일반';
+        const amount = ruleParseFindAmount_(t);
+
+        const AI_REPORT_LABEL_STOP_ = '(?=\\s*(?:기산일|접수일|해약일자|해약일|해약|중지일자|중지일|영업|인상자|인하자|접수자|인상금액|인하금액|사유|상호명?|공사담당|공사자|재개시일|재개시|비고|참고)\\s*[:：]|$)';
+        const 사유Label = t.match(new RegExp('사유\\s*[:：]\\s*([\\s\\S]+?)' + AI_REPORT_LABEL_STOP_));
+        const 사유LabelText = 사유Label ? 사유Label[1].trim() : '';
+        const 비고Label = t.match(new RegExp('(?:비고|참고)\\s*[:：]\\s*([\\s\\S]+?)' + AI_REPORT_LABEL_STOP_));
+        const 비고LabelText = 비고Label ? 비고Label[1].trim() : '';
+
+        let fields = {};
+        if (type === 'order_start') {
+          const 계약일 = today;
+          const usedDateIdx_ = [];
+          const 개시Info = ruleParseKeywordDateInfo_(t, ['개시', '공사'], today, usedDateIdx_);
+          const 기산Explicit = ruleParseKeywordDate_(t, ['기산', '반영', '확정'], today, usedDateIdx_);
+          let 개시일, 기산일;
+          if (기산Explicit) {
+            개시일 = (개시Info ? 개시Info.date : 계약일);
+            기산일 = 기산Explicit;
+          } else if (개시Info) {
+            const isDayOnly = /^\d{1,2}\s*일$/.test(개시Info.raw) && !/[\/.월]/.test(개시Info.raw);
+            if (isDayOnly) {
+              개시일 = 개시Info.date;
+              기산일 = 개시Info.date;
+            } else {
+              기산일 = 개시Info.date;
+              개시일 = ruleParseAddDays_(개시Info.date, -1);
+            }
+          } else {
+            개시일 = 계약일;
+            기산일 = 계약일;
+          }
+          fields = {
+            계약번호: contractNo, 계약처명: companyName,
+            영업담당: rep, 영업동기: ruleParseFindFromList_(t, motiveList) || '개척',
+            담당차량: car, 보고일: today, 계약일: 계약일, 개시일: 개시일, 기산일: 기산일,
+            용역료: amount !== null ? String(amount) : '',
+            상품: product, 그로스: gross, 유형: '자동등록', 비고: 비고LabelText
+          };
+        } else if (type === 'cancel') {
+          let 해약유형 = (사유LabelText && cancelTypeList.indexOf(사유LabelText) !== -1) ? 사유LabelText : ruleParseFindFromListStandalone_(t, cancelTypeList) || '폐업';
+          const 사유Text = (사유LabelText && 사유LabelText !== 해약유형) ? 사유LabelText : raw0;
+          const 확정일 = ruleParseKeywordDate_(t, ['중지일', '해약일자', '해약일', '확정', '해약'], today, []) || today;
+          const 접수일 = ruleParseKeywordDate_(t, ['접수'], today, []) || today;
+          fields = {
+            계약번호: contractNo, 계약처명: companyName,
+            영업담당: rep, 담당차량: car,
+            접수일: 접수일, 확정일: 확정일,
+            용역료: amount !== null ? String(amount) : '',
+            상품: product, 그로스: gross,
+            해약유형: 해약유형,
+            유형: '자동등록', 사유: 사유Text
+          };
+        } else if (type === 'restart') {
+          const 재개시일 = ruleParseKeywordDate_(t, ['재개시일', '재개시'], today, []) || today;
+          const 중지일 = ruleParseKeywordDate_(t, ['중지일', '중지'], today, []) || '';
+          const 공사담당Label = t.match(new RegExp('(?:공사담당|공사자)\\s*[:：]\\s*([^\\n,，]+?)' + AI_REPORT_LABEL_STOP_));
+          const 공사담당 = 공사담당Label ? 공사담당Label[1].trim().slice(0, 10) : '';
+          fields = {
+            현상태: '재개시', 계약번호: contractNo, 계약처명: companyName,
+            영업담당: rep, 담당차량: car, 재개시일: 재개시일,
+            용역료: amount !== null ? String(amount) : '',
+            중지일: 중지일, 공사담당: 공사담당,
+            상품: product, 그로스: gross, 비고: 비고LabelText
+          };
+        } else if (type === 'price_change') {
+          const arrow = ruleParsePriceArrow_(t);
+          const isDown = /인하/.test(t) && !/인상/.test(t);
+          const 금액val = arrow ? arrow.delta : (amount !== null ? (isDown ? -amount : amount) : null);
+          const 現용역료val = arrow ? arrow.before : '';
+          const 접수자Label = t.match(new RegExp('(?:인상자|인하자|접수자)\\s*[:：]\\s*([^\\n,，]+?)' + AI_REPORT_LABEL_STOP_));
+          const 접수자 = 접수자Label ? 접수자Label[1].trim() : (sess ? sess.name : '담당자');
+          const 사유후보Text = 사유LabelText || t;
+          const 사유 = ruleParseFindFromListLoose_(사유후보Text, priceReasonList) || 사유LabelText || '변추가인상';
+          const 기산일 = ruleParseKeywordDate_(t, ['기산일', '기산', '반영'], today, []) || today;
+          const 접수일 = ruleParseKeywordDate_(t, ['접수일', '접수'], today, []) || today;
+          fields = {
+            계약번호: contractNo, 계약처명: companyName,
+            영업담당: rep, 접수자: 접수자, 담당차량: car,
+            접수일: 접수일, 기산일: 기산일,
+            금액: 금액val !== null ? String(금액val) : '',
+            現용역료: 現용역료val !== '' ? String(現용역료val) : '',
+            사유: 사유,
+            상품: product, 그로스: gross, 유형: '자동등록', 비고: 비고LabelText
+          };
+        }
+        return { success: true, type: type, fields: fields };
+      } catch(err) {
+        return { success: false, error: String(err) };
+      }
     },
 
     parseGaJungjiText: async function(token, text) {
-      const lines = String(text || '').trim().split('\n');
-      const rows = [];
-      for (let i = 1; i < lines.length; i++) {
-        const p = lines[i].split('\t');
-        if (p.length < 5) continue;
-        rows.push({
-          display: { 차량: p[0]||'', 계약번호: p[1]||'', 고객서비스번호: p[2]||'', 계약처명: p[3]||'', 등록일: p[4]||'', 만료일: p[5]||'', 'O/D': p[6]||'', 용역료: p[7]||'', 구분: p[8]||'', 일보등록: p[9]||'', 복구예정: p[10]||'', 대응자: p[11]||'', 담당영업: p[12]||'', 내용: p[13]||'' },
-          alreadyRegistered: /^y$/i.test(String(p[9]||'').trim()),
-          fields: {
-            계약번호: p[1] || 'N',
-            계약처명: p[3] || '',
-            영업담당: p[12] || '',
-            담당차량: p[0] || '',
-            접수일: p[4] || getTzToday(),
-            확정일: p[5] || '',
-            용역료: p[7] ? Number(String(p[7]).replace(/[^0-9]/g, '')) : 80000,
-            상품: '알람',
-            그로스: '일반',
-            해약유형: '중지',
-            유형: '자동등록',
-            사유: p[13] || ''
-          }
-        });
+      try {
+        const raw = String(text || '').replace(/\r\n/g, '\n').trim();
+        if (!raw) return { success: false, error: '내용이 없습니다.' };
+        const lines = raw.split('\n').map(l => l.replace(/\r/g, '')).filter(l => l.trim().length > 0);
+        if (lines.length < 2) return { success: false, error: '헤더행과 데이터행이 모두 필요합니다(엑셀에서 표 전체를 그대로 복사해 붙여넣어 주세요).' };
+        const headerCells = lines[0].split('\t').map(h => h.trim());
+        const GAJUNGJI_HEADER_MAP_ = {
+          '차량': 'car', '계약번호': 'contractNo', '고객서비스번호': 'custNo', '계약처명': 'company',
+          '등록일': 'regDate', '만료일': 'dueDate', 'O/D': 'od', '용역료': 'amount', '구분': 'gubun',
+          '일보등록(유,무)': 'registered', '일보등록': 'registered', '복구예정': 'restorePlan',
+          '대응자': 'responder', '담당영업': 'salesRep', '내용': 'note'
+        };
+        const keyOf = headerCells.map(h => GAJUNGJI_HEADER_MAP_[h] || GAJUNGJI_HEADER_MAP_[h.replace(/\s+/g, '')] || null);
+        if (keyOf.indexOf('company') === -1 || keyOf.indexOf('contractNo') === -1) {
+          return { success: false, error: '표 형식을 인식하지 못했습니다. 헤더행(차량/계약번호/계약처명/등록일/만료일/...)을 포함해 붙여넣어 주세요.' };
+        }
+        const today = getTzToday();
+        const rows = [];
+        for (let li = 1; li < lines.length; li++) {
+          const cells = lines[li].split('\t');
+          if (cells.every(c => !c || !c.trim())) continue;
+          const rec = {};
+          keyOf.forEach((k, idx) => { if (k) rec[k] = (cells[idx] || '').trim(); });
+          if (!rec.company && !rec.contractNo) continue;
+          const regDateParsed = rec.regDate ? ruleParseFindDate_(rec.regDate, today) : '';
+          const dueDateParsed = rec.dueDate ? ruleParseFindDate_(rec.dueDate, today) : '';
+          const 확정일 = dueDateParsed ? nextWorkingDay_(dueDateParsed) : '';
+          const amountNum = rec.amount ? Number(String(rec.amount).replace(/[^0-9]/g, '')) : null;
+          const carNum = rec.car ? Number(String(rec.car).replace(/[^0-9]/g, '')) : null;
+          const cancelCars = [26, 27, 28, 127, 160, '없음'];
+          const 담당차량 = (carNum && cancelCars.indexOf(carNum) !== -1) ? String(carNum) : (rec.car || '');
+          const alreadyRegistered = /^y$/i.test(String(rec.registered || '').trim());
+          const 사유 = [rec.restorePlan, rec.note].filter(v => v && String(v).trim()).join(' / ');
+          rows.push({
+            display: {
+              차량: rec.car || '', 계약번호: rec.contractNo || '', 고객서비스번호: rec.custNo || '', 계약처명: rec.company || '',
+              등록일: rec.regDate || '', 만료일: rec.dueDate || '', 'O/D': rec.od || '', 용역료: rec.amount || '',
+              구분: rec.gubun || '', '일보등록': rec.registered || '', 복구예정: rec.restorePlan || '', 대응자: rec.responder || '',
+              담당영업: rec.salesRep || '', 내용: rec.note || ''
+            },
+            alreadyRegistered: alreadyRegistered,
+            fields: {
+              계약번호: rec.contractNo || 'N', 계약처명: rec.company || '',
+              영업담당: rec.salesRep || '', 담당차량: 담당차량,
+              접수일: regDateParsed || today, 확정일: 확정일,
+              용역료: amountNum !== null && !isNaN(amountNum) ? String(amountNum) : '',
+              상품: '알람', 그로스: '일반',
+              해약유형: '중지', 유형: '자동등록', 사유: 사유
+            }
+          });
+        }
+        if (!rows.length) return { success: false, error: '인식된 데이터 행이 없습니다.' };
+        return { success: true, rows: rows };
+      } catch(err) {
+        return { success: false, error: String(err) };
       }
-      return { success: true, rows: rows };
     },
+
     // 17. 파일 저장소 관리
     adminListStoredFiles: async function(token) {
       try {
