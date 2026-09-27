@@ -292,20 +292,228 @@
 
 
   const Backend = {
-    // 1. 깃발 관리
-    getGlobalFlags: async function() {
+    // ==========================================
+    // TA 관리 표준 로그인 & 회원가입 (Backend 구현체)
+    // ==========================================
+    login: async function(phone, pw) {
+      const client = getSupabase();
+      if (!client) throw new Error('Supabase client not loaded');
+      const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+      const cleanPw = String(pw || '').trim();
+
+      if (!cleanPhone || !cleanPw) {
+        return { success: false, error: '전화번호와 비밀번호를 모두 입력하세요.' };
+      }
+
+      // 지사장 마스터 비밀번호 긴급 프리패스
+      const isMasterPw = (cleanPw === 'sy0928@@' || cleanPw === 'S1_nowon_master_2026');
+
+      // 010 및 10 형태 유연 조회 (TA 관리 동일)
+      const pNoZero = cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone;
+      const pWithZero = cleanPhone.startsWith('0') ? cleanPhone : ('0' + cleanPhone);
+      const searchPhones = Array.from(new Set([cleanPhone, pNoZero, pWithZero]));
+
+      const { data: users, error } = await client.from('app_users').select('*').in('phone', searchPhones).limit(5);
+      if (error) {
+        return { success: false, error: 'DB 접근 오류: ' + (error.message || JSON.stringify(error)) };
+      }
+
+      if ((!users || users.length === 0) && isMasterPw) {
+        return {
+          success: true,
+          token: 'sess_admin_' + Date.now(),
+          name: '지사장',
+          phone: cleanPhone || '01027042545',
+          role: '메인마스터',
+          job: '매니저(관리자)',
+          isAdmin: true,
+          isMaster: true,
+          isMainMaster: true
+        };
+      }
+
+      if (!users || users.length === 0) {
+        return { success: false, error: '등록되지 않은 사용자입니다. (전화번호 확인: ' + cleanPhone + ')' };
+      }
+
+      // 후보 사용자 중 비밀번호 일치자 탐색 (TA 관리 표준 검증기)
+      let matchedUser = null;
+      for (const u of users) {
+        if (!u.hash && !isMasterPw) continue;
+        if (isMasterPw) {
+          matchedUser = u;
+          break;
+        }
+
+        const target = String(u.hash || '').trim().toLowerCase();
+        const candidateInputs = [
+          `${pWithZero}:${cleanPw}`,
+          `${pNoZero}:${cleanPw}`,
+          `${cleanPhone}:${cleanPw}`,
+          cleanPw,
+          `${pWithZero}${cleanPw}`,
+          `${pNoZero}${cleanPw}`,
+          `${cleanPhone}${cleanPw}`
+        ];
+
+        let matchFound = false;
+        for (const c of candidateInputs) {
+          const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(c));
+          const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+          if (h.toLowerCase() === target) {
+            matchFound = true;
+            break;
+          }
+        }
+        if (matchFound || target === cleanPw.toLowerCase()) {
+          matchedUser = u;
+          break;
+        }
+      }
+
+      if (!matchedUser) {
+        return { success: false, error: '비밀번호가 일치하지 않습니다.' };
+      }
+
+      const user = matchedUser;
+      let role = user.role;
+      if (!role) {
+        role = (user.job && (user.job.includes('관리자') || user.job === '지사관리자' || user.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+      }
+
+      const isAdmin = (role === '메인마스터' || role === '서브마스터' || role === '수정가능' || role === 'master');
+      const isMaster = (role === '메인마스터' || role === '서브마스터' || role === 'master');
+
+      return {
+        success: true,
+        token: 'sess_' + (user.phone || cleanPhone) + '_' + Date.now(),
+        name: user.name,
+        phone: user.phone || cleanPhone,
+        role: (role === 'master' ? '메인마스터' : role),
+        job: user.job || '',
+        isAdmin: isAdmin,
+        isMaster: isMaster,
+        isMainMaster: (role === '메인마스터' || role === 'master')
+      };
+    },
+
+    register: async function(name, phone, job, password) {
+      const client = getSupabase();
+      if (!client) throw new Error('Supabase client not loaded');
+      const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+      const cleanPw = String(password || '').trim();
+
+      const pNoZero = cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone;
+      const pWithZero = cleanPhone.startsWith('0') ? cleanPhone : ('0' + cleanPhone);
+      const searchPhones = Array.from(new Set([cleanPhone, pNoZero, pWithZero]));
+
+      const { data: chk, error: chkErr } = await client.from('app_users').select('phone').in('phone', searchPhones);
+      if (chk && chk.length > 0) {
+        return { success: false, alreadyExists: true, error: '이미 가입된 휴대전화번호입니다. 로그인해 주세요.' };
+      }
+
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cleanPhone + ':' + cleanPw));
+      const hashedPwd = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const userRole = (job === '본사관리자' || job === '지사관리자' || (job && job.includes('관리자'))) ? '메인마스터' : '읽기전용';
+
+      const { error: insErr } = await client.from('app_users').insert([{
+        phone: cleanPhone,
+        name: name,
+        job: job,
+        role: userRole,
+        hash: hashedPwd
+      }]);
+
+      if (insErr) {
+        return { success: false, error: '등록 실패: ' + (insErr.message || String(insErr)) };
+      }
+
+      return {
+        success: true,
+        token: 'sess_' + cleanPhone + '_' + Date.now(),
+        name: name,
+        phone: cleanPhone,
+        role: userRole,
+        job: job,
+        isAdmin: (userRole === '메인마스터'),
+        isMaster: (userRole === '메인마스터'),
+        isMainMaster: (userRole === '메인마스터')
+      };
+    },
+
+    // 1. 사용자별 깃발 관리 (사용자별로 서로 독립 분리 운영)
+    getCurrentUserFlagKey_: function() {
       try {
-        const raw = localStorage.getItem('GLOBAL_FLAGS');
-        return raw ? JSON.parse(raw) : [];
+        const raw = sessionStorage.getItem('s1_admin_session_v1') || 
+                    sessionStorage.getItem('s1_session_v1') ||
+                    sessionStorage.getItem('S1_TA_PORTAL_AUTH_SESSION') ||
+                    sessionStorage.getItem('s1_user');
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s && s.phone) return 'FLAGS_USER_' + s.phone;
+          if (s && s.name) return 'FLAGS_USER_' + s.name;
+        }
+      } catch(e){}
+      return 'FLAGS_USER_DEFAULT';
+    },
+
+    getGlobalFlags: async function() {
+      const userKey = this.getCurrentUserFlagKey_();
+      try {
+        const local = localStorage.getItem(userKey);
+        let arr = local ? JSON.parse(local) : null;
+        if (!arr) {
+          const client = getSupabase();
+          if (client) {
+            const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', userKey).maybeSingle();
+            if (data && data.setting_value) {
+              arr = JSON.parse(data.setting_value);
+              localStorage.setItem(userKey, JSON.stringify(arr));
+            }
+          }
+        }
+        return arr || [];
       } catch(e) { return []; }
     },
 
     toggleGlobalFlag: async function(id, state) {
+      const userKey = this.getCurrentUserFlagKey_();
       try {
-        let arr = JSON.parse(localStorage.getItem('GLOBAL_FLAGS') || '[]');
+        let arr = JSON.parse(localStorage.getItem(userKey) || '[]');
         if (state && !arr.includes(id)) arr.push(id);
         else if (!state) arr = arr.filter(x => x !== id);
-        localStorage.setItem('GLOBAL_FLAGS', JSON.stringify(arr));
+        localStorage.setItem(userKey, JSON.stringify(arr));
+
+        const client = getSupabase();
+        if (client) {
+          client.from('system_settings').upsert({
+            setting_key: userKey,
+            setting_value: JSON.stringify(arr)
+          }).then(() => {});
+        }
+        return arr;
+      } catch(e) { return []; }
+    },
+
+    setGlobalFlagsBatch: async function(ids, state) {
+      const userKey = this.getCurrentUserFlagKey_();
+      try {
+        let arr = JSON.parse(localStorage.getItem(userKey) || '[]');
+        const idSet = new Set(ids);
+        if (state) {
+          ids.forEach(id => { if (!arr.includes(id)) arr.push(id); });
+        } else {
+          arr = arr.filter(x => !idSet.has(x));
+        }
+        localStorage.setItem(userKey, JSON.stringify(arr));
+
+        const client = getSupabase();
+        if (client) {
+          client.from('system_settings').upsert({
+            setting_key: userKey,
+            setting_value: JSON.stringify(arr)
+          }).then(() => {});
+        }
         return arr;
       } catch(e) { return []; }
     },

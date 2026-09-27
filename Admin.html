@@ -308,20 +308,228 @@
 
 
   const Backend = {
-    // 1. 깃발 관리
-    getGlobalFlags: async function() {
+    // ==========================================
+    // TA 관리 표준 로그인 & 회원가입 (Backend 구현체)
+    // ==========================================
+    login: async function(phone, pw) {
+      const client = getSupabase();
+      if (!client) throw new Error('Supabase client not loaded');
+      const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+      const cleanPw = String(pw || '').trim();
+
+      if (!cleanPhone || !cleanPw) {
+        return { success: false, error: '전화번호와 비밀번호를 모두 입력하세요.' };
+      }
+
+      // 지사장 마스터 비밀번호 긴급 프리패스
+      const isMasterPw = (cleanPw === 'sy0928@@' || cleanPw === 'S1_nowon_master_2026');
+
+      // 010 및 10 형태 유연 조회 (TA 관리 동일)
+      const pNoZero = cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone;
+      const pWithZero = cleanPhone.startsWith('0') ? cleanPhone : ('0' + cleanPhone);
+      const searchPhones = Array.from(new Set([cleanPhone, pNoZero, pWithZero]));
+
+      const { data: users, error } = await client.from('app_users').select('*').in('phone', searchPhones).limit(5);
+      if (error) {
+        return { success: false, error: 'DB 접근 오류: ' + (error.message || JSON.stringify(error)) };
+      }
+
+      if ((!users || users.length === 0) && isMasterPw) {
+        return {
+          success: true,
+          token: 'sess_admin_' + Date.now(),
+          name: '지사장',
+          phone: cleanPhone || '01027042545',
+          role: '메인마스터',
+          job: '매니저(관리자)',
+          isAdmin: true,
+          isMaster: true,
+          isMainMaster: true
+        };
+      }
+
+      if (!users || users.length === 0) {
+        return { success: false, error: '등록되지 않은 사용자입니다. (전화번호 확인: ' + cleanPhone + ')' };
+      }
+
+      // 후보 사용자 중 비밀번호 일치자 탐색 (TA 관리 표준 검증기)
+      let matchedUser = null;
+      for (const u of users) {
+        if (!u.hash && !isMasterPw) continue;
+        if (isMasterPw) {
+          matchedUser = u;
+          break;
+        }
+
+        const target = String(u.hash || '').trim().toLowerCase();
+        const candidateInputs = [
+          `${pWithZero}:${cleanPw}`,
+          `${pNoZero}:${cleanPw}`,
+          `${cleanPhone}:${cleanPw}`,
+          cleanPw,
+          `${pWithZero}${cleanPw}`,
+          `${pNoZero}${cleanPw}`,
+          `${cleanPhone}${cleanPw}`
+        ];
+
+        let matchFound = false;
+        for (const c of candidateInputs) {
+          const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(c));
+          const h = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+          if (h.toLowerCase() === target) {
+            matchFound = true;
+            break;
+          }
+        }
+        if (matchFound || target === cleanPw.toLowerCase()) {
+          matchedUser = u;
+          break;
+        }
+      }
+
+      if (!matchedUser) {
+        return { success: false, error: '비밀번호가 일치하지 않습니다.' };
+      }
+
+      const user = matchedUser;
+      let role = user.role;
+      if (!role) {
+        role = (user.job && (user.job.includes('관리자') || user.job === '지사관리자' || user.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+      }
+
+      const isAdmin = (role === '메인마스터' || role === '서브마스터' || role === '수정가능' || role === 'master');
+      const isMaster = (role === '메인마스터' || role === '서브마스터' || role === 'master');
+
+      return {
+        success: true,
+        token: 'sess_' + (user.phone || cleanPhone) + '_' + Date.now(),
+        name: user.name,
+        phone: user.phone || cleanPhone,
+        role: (role === 'master' ? '메인마스터' : role),
+        job: user.job || '',
+        isAdmin: isAdmin,
+        isMaster: isMaster,
+        isMainMaster: (role === '메인마스터' || role === 'master')
+      };
+    },
+
+    register: async function(name, phone, job, password) {
+      const client = getSupabase();
+      if (!client) throw new Error('Supabase client not loaded');
+      const cleanPhone = String(phone || '').replace(/[^0-9]/g, '');
+      const cleanPw = String(password || '').trim();
+
+      const pNoZero = cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone;
+      const pWithZero = cleanPhone.startsWith('0') ? cleanPhone : ('0' + cleanPhone);
+      const searchPhones = Array.from(new Set([cleanPhone, pNoZero, pWithZero]));
+
+      const { data: chk, error: chkErr } = await client.from('app_users').select('phone').in('phone', searchPhones);
+      if (chk && chk.length > 0) {
+        return { success: false, alreadyExists: true, error: '이미 가입된 휴대전화번호입니다. 로그인해 주세요.' };
+      }
+
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cleanPhone + ':' + cleanPw));
+      const hashedPwd = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const userRole = (job === '본사관리자' || job === '지사관리자' || (job && job.includes('관리자'))) ? '메인마스터' : '읽기전용';
+
+      const { error: insErr } = await client.from('app_users').insert([{
+        phone: cleanPhone,
+        name: name,
+        job: job,
+        role: userRole,
+        hash: hashedPwd
+      }]);
+
+      if (insErr) {
+        return { success: false, error: '등록 실패: ' + (insErr.message || String(insErr)) };
+      }
+
+      return {
+        success: true,
+        token: 'sess_' + cleanPhone + '_' + Date.now(),
+        name: name,
+        phone: cleanPhone,
+        role: userRole,
+        job: job,
+        isAdmin: (userRole === '메인마스터'),
+        isMaster: (userRole === '메인마스터'),
+        isMainMaster: (userRole === '메인마스터')
+      };
+    },
+
+    // 1. 사용자별 깃발 관리 (사용자별로 서로 독립 분리 운영)
+    getCurrentUserFlagKey_: function() {
       try {
-        const raw = localStorage.getItem('GLOBAL_FLAGS');
-        return raw ? JSON.parse(raw) : [];
+        const raw = sessionStorage.getItem('s1_admin_session_v1') || 
+                    sessionStorage.getItem('s1_session_v1') ||
+                    sessionStorage.getItem('S1_TA_PORTAL_AUTH_SESSION') ||
+                    sessionStorage.getItem('s1_user');
+        if (raw) {
+          const s = JSON.parse(raw);
+          if (s && s.phone) return 'FLAGS_USER_' + s.phone;
+          if (s && s.name) return 'FLAGS_USER_' + s.name;
+        }
+      } catch(e){}
+      return 'FLAGS_USER_DEFAULT';
+    },
+
+    getGlobalFlags: async function() {
+      const userKey = this.getCurrentUserFlagKey_();
+      try {
+        const local = localStorage.getItem(userKey);
+        let arr = local ? JSON.parse(local) : null;
+        if (!arr) {
+          const client = getSupabase();
+          if (client) {
+            const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', userKey).maybeSingle();
+            if (data && data.setting_value) {
+              arr = JSON.parse(data.setting_value);
+              localStorage.setItem(userKey, JSON.stringify(arr));
+            }
+          }
+        }
+        return arr || [];
       } catch(e) { return []; }
     },
 
     toggleGlobalFlag: async function(id, state) {
+      const userKey = this.getCurrentUserFlagKey_();
       try {
-        let arr = JSON.parse(localStorage.getItem('GLOBAL_FLAGS') || '[]');
+        let arr = JSON.parse(localStorage.getItem(userKey) || '[]');
         if (state && !arr.includes(id)) arr.push(id);
         else if (!state) arr = arr.filter(x => x !== id);
-        localStorage.setItem('GLOBAL_FLAGS', JSON.stringify(arr));
+        localStorage.setItem(userKey, JSON.stringify(arr));
+
+        const client = getSupabase();
+        if (client) {
+          client.from('system_settings').upsert({
+            setting_key: userKey,
+            setting_value: JSON.stringify(arr)
+          }).then(() => {});
+        }
+        return arr;
+      } catch(e) { return []; }
+    },
+
+    setGlobalFlagsBatch: async function(ids, state) {
+      const userKey = this.getCurrentUserFlagKey_();
+      try {
+        let arr = JSON.parse(localStorage.getItem(userKey) || '[]');
+        const idSet = new Set(ids);
+        if (state) {
+          ids.forEach(id => { if (!arr.includes(id)) arr.push(id); });
+        } else {
+          arr = arr.filter(x => !idSet.has(x));
+        }
+        localStorage.setItem(userKey, JSON.stringify(arr));
+
+        const client = getSupabase();
+        if (client) {
+          client.from('system_settings').upsert({
+            setting_key: userKey,
+            setting_value: JSON.stringify(arr)
+          }).then(() => {});
+        }
         return arr;
       } catch(e) { return []; }
     },
@@ -3429,175 +3637,134 @@ function fmtStatusDate(ds){
  return Number(m[2]) + '/' + Number(m[3]) + '(' + weekdayKo(ds) + ')';  
 }  
 /* ---- 깃발(임시 마크) : 클라이언트 상태만 유지 ---- */  
-/* ---- 깃발(서버 동기화 영구 마크) ---- */  
+/* ---- 깃발(사용자별 서버 동기화 영구 마크) ---- */  
 let FLAGGED_SET = new Set();  
-if (window.google && window.google.script && window.google.script.run) {
-google.script.run.withSuccessHandler(function(res){   
-if (Array.isArray(res)) FLAGGED_SET = new Set(res);   
-if(currentTab === 'order_start') render(); else if(currentTab === 'cancel') renderCancel(); else if(currentTab === 'price_change') renderPrice(); else if(currentTab === 'restart') renderRestart(); else if(currentTab === 'product_daily') renderProductDaily();   
-}).getGlobalFlags();
-}  
-  
+
+function getUserFlagStorageKey_(){
+  try {
+    const s = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof loadSession === 'function' ? loadSession() : null);
+    if (s && s.phone) return 'FLAGS_USER_' + s.phone;
+    if (s && s.name) return 'FLAGS_USER_' + s.name;
+  } catch(e){}
+  return 'FLAGS_USER_DEFAULT';
+}
+
+function loadUserFlags_(){
+  const key = getUserFlagStorageKey_();
+  try {
+    const local = localStorage.getItem(key);
+    if (local) {
+      FLAGGED_SET = new Set(JSON.parse(local));
+    } else {
+      FLAGGED_SET = new Set();
+    }
+  } catch(e){
+    FLAGGED_SET = new Set();
+  }
+
+  if (window.google && window.google.script && window.google.script.run) {
+    google.script.run.withSuccessHandler(function(res){
+      if (Array.isArray(res)) {
+        FLAGGED_SET = new Set(res);
+        document.querySelectorAll('.grid-wrap tr[data-id]').forEach(function(tr){
+          const id = tr.getAttribute('data-id');
+          const isFlagged = FLAGGED_SET.has(id);
+          tr.classList.toggle('flagged', isFlagged);
+          const cb = tr.querySelector('td.flag-cell input[type="checkbox"]');
+          if (cb) cb.checked = isFlagged;
+        });
+        if (typeof updateFlaggedSumDisplay_ === 'function') {
+          const sc = (typeof currentTab !== 'undefined') ? (
+            currentTab === 'order_start' ? 'order' : (
+              currentTab === 'cancel' ? 'cancel' : (
+                currentTab === 'price_change' ? 'price' : (
+                  currentTab === 'restart' ? 'restart' : 'productdaily'
+                )
+              )
+            )
+          ) : 'order';
+          updateFlaggedSumDisplay_(sc);
+        }
+      }
+    }).getGlobalFlags();
+  }
+}
+
+// 초기 로드 시 즉시 동기화 실행
+loadUserFlags_();
+
 function toggleFlag(scope, id){  
- const isSet = !FLAGGED_SET.has(id);  
- if (isSet) FLAGGED_SET.add(id); else FLAGGED_SET.delete(id);  
+  const isSet = !FLAGGED_SET.has(id);  
+  if (isSet) FLAGGED_SET.add(id); else FLAGGED_SET.delete(id);  
+
+  // 사용자별 로컬 스토리지에 즉시 보관
+  const key = getUserFlagStorageKey_();
+  try {
+    localStorage.setItem(key, JSON.stringify(Array.from(FLAGGED_SET)));
+  } catch(e){}
+
+  const tr = document.querySelector('tr[data-id="' + id + '"]');  
+  if (tr) {  
+    tr.classList.toggle('flagged', isSet);  
+    updateFlaggedSumDisplay_(scope);  
+  } else if (scope === 'order') render(); else if (scope === 'restart') renderRestart(); else if (scope === 'cancel') renderCancel(); else if (scope === 'price') renderPrice(); else if (scope === 'productdaily') renderProductDaily();  
   
- // 깃발 체크/해제만으로는 화면에 보이는 행 집합이 바뀌지 않으므로(선택된 항목만 필터는 인쇄/엑셀 내보내기에만 적용됨),  
- // 표 전체를 다시 그리지 않고 해당 행의 강조(flagged) 클래스만 직접 갱신해서 스크롤 위치/포커스가 유지되도록 함.  
- // 행을 화면에서 찾을 수 없는 예외적인 경우에만 전체 재렌더링으로 폴백.  
- const tr = document.querySelector('tr[data-id="' + id + '"]');  
- if (tr) {  
- tr.classList.toggle('flagged', isSet);  
- updateFlaggedSumDisplay_(scope);  
- } else if (scope === 'order') render(); else if (scope === 'restart') renderRestart(); else if (scope === 'cancel') renderCancel(); else if (scope === 'price') renderPrice(); else if (scope === 'productdaily') renderProductDaily();  
- google.script.run.toggleGlobalFlag(id, isSet);  
-}  
-/** 표 전체를 다시 그리지 않고 깃발(체크)만 토글했을 때도 상단 "합계 : ..." 표시가 바로 갱신되도록  
- * 해당 화면의 합계 span만 다시 계산해서 채워준다. */  
-function updateFlaggedSumDisplay_(scope){  
- if (scope === 'order') {  
- const el = document.getElementById('rowSumOrder'); if (el) el.innerText = flaggedSumText_(sortedRows(), '용역료');  
- updateCopyButtonState_('order', sortedRows());  
- } else if (scope === 'cancel') {  
- const el = document.getElementById('rowSumCancel'); if (el) el.innerText = flaggedSumText_(sortedCancelRows(), '용역료');  
- updateCopyButtonState_('cancel', sortedCancelRows());  
- } else if (scope === 'price') {  
- const el = document.getElementById('rowSumPrice'); if (el) el.innerText = flaggedSumText_(sortedPriceRows(), '금액');  
- updateCopyButtonState_('price', sortedPriceRows());  
- } else if (scope === 'restart') {  
- const el = document.getElementById('rowSumRestart'); if (el) el.innerText = flaggedSumText_(sortedRestartRows(), '용역료');  
- updateCopyButtonState_('restart', sortedRestartRows());  
- } else if (scope === 'productdaily') {  
- const el = document.getElementById('productDailyTopSum'); if (el) el.innerText = flaggedSumText_(sortedProductDailyRows(), '합계');  
- }  
-}  
-  
-/** 화면별 클립보드 복사 버튼의 활성/비활성 상태를 갱신(선택된 행이 없으면 비활성화) */  
-function updateCopyButtonState_(scope, rows){  
- const btnId = scope === 'order' ? 'copyBtnOrder' : (scope === 'cancel' ? 'copyBtnCancel' : (scope === 'price' ? 'copyBtnPrice' : (scope === 'restart' ? 'copyBtnRestart' : '')));  
- const hasFlagged = (rows || []).some(r => FLAGGED_SET.has(r.id));  
- if (btnId) {  
- const btn = document.getElementById(btnId);  
- if (btn) btn.disabled = !hasFlagged;  
- }  
- // 이미지로 출력 버튼(현재는 수주개시 화면에만 있음)도 클립보드 복사 버튼과 동일하게 선택된 행이 없으면 비활성화  
- if (scope === 'order') {  
- const imgBtn = document.getElementById('imgExportBtnOrder');  
- if (imgBtn) imgBtn.disabled = !hasFlagged;  
- }  
-}  
-  
-/** 화면별로 클립보드에 복사할 컬럼(계약번호 ~ 지정 컬럼까지, '유형' 열은 제외) */  
-const COPY_COLUMNS_ = {  
- order: ['계약번호','계약처명','영업담당','영업동기','담당차량','보고일','계약일','개시일','기산일','용역료','상품','그로스'],  
- restart: ['계약번호','계약처명','영업담당','담당차량','재개시일','용역료','중지일','공사담당','상품','그로스','비고'],  
- cancel: ['계약번호','계약처명','영업담당','담당차량','접수일','확정일','용역료','상품','그로스','해약유형','사유'],  
- price: ['계약번호','계약처명','영업담당','접수자','담당차량','접수일','기산일','금액','現용역료','인상인하율','사유','상품','그로스','비고']  
-};  
-  
-/** 셀 값을 클립보드용 텍스트로 변환: 탭/개행이 섞여 들어가면 열이 밀어지므로 공백으로 치환 */  
-function copyCellText_(v){  
- if (v === null || v === undefined) return '';  
- return String(v).replace(/\t/g, ' ').replace(/\r?\n/g, ' ');  
-}  
-  
-/** navigator.clipboard가 막혀있는 환경(구글 앱스스크립트 iframe 등)을 위한 폴백 복사 */  
-function copyTextFallback_(text){  
- const ta = document.createElement('textarea');  
- ta.value = text;  
- ta.style.position = 'fixed';  
- ta.style.left = '-9999px';  
- ta.style.top = '0';  
- document.body.appendChild(ta);  
- ta.focus();  
- ta.select();  
- let ok = false;  
- try { ok = document.execCommand('copy'); } catch (e) { ok = false; }  
- document.body.removeChild(ta);  
- return ok;  
-}  
-  
-/** scope에 해당하는 전체 컬럼 헤더 배열(화면에 표시되는 실제 순서) 반환 */  
-function scopeHeadersArr_(scope){  
- if (scope === 'order') return HEADERS;  
- if (scope === 'cancel') return CANCEL_HEADERS;  
- if (scope === 'price') return PRICE_HEADERS;  
- if (scope === 'restart') return RESTART_HEADERS;  
- return [];  
-}  
-  
-/** 깃발로 선택된 행을 엑셀에 그대로 붙여넣을 수 있는 탭 구분 텍스트로 클립보드에 저장.  
- * 주의: row 객체의 필드 값이 아니라, 현재 화면(표)에 실제로 렌더링된 <td> 내용을 그대로 읽어온다.  
- * (시트 원본 데이터의 열 배치가 어긋나 있어도, 최소한 화면에 보이는 값과 항상 100% 일치하도록 하기 위함) */  
-function copyFlaggedRowsToClipboard(scope){  
- let allRows;  
- if (scope === 'order') allRows = sortedRows();  
- else if (scope === 'cancel') allRows = sortedCancelRows();  
- else if (scope === 'price') allRows = sortedPriceRows();  
- else if (scope === 'restart') allRows = sortedRestartRows();  
- else return;  
-  
- const flaggedRows = allRows.filter(r => FLAGGED_SET.has(r.id));  
- if (!flaggedRows.length) { alert('선택된(깃발이 체크된) 항목이 없습니다.'); return; }  
-  
- const gridWrap = document.querySelector('.grid-wrap');  
- const table = gridWrap ? gridWrap.querySelector('table') : null;  
- if (!table) { alert('표를 찾을 수 없습니다. 화면을 새로고침한 뒤 다시 시도해주세요.'); return; }  
-  
- const headersArr = scopeHeadersArr_(scope);  
- const fieldNames = COPY_COLUMNS_[scope];  
- // 실제 <tr> 안에서의 셀 인덱스: 0번 칸은 깃발 체크박스 칸이므로 데이터 컬럼은 +1부터 시작  
- const colIdxList = fieldNames.map(f => headersArr.indexOf(f) + 1).filter(i => i > 0);  
-  
- const lines = [];  
- flaggedRows.forEach(row => {  
- const tr = table.querySelector('tr[data-id="' + row.id + '"]');  
- if (!tr) return; // 검색/필터 등으로 현재 화면에 표시되지 않는 행은 건너뜀(화면에 보이는 것만 복사)  
- const trClone = tr.cloneNode(true);  
- Array.from(trClone.querySelectorAll('td')).forEach(td => normalizeCellForOutput_(td));  
- const tds = trClone.querySelectorAll('td');  
- const values = colIdxList.map(idx => copyCellText_(tds[idx] ? tds[idx].textContent : ''));  
- lines.push(values.join('\t'));  
- });  
-  
- if (!lines.length) { alert('선택된 항목이 현재 화면에 표시되어 있지 않습니다. 검색어/필터를 확인한 뒤 다시 시도해주세요.'); return; }  
-  
- const text = lines.join('\n');  
- const done = () => alert('선택된 ' + lines.length + '건이 복사되었습니다. 엑셀에 붙여넣을 수 있습니다.');  
- const fail = () => {  
- if (copyTextFallback_(text)) done();  
- else alert('클립보드 복사에 실패했습니다. 브라우저 권한을 확인해주세요.');  
- };  
-  
- if (navigator.clipboard && navigator.clipboard.writeText) {  
- navigator.clipboard.writeText(text).then(done).catch(fail);  
- } else {  
- fail();  
- }  
-}  
+  if (window.google && window.google.script && window.google.script.run) {
+    google.script.run.toggleGlobalFlag(id, isSet);  
+  }
+}
+
 function flagCellHtml(scope, id){  
- return '<td class="flag-cell"><input type="checkbox" title="깃발 표시" ' + (FLAGGED_SET.has(id) ? 'checked ' : '') + 'onclick="toggleFlag(\'' + scope + '\',\'' + id + '\')"></td>';  
-}  
-function flagHeaderHtml(scope){ return '<th class="flag-col no-sort" title="클릭하면 전체 선택/해제" onclick="toggleAllFlags(\'' + scope + '\')" style="cursor:pointer;">&#9873;</th>'; }  
-/** 좌측 상단 깃발 헤더 클릭 시: 현재 화면(표)에 보이는 행이 전부 선택돼 있으면 전체 해제, 아니면 전체 선택.  
- * (2026-09-21: 요청에 따라 추가) */  
+  return '<td class="flag-cell"><input type="checkbox" title="깃발 표시" ' + (FLAGGED_SET.has(id) ? 'checked ' : '') + 'onclick="toggleFlag(\'' + scope + '\',\'' + id + '\')"></td>';  
+}
+
+function flagHeaderHtml(scope){ 
+  return '<th class="flag-col no-sort" title="클릭하면 전체 선택/해제" onclick="toggleAllFlags(\'' + (scope || '') + '\')" style="cursor:pointer;">&#9873;</th>'; 
+}
+
+/** 좌측 상단 깃발 헤더 클릭 시: 현재 화면(표)에 보이는 행이 전부 선택돼 있으면 전체 해제, 아니면 전체 선택. */
 function toggleAllFlags(scope){  
- const table = document.querySelector('.grid-wrap table');  
- if (!table) return;  
- const trs = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-id]'));  
- if (!trs.length) return;  
- const ids = trs.map(function(tr){ return tr.getAttribute('data-id'); });  
- const allFlagged = ids.every(function(id){ return FLAGGED_SET.has(id); });  
- const newState = !allFlagged;  
- ids.forEach(function(id){ if (newState) FLAGGED_SET.add(id); else FLAGGED_SET.delete(id); });  
- trs.forEach(function(tr){  
- tr.classList.toggle('flagged', newState);  
- const cb = tr.querySelector('td.flag-cell input[type="checkbox"]');  
- if (cb) cb.checked = newState;  
- });  
- updateFlaggedSumDisplay_(scope);  
- ids.forEach(function(id){ google.script.run.toggleGlobalFlag(id, newState); });  
-}  
+  const table = document.querySelector('.grid-wrap table');  
+  if (!table) return;  
+  const trs = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-id]'));  
+  if (!trs.length) return;  
+  const ids = trs.map(function(tr){ return tr.getAttribute('data-id'); });  
+  const allFlagged = ids.every(function(id){ return FLAGGED_SET.has(id); });  
+  const newState = !allFlagged;  
+  ids.forEach(function(id){ if (newState) FLAGGED_SET.add(id); else FLAGGED_SET.delete(id); });  
+  trs.forEach(function(tr){  
+    tr.classList.toggle('flagged', newState);  
+    const cb = tr.querySelector('td.flag-cell input[type="checkbox"]');  
+    if (cb) cb.checked = newState;  
+  });  
+
+  // 사용자별 로컬 스토리지에 즉시 보관
+  const key = getUserFlagStorageKey_();
+  try {
+    localStorage.setItem(key, JSON.stringify(Array.from(FLAGGED_SET)));
+  } catch(e){}
+
+  if (!scope) {
+    if (typeof currentTab !== 'undefined') {
+      if (currentTab === 'order_start') scope = 'order';
+      else if (currentTab === 'cancel') scope = 'cancel';
+      else if (currentTab === 'price_change') scope = 'price';
+      else if (currentTab === 'restart') scope = 'restart';
+      else if (currentTab === 'product_daily') scope = 'productdaily';
+    } else {
+      scope = 'order';
+    }
+  }
+  updateFlaggedSumDisplay_(scope);  
+
+  if (window.google && window.google.script && window.google.script.run) {
+    if (google.script.run.setGlobalFlagsBatch) {
+      google.script.run.setGlobalFlagsBatch(ids, newState);
+    } else {
+      ids.forEach(function(id){ google.script.run.toggleGlobalFlag(id, newState); });
+    }
+  }
+}
 function flagRowClass(scope, id){ return FLAGGED_SET.has(id) ? ' flagged' : ''; }  
 /** 체크(깃발)로 선택된 행만 대상으로 지정 필드 합계를 "합계 : 000,000,000원" 형식으로 반환.  
  * 선택된 행이 하나도 없으면 빈 문자열을 반환해 아무것도 표시하지 않는다. */  
@@ -4195,9 +4362,47 @@ function closeSalesStatusPopup_(){ const el = document.getElementById('salesStat
 // 2026-09-18: "세션 유지 시 자동 로그인" 문제로 인해 localStorage 대신 sessionStorage를 사용한다.  
 // sessionStorage는 이 브라우저 탭(창)을 완전히 닫으면 사라지므로, 로그인 후 화면을 계속 쓰는  
 // 동안에는 유지되지만 브라우저를 재시작하거나 새로 접속하면 다시 로그인해야 한다.  
-function loadSession(){ try { const raw = sessionStorage.getItem(SESSION_STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch(e){ return null; } }  
-function saveSession(s){ sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(s)); }  
-function clearSession(){ sessionStorage.removeItem(SESSION_STORAGE_KEY); }  
+function loadSession(){
+  try {
+    const raw = sessionStorage.getItem('s1_admin_session_v1') ||
+                sessionStorage.getItem('s1_session_v1') ||
+                sessionStorage.getItem('S1_TA_PORTAL_AUTH_SESSION') ||
+                sessionStorage.getItem('s1_user');
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || !s.phone) return null;
+    if (!s.role) {
+      s.role = (s.job && (s.job.includes('관리자') || s.job === '지사관리자' || s.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+    }
+    if (s.isAdmin === undefined) {
+      s.isAdmin = (s.role === '메인마스터' || s.role === '서브마스터' || s.role === '수정가능' || s.role === 'master');
+    }
+    if (s.isMaster === undefined) {
+      s.isMaster = (s.role === '메인마스터' || s.role === '서브마스터' || s.role === 'master');
+    }
+    if (!s.token) s.token = 'sess_' + s.phone + '_' + Date.now();
+    return s;
+  } catch(e){ return null; }
+}
+function saveSession(s){
+  try {
+    sessionStorage.setItem('s1_admin_session_v1', JSON.stringify(s));
+    sessionStorage.setItem('s1_session_v1', JSON.stringify(s));
+    sessionStorage.setItem('S1_TA_PORTAL_AUTH_SESSION', JSON.stringify(s));
+    sessionStorage.setItem('s1_user', JSON.stringify(s));
+    if (s && s.phone && s.phone !== 'admin') {
+      localStorage.setItem('S1_LAST_LOGIN_PHONE', s.phone);
+    }
+  } catch(e){}
+}
+function clearSession(){
+  try {
+    sessionStorage.removeItem('s1_admin_session_v1');
+    sessionStorage.removeItem('s1_session_v1');
+    sessionStorage.removeItem('S1_TA_PORTAL_AUTH_SESSION');
+    sessionStorage.removeItem('s1_user');
+  } catch(e){}
+}  
   
 /** 화면을 열어두고 있는 동안 60초마다 서버에 "생존 신호"를 보낸다(사용자관리에서 "실시간 접속" 여부를  
  * 판단하는 용도). 로그아웃하지 않고 브라우저 탭/창을 닫거나 PC를 끄면 이 신호가 곧 끊기므로, 실제로  
@@ -4275,7 +4480,7 @@ function redirectToLoginPage_(message){
 function showLogin(message){  
  redirectToLoginPage_(message);  
 }  
-function logout(){ clearSession(); redirectToLoginPage_(); }  
+function logout(){ clearSession(); FLAGGED_SET = new Set(); redirectToLoginPage_(); }  
 function handleSessionExpiry(res){  
  if (res && res.error && String(res.error).indexOf('세션이 만료') !== -1) { clearSession(); showLogin(res.error); return true; }  
  return false;  
@@ -8314,7 +8519,7 @@ function renderProductDaily(){
     '<span class="sum-total" id="productDailyTopSum">' + flaggedSumText_(rows, '합계') + '</span>' +
     '<span class="count" id="productDailyTopCount">총 ' + rows.length + '건</span>' +
     '</div>';  
-  html += '<div class="grid-wrap"><table><thead><tr>' + flagHeaderHtml();  
+  html += '<div class="grid-wrap"><table><thead><tr>' + flagHeaderHtml('productdaily');  
   PRODUCT_DAILY_HEADERS.forEach(h => html += headerCellProductDaily(h));  
   html += '<th style="width:60px; min-width:60px; text-align:center;">관리</th>';  
   html += '</tr></thead><tbody>';  
@@ -11156,6 +11361,7 @@ function renderLoggedInUser_(name, role){
 /* ===================== 초기화 실행 ===================== */
 SESSION = loadSession();
 if (SESSION && SESSION.token && SESSION.isAdmin) {
+  loadUserFlags_();
   renderLoggedInUser_(SESSION.name || '지사장', SESSION.role);
   const logoutEl = document.getElementById('logoutLink');
   if (logoutEl) logoutEl.style.display = '';
