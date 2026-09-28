@@ -428,7 +428,7 @@
       const user = matchedUser;
       let role = user.role;
       if (!role) {
-        role = (user.job && (user.job.includes('관리자') || user.job === '지사관리자' || user.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+        role = (user.name === '심정환' || user.job === '지사관리자' || user.job === '본사관리자' || user.job === '매니저(관리자)' || (user.job && user.job.includes('관리자') && !user.job.includes('CS'))) ? '메인마스터' : (user.role || '수정가능');
       }
 
       const isAdmin = (role === '메인마스터' || role === '서브마스터' || role === '수정가능' || role === 'master');
@@ -631,47 +631,95 @@
         ];
       });
 
-      if (yearMonth !== 'ALL') {
+      if (yearMonth && yearMonth !== 'ALL') {
+        const targetYM = (yearMonth.length === 7) ? yearMonth : curYM;
         rows = rows.filter(r => {
-          const bDate = r[13];
-          if (!bDate || bDate === '미정') return true;
-          return bDate.slice(0, 7) >= curYM;
+          const bDate = r[13]; // 기산일 기준
+          if (!bDate || bDate === '미정') return true; // 미정/미기산은 항상 표시
+          const m = String(bDate).match(/^(\d{4})[\.\/\-](\d{1,2})/);
+          if (m) {
+            const ym = `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+            return ym >= targetYM; // 해당 년월부터 그 이후까지
+          }
+          return true;
         });
       }
 
       return { headers: HEADERS, rows: rows };
     },
 
+    // 날짜 및 년월 안전 정규화 헬퍼 (한국형 날짜 문자열 완벽 처리)
+    cleanDateVal_: function(v) {
+      if (!v) return null;
+      const s = String(v).trim();
+      if (s === '미정' || s === '해약방어') return s;
+      const m1 = s.match(/^(\d{4})\s*[\.\/\-]\s*(\d{1,2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m1) {
+        return `${m1[1]}-${String(m1[2]).padStart(2, '0')}-${String(m1[3]).padStart(2, '0')}`;
+      }
+      const m2 = s.match(/^(\d{2})\s*[\.\/\-]\s*(\d{1,2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m2) {
+        return `20${m2[1]}-${String(m2[2]).padStart(2, '0')}-${String(m2[3]).padStart(2, '0')}`;
+      }
+      const m3 = s.match(/^(\d{1,2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m3) {
+        const curY = new Date().getFullYear();
+        return `${curY}-${String(m3[1]).padStart(2, '0')}-${String(m3[2]).padStart(2, '0')}`;
+      }
+      return null;
+    },
+
+    cleanYmVal_: function(v) {
+      if (!v) return '';
+      const s = String(v).trim();
+      if (s === '미정' || s === '해약방어') return s;
+      const d = this.cleanDateVal_(s);
+      if (d && d !== '미정' && d !== '해약방어') return d.slice(0, 7);
+      const m1 = s.match(/^(\d{4})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m1) return `${m1[1]}-${String(m1[2]).padStart(2, '0')}`;
+      const m2 = s.match(/^(\d{2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m2) return `20${m2[1]}-${String(m2[2]).padStart(2, '0')}`;
+      return s;
+    },
+
     saveOrderStartRow: async function(token, payload) {
       const client = getSupabase();
       const fields = payload.fields || {};
-      const isStartUnknown = (fields['개시일'] === '미정' || !fields['개시일']);
-      const isBillingUnknown = (fields['기산일'] === '미정' || !fields['기산일']);
+      const rawStart = fields['개시일'];
+      const rawBilling = fields['기산일'];
+      const isStartUnknown = (rawStart === '미정' || !rawStart);
+      const isBillingUnknown = (rawBilling === '미정' || !rawBilling);
+      const parsedStart = isStartUnknown ? null : this.cleanDateVal_(rawStart);
+      const parsedBilling = isBillingUnknown ? null : this.cleanDateVal_(rawBilling);
+      const parsedContract = this.cleanDateVal_(fields['계약일']);
+      const parsedReport = this.cleanDateVal_(fields['보고일']);
+
       const today = getTzToday();
       const todayYm = today.slice(0, 7);
-      const startYm = isStartUnknown ? '미정' : fields['개시일'].slice(0, 7);
-      const billingYm = isBillingUnknown ? '미정' : fields['기산일'].slice(0, 7);
+      const startYm = isStartUnknown ? '미정' : (parsedStart ? parsedStart.slice(0, 7) : this.cleanYmVal_(rawStart));
+      const billingYm = isBillingUnknown ? '미정' : (parsedBilling ? parsedBilling.slice(0, 7) : this.cleanYmVal_(rawBilling));
+      const orderYm = parsedContract ? parsedContract.slice(0, 7) : this.cleanYmVal_(fields['계약일']);
 
       const record = {
         start_status: isBillingUnknown ? '미정' : (billingYm > todayYm ? '예정' : '확정'),
-        order_ym: fields['계약일'] ? fields['계약일'].slice(0, 7) : '',
+        order_ym: orderYm,
         start_ym: startYm,
         carry_over: isStartUnknown ? '미정' : (startYm === todayYm ? '당월' : '이월'),
-        category: isBillingUnknown ? '미개시' : (fields['기산일'] < today ? '개시' : '미개시'),
-        contract_no: fields['계약번호'] || 'N',
-        customer_name: fields['계약처명'] || '',
-        rep_name: fields['영업담당'] || '',
-        sales_motive: fields['영업동기'] || '',
-        car_no: fields['담당차량'] ? String(fields['담당차량']) : '',
-        report_date: fields['보고일'] || null,
-        contract_date: fields['계약일'] || null,
-        start_date: isStartUnknown ? null : fields['개시일'],
-        billing_date: isBillingUnknown ? null : fields['기산일'],
+        category: isBillingUnknown ? '미개시' : ((parsedBilling && parsedBilling < today) ? '개시' : '미개시'),
+        contract_no: String(fields['계약번호'] || 'N').trim(),
+        customer_name: String(fields['계약처명'] || '').trim(),
+        rep_name: String(fields['영업담당'] || '').trim(),
+        sales_motive: String(fields['영업동기'] || '').trim(),
+        car_no: fields['담당차량'] ? String(fields['담당차량']).trim() : '',
+        report_date: parsedReport,
+        contract_date: parsedContract,
+        start_date: parsedStart,
+        billing_date: parsedBilling,
         monthly_fee: fields['용역료'] ? Number(String(fields['용역료']).replace(/[^0-9.-]/g, '')) : null,
-        product_name: fields['상품'] || '알람',
-        gross_type: fields['그로스'] || '일반',
-        note: fields['비고'] || '',
-        reg_type: fields['유형'] || '직접등록',
+        product_name: String(fields['상품'] || '알람').trim(),
+        gross_type: String(fields['그로스'] || '일반').trim(),
+        note: String(fields['비고'] || '').trim(),
+        reg_type: String(fields['유형'] || '직접등록').trim(),
         updated_at: new Date().toISOString()
       };
 
@@ -683,6 +731,21 @@
         if (error) throw error;
         return { success: true, id: payload.id };
       } else {
+        if (!payload.allowDuplicate && record.contract_no && record.contract_no !== 'N') {
+          const { data: dupCheck, error: dupErr } = await client
+            .from('daily_orders')
+            .select('id, contract_no, customer_name, order_date, start_date')
+            .eq('contract_no', record.contract_no)
+            .limit(1);
+          if (!dupErr && dupCheck && dupCheck.length > 0) {
+            const dupItem = dupCheck[0];
+            return {
+              success: false,
+              duplicate: true,
+              error: `이미 등록된 계약건입니다.\n- 계약번호: ${dupItem.contract_no}\n- 기존 계약처명: ${dupItem.customer_name || '미확인'}`
+            };
+          }
+        }
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
         const { data, error } = await client.from('daily_orders').insert([record]).select();
@@ -739,11 +802,17 @@
         ];
       });
 
-      if (yearMonth !== 'ALL') {
+      if (yearMonth && yearMonth !== 'ALL') {
+        const targetYM = (yearMonth.length === 7) ? yearMonth : curYM;
         rows = rows.filter(r => {
-          const cDate = r[8];
-          if (!cDate || cDate === '미정' || cDate === '해약방어') return true;
-          return cDate.slice(0, 7) >= curYM;
+          const cDate = r[8]; // 확정일 기준
+          if (!cDate || cDate === '미정' || cDate === '해약방어') return true; // 미정/해약방어는 항상 표시
+          const m = String(cDate).match(/^(\d{4})[\.\/\-](\d{1,2})/);
+          if (m) {
+            const ym = `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+            return ym >= targetYM; // 해당 년월부터 그 이후까지
+          }
+          return true;
         });
       }
 
@@ -753,30 +822,31 @@
     saveCancelRow: async function(token, payload) {
       const client = getSupabase();
       const fields = payload.fields || {};
-      const isDefended = (fields['확정일'] === '해약방어');
-      const isUnknown = (fields['확정일'] === '미정' || !fields['확정일']);
-      const confirmDateVal = (isDefended || isUnknown) ? null : fields['확정일'];
+      const rawConfirm = fields['확정일'];
+      const isDefended = (rawConfirm === '해약방어');
+      const isUnknown = (rawConfirm === '미정' || !rawConfirm);
+      const parsedConfirm = (isDefended || isUnknown) ? null : this.cleanDateVal_(rawConfirm);
       const todayYm = getTzToday().slice(0, 7);
-      const confirmYm = isDefended ? '해약방어' : (isUnknown ? '미정' : fields['확정일'].slice(0, 7));
+      const confirmYm = isDefended ? '해약방어' : (isUnknown ? '미정' : (parsedConfirm ? parsedConfirm.slice(0, 7) : this.cleanYmVal_(rawConfirm)));
       const standardVal = isDefended ? '방어' : (isUnknown ? '미정' : (confirmYm === todayYm ? '당월' : '이월'));
-      const categoryVal = (fields['해약유형'] && fields['해약유형'].indexOf('중지') !== -1) ? '중지' : '해약';
+      const categoryVal = (fields['해약유형'] && String(fields['해약유형']).indexOf('중지') !== -1) ? '중지' : '해약';
 
       const record = {
         category: categoryVal,
         standard: standardVal,
         cancel_ym: confirmYm,
-        contract_no: fields['계약번호'] || 'N',
-        customer_name: fields['계약처명'] || '',
-        rep_name: fields['영업담당'] || '',
-        car_no: fields['담당차량'] ? String(fields['담당차량']) : '',
-        receipt_date: fields['접수일'] || null,
-        confirm_date: confirmDateVal,
+        contract_no: String(fields['계약번호'] || 'N').trim(),
+        customer_name: String(fields['계약처명'] || '').trim(),
+        rep_name: String(fields['영업담당'] || '').trim(),
+        car_no: fields['담당차량'] ? String(fields['담당차량']).trim() : '',
+        receipt_date: this.cleanDateVal_(fields['접수일']),
+        confirm_date: parsedConfirm,
         monthly_fee: fields['용역료'] ? Number(String(fields['용역료']).replace(/[^0-9.-]/g, '')) : null,
-        product_name: fields['상품'] || '알람',
-        gross_type: fields['그로스'] || '일반',
-        cancel_type: fields['해약유형'] || '폐업',
-        reg_type: fields['유형'] || '직접등록',
-        cancel_reason: fields['사유'] || '',
+        product_name: String(fields['상품'] || '알람').trim(),
+        gross_type: String(fields['그로스'] || '일반').trim(),
+        cancel_type: String(fields['해약유형'] || '폐업').trim(),
+        reg_type: String(fields['유형'] || '직접등록').trim(),
+        cancel_reason: String(fields['사유'] || '').trim(),
         updated_at: new Date().toISOString()
       };
 
@@ -788,11 +858,28 @@
         if (error) throw error;
         return { success: true, id: payload.id };
       } else {
+        // 계약번호 중복 체크 (!payload.allowDuplicate)
+        if (!payload.allowDuplicate && record.contract_no && record.contract_no !== 'N') {
+          const { data: dupCheck, error: dupErr } = await client
+            .from('daily_cancels')
+            .select('id, contract_no, customer_name, receipt_date, confirm_date')
+            .eq('contract_no', record.contract_no)
+            .limit(1);
+          if (!dupErr && dupCheck && dupCheck.length > 0) {
+            const dupItem = dupCheck[0];
+            return {
+              success: false,
+              duplicate: true,
+              error: `이미 등록된 계약건입니다.\n- 계약번호: ${dupItem.contract_no}\n- 기존 계약처명: ${dupItem.customer_name || '미확인'}\n- 접수일: ${dupItem.receipt_date || '-'}`
+            };
+          }
+        }
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_cancels').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_cancels').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -840,11 +927,17 @@
         ];
       });
 
-      if (yearMonth !== 'ALL') {
+      if (yearMonth && yearMonth !== 'ALL') {
+        const targetYM = (yearMonth.length === 7) ? yearMonth : curYM;
         rows = rows.filter(r => {
-          const bDate = r[9];
-          if (!bDate || bDate === '미정') return true;
-          return bDate.slice(0, 7) >= curYM;
+          const bDate = r[9]; // 기산일 기준
+          if (!bDate || bDate === '미정') return true; // 미정은 항상 표시
+          const m = String(bDate).match(/^(\d{4})[\.\/\-](\d{1,2})/);
+          if (m) {
+            const ym = `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+            return ym >= targetYM; // 해당 년월부터 그 이후까지
+          }
+          return true;
         });
       }
 
@@ -894,9 +987,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_price_changes').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_price_changes').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -939,11 +1033,17 @@
         ];
       });
 
-      if (yearMonth !== 'ALL') {
+      if (yearMonth && yearMonth !== 'ALL') {
+        const targetYM = (yearMonth.length === 7) ? yearMonth : curYM;
         rows = rows.filter(r => {
-          const rDate = r[6];
-          if (!rDate || rDate === '미정') return true;
-          return rDate.slice(0, 7) >= curYM;
+          const rDate = r[6]; // 재개시일 기준
+          if (!rDate || rDate === '미정') return true; // 미정은 항상 표시
+          const m = String(rDate).match(/^(\d{4})[\.\/\-](\d{1,2})/);
+          if (m) {
+            const ym = `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+            return ym >= targetYM; // 해당 년월부터 그 이후까지
+          }
+          return true;
         });
       }
 
@@ -983,9 +1083,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_restarts').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_restarts').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -1054,9 +1155,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_product_reports').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_product_reports').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -1120,12 +1222,96 @@
       return { success: true, names: names.length ? names : ['최영국', '이수열', '박광춘', '정문재', '임영민'] };
     },
 
-        adminListUsers: async function(token) {
+        
+    // 표준 사용자 및 직무 코드 자동 동기화
+    syncStandardUsers: async function() {
+      const client = getSupabase();
+      if (!client) return { success: false, error: 'Supabase client unavailable' };
+      try {
+        const TARGET_USERS = [
+          { name: '최문혁', phone: '01087372485', job: 'CS관리자', role: '수정가능' },
+          { name: '이재식', phone: '01028541559', job: 'CS관리자', role: '수정가능' },
+          { name: '원종범', phone: '01042827968', job: 'CS관리자', role: '수정가능' },
+          { name: '강창우', phone: '01053918289', job: '본사관리자', role: '메인마스터' },
+          { name: '윤영환', phone: '01051034449', job: '본사스탭', role: '수정가능' },
+          { name: '김대진', phone: '01092952696', job: '본사스탭', role: '수정가능' },
+          { name: '김대영', phone: '01087477150', job: '본사스탭', role: '수정가능' },
+          { name: '심정환', phone: '01027042545', job: '지사관리자', role: '메인마스터' }
+        ];
+
+        const { data: existing, error } = await client.from('app_users').select('*');
+        if (error || !existing) return { success: false, error: error };
+
+        const LEGACY_JOB_MAP = {
+          '서비스(CS)': 'CS관리자',
+          '매니저(관리자)': '본사관리자',
+          'Staff(지원)': '본사스탭',
+          '스탭': '본사스탭',
+          '컨설턴트(영업)': '컨설턴트',
+          '엔지니어(기술)': '기술사원'
+        };
+
+        // 1) 레거시 직무 문자열 일괄 변환
+        for (const u of existing) {
+          if (u.job && LEGACY_JOB_MAP[u.job]) {
+            await client.from('app_users').update({ job: LEGACY_JOB_MAP[u.job] }).eq('id', u.id);
+          }
+        }
+
+        // 2) 8인 핵심 사용자 직무 및 권한 확정 반영
+        for (const target of TARGET_USERS) {
+          const cleanP = target.phone.replace(/[^0-9]/g, '');
+          const pNoZero = cleanP.startsWith('0') ? cleanP.slice(1) : cleanP;
+          const searchPhones = [target.phone, cleanP, pNoZero, '0' + pNoZero];
+
+          const found = existing.find(u => {
+            const uP = String(u.phone || '').replace(/[^0-9]/g, '');
+            return searchPhones.includes(uP) || u.name === target.name;
+          });
+
+          if (found) {
+            const needJobUpdate = found.job !== target.job;
+            const needRoleUpdate = target.role === '메인마스터' && found.role !== '메인마스터';
+            if (needJobUpdate || needRoleUpdate) {
+              await client.from('app_users').update({
+                job: target.job,
+                role: (target.role === '메인마스터') ? '메인마스터' : (found.role || target.role)
+              }).eq('id', found.id);
+            }
+          } else {
+            // 없는 경우 기본 해시(전화번호 뒤 4자리)로 신규 등록
+            const last4 = cleanP.slice(-4);
+            const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cleanP + ':' + last4));
+            const defHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+            await client.from('app_users').insert([{
+              name: target.name,
+              phone: target.phone,
+              job: target.job,
+              role: target.role,
+              hash: defHash
+            }]);
+          }
+        }
+        return { success: true };
+      } catch(e) {
+        console.warn('syncStandardUsers notice:', e);
+        return { success: false, error: String(e) };
+      }
+    },
+
+    adminListUsers: async function(token) {
+      await this.syncStandardUsers();
       const client = getSupabase();
       const { data: rawUsers, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
       if (error) throw error;
 
-      // 1. 로그인 로그에서 사용자별 최신 접속기록 추출
+      // 1. 로그인 로그에서 사용자별 최신 접속기록 추출 (전화번호 형태 유연 정규화)
+      function normP_(raw) {
+        let s = String(raw || '').replace(/[^0-9]/g, '');
+        if (s.startsWith('10')) s = '0' + s;
+        return s;
+      }
+
       const logsByPhone = {};
       const logsByName = {};
       try {
@@ -1133,13 +1319,13 @@
           .from('login_logs')
           .select('phone, name, browser, device_type, created_at')
           .order('created_at', { ascending: false })
-          .limit(500);
+          .limit(1000);
 
         if (logs && logs.length) {
           logs.forEach(l => {
-            const p = String(l.phone || '').trim();
+            const np = normP_(l.phone);
             const n = String(l.name || '').trim();
-            if (p && !logsByPhone[p]) logsByPhone[p] = l;
+            if (np && !logsByPhone[np]) logsByPhone[np] = l;
             if (n && !logsByName[n]) logsByName[n] = l;
           });
         }
@@ -1160,7 +1346,7 @@
           hbSettings.forEach(s => {
             try {
               const val = JSON.parse(s.setting_value);
-              if (val && val.phone) heartbeatsByPhone[String(val.phone).trim()] = val;
+              if (val && val.phone) heartbeatsByPhone[normP_(val.phone)] = val;
               if (val && val.name) heartbeatsByName[String(val.name).trim()] = val;
             } catch(err){}
           });
@@ -1190,14 +1376,31 @@
       }
 
       const users = (rawUsers || []).map(u => {
-        const p = String(u.phone || '').trim();
+        const np = normP_(u.phone);
         const n = String(u.name || '').trim();
-        const log = logsByPhone[p] || logsByName[n] || {};
-        const hb = heartbeatsByPhone[p] || heartbeatsByName[n] || null;
+        const log = logsByPhone[np] || logsByName[n] || {};
+        const hb = heartbeatsByPhone[np] || heartbeatsByName[n] || null;
 
-        // 최근접속일시: 최신 login_logs 또는 app_users 또는 하트비트
-        const rawLoginAt = (log && log.created_at) || u.last_login_at || (hb && hb.login_at) || null;
-        const recentLoginStr = toKstStr(rawLoginAt) || toKstStr(u.created_at);
+        // 최근접속일시: 모든 소스(login_logs, app_users.last_login_at, heartbeats) 중 가장 최신 타임스탬프 채택
+        const candidates = [
+          log && log.created_at,
+          u.last_login_at,
+          hb && hb.login_at,
+          hb && hb.ping_at
+        ].filter(Boolean);
+
+        let latestTs = null;
+        candidates.forEach(ts => {
+          const d = new Date(ts);
+          if (!isNaN(d.getTime())) {
+            if (!latestTs || d.getTime() > latestTs.getTime()) {
+              latestTs = d;
+            }
+          }
+        });
+
+        const rawLoginAt = latestTs || null;
+        const recentLoginStr = latestTs ? toKstStr(latestTs) : (toKstStr(u.created_at) || '-');
 
         // 접속기기: log 또는 hb 또는 u
         const browser = (log && log.browser) || (hb && hb.browser) || u.browser || '-';
@@ -1220,7 +1423,7 @@
             sessionEndTimeStr = toKstStr(endD);
           }
         } else if (rawLoginAt) {
-          const loginTime = new Date(rawLoginAt).getTime();
+          const loginTime = (rawLoginAt instanceof Date) ? rawLoginAt.getTime() : new Date(rawLoginAt).getTime();
           if (!isNaN(loginTime)) {
             const diff = nowMs - loginTime;
             if (diff >= 0 && diff < SESSION_TTL_MS) {
