@@ -1381,6 +1381,7 @@
           }
         });
 
+        const rawLoginAt = latestTs || null;
         const recentLoginStr = latestTs ? toKstStr(latestTs) : (toKstStr(u.created_at) || '-');
 
         // 접속기기: log 또는 hb 또는 u
@@ -1404,7 +1405,7 @@
             sessionEndTimeStr = toKstStr(endD);
           }
         } else if (rawLoginAt) {
-          const loginTime = new Date(rawLoginAt).getTime();
+          const loginTime = (rawLoginAt instanceof Date) ? rawLoginAt.getTime() : new Date(rawLoginAt).getTime();
           if (!isNaN(loginTime)) {
             const diff = nowMs - loginTime;
             if (diff >= 0 && diff < SESSION_TTL_MS) {
