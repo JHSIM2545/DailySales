@@ -856,9 +856,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_cancels').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_cancels').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -969,9 +970,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_price_changes').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_price_changes').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -1067,9 +1069,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_restarts').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_restarts').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -1138,9 +1141,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_product_reports').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_product_reports').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -4172,7 +4176,7 @@ function submitDateEdit_(){
  btn.disabled = false; btn.innerText = '저장';  
  if (!res || !res.success) { errEl.innerText = '저장 실패: ' + ((res && res.error) || '알 수 없는 오류'); return; }  
  applyDateEditLocally_(ctx.scope, ctx.id, ctx.field, parsed);  
- closeDateEditModal_();  
+ closeDateEditModal_(); onDataChanged_(ctx.scope);  
  })  
  .withFailureHandler(function(err){  
  btn.disabled = false; btn.innerText = '저장';  
@@ -4235,11 +4239,147 @@ const SCOPE_OWN_CACHE_KEYS_ = {
  restart: ['restartData_', 'restartData_ALL'],  
  productdaily: ['productDailyData']  
 };  
+
+function clearAllAggregateCaches_(scope){
+  if (typeof CLIENT_CACHE_ === 'object') {
+    Object.keys(CLIENT_CACHE_).forEach(function(k){
+      if (k.indexOf('dash|') === 0 ||
+          k.indexOf('salesStatus|') === 0 ||
+          k.indexOf('dailyReport|') === 0 ||
+          k.indexOf('extraProduct|') === 0 ||
+          k.indexOf('safetySummaryDaily|') === 0 ||
+          k.indexOf('bizTeamStatus') === 0) {
+        delete CLIENT_CACHE_[k];
+      }
+      if (scope) {
+        if (scope === 'order' && k.indexOf('orderStartData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'cancel' && k.indexOf('cancelData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'price' && k.indexOf('priceData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'restart' && k.indexOf('restartData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'productdaily' && k.indexOf('productDailyData') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'target' && k.indexOf('targetInput|') === 0) delete CLIENT_CACHE_[k];
+      }
+    });
+  }
+  DASH_DATA = null;
+  SALES_STATUS_LATEST_ = null;
+  if (typeof SCOPE_LOADED_ === 'object' && scope && scope in SCOPE_LOADED_) {
+    SCOPE_LOADED_[scope] = false;
+  }
+}
+
+/** 데이터 등록, 수정, 삭제 즉시 호출되어 전체 집계 캐시를 비우고 영업현황/대시보드/일일실적보고를 실시간 갱신 */
+function onDataChanged_(scope){
+  clearAllAggregateCaches_(scope);
+
+  // 1. 현재 화면이 대시보드 / 영업현황 / 일일실적보고라면 즉시 화면 재조회 & 렌더링
+  if (currentTab === 'dashboard') {
+    if (typeof loadDashboard === 'function') loadDashboard();
+  } else if (currentTab === 'sales_status') {
+    if (typeof loadSalesStatus === 'function') loadSalesStatus();
+  } else if (currentTab === 'daily_report') {
+    if (typeof loadDailyReport === 'function') loadDailyReport();
+  }
+
+  // 2. 영업현황 팝업(📊)이 열려있다면 즉시 최신 데이터 다시 받아 팝업 갱신
+  const popup = document.getElementById('salesStatusPopupOverlay');
+  if (popup && popup.classList.contains('open')) {
+    if (typeof fetchSalesStatusForCurrentMode_ === 'function') {
+      fetchSalesStatusForCurrentMode_(function(res){
+        if (res && res.success) {
+          SALES_STATUS_LATEST_ = res;
+          renderSalesStatusPopupBody_(res);
+        }
+      });
+    } else {
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (res && res.success) {
+            SALES_STATUS_LATEST_ = res;
+            renderSalesStatusPopupBody_(res);
+          }
+        })
+        .getSalesStatus(SESSION.token, statusYearMonth, statusProductFilter);
+    }
+  }
+
+  // 3. 백그라운드 사전 갱신(Prewarm) 즉시 실행
+  scheduleDependentCachesRefresh_(true);
+
+  // 4. 크로스 브라우저 탭/창 실시간 브로드캐스트 동기화
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      new BroadcastChannel('s1_sales_sync_channel').postMessage({ type: 'DATA_CHANGED', scope: scope, ts: Date.now() });
+    }
+  } catch(e) {}
+}
+
 function invalidateScopeCache_(scope){  
- (SCOPE_OWN_CACHE_KEYS_[scope] || []).forEach(function(k){ delete CLIENT_CACHE_[k]; });  
- if (scope in SCOPE_LOADED_) SCOPE_LOADED_[scope] = false;  
+  onDataChanged_(scope);
 }  
-function invalidateScopeCacheQuiet_(scope){ invalidateScopeCache_(scope); }  
+function invalidateScopeCacheQuiet_(scope){ invalidateScopeCache_(scope); }
+
+let DEPENDENT_REFRESH_TIMER_ = null;
+function scheduleDependentCachesRefresh_(immediate){
+  if (DEPENDENT_REFRESH_TIMER_) clearTimeout(DEPENDENT_REFRESH_TIMER_);
+  const delay = immediate ? 50 : 300;
+  DEPENDENT_REFRESH_TIMER_ = setTimeout(function(){
+    DEPENDENT_REFRESH_TIMER_ = null;
+    if (!SESSION || !SESSION.token) return;
+    refreshDashboardInBackground_();
+    refreshDailyReportInBackground_();
+    google.script.run
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) return;
+        SALES_STATUS_LATEST_ = res;
+        cacheSet_('salesStatus|' + statusYearMonth + '|' + statusProductFilter, res);
+        const overlay = document.getElementById('salesStatusPopupOverlay');
+        if (overlay && overlay.classList.contains('open')) renderSalesStatusPopupBody_(res);
+        if (currentTab === 'sales_status') applySalesStatusResult_(res);
+      })
+      .withFailureHandler(function(){})
+      .getSalesStatus(SESSION.token, statusYearMonth, statusProductFilter);
+  }, delay);
+}
+
+function refreshDashboardInBackground_(){  
+  const cacheKey = 'dash|' + DASH_YM + '|' + DASH_CATEGORY;  
+  google.script.run  
+  .withSuccessHandler(function(bundle){  
+    if (!bundle || !bundle.success) return;  
+    const results = { status: bundle.status, working: bundle.working, order: bundle.order, cancel: bundle.cancel, priceUp: bundle.priceUp, priceDown: bundle.priceDown };  
+    cacheSet_(cacheKey, results);  
+    if (currentTab === 'dashboard') { DASH_DATA = results; renderDashboard(); }  
+  })  
+  .withFailureHandler(function(){})  
+  .getDashboardBundle(SESSION.token, DASH_YM, DASH_CATEGORY);  
+}
+
+function refreshDailyReportInBackground_(){  
+  google.script.run  
+  .withSuccessHandler(function(res){  
+    if (!res || !res.success) return;  
+    cacheSet_('dailyReport|' + dailyReportDate, res);  
+    if (currentTab === 'daily_report') { applyDailyReportResult_(res); renderDailyReport(); }  
+  })  
+  .withFailureHandler(function(){})  
+  .getDailyReportAuto(SESSION.token, dailyReportDate);  
+}
+
+// 다중 탭/창 실시간 동기화 리스너 등록
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    const syncCh = new BroadcastChannel('s1_sales_sync_channel');
+    syncCh.onmessage = function(ev) {
+      if (ev && ev.data && ev.data.type === 'DATA_CHANGED') {
+        clearAllAggregateCaches_(ev.data.scope);
+        if (currentTab === 'dashboard') loadDashboard();
+        else if (currentTab === 'sales_status') loadSalesStatus();
+        else if (currentTab === 'daily_report') loadDailyReport();
+      }
+    };
+  }
+} catch(e) {}  
 let DATA_VERSION_INITED_ = false;  
 const LAST_SEEN_SHEET_VERSION_ = { order: 0, cancel: 0, price: 0, restart: 0, productdaily: 0 };  
 // 지금 보고 있는 화면과 관련된 시트인데 아직 반영하지 않은(=수동 새로고침 버튼 대상) scope 목록  
@@ -5901,7 +6041,7 @@ function pushSave(row){
  if (res && res.success) {  
  row._unsynced = false;  
  row._syncError = false;  
- setSyncStatus('ok');  
+ setSyncStatus('ok'); onDataChanged_('order');  
  } else {  
  row._syncError = true;  
  setSyncStatus('error', res && res.error);  
@@ -5960,7 +6100,7 @@ function deleteRow(id){
  google.script.run  
  .withSuccessHandler(function(res){  
  if (res && res.success) {  
- setSyncStatus('ok');  
+ setSyncStatus('ok'); onDataChanged_('order');  
  } else {  
  ROWS.splice(idx, 0, removed);  
  setSyncStatus('error', res && res.error);  
@@ -6097,7 +6237,7 @@ function submitNewRow(){
  if (res && res.success) {  
  tempRow.id = res.id;  
  tempRow._unsynced = false;  
- setSyncStatus('ok');  
+ setSyncStatus('ok'); onDataChanged_('order');  
  } else {  
  ROWS = ROWS.filter(r => r.id !== tempId);  
  setSyncStatus('error', res && res.error);  
@@ -6312,7 +6452,7 @@ function pushSaveCancel(row){
  CANCEL_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('cancel'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  renderCancel();  
  })  
@@ -6419,7 +6559,7 @@ function submitNewCancelRow(){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('cancel'); }  
  else { CANCEL_ROWS = CANCEL_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  renderCancel();  
  })  
@@ -6646,7 +6786,7 @@ function pushSavePrice(row){
  PRICE_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('price'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  renderPrice();  
  })  
@@ -6766,7 +6906,7 @@ function submitNewPriceRow(){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('price'); }  
  else { PRICE_ROWS = PRICE_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  renderPrice();  
  })  
@@ -7265,7 +7405,7 @@ function pushSaveRestart(row){
  RESTART_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('restart'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  renderRestart();  
  })  
@@ -7370,7 +7510,7 @@ function submitNewRestartRow(){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('restart'); }  
  else { RESTART_ROWS = RESTART_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  renderRestart();  
  })  

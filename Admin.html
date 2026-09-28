@@ -836,9 +836,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_cancels').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_cancels').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -949,9 +950,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_price_changes').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_price_changes').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -1047,9 +1049,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_restarts').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_restarts').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -1118,9 +1121,10 @@
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
-        const { data, error } = await client.from('daily_product_reports').insert([record]).select('id').single();
+        const { data, error } = await client.from('daily_product_reports').insert([record]).select();
         if (error) throw error;
-        return { success: true, id: String(data.id) };
+        const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+        return { success: true, id: newId };
       }
     },
 
@@ -4723,29 +4727,103 @@ const SCOPE_OWN_CACHE_KEYS_ = {
  * 자동등록(영업보고/가중지보고 확인)처럼 화면 밖에서 데이터가 바뀌는 경우에만 invalidateScopeCache_가  
  * 이 값을 false로 되돌려 다음 방문 때 실제로 다시 불러오게 한다. */  
 const SCOPE_LOADED_ = { order: false, cancel: false, price: false, restart: false, productdaily: false };  
+
+function clearAllAggregateCaches_(scope){
+  if (typeof CLIENT_CACHE_ === 'object') {
+    Object.keys(CLIENT_CACHE_).forEach(function(k){
+      if (k.indexOf('dash|') === 0 ||
+          k.indexOf('salesStatus|') === 0 ||
+          k.indexOf('dailyReport|') === 0 ||
+          k.indexOf('extraProduct|') === 0 ||
+          k.indexOf('safetySummaryDaily|') === 0 ||
+          k.indexOf('bizTeamStatus') === 0) {
+        delete CLIENT_CACHE_[k];
+      }
+      if (scope) {
+        if (scope === 'order' && k.indexOf('orderStartData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'cancel' && k.indexOf('cancelData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'price' && k.indexOf('priceData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'restart' && k.indexOf('restartData_') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'productdaily' && k.indexOf('productDailyData') === 0) delete CLIENT_CACHE_[k];
+        if (scope === 'target' && k.indexOf('targetInput|') === 0) delete CLIENT_CACHE_[k];
+      }
+    });
+  }
+  DASH_DATA = null;
+  SALES_STATUS_LATEST_ = null;
+  if (typeof SCOPE_LOADED_ === 'object' && scope && scope in SCOPE_LOADED_) {
+    SCOPE_LOADED_[scope] = false;
+  }
+}
+
+/** 데이터 등록, 수정, 삭제 즉시 호출되어 전체 집계 캐시를 비우고 영업현황/대시보드/일일실적보고를 실시간 갱신 */
+function onDataChanged_(scope){
+  clearAllAggregateCaches_(scope);
+
+  // 1. 현재 화면이 대시보드 / 영업현황 / 일일실적보고라면 즉시 화면 재조회 & 렌더링
+  if (currentTab === 'dashboard') {
+    if (typeof loadDashboard === 'function') loadDashboard();
+  } else if (currentTab === 'sales_status') {
+    if (typeof loadSalesStatus === 'function') loadSalesStatus();
+  } else if (currentTab === 'daily_report') {
+    if (typeof loadDailyReport === 'function') loadDailyReport();
+  }
+
+  // 2. 영업현황 팝업(📊)이 열려있다면 즉시 최신 데이터 다시 받아 팝업 갱신
+  const popup = document.getElementById('salesStatusPopupOverlay');
+  if (popup && popup.classList.contains('open')) {
+    if (typeof fetchSalesStatusForCurrentMode_ === 'function') {
+      fetchSalesStatusForCurrentMode_(function(res){
+        if (res && res.success) {
+          SALES_STATUS_LATEST_ = res;
+          renderSalesStatusPopupBody_(res);
+        }
+      });
+    }
+  }
+
+  // 3. 백그라운드 사전 갱신(Prewarm) 즉시 실행
+  scheduleDependentCachesRefresh_(true);
+
+  // 4. 크로스 브라우저 탭/창 실시간 브로드캐스트 동기화
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      new BroadcastChannel('s1_sales_sync_channel').postMessage({ type: 'DATA_CHANGED', scope: scope, ts: Date.now() });
+    }
+  } catch(e) {}
+}
+
 function invalidateScopeCache_(scope){  
- if (scope === 'target') {  
- delete CLIENT_CACHE_['targetInput|' + targetYearMonth];  
- } else {  
- (SCOPE_OWN_CACHE_KEYS_[scope] || []).forEach(function(k){ delete CLIENT_CACHE_[k]; });  
- if (scope in SCOPE_LOADED_) SCOPE_LOADED_[scope] = false;  
- }  
- scheduleDependentCachesRefresh_();  
+  onDataChanged_(scope);
 }  
+
 let DEPENDENT_REFRESH_TIMER_ = null;  
-/** 종합대시보드/영업현황/일일실적보고만 백그라운드에서 다시 계산해 캐시에 채워둔다. 여러 필드가  
- * 연달아 바뀔 때 매번 서버를 부르지 않도록 짧게 묶어서 한 번만 실행하며, 지금 보고 있는 화면이면  
- * 다시 불러오지 않고도 화면에 바로 반영한다. */  
-function scheduleDependentCachesRefresh_(){  
- if (DEPENDENT_REFRESH_TIMER_) clearTimeout(DEPENDENT_REFRESH_TIMER_);  
- DEPENDENT_REFRESH_TIMER_ = setTimeout(function(){  
- DEPENDENT_REFRESH_TIMER_ = null;  
- if (!SESSION || !SESSION.token) return;  
- refreshDashboardInBackground_();  
- refreshDailyReportInBackground_();  
- }, 1500);  
- scheduleSalesStatusBackgroundRefresh_(); // 영업현황은 시뮬레이션 인지 등 기존 로직을 그대로 재사용  
-}  
+function scheduleDependentCachesRefresh_(immediate){  
+  if (DEPENDENT_REFRESH_TIMER_) clearTimeout(DEPENDENT_REFRESH_TIMER_);  
+  const delay = immediate ? 50 : 300;  
+  DEPENDENT_REFRESH_TIMER_ = setTimeout(function(){  
+    DEPENDENT_REFRESH_TIMER_ = null;  
+    if (!SESSION || !SESSION.token) return;  
+    if (typeof refreshDashboardInBackground_ === 'function') refreshDashboardInBackground_();  
+    if (typeof refreshDailyReportInBackground_ === 'function') refreshDailyReportInBackground_();  
+    if (typeof scheduleSalesStatusBackgroundRefresh_ === 'function') scheduleSalesStatusBackgroundRefresh_();
+  }, delay);  
+}
+
+// 다중 탭/창 실시간 동기화 리스너 등록
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    const syncCh = new BroadcastChannel('s1_sales_sync_channel');
+    syncCh.onmessage = function(ev) {
+      if (ev && ev.data && ev.data.type === 'DATA_CHANGED') {
+        clearAllAggregateCaches_(ev.data.scope);
+        if (currentTab === 'dashboard') loadDashboard();
+        else if (currentTab === 'sales_status') loadSalesStatus();
+        else if (currentTab === 'daily_report') loadDailyReport();
+      }
+    };
+  }
+} catch(e) {}  
 /** 종합대시보드를 백그라운드에서 다시 계산해 캐시를 갱신. 지금 대시보드를 보고 있으면 화면도 즉시 갱신. */  
 function refreshDashboardInBackground_(){  
  const cacheKey = 'dash|' + DASH_YM + '|' + DASH_CATEGORY;  
@@ -7769,7 +7847,7 @@ function pushSave(row){
  EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  if (!updateRowSyncClassOnly_(row, 'order')) render();  
  })  
@@ -7819,11 +7897,11 @@ function deleteRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('order'); }  
  else { ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); render(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ ROWS.splice(idx, 0, removed); setSyncStatus('error', err); render(); alert('삭제 실패: ' + err); })  
- .deleteOrderStartRow(SESSION.token, id);  
+ /* delete order */ .deleteOrderStartRow(SESSION.token, id);  
 }  
   
 /* ===================== 신규 등록 ===================== */  
@@ -7965,7 +8043,7 @@ function saveNewOrderStartRow_(fields, allowDuplicate){
  const payload = allowDuplicate ? { id: null, fields: fields, allowDuplicate: true } : { id: null, fields: fields };  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); render(); return; }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); render(); onDataChanged_('order'); return; }  
  ROWS = ROWS.filter(r => r.id !== tempId); render();  
  if (res && res.duplicate) {  
  setSyncStatus('idle');  
@@ -8202,7 +8280,7 @@ function pushSaveCancel(row){
  CANCEL_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  if (!updateRowSyncClassOnly_(row, 'cancel')) renderCancel();  
  })  
@@ -8228,11 +8306,11 @@ function deleteCancelGridRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('cancel'); }  
  else { CANCEL_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderCancel(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ CANCEL_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderCancel(); alert('삭제 실패: ' + err); })  
- .deleteCancelRow(SESSION.token, id);  
+ /* delete cancel */ .deleteCancelRow(SESSION.token, id);  
 }  
   
 /* ---- 해약중지 신규 등록 모달 ---- */  
@@ -8375,7 +8453,7 @@ function saveNewCancelRow_(fields, allowDuplicate){
  const payload = allowDuplicate ? { id: null, fields: fields, allowDuplicate: true } : { id: null, fields: fields };  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); renderCancel(); return; }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); renderCancel(); onDataChanged_('cancel'); return; }  
  CANCEL_ROWS = CANCEL_ROWS.filter(r => r.id !== tempId); renderCancel();  
  if (res && res.duplicate) {  
  setSyncStatus('idle');  
@@ -8642,7 +8720,7 @@ function pushSavePrice(row){
  PRICE_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  if (!updateRowSyncClassOnly_(row, 'price')) renderPrice();  
  })  
@@ -8668,7 +8746,7 @@ function deletePriceGridRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('price'); }  
  else { PRICE_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderPrice(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ PRICE_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderPrice(); alert('삭제 실패: ' + err); })  
@@ -8779,7 +8857,7 @@ function saveNewPriceRow_(fields, allowDuplicate){
  const payload = allowDuplicate ? { id: null, fields: fields, allowDuplicate: true } : { id: null, fields: fields };  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); renderPrice(); return; }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); renderPrice(); onDataChanged_('price'); return; }  
  PRICE_ROWS = PRICE_ROWS.filter(r => r.id !== tempId); renderPrice();  
  if (res && res.duplicate) {  
  setSyncStatus('idle');  
@@ -8969,7 +9047,7 @@ function pushSaveRestart(row){
  RESTART_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); }  
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
  if (!updateRowSyncClassOnly_(row, 'restart')) renderRestart();  
  })  
@@ -8995,7 +9073,7 @@ function deleteRestartGridRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('restart'); }  
  else { RESTART_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderRestart(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ RESTART_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderRestart(); alert('삭제 실패: ' + err); })  
@@ -9090,7 +9168,7 @@ function submitNewRestartRow(){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); }  
+ if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('restart'); }  
  else { RESTART_ROWS = RESTART_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  renderRestart();  
  })  
@@ -9545,7 +9623,7 @@ function deleteProductDailyRow(id){
   google.script.run  
     .withSuccessHandler(function(res){  
       if (res && res.success) {
-        setSyncStatus('ok');
+        setSyncStatus('ok'); onDataChanged_('productdaily');
         loadProductDailySummaryTarget_(function(){ renderProductDaily(); });
       } else { 
         PRODUCT_DAILY_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderProductDaily(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); 
@@ -11041,7 +11119,7 @@ function saveDoorcamData_(){
       setLoadingCursor(false);
       alert('AI도어캠 실적이 성공적으로 저장되었습니다.');
       delete CLIENT_CACHE_['extraProduct|' + dailyReportDate];
-      loadDailyReport();
+      loadDailyReport(); onDataChanged_('daily_report');
     })
     .withFailureHandler(function(err){
       setLoadingCursor(false);
