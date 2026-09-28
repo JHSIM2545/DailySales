@@ -10,6 +10,13 @@
         var s = sessionStorage.getItem('s1_admin_session_v1') || sessionStorage.getItem('s1_session_v1');
         if (!s) {
           window.location.replace('Login.html');
+        } else {
+          var parsed = JSON.parse(s);
+          if (parsed && parsed.job === 'CS근무자') {
+            alert('시스템 접속 권한이 없습니다\n담당자에게 문의해 주세요');
+            sessionStorage.clear();
+            window.location.replace('Login.html');
+          }
         }
       } catch(e) {
         window.location.replace('Login.html');
@@ -1280,7 +1287,13 @@
       const { data: rawUsers, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
       if (error) throw error;
 
-      // 1. 로그인 로그에서 사용자별 최신 접속기록 추출
+      // 1. 로그인 로그에서 사용자별 최신 접속기록 추출 (전화번호 형태 유연 정규화)
+      function normP_(raw) {
+        let s = String(raw || '').replace(/[^0-9]/g, '');
+        if (s.startsWith('10')) s = '0' + s;
+        return s;
+      }
+
       const logsByPhone = {};
       const logsByName = {};
       try {
@@ -1288,13 +1301,13 @@
           .from('login_logs')
           .select('phone, name, browser, device_type, created_at')
           .order('created_at', { ascending: false })
-          .limit(500);
+          .limit(1000);
 
         if (logs && logs.length) {
           logs.forEach(l => {
-            const p = String(l.phone || '').trim();
+            const np = normP_(l.phone);
             const n = String(l.name || '').trim();
-            if (p && !logsByPhone[p]) logsByPhone[p] = l;
+            if (np && !logsByPhone[np]) logsByPhone[np] = l;
             if (n && !logsByName[n]) logsByName[n] = l;
           });
         }
@@ -1315,7 +1328,7 @@
           hbSettings.forEach(s => {
             try {
               const val = JSON.parse(s.setting_value);
-              if (val && val.phone) heartbeatsByPhone[String(val.phone).trim()] = val;
+              if (val && val.phone) heartbeatsByPhone[normP_(val.phone)] = val;
               if (val && val.name) heartbeatsByName[String(val.name).trim()] = val;
             } catch(err){}
           });
@@ -1345,14 +1358,30 @@
       }
 
       const users = (rawUsers || []).map(u => {
-        const p = String(u.phone || '').trim();
+        const np = normP_(u.phone);
         const n = String(u.name || '').trim();
-        const log = logsByPhone[p] || logsByName[n] || {};
-        const hb = heartbeatsByPhone[p] || heartbeatsByName[n] || null;
+        const log = logsByPhone[np] || logsByName[n] || {};
+        const hb = heartbeatsByPhone[np] || heartbeatsByName[n] || null;
 
-        // 최근접속일시: 최신 login_logs 또는 app_users 또는 하트비트
-        const rawLoginAt = (log && log.created_at) || u.last_login_at || (hb && hb.login_at) || null;
-        const recentLoginStr = toKstStr(rawLoginAt) || toKstStr(u.created_at);
+        // 최근접속일시: 모든 소스(login_logs, app_users.last_login_at, heartbeats) 중 가장 최신 타임스탬프 채택
+        const candidates = [
+          log && log.created_at,
+          u.last_login_at,
+          hb && hb.login_at,
+          hb && hb.ping_at
+        ].filter(Boolean);
+
+        let latestTs = null;
+        candidates.forEach(ts => {
+          const d = new Date(ts);
+          if (!isNaN(d.getTime())) {
+            if (!latestTs || d.getTime() > latestTs.getTime()) {
+              latestTs = d;
+            }
+          }
+        });
+
+        const recentLoginStr = latestTs ? toKstStr(latestTs) : (toKstStr(u.created_at) || '-');
 
         // 접속기기: log 또는 hb 또는 u
         const browser = (log && log.browser) || (hb && hb.browser) || u.browser || '-';
@@ -8571,6 +8600,11 @@ function renderLoggedInUser_(name, role){
 
 /* ===================== 초기화 ===================== */
 SESSION = loadSession();
+if (SESSION && SESSION.job === 'CS근무자') {
+  alert('시스템 접속 권한이 없습니다\n담당자에게 문의해 주세요');
+  try { sessionStorage.clear(); } catch(e) {}
+  window.location.replace('Login.html');
+}
 if (SESSION && SESSION.token) {
   loadUserFlags_();
   hideLogin();
