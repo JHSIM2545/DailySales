@@ -699,36 +699,78 @@
       return { headers: HEADERS, rows: rows };
     },
 
+    // 날짜 및 년월 안전 정규화 헬퍼 (한국형 날짜 문자열 완벽 처리)
+    cleanDateVal_: function(v) {
+      if (!v) return null;
+      const s = String(v).trim();
+      if (s === '미정' || s === '해약방어') return s;
+      const m1 = s.match(/^(\d{4})\s*[\.\/\-]\s*(\d{1,2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m1) {
+        return `${m1[1]}-${String(m1[2]).padStart(2, '0')}-${String(m1[3]).padStart(2, '0')}`;
+      }
+      const m2 = s.match(/^(\d{2})\s*[\.\/\-]\s*(\d{1,2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m2) {
+        return `20${m2[1]}-${String(m2[2]).padStart(2, '0')}-${String(m2[3]).padStart(2, '0')}`;
+      }
+      const m3 = s.match(/^(\d{1,2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m3) {
+        const curY = new Date().getFullYear();
+        return `${curY}-${String(m3[1]).padStart(2, '0')}-${String(m3[2]).padStart(2, '0')}`;
+      }
+      return null;
+    },
+
+    cleanYmVal_: function(v) {
+      if (!v) return '';
+      const s = String(v).trim();
+      if (s === '미정' || s === '해약방어') return s;
+      const d = this.cleanDateVal_(s);
+      if (d && d !== '미정' && d !== '해약방어') return d.slice(0, 7);
+      const m1 = s.match(/^(\d{4})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m1) return `${m1[1]}-${String(m1[2]).padStart(2, '0')}`;
+      const m2 = s.match(/^(\d{2})\s*[\.\/\-]\s*(\d{1,2})/);
+      if (m2) return `20${m2[1]}-${String(m2[2]).padStart(2, '0')}`;
+      return s;
+    },
+
     saveOrderStartRow: async function(token, payload) {
       const client = getSupabase();
       const fields = payload.fields || {};
-      const isStartUnknown = (fields['개시일'] === '미정' || !fields['개시일']);
-      const isBillingUnknown = (fields['기산일'] === '미정' || !fields['기산일']);
+      const rawStart = fields['개시일'];
+      const rawBilling = fields['기산일'];
+      const isStartUnknown = (rawStart === '미정' || !rawStart);
+      const isBillingUnknown = (rawBilling === '미정' || !rawBilling);
+      const parsedStart = isStartUnknown ? null : this.cleanDateVal_(rawStart);
+      const parsedBilling = isBillingUnknown ? null : this.cleanDateVal_(rawBilling);
+      const parsedContract = this.cleanDateVal_(fields['계약일']);
+      const parsedReport = this.cleanDateVal_(fields['보고일']);
+
       const today = getTzToday();
       const todayYm = today.slice(0, 7);
-      const startYm = isStartUnknown ? '미정' : fields['개시일'].slice(0, 7);
-      const billingYm = isBillingUnknown ? '미정' : fields['기산일'].slice(0, 7);
+      const startYm = isStartUnknown ? '미정' : (parsedStart ? parsedStart.slice(0, 7) : this.cleanYmVal_(rawStart));
+      const billingYm = isBillingUnknown ? '미정' : (parsedBilling ? parsedBilling.slice(0, 7) : this.cleanYmVal_(rawBilling));
+      const orderYm = parsedContract ? parsedContract.slice(0, 7) : this.cleanYmVal_(fields['계약일']);
 
       const record = {
         start_status: isBillingUnknown ? '미정' : (billingYm > todayYm ? '예정' : '확정'),
-        order_ym: fields['계약일'] ? fields['계약일'].slice(0, 7) : '',
+        order_ym: orderYm,
         start_ym: startYm,
         carry_over: isStartUnknown ? '미정' : (startYm === todayYm ? '당월' : '이월'),
-        category: isBillingUnknown ? '미개시' : (fields['기산일'] < today ? '개시' : '미개시'),
-        contract_no: fields['계약번호'] || 'N',
-        customer_name: fields['계약처명'] || '',
-        rep_name: fields['영업담당'] || '',
-        sales_motive: fields['영업동기'] || '',
-        car_no: fields['담당차량'] ? String(fields['담당차량']) : '',
-        report_date: fields['보고일'] || null,
-        contract_date: fields['계약일'] || null,
-        start_date: isStartUnknown ? null : fields['개시일'],
-        billing_date: isBillingUnknown ? null : fields['기산일'],
+        category: isBillingUnknown ? '미개시' : ((parsedBilling && parsedBilling < today) ? '개시' : '미개시'),
+        contract_no: String(fields['계약번호'] || 'N').trim(),
+        customer_name: String(fields['계약처명'] || '').trim(),
+        rep_name: String(fields['영업담당'] || '').trim(),
+        sales_motive: String(fields['영업동기'] || '').trim(),
+        car_no: fields['담당차량'] ? String(fields['담당차량']).trim() : '',
+        report_date: parsedReport,
+        contract_date: parsedContract,
+        start_date: parsedStart,
+        billing_date: parsedBilling,
         monthly_fee: fields['용역료'] ? Number(String(fields['용역료']).replace(/[^0-9.-]/g, '')) : null,
-        product_name: fields['상품'] || '알람',
-        gross_type: fields['그로스'] || '일반',
-        note: fields['비고'] || '',
-        reg_type: fields['유형'] || '직접등록',
+        product_name: String(fields['상품'] || '알람').trim(),
+        gross_type: String(fields['그로스'] || '일반').trim(),
+        note: String(fields['비고'] || '').trim(),
+        reg_type: String(fields['유형'] || '직접등록').trim(),
         updated_at: new Date().toISOString()
       };
 
@@ -819,30 +861,31 @@
     saveCancelRow: async function(token, payload) {
       const client = getSupabase();
       const fields = payload.fields || {};
-      const isDefended = (fields['확정일'] === '해약방어');
-      const isUnknown = (fields['확정일'] === '미정' || !fields['확정일']);
-      const confirmDateVal = (isDefended || isUnknown) ? null : fields['확정일'];
+      const rawConfirm = fields['확정일'];
+      const isDefended = (rawConfirm === '해약방어');
+      const isUnknown = (rawConfirm === '미정' || !rawConfirm);
+      const parsedConfirm = (isDefended || isUnknown) ? null : this.cleanDateVal_(rawConfirm);
       const todayYm = getTzToday().slice(0, 7);
-      const confirmYm = isDefended ? '해약방어' : (isUnknown ? '미정' : fields['확정일'].slice(0, 7));
+      const confirmYm = isDefended ? '해약방어' : (isUnknown ? '미정' : (parsedConfirm ? parsedConfirm.slice(0, 7) : this.cleanYmVal_(rawConfirm)));
       const standardVal = isDefended ? '방어' : (isUnknown ? '미정' : (confirmYm === todayYm ? '당월' : '이월'));
-      const categoryVal = (fields['해약유형'] && fields['해약유형'].indexOf('중지') !== -1) ? '중지' : '해약';
+      const categoryVal = (fields['해약유형'] && String(fields['해약유형']).indexOf('중지') !== -1) ? '중지' : '해약';
 
       const record = {
         category: categoryVal,
         standard: standardVal,
         cancel_ym: confirmYm,
-        contract_no: fields['계약번호'] || 'N',
-        customer_name: fields['계약처명'] || '',
-        rep_name: fields['영업담당'] || '',
-        car_no: fields['담당차량'] ? String(fields['담당차량']) : '',
-        receipt_date: fields['접수일'] || null,
-        confirm_date: confirmDateVal,
+        contract_no: String(fields['계약번호'] || 'N').trim(),
+        customer_name: String(fields['계약처명'] || '').trim(),
+        rep_name: String(fields['영업담당'] || '').trim(),
+        car_no: fields['담당차량'] ? String(fields['담당차량']).trim() : '',
+        receipt_date: this.cleanDateVal_(fields['접수일']),
+        confirm_date: parsedConfirm,
         monthly_fee: fields['용역료'] ? Number(String(fields['용역료']).replace(/[^0-9.-]/g, '')) : null,
-        product_name: fields['상품'] || '알람',
-        gross_type: fields['그로스'] || '일반',
-        cancel_type: fields['해약유형'] || '폐업',
-        reg_type: fields['유형'] || '직접등록',
-        cancel_reason: fields['사유'] || '',
+        product_name: String(fields['상품'] || '알람').trim(),
+        gross_type: String(fields['그로스'] || '일반').trim(),
+        cancel_type: String(fields['해약유형'] || '폐업').trim(),
+        reg_type: String(fields['유형'] || '직접등록').trim(),
+        cancel_reason: String(fields['사유'] || '').trim(),
         updated_at: new Date().toISOString()
       };
 
@@ -6223,33 +6266,30 @@ function closeModal(){ document.getElementById('modalOverlay').classList.remove(
   
 function submitNewRow(){  
  const fields = collectFormValues();  
- if (!validateRow(fields)) return;  
-  
- const tempId = 'tmp_' + Date.now();  
- const tempRow = Object.assign({ id: tempId, _unsynced: true }, fields);  
- ROWS.unshift(tempRow);  
- closeModal();  
- render();  
-  
+ if (!validateRow(fields)) return;     
+ const saveBtn = document.querySelector('#modalOverlay button.primary') || document.querySelector('#modalOverlay button:last-child');
+ if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = 'DB 저장 중...'; }
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) {  
- tempRow.id = res.id;  
- tempRow._unsynced = false;  
- setSyncStatus('ok'); onDataChanged_('order');  
- } else {  
- ROWS = ROWS.filter(r => r.id !== tempId);  
- setSyncStatus('error', res && res.error);  
- alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));  
- }  
- render();  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   if (res && res.success) {  
+     closeModal();
+     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
+     ROWS.unshift(newRow);
+     render();
+     setSyncStatus('ok');  
+     alert('✓ DB에 정상 등록되었습니다.');
+     onDataChanged_('order');
+   } else {  
+     setSyncStatus('error', res && res.error);  
+     alert('⚠️ DB 등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));  
+   }  
  })  
  .withFailureHandler(function(err){  
- ROWS = ROWS.filter(r => r.id !== tempId);  
- setSyncStatus('error', err);  
- render();  
- alert('등록 실패: ' + err);  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   setSyncStatus('error', err);  
+   alert('⚠️ DB 등록 통신 실패: ' + err);  
  })  
  .saveOrderStartRow(SESSION.token, { id: null, fields: fields });  
 }  
@@ -6548,22 +6588,31 @@ function closeCancelModal(){ document.getElementById('cancelModalOverlay').class
 function submitNewCancelRow(){  
  const fields = collectCancelFormValues();  
  if (!validateCancelRow(fields)) return;  
- if (!fields['유형']) fields['유형'] = '직접등록';  
-  
- const tempId = 'tmp_' + Date.now();  
- const tempRow = Object.assign({ id: tempId, _unsynced: true }, fields);  
- CANCEL_ROWS.unshift(tempRow);  
- closeCancelModal();  
- renderCancel();  
-  
+ if (!fields['유형']) fields['유형'] = '직접등록';     
+ const saveBtn = document.querySelector('#cancelModalOverlay button.primary') || document.querySelector('#cancelModalOverlay button:last-child');
+ if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = 'DB 저장 중...'; }
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('cancel'); }  
- else { CANCEL_ROWS = CANCEL_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
- renderCancel();  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   if (res && res.success) {  
+     closeCancelModal();
+     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
+     CANCEL_ROWS.unshift(newRow);
+     renderCancel();
+     setSyncStatus('ok');  
+     alert('✓ DB에 정상 등록되었습니다.');
+     onDataChanged_('cancel');
+   } else {  
+     setSyncStatus('error', res && res.error);  
+     alert('⚠️ DB 등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));  
+   }  
  })  
- .withFailureHandler(function(err){ CANCEL_ROWS = CANCEL_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', err); renderCancel(); alert('등록 실패: ' + err); })  
+ .withFailureHandler(function(err){  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   setSyncStatus('error', err);  
+   alert('⚠️ DB 등록 통신 실패: ' + err);  
+ })  
  .saveCancelRow(SESSION.token, { id: null, fields: fields });  
 }  
   
@@ -6895,22 +6944,31 @@ function closePriceModal(){ document.getElementById('priceModalOverlay').classLi
 function submitNewPriceRow(){  
  const fields = collectPriceFormValues();  
  if (!validatePriceRow(fields)) return;  
- if (!fields['유형']) fields['유형'] = '직접등록';  
-  
- const tempId = 'tmp_' + Date.now();  
- const tempRow = Object.assign({ id: tempId, _unsynced: true }, fields);  
- PRICE_ROWS.unshift(tempRow);  
- closePriceModal();  
- renderPrice();  
-  
+ if (!fields['유형']) fields['유형'] = '직접등록';     
+ const saveBtn = document.querySelector('#priceModalOverlay button.primary') || document.querySelector('#priceModalOverlay button:last-child');
+ if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = 'DB 저장 중...'; }
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('price'); }  
- else { PRICE_ROWS = PRICE_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
- renderPrice();  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   if (res && res.success) {  
+     closePriceModal();
+     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
+     PRICE_ROWS.unshift(newRow);
+     renderPrice();
+     setSyncStatus('ok');  
+     alert('✓ DB에 정상 등록되었습니다.');
+     onDataChanged_('price');
+   } else {  
+     setSyncStatus('error', res && res.error);  
+     alert('⚠️ DB 등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));  
+   }  
  })  
- .withFailureHandler(function(err){ PRICE_ROWS = PRICE_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', err); renderPrice(); alert('등록 실패: ' + err); })  
+ .withFailureHandler(function(err){  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   setSyncStatus('error', err);  
+   alert('⚠️ DB 등록 통신 실패: ' + err);  
+ })  
  .savePriceRow(SESSION.token, { id: null, fields: fields });  
 }  
   
@@ -7499,22 +7557,31 @@ function openAddRestartModal(){ buildRestartForm(); document.getElementById('res
 function closeRestartModal(){ document.getElementById('restartModalOverlay').classList.remove('open'); }  
 function submitNewRestartRow(){  
  const fields = collectRestartFormValues();  
- if (!validateRestartRow(fields)) return;  
-  
- const tempId = 'tmp_' + Date.now();  
- const tempRow = Object.assign({ id: tempId, _unsynced: true }, fields);  
- RESTART_ROWS.unshift(tempRow);  
- closeRestartModal();  
- renderRestart();  
-  
+ if (!validateRestartRow(fields)) return;     
+ const saveBtn = document.querySelector('#restartModalOverlay button.primary') || document.querySelector('#restartModalOverlay button:last-child');
+ if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = 'DB 저장 중...'; }
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { tempRow.id = res.id; tempRow._unsynced = false; setSyncStatus('ok'); onDataChanged_('restart'); }  
- else { RESTART_ROWS = RESTART_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', res && res.error); alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
- renderRestart();  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   if (res && res.success) {  
+     closeRestartModal();
+     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
+     RESTART_ROWS.unshift(newRow);
+     renderRestart();
+     setSyncStatus('ok');  
+     alert('✓ DB에 정상 등록되었습니다.');
+     onDataChanged_('restart');
+   } else {  
+     setSyncStatus('error', res && res.error);  
+     alert('⚠️ DB 등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));  
+   }  
  })  
- .withFailureHandler(function(err){ RESTART_ROWS = RESTART_ROWS.filter(r => r.id !== tempId); setSyncStatus('error', err); renderRestart(); alert('등록 실패: ' + err); })  
+ .withFailureHandler(function(err){  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   setSyncStatus('error', err);  
+   alert('⚠️ DB 등록 통신 실패: ' + err);  
+ })  
  .saveRestartRow(SESSION.token, { id: null, fields: fields });  
 }  
   
