@@ -3565,7 +3565,7 @@
  <select id="repFilterOrder" onchange="render()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
- <label class="chk"><input type="checkbox" id="onlyUnstartedOrder" checked onchange="render()">개시예정</label>  
+ <label class="chk"><input type="checkbox" id="onlyUnstartedOrder" onchange="render()">개시예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossOrder" onchange="render()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
@@ -3591,7 +3591,7 @@
  <select id="repFilterCancel" onchange="renderCancel()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
- <label class="chk"><input type="checkbox" id="onlyPendingCancel" checked onchange="renderCancel()">해약예정</label>  
+ <label class="chk"><input type="checkbox" id="onlyPendingCancel" onchange="renderCancel()">해약예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossCancel" onchange="renderCancel()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
@@ -7730,7 +7730,7 @@ function sortedRows(){
  let list = applySimToRows_('order', ROWS).map(r => Object.assign({}, r, computeAutoFields(r)));  
  if (filterText) list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
- if (chkVal('onlyUnstartedOrder', true)) list = list.filter(r => r.구분 === '미개시');  
+ if (chkVal('onlyUnstartedOrder', false)) list = list.filter(r => r.구분 === '미개시');  
  if (chkVal('excludeGrossOrder', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
  const key = sortState.key, dir = sortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
@@ -8088,11 +8088,15 @@ function saveNewOrderStartRow_(fields, allowDuplicate){
    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
    if (res && res.success) { 
      closeModal();
-     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
-     ROWS.unshift(newRow);
-     render(); 
      setSyncStatus('ok'); 
      alert('✓ DB에 정상 등록되었습니다.');
+     const rowYm = (fields['기산일'] && fields['기산일'] !== '미정') ? fields['기산일'].slice(0, 7) : (fields['계약일'] ? fields['계약일'].slice(0, 7) : '');
+     const ymInput = document.getElementById('ymFilterOrder');
+     if (rowYm && ymInput && ymInput.value && ymInput.value !== rowYm && ymInput.value !== 'ALL') {
+       ymInput.value = rowYm;
+     }
+     clearScopeCacheKeys_('orderStartData_');
+     loadData(false);
      onDataChanged_('order'); 
      return; 
    }  
@@ -8206,7 +8210,7 @@ function sortedCancelRows(){
  if (filterText) list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
   
- if (chkVal('onlyPendingCancel', true)) list = list.filter(r => isPendingDate(r.확정일));  
+ if (chkVal('onlyPendingCancel', false)) list = list.filter(r => isPendingDate(r.확정일));  
  if (chkVal('excludeGrossCancel', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
  const key = cancelSortState.key, dir = cancelSortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
@@ -8510,11 +8514,16 @@ function saveNewCancelRow_(fields, allowDuplicate){
    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
    if (res && res.success) { 
      closeCancelModal();
-     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
-     CANCEL_ROWS.unshift(newRow);
-     renderCancel(); 
      setSyncStatus('ok'); 
      alert('✓ DB에 정상 등록되었습니다.');
+     // 해당 년월 필터 동기화 및 DB에서 즉시 재조회
+     const rowYm = (fields['확정일'] && fields['확정일'] !== '미정' && fields['확정일'] !== '해약방어') ? fields['확정일'].slice(0, 7) : (fields['접수일'] ? fields['접수일'].slice(0, 7) : '');
+     const ymInput = document.getElementById('ymFilterCancel');
+     if (rowYm && ymInput && ymInput.value && ymInput.value !== rowYm && ymInput.value !== 'ALL') {
+       ymInput.value = rowYm;
+     }
+     clearScopeCacheKeys_('cancelData_');
+     loadCancelData(false);
      onDataChanged_('cancel'); 
      return; 
    }  
@@ -8926,11 +8935,10 @@ function saveNewPriceRow_(fields, allowDuplicate){
    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
    if (res && res.success) { 
      closePriceModal();
-     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
-     PRICE_ROWS.unshift(newRow);
-     renderPrice(); 
      setSyncStatus('ok'); 
      alert('✓ DB에 정상 등록되었습니다.');
+     clearScopeCacheKeys_('priceData_');
+     loadPriceData(false);
      onDataChanged_('price'); 
      return; 
    }  
@@ -9013,7 +9021,7 @@ function sortedRestartRows(){
  let list = applySimToRows_('restart', RESTART_ROWS).map(r => Object.assign({}, r, computeAutoRestart(r)));  
  if (filterText) list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
- if (chkVal('onlyStoppedRestart', true)) list = list.filter(r => String(r.현상태||'') === '중지');  
+ if (chkVal('onlyStoppedRestart', false)) list = list.filter(r => String(r.현상태||'') === '중지');  
  if (chkVal('excludeGrossRestart', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
  const key = restartSortState.key, dir = restartSortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
@@ -9244,11 +9252,10 @@ function submitNewRestartRow(){
    if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
    if (res && res.success) { 
      closeRestartModal();
-     const newRow = Object.assign({ id: res.id, _unsynced: false }, fields);
-     RESTART_ROWS.unshift(newRow);
-     renderRestart();
      setSyncStatus('ok'); 
      alert('✓ DB에 정상 등록되었습니다.');
+     clearScopeCacheKeys_('restartData_');
+     loadRestartData(false);
      onDataChanged_('restart'); 
    } else { 
      setSyncStatus('error', res && res.error); 
