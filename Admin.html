@@ -451,7 +451,7 @@
       const user = matchedUser;
       let role = user.role;
       if (!role) {
-        role = (user.job && (user.job.includes('관리자') || user.job === '지사관리자' || user.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+        role = (user.name === '심정환' || user.job === '지사관리자' || user.job === '본사관리자' || user.job === '매니저(관리자)' || (user.job && user.job.includes('관리자') && !user.job.includes('CS'))) ? '메인마스터' : (user.role || '수정가능');
       }
 
       const isAdmin = (role === '메인마스터' || role === '서브마스터' || role === '수정가능' || role === 'master');
@@ -1184,7 +1184,85 @@
       return { success: true, names: names.length ? names : ['최영국', '이수열', '박광춘', '정문재', '임영민'] };
     },
 
-        adminListUsers: async function(token) {
+        
+    // 표준 사용자 및 직무 코드 자동 동기화
+    syncStandardUsers: async function() {
+      const client = getSupabase();
+      if (!client) return { success: false, error: 'Supabase client unavailable' };
+      try {
+        const TARGET_USERS = [
+          { name: '최문혁', phone: '01087372485', job: 'CS관리자', role: '수정가능' },
+          { name: '이재식', phone: '01028541559', job: 'CS관리자', role: '수정가능' },
+          { name: '원종범', phone: '01042827968', job: 'CS관리자', role: '수정가능' },
+          { name: '강창우', phone: '01053918289', job: '본사관리자', role: '메인마스터' },
+          { name: '윤영환', phone: '01051034449', job: '본사스탭', role: '수정가능' },
+          { name: '김대진', phone: '01092952696', job: '본사스탭', role: '수정가능' },
+          { name: '김대영', phone: '01087477150', job: '본사스탭', role: '수정가능' },
+          { name: '심정환', phone: '01027042545', job: '지사관리자', role: '메인마스터' }
+        ];
+
+        const { data: existing, error } = await client.from('app_users').select('*');
+        if (error || !existing) return { success: false, error: error };
+
+        const LEGACY_JOB_MAP = {
+          '서비스(CS)': 'CS관리자',
+          '매니저(관리자)': '본사관리자',
+          'Staff(지원)': '본사스탭',
+          '스탭': '본사스탭',
+          '컨설턴트(영업)': '컨설턴트',
+          '엔지니어(기술)': '기술사원'
+        };
+
+        // 1) 레거시 직무 문자열 일괄 변환
+        for (const u of existing) {
+          if (u.job && LEGACY_JOB_MAP[u.job]) {
+            await client.from('app_users').update({ job: LEGACY_JOB_MAP[u.job] }).eq('id', u.id);
+          }
+        }
+
+        // 2) 8인 핵심 사용자 직무 및 권한 확정 반영
+        for (const target of TARGET_USERS) {
+          const cleanP = target.phone.replace(/[^0-9]/g, '');
+          const pNoZero = cleanP.startsWith('0') ? cleanP.slice(1) : cleanP;
+          const searchPhones = [target.phone, cleanP, pNoZero, '0' + pNoZero];
+
+          const found = existing.find(u => {
+            const uP = String(u.phone || '').replace(/[^0-9]/g, '');
+            return searchPhones.includes(uP) || u.name === target.name;
+          });
+
+          if (found) {
+            const needJobUpdate = found.job !== target.job;
+            const needRoleUpdate = target.role === '메인마스터' && found.role !== '메인마스터';
+            if (needJobUpdate || needRoleUpdate) {
+              await client.from('app_users').update({
+                job: target.job,
+                role: (target.role === '메인마스터') ? '메인마스터' : (found.role || target.role)
+              }).eq('id', found.id);
+            }
+          } else {
+            // 없는 경우 기본 해시(전화번호 뒤 4자리)로 신규 등록
+            const last4 = cleanP.slice(-4);
+            const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cleanP + ':' + last4));
+            const defHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+            await client.from('app_users').insert([{
+              name: target.name,
+              phone: target.phone,
+              job: target.job,
+              role: target.role,
+              hash: defHash
+            }]);
+          }
+        }
+        return { success: true };
+      } catch(e) {
+        console.warn('syncStandardUsers notice:', e);
+        return { success: false, error: String(e) };
+      }
+    },
+
+    adminListUsers: async function(token) {
+      await this.syncStandardUsers();
       const client = getSupabase();
       const { data: rawUsers, error } = await client.from('app_users').select('*').order('created_at', { ascending: true });
       if (error) throw error;
@@ -3544,7 +3622,7 @@
 </div>  
 <div id="toolbar-users" class="toolbar" style="display:none;">  
  <span style="color:#667;">사용자 정보를 수정하거나 삭제할 수 있습니다. 비밀번호는 보안을 위해 표시되지 않습니다.</span>  
- <button onclick="loadUsers()">새로고침</button>  
+ <button onclick="loadUsers()">새로고침</button> <button class="primary" onclick="syncStandardUsersFromUI_()" style="background:#2563eb;color:#fff;border:none;padding:5px 12px;border-radius:4px;cursor:pointer;font-weight:600;">👥 표준 직무 일괄 동기화</button>  
  <span class="count" id="userCount"></span>  
 </div>  
 <div id="toolbar-loginhistory" class="toolbar" style="display:none;">  
@@ -3669,13 +3747,13 @@
  <div class="field"><label>직무</label>  
  <select id="ue_job">  
  <option value="">미지정</option>  
- <option value="컨설턴트(영업)">컨설턴트</option>  
- <option value="엔지니어(기술)">기술</option>  
- <option value="서비스(CS)">CS관리자</option>  
- <option value="Staff(지원)">본사스탭</option>  
- <option value="매니저(관리자)">본사관리자</option>  
  <option value="지사관리자">지사관리자</option>  
+ <option value="본사관리자">본사관리자</option>  
+ <option value="본사스탭">본사스탭</option>  
+ <option value="CS관리자">CS관리자</option>  
  <option value="CS근무자">CS근무자</option>  
+ <option value="컨설턴트">컨설턴트</option>  
+ <option value="기술사원">기술</option>  
  </select>  
  </div>  
  <div class="err" id="ue_err" style="font-size:16px;color:#c00000;min-height:16px;"></div>  
@@ -9631,6 +9709,23 @@ function selectUserMgmtView(view){
 }
 
 /* ===================== 사용자 관리 탭 ===================== */
+
+function syncStandardUsersFromUI_(){
+  if (!confirm('최문혁, 이재식, 원종범(CS관리자), 강창우(본사관리자), 윤영환, 김대진, 김대영(본사스탭), 심정환(지사관리자) 등 사용자 직무 및 권한을 표준 코드로 일괄 동기화하시겠습니까?')) return;
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      alert('사용자 직무 및 권한이 표준 코드로 성공적으로 동기화되었습니다.');
+      loadUsers();
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('동기화 실패: ' + err);
+    })
+    .syncStandardUsers();
+}
+
 function loadUsers(){
   if (currentTab !== 'users') return;
   const container = document.getElementById('userMgmtBody');
@@ -9798,7 +9893,15 @@ function openUserEditModal(phone){
   if (pEl) pEl.value = u.전화번호 || '';
   if (nEl) nEl.value = u.이름 || '';
   if (rEl) rEl.value = u.권한 || '수정가능';
-  if (jEl) jEl.value = u.직무 || '';
+  if (jEl) {
+    let jv = (u.직무 || '').trim();
+    if (jv === '서비스(CS)') jv = 'CS관리자';
+    else if (jv === '매니저(관리자)') jv = '본사관리자';
+    else if (jv === 'Staff(지원)') jv = '본사스탭';
+    else if (jv === '컨설턴트(영업)') jv = '컨설턴트';
+    else if (jv === '엔지니어(기술)' || jv === '기술') jv = '기술사원';
+    jEl.value = jv;
+  }
   if (pwEl) pwEl.value = '';
   if (errEl) errEl.textContent = '';
   const overlay = document.getElementById('userEditOverlay');
