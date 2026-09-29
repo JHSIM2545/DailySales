@@ -72,7 +72,8 @@
     return scope || '-';
   }
 
-  window.logUserAction_ = async function(action, scope, targetId, details) {
+  // --- 데이터 변경 이력 전용 로깅 엔진 (추가/등록, 변경/수정, 삭제 중심 기록) ---
+  async function logDataChange_(action, scope, contractNo, customerName, details) {
     try {
       const client = getSupabase();
       if (!client) return;
@@ -80,30 +81,43 @@
       const userName = (sess && sess.name) ? sess.name : '일반사용자';
       const userRole = (sess && sess.role) ? sess.role : '';
       const userPhone = (sess && sess.phone) ? sess.phone : '';
-      const d = details || {};
-      const korScope = scopeNameKor_(scope);
+
+      const descText = typeof details === 'string' ? details : (details && details.desc ? details.desc : JSON.stringify(details));
 
       const record = {
         consultant: userName,
-        action: action,
-        company: d.company || korScope,
-        lead_id: d.contractNo || (targetId ? String(targetId) : '-'),
+        action: action, // '등록', '수정', '삭제'
+        company: customerName || scope || '-',
+        lead_id: contractNo || '-',
         changes: {
-          scope: korScope,
-          field: d.field || '',
-          before: d.before !== undefined ? d.before : '',
-          after: d.after !== undefined ? d.after : '',
-          desc: d.desc || '',
+          scope: scope,
+          desc: descText,
           role: userRole,
           phone: userPhone
         },
         created_at: new Date().toISOString()
       };
 
-      client.from('activity_logs').insert([record]).then(() => {});
+      await client.from('activity_logs').insert([record]);
     } catch(e) {
-      console.warn('[ActivityLog] 기록 실패:', e);
+      console.warn('[ActivityLog] 데이터 변경 이력 기록 실패:', e);
     }
+  }
+
+  window.logUserAction_ = async function(action, scope, targetId, details) {
+    // 사용자 작업내용은 데이터의 추가, 변경, 삭제 등에 관련한 데이터 변경 이력 중심으로만 기록
+    if (!action || (!action.includes('등록') && !action.includes('추가') && !action.includes('수정') && !action.includes('변경') && !action.includes('삭제'))) {
+      return; // 인쇄, 엑셀 내보내기, 포털 이동 등은 제외
+    }
+    const d = details || {};
+    const korScope = scopeNameKor_(scope);
+    const contractNo = d.contractNo || (targetId ? String(targetId) : '-');
+    const customerName = d.company || d.customerName || korScope;
+    let actType = '수정';
+    if (action.includes('등록') || action.includes('추가')) actType = '등록';
+    else if (action.includes('삭제')) actType = '삭제';
+
+    await logDataChange_(actType, korScope, contractNo, customerName, d.desc || d);
   };
 
 
@@ -747,11 +761,34 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_orders').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_orders').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.monthly_fee !== record.monthly_fee) diffs.push(`용역료: ${(oldRow.monthly_fee||0).toLocaleString()} → ${(record.monthly_fee||0).toLocaleString()}`);
+          if (oldRow.start_date !== record.start_date) diffs.push(`개시일: ${oldRow.start_date||'미정'} → ${record.start_date||'미정'}`);
+          if (oldRow.billing_date !== record.billing_date) diffs.push(`기산일: ${oldRow.billing_date||'미정'} → ${record.billing_date||'미정'}`);
+          if (oldRow.product_name !== record.product_name) diffs.push(`상품: ${oldRow.product_name||'-'} → ${record.product_name||'-'}`);
+          if (oldRow.rep_name !== record.rep_name) diffs.push(`담당: ${oldRow.rep_name||'-'} → ${record.rep_name||'-'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+          if (oldRow.note !== record.note) diffs.push(`비고: ${record.note||'삭제'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '수주개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
         if (!payload.allowDuplicate && record.contract_no && record.contract_no !== 'N') {
@@ -777,17 +814,36 @@
           throw new Error(error.message || JSON.stringify(error));
         }
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 상품: ${record.product_name}, 용역료: ${(record.monthly_fee||0).toLocaleString()}원, 담당: ${record.rep_name||'-'}, 계약일: ${record.contract_date||'-'}, 개시일: ${record.start_date||'미정'}`;
+        logDataChange_('등록', '수주개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deleteOrderStartRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_orders').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_orders').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 상품: ${oldRow.product_name}, 용역료: ${(oldRow.monthly_fee||0).toLocaleString()}원, 담당: ${oldRow.rep_name||'-'}` : '[데이터 삭제]';
+      logDataChange_('삭제', '수주개시', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -874,14 +930,34 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_cancels').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_cancels').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.monthly_fee !== record.monthly_fee) diffs.push(`용역료: ${(oldRow.monthly_fee||0).toLocaleString()} → ${(record.monthly_fee||0).toLocaleString()}`);
+          if (oldRow.confirm_date !== record.confirm_date) diffs.push(`확정일: ${oldRow.confirm_date||'미정'} → ${record.confirm_date||'미정'}`);
+          if (oldRow.cancel_type !== record.cancel_type) diffs.push(`해약유형: ${oldRow.cancel_type||'-'} → ${record.cancel_type||'-'}`);
+          if (oldRow.cancel_reason !== record.cancel_reason) diffs.push(`사유: ${record.cancel_reason||'삭제'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '해약중지', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
-        // 계약번호 중복 체크 (!payload.allowDuplicate)
         if (!payload.allowDuplicate && record.contract_no && record.contract_no !== 'N') {
           const { data: dupCheck, error: dupErr } = await client
             .from('daily_cancels')
@@ -902,17 +978,36 @@
         const { data, error } = await client.from('daily_cancels').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 구분: ${record.category}, 상품: ${record.product_name}, 용역료: ${(record.monthly_fee||0).toLocaleString()}원, 유형: ${record.cancel_type}, 사유: ${record.cancel_reason||'-'}`;
+        logDataChange_('등록', '해약중지', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deleteCancelRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_cancels').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_cancels').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 구분: ${oldRow.category}, 상품: ${oldRow.product_name}, 용역료: ${(oldRow.monthly_fee||0).toLocaleString()}원, 유형: ${oldRow.cancel_type}` : '[데이터 삭제]';
+      logDataChange_('삭제', '해약중지', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -1001,11 +1096,32 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_price_changes').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_price_changes').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.diff_amount !== record.diff_amount) diffs.push(`변동금액: ${(oldRow.diff_amount||0).toLocaleString()} → ${(record.diff_amount||0).toLocaleString()}`);
+          if (oldRow.current_fee !== record.current_fee) diffs.push(`現용역료: ${(oldRow.current_fee||0).toLocaleString()} → ${(record.current_fee||0).toLocaleString()}`);
+          if (oldRow.billing_date !== record.billing_date) diffs.push(`기산일: ${oldRow.billing_date||'미정'} → ${record.billing_date||'미정'}`);
+          if (oldRow.reason !== record.reason) diffs.push(`사유: ${record.reason||'삭제'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '인상인하', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
@@ -1013,17 +1129,36 @@
         const { data, error } = await client.from('daily_price_changes').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 구분: ${record.category}, 변동금액: ${(record.diff_amount||0).toLocaleString()}원, 現용역료: ${(record.current_fee||0).toLocaleString()}원, 기산일: ${record.billing_date||'미정'}, 사유: ${record.reason||'-'}`;
+        logDataChange_('등록', '인상인하', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deletePriceRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_price_changes').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_price_changes').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 구분: ${oldRow.category}, 변동금액: ${(oldRow.diff_amount||0).toLocaleString()}원, 現용역료: ${(oldRow.current_fee||0).toLocaleString()}원` : '[데이터 삭제]';
+      logDataChange_('삭제', '인상인하', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -1097,11 +1232,32 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_restarts').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_restarts').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.status !== record.status) diffs.push(`상태: ${oldRow.status||'-'} → ${record.status||'-'}`);
+          if (oldRow.restart_date !== record.restart_date) diffs.push(`재개시일: ${oldRow.restart_date||'미정'} → ${record.restart_date||'미정'}`);
+          if (oldRow.monthly_fee !== record.monthly_fee) diffs.push(`용역료: ${(oldRow.monthly_fee||0).toLocaleString()} → ${(record.monthly_fee||0).toLocaleString()}`);
+          if (oldRow.construct_rep !== record.construct_rep) diffs.push(`공사담당: ${oldRow.construct_rep||'-'} → ${record.construct_rep||'-'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '재개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
@@ -1109,17 +1265,36 @@
         const { data, error } = await client.from('daily_restarts').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 상태: ${record.status}, 재개시일: ${record.restart_date||'미정'}, 용역료: ${(record.monthly_fee||0).toLocaleString()}원, 담당: ${record.rep_name||'-'}`;
+        logDataChange_('등록', '재개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deleteRestartRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_restarts').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_restarts').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 상태: ${oldRow.status}, 재개시일: ${oldRow.restart_date||'미정'}, 용역료: ${(oldRow.monthly_fee||0).toLocaleString()}원` : '[데이터 삭제]';
+      logDataChange_('삭제', '재개시', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -1516,15 +1691,37 @@
       if (to) q = q.lte('created_at', to + 'T23:59:59');
       const { data, error } = await q;
       if (error) return { success: true, rows: [] };
-      const rows = (data || []).map(r => [
-        r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '',
-        r.consultant || '',
-        r.lead_id || '',
-        r.action || '',
-        '',
-        '',
-        JSON.stringify(r.changes || '')
-      ]);
+
+      // 데이터의 추가, 변경, 삭제 등에 관련한 데이터 변경 이력 중심으로만 필터링하여 조회
+      const filtered = (data || []).filter(r => {
+        const act = String(r.action || '').trim();
+        return act.includes('등록') || act.includes('수정') || act.includes('삭제') || act.includes('추가') || act.includes('변경');
+      });
+
+      const rows = filtered.map(r => {
+        const timeStr = r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '';
+        const consultant = r.consultant || '';
+        const ch = r.changes || {};
+        const scope = (ch && ch.scope) ? ch.scope : (r.company === '외부연동' ? '외부연동' : '데이터');
+        const action = r.action || '변경';
+        const contractNo = r.lead_id || '-';
+        const customerName = r.company || '-';
+        let desc = '';
+        if (typeof ch === 'string') desc = ch;
+        else if (ch.desc) desc = ch.desc;
+        else if (ch.field) desc = `[${ch.field}] ${ch.before !== undefined ? ch.before : ''} → ${ch.after !== undefined ? ch.after : ''}`;
+        else desc = JSON.stringify(ch);
+
+        return [
+          timeStr,      // r[0]: 일시
+          consultant,   // r[1]: 사용자명
+          scope,        // r[2]: 구분 (수주개시, 해약중지 등)
+          action,       // r[3]: 작업 (등록, 수정, 삭제)
+          contractNo,   // r[4]: 계약번호
+          customerName, // r[5]: 계약처명
+          desc          // r[6]: 변경내역 (상세 내용)
+        ];
+      });
       return { success: true, rows: rows };
     },
 
@@ -3734,16 +3931,22 @@
  <span style="color:#8a93a0;">※ 최근 6개월 이내 이력만 조회/보관됩니다.</span>  
  <span class="count" id="loginHistoryCount"></span>  
 </div>  
-<div id="toolbar-userhistory" class="toolbar" style="display:none;">  
- <span class="radio-group">  
- <label><input type="radio" name="uhMode" value="day" checked onchange="onUserHistoryModeChange()">특정일</label>  
- <label><input type="radio" name="uhMode" value="range" onchange="onUserHistoryModeChange()">기간</label>  
+<div id="toolbar-userhistory" class="toolbar" style="display:none; align-items:center; gap:8px; flex-wrap:wrap;">  
+ <span class="radio-group" style="display:inline-flex; align-items:center; gap:6px;">  
+   <label><input type="radio" name="uhMode" value="day" checked onchange="onUserHistoryModeChange()">특정일</label>  
+   <label><input type="radio" name="uhMode" value="range" onchange="onUserHistoryModeChange()">기간</label>  
+   <label><input type="radio" name="uhMode" value="all" onchange="onUserHistoryModeChange()">전체</label>  
  </span>  
- <input type="date" id="uhFrom" onchange="loadUserActionHistory()">  
- <span id="uhToWrap" style="display:none;">~ <input type="date" id="uhTo" onchange="loadUserActionHistory()"></span>  
- <button onclick="loadUserActionHistory()">조회</button>  
- <input type="text" id="userHistorySearchBox" placeholder="사용자명 / 계약번호 / 액션 검색" oninput="renderUserActionHistory()" style="width:220px;">  
- <span class="count" id="userHistoryCount"></span>  
+ <input type="date" id="uhFrom" onchange="loadUserActionHistory()" style="height:30px; padding:0 6px; border:1px solid #cbd5e1; border-radius:4px;">  
+ <span id="uhToWrap" style="display:none;">~ <input type="date" id="uhTo" onchange="loadUserActionHistory()" style="height:30px; padding:0 6px; border:1px solid #cbd5e1; border-radius:4px;"></span>  
+ <button onclick="loadUserActionHistory()" style="height:30px; padding:0 12px; background:#4a86e8; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer;">조회</button>  
+ <span style="color:#94a3b8; margin:0 4px;">|</span>
+ <label style="font-weight:600; font-size:13px; color:#334155;">사용자: </label>
+ <select id="uhUserSelect" onchange="renderUserActionHistory()" style="height:30px; padding:0 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
+   <option value="">전체 사용자</option>
+ </select>
+ <input type="text" id="userHistorySearchBox" placeholder="계약번호 / 계약처명 / 변경내역 검색" oninput="renderUserActionHistory()" style="width:240px; height:30px; padding:0 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">  
+ <span class="count" id="userHistoryCount" style="font-weight:600; color:#475569; margin-left:auto;"></span>  
 </div>  
   
 <div id="toolbar-target" class="toolbar" style="display:none;">  
@@ -10107,6 +10310,11 @@ function selectUserMgmtView(view){
   } else if (isAction) {
     const tb = document.getElementById('toolbar-userhistory');
     if (tb) tb.style.display = 'flex';
+    const today = todayStr();
+    const fromEl = document.getElementById('uhFrom');
+    const toEl = document.getElementById('uhTo');
+    if (fromEl && !fromEl.value) fromEl.value = today;
+    if (toEl && !toEl.value) toEl.value = today;
     loadUserActionHistory();
   } else {
     loadUsers();
@@ -10402,16 +10610,24 @@ function loadUserActionHistory(){
   if (currentTab !== 'users') return;
   const container = document.getElementById('userMgmtBody');
   if (!container) return;
-  container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">작업 이력 로드 중...</div></div>';
+  container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">데이터 변경 이력 로드 중...</div></div>';
   
   const mode = document.querySelector('input[name="uhMode"]:checked')?.value || 'day';
-  const fromVal = document.getElementById('uhFrom')?.value || '';
-  const toVal = (mode === 'range') ? (document.getElementById('uhTo')?.value || '') : fromVal;
+  let fromVal = '';
+  let toVal = '';
+  if (mode === 'day') {
+    fromVal = document.getElementById('uhFrom')?.value || '';
+    toVal = fromVal;
+  } else if (mode === 'range') {
+    fromVal = document.getElementById('uhFrom')?.value || '';
+    toVal = document.getElementById('uhTo')?.value || '';
+  }
 
   google.script.run
     .withSuccessHandler(function(res){
       if (currentTab !== 'users' || !document.getElementById('userMgmtBody')) return;
-      USER_ACTION_HISTORY_ROWS = res.rows || [];
+      USER_ACTION_HISTORY_ROWS = (res && res.rows) ? res.rows : [];
+      updateUserSelectOptions_(USER_ACTION_HISTORY_ROWS);
       renderUserActionHistory();
     })
     .withFailureHandler(function(err){ 
@@ -10419,77 +10635,106 @@ function loadUserActionHistory(){
         container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; 
       }
     })
-    .adminListHistory(SESSION.token, fromVal, toVal);
+    .adminListHistory(SESSION ? SESSION.token : '', fromVal, toVal);
 }
 
 function renderUserActionHistory(){
   if (currentTab !== 'users') return;
   const container = document.getElementById('userMgmtBody');
   if (!container) return;
-  const q = (document.getElementById('userHistorySearchBox')?.value || '').trim().toLowerCase();
+  
+  const selectedUser = (document.getElementById('uhUserSelect')?.value || '').trim();
+  const searchQ = (document.getElementById('userHistorySearchBox')?.value || '').trim().toLowerCase();
+  
   let rows = USER_ACTION_HISTORY_ROWS || [];
-  if (q) {
-    rows = rows.filter(r => r.some(c => String(c||'').toLowerCase().includes(q)));
+
+  // 1. 사용자 이름 필터링
+  if (selectedUser) {
+    rows = rows.filter(r => String(r[1] || '').trim() === selectedUser);
   }
+
+  // 2. 통합 검색 필터링 (계약번호, 계약처명, 변경내역 등)
+  if (searchQ) {
+    rows = rows.filter(r => {
+      const timeStr = String(r[0] || '').toLowerCase();
+      const userName = String(r[1] || '').toLowerCase();
+      const scope = String(r[2] || '').toLowerCase();
+      const action = String(r[3] || '').toLowerCase();
+      const contractNo = String(r[4] || '').toLowerCase();
+      const customerName = String(r[5] || '').toLowerCase();
+      const changeDesc = String(r[6] || '').toLowerCase();
+      return contractNo.includes(searchQ) || 
+             customerName.includes(searchQ) || 
+             changeDesc.includes(searchQ) ||
+             scope.includes(searchQ) ||
+             action.includes(searchQ) ||
+             userName.includes(searchQ) ||
+             timeStr.includes(searchQ);
+    });
+  }
+
   const countEl = document.getElementById('userHistoryCount');
   if (countEl) countEl.innerText = '총 ' + rows.length + '건';
 
   if (!rows.length) {
-    container.innerHTML = '<div style="background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:40px; text-align:center; color:#64748b; margin:20px auto; max-width:800px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">작업 이력이 없습니다.</div>';
+    container.innerHTML = '<div style="background:#fff; border-radius:12px; border:1px solid #e2e8f0; padding:40px; text-align:center; color:#64748b; margin:20px auto; max-width:800px; box-shadow:0 2px 4px rgba(0,0,0,0.03);">' +
+      '<div style="font-size:16px; font-weight:600; color:#334155; margin-bottom:6px;">데이터 변경 이력이 없습니다.</div>' +
+      '<div style="font-size:13px; color:#94a3b8;">데이터의 추가(등록), 변경(수정), 삭제 내역이 이곳에 기록됩니다.</div>' +
+      '</div>';
     return;
   }
 
   function getActionBadgeHtml_(act) {
     const a = String(act || '').trim();
     let bg = '#f8fafc', color = '#64748b', border = '#e2e8f0';
-    if (a.includes('등록')) {
+    if (a.includes('등록') || a.includes('추가')) {
       bg = '#ecfdf5'; color = '#059669'; border = '#a7f3d0';
     } else if (a.includes('수정') || a.includes('변경')) {
       bg = '#eff6ff'; color = '#2563eb'; border = '#bfdbfe';
     } else if (a.includes('삭제')) {
       bg = '#fef2f2'; color = '#dc2626'; border = '#fecaca';
-    } else if (a.includes('인쇄')) {
-      bg = '#f5f3ff'; color = '#7c3aed'; border = '#ddd6fe';
-    } else if (a.includes('엑셀') || a.includes('이미지') || a.includes('PDF') || a.includes('저장') || a.includes('다운로드')) {
-      bg = '#fffbeb'; color = '#d97706'; border = '#fde68a';
     }
-    return '<span style="display:inline-block; padding:2px 8px; font-size:12px; font-weight:600; border-radius:4px; border:1px solid ' + border + '; background:' + bg + '; color:' + color + ';">' + escHtml(a) + '</span>';
+    return '<span style="display:inline-block; padding:3px 8px; font-size:12px; font-weight:700; border-radius:4px; border:1px solid ' + border + '; background:' + bg + '; color:' + color + ';">' + escHtml(a) + '</span>';
   }
 
   function getScopeBadgeHtml_(sc) {
     const s = String(sc || '').trim();
-    return '<span style="display:inline-block; padding:2px 8px; font-size:12px; font-weight:600; border-radius:4px; border:1px solid #cbd5e1; background:#f1f5f9; color:#475569;">' + escHtml(s) + '</span>';
+    let bg = '#f1f5f9', color = '#475569', border = '#cbd5e1';
+    if (s === '수주개시') { bg = '#e0f2fe'; color = '#0369a1'; border = '#bae6fd'; }
+    else if (s === '해약중지') { bg = '#fef2f2'; color = '#b91c1c'; border = '#fecaca'; }
+    else if (s === '인상인하') { bg = '#fefce8'; color = '#a16207'; border = '#fef08a'; }
+    else if (s === '재개시') { bg = '#f0fdf4'; color = '#15803d'; border = '#bbf7d0'; }
+    else if (s === '상품일보') { bg = '#faf5ff'; color = '#7e22ce'; border = '#e9d5ff'; }
+    return '<span style="display:inline-block; padding:3px 8px; font-size:12px; font-weight:600; border-radius:4px; border:1px solid ' + border + '; background:' + bg + '; color:' + color + ';">' + escHtml(s) + '</span>';
   }
 
   let rowsHtml = '';
   rows.forEach(function(r){
     rowsHtml += '<tr style="border-bottom:1px solid #cfd6dc; transition:background 0.12s;" onmouseover="this.style.background=\'#f4f8fd\'" onmouseout="this.style.background=\'#ffffff\'">' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center; font-family:sans-serif; color:#475569;">' + escHtml(r[0]) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center; font-weight:600; color:#1e293b;">' + escHtml(r[1]) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + getScopeBadgeHtml_(r[2]) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + getActionBadgeHtml_(r[3]) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center; font-family:monospace;">' + escHtml(r[4]) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:left; font-weight:500;">' + escHtml(r[5]) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:left; color:#334155;">' + escHtml(r[7]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:center; font-family:sans-serif; color:#475569; width:150px;">' + escHtml(r[0]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:center; font-weight:600; color:#1e293b; width:100px;">' + escHtml(r[1]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:center; width:90px;">' + getScopeBadgeHtml_(r[2]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:center; width:75px;">' + getActionBadgeHtml_(r[3]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:center; font-family:monospace; font-weight:700; color:#0f172a; width:120px;">' + escHtml(r[4]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:left; font-weight:600; color:#1e293b; width:180px;">' + escHtml(r[5]) + '</td>' +
+      '<td style="padding:9px 12px; border:1px solid #cfd6dc; text-align:left; color:#334155; white-space:normal; line-height:1.45;">' + escHtml(r[6]) + '</td>' +
     '</tr>';
   });
 
   let html = '<div class="grid-wrap" style="overflow:auto; background:#fff; height:calc(100vh - 195px); width:100%;">' +
-    '<table style="border-collapse:collapse; width:100%; white-space:nowrap; font-size:13px;">' +
+    '<table style="border-collapse:collapse; width:100%; font-size:13px;">' +
       '<thead style="position:sticky; top:0; z-index:2;">' +
         '<tr style="background:#4a86e8; color:#ffffff;">' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:160px;">일시</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:150px;">일시</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:100px;">사용자</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:100px;">구분</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:120px;">작업(액션)</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:90px;">구분</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:75px;">작업</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center; width:120px;">계약번호</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:left; width:180px;">계약처명/대상</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:left;">상세 내용</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:left; width:180px;">계약처명</th>' +
+          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:left;">변경내역</th>' +
         '</tr>' +
       '</thead>' +
-      '<tbody>' +
-        rowsHtml +
-      '</tbody>' +
+      '<tbody>' + rowsHtml + '</tbody>' +
     '</table>' +
   '</div>';
 
@@ -11692,9 +11937,34 @@ function onLoginHistoryModeChange(){
 function onUserHistoryModeChange(){
   if (currentTab !== 'users') return;
   const mode = document.querySelector('input[name="uhMode"]:checked')?.value || 'day';
+  const fromEl = document.getElementById('uhFrom');
   const toWrap = document.getElementById('uhToWrap');
-  if (toWrap) toWrap.style.display = (mode === 'range') ? 'inline' : 'none';
+  if (mode === 'all') {
+    if (fromEl) fromEl.style.display = 'none';
+    if (toWrap) toWrap.style.display = 'none';
+  } else if (mode === 'range') {
+    if (fromEl) fromEl.style.display = 'inline';
+    if (toWrap) toWrap.style.display = 'inline';
+  } else { // 'day'
+    if (fromEl) fromEl.style.display = 'inline';
+    if (toWrap) toWrap.style.display = 'none';
+  }
   loadUserActionHistory();
+}
+
+function updateUserSelectOptions_(rows) {
+  const select = document.getElementById('uhUserSelect');
+  if (!select) return;
+  const currentVal = select.value;
+  const users = Array.from(new Set(rows.map(r => String(r[1] || '').trim()).filter(Boolean))).sort();
+  let optHtml = '<option value="">전체 사용자</option>';
+  users.forEach(u => {
+    optHtml += `<option value="${escAttr(u)}">${escHtml(u)}</option>`;
+  });
+  select.innerHTML = optHtml;
+  if (users.includes(currentVal)) {
+    select.value = currentVal;
+  }
 }
 
 function renderLoginHistory(){

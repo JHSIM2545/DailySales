@@ -49,7 +49,8 @@
     return scope || '-';
   }
 
-  window.logUserAction_ = async function(action, scope, targetId, details) {
+  // --- 데이터 변경 이력 전용 로깅 엔진 (추가/등록, 변경/수정, 삭제 중심 기록) ---
+  async function logDataChange_(action, scope, contractNo, customerName, details) {
     try {
       const client = getSupabase();
       if (!client) return;
@@ -57,30 +58,43 @@
       const userName = (sess && sess.name) ? sess.name : '일반사용자';
       const userRole = (sess && sess.role) ? sess.role : '';
       const userPhone = (sess && sess.phone) ? sess.phone : '';
-      const d = details || {};
-      const korScope = scopeNameKor_(scope);
+
+      const descText = typeof details === 'string' ? details : (details && details.desc ? details.desc : JSON.stringify(details));
 
       const record = {
         consultant: userName,
-        action: action,
-        company: d.company || korScope,
-        lead_id: d.contractNo || (targetId ? String(targetId) : '-'),
+        action: action, // '등록', '수정', '삭제'
+        company: customerName || scope || '-',
+        lead_id: contractNo || '-',
         changes: {
-          scope: korScope,
-          field: d.field || '',
-          before: d.before !== undefined ? d.before : '',
-          after: d.after !== undefined ? d.after : '',
-          desc: d.desc || '',
+          scope: scope,
+          desc: descText,
           role: userRole,
           phone: userPhone
         },
         created_at: new Date().toISOString()
       };
 
-      client.from('activity_logs').insert([record]).then(() => {});
+      await client.from('activity_logs').insert([record]);
     } catch(e) {
-      console.warn('[ActivityLog] 기록 실패:', e);
+      console.warn('[ActivityLog] 데이터 변경 이력 기록 실패:', e);
     }
+  }
+
+  window.logUserAction_ = async function(action, scope, targetId, details) {
+    // 사용자 작업내용은 데이터의 추가, 변경, 삭제 등에 관련한 데이터 변경 이력 중심으로만 기록
+    if (!action || (!action.includes('등록') && !action.includes('추가') && !action.includes('수정') && !action.includes('변경') && !action.includes('삭제'))) {
+      return; // 인쇄, 엑셀 내보내기, 포털 이동 등은 제외
+    }
+    const d = details || {};
+    const korScope = scopeNameKor_(scope);
+    const contractNo = d.contractNo || (targetId ? String(targetId) : '-');
+    const customerName = d.company || d.customerName || korScope;
+    let actType = '수정';
+    if (action.includes('등록') || action.includes('추가')) actType = '등록';
+    else if (action.includes('삭제')) actType = '삭제';
+
+    await logDataChange_(actType, korScope, contractNo, customerName, d.desc || d);
   };
 
 
@@ -724,11 +738,34 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_orders').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_orders').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.monthly_fee !== record.monthly_fee) diffs.push(`용역료: ${(oldRow.monthly_fee||0).toLocaleString()} → ${(record.monthly_fee||0).toLocaleString()}`);
+          if (oldRow.start_date !== record.start_date) diffs.push(`개시일: ${oldRow.start_date||'미정'} → ${record.start_date||'미정'}`);
+          if (oldRow.billing_date !== record.billing_date) diffs.push(`기산일: ${oldRow.billing_date||'미정'} → ${record.billing_date||'미정'}`);
+          if (oldRow.product_name !== record.product_name) diffs.push(`상품: ${oldRow.product_name||'-'} → ${record.product_name||'-'}`);
+          if (oldRow.rep_name !== record.rep_name) diffs.push(`담당: ${oldRow.rep_name||'-'} → ${record.rep_name||'-'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+          if (oldRow.note !== record.note) diffs.push(`비고: ${record.note||'삭제'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '수주개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
         if (!payload.allowDuplicate && record.contract_no && record.contract_no !== 'N') {
@@ -754,17 +791,36 @@
           throw new Error(error.message || JSON.stringify(error));
         }
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 상품: ${record.product_name}, 용역료: ${(record.monthly_fee||0).toLocaleString()}원, 담당: ${record.rep_name||'-'}, 계약일: ${record.contract_date||'-'}, 개시일: ${record.start_date||'미정'}`;
+        logDataChange_('등록', '수주개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deleteOrderStartRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_orders').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_orders').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 상품: ${oldRow.product_name}, 용역료: ${(oldRow.monthly_fee||0).toLocaleString()}원, 담당: ${oldRow.rep_name||'-'}` : '[데이터 삭제]';
+      logDataChange_('삭제', '수주개시', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -851,14 +907,34 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_cancels').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_cancels').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.monthly_fee !== record.monthly_fee) diffs.push(`용역료: ${(oldRow.monthly_fee||0).toLocaleString()} → ${(record.monthly_fee||0).toLocaleString()}`);
+          if (oldRow.confirm_date !== record.confirm_date) diffs.push(`확정일: ${oldRow.confirm_date||'미정'} → ${record.confirm_date||'미정'}`);
+          if (oldRow.cancel_type !== record.cancel_type) diffs.push(`해약유형: ${oldRow.cancel_type||'-'} → ${record.cancel_type||'-'}`);
+          if (oldRow.cancel_reason !== record.cancel_reason) diffs.push(`사유: ${record.cancel_reason||'삭제'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '해약중지', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
-        // 계약번호 중복 체크 (!payload.allowDuplicate)
         if (!payload.allowDuplicate && record.contract_no && record.contract_no !== 'N') {
           const { data: dupCheck, error: dupErr } = await client
             .from('daily_cancels')
@@ -879,17 +955,36 @@
         const { data, error } = await client.from('daily_cancels').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 구분: ${record.category}, 상품: ${record.product_name}, 용역료: ${(record.monthly_fee||0).toLocaleString()}원, 유형: ${record.cancel_type}, 사유: ${record.cancel_reason||'-'}`;
+        logDataChange_('등록', '해약중지', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deleteCancelRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_cancels').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_cancels').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 구분: ${oldRow.category}, 상품: ${oldRow.product_name}, 용역료: ${(oldRow.monthly_fee||0).toLocaleString()}원, 유형: ${oldRow.cancel_type}` : '[데이터 삭제]';
+      logDataChange_('삭제', '해약중지', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -978,11 +1073,32 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_price_changes').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_price_changes').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.diff_amount !== record.diff_amount) diffs.push(`변동금액: ${(oldRow.diff_amount||0).toLocaleString()} → ${(record.diff_amount||0).toLocaleString()}`);
+          if (oldRow.current_fee !== record.current_fee) diffs.push(`現용역료: ${(oldRow.current_fee||0).toLocaleString()} → ${(record.current_fee||0).toLocaleString()}`);
+          if (oldRow.billing_date !== record.billing_date) diffs.push(`기산일: ${oldRow.billing_date||'미정'} → ${record.billing_date||'미정'}`);
+          if (oldRow.reason !== record.reason) diffs.push(`사유: ${record.reason||'삭제'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '인상인하', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
@@ -990,17 +1106,36 @@
         const { data, error } = await client.from('daily_price_changes').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 구분: ${record.category}, 변동금액: ${(record.diff_amount||0).toLocaleString()}원, 現용역료: ${(record.current_fee||0).toLocaleString()}원, 기산일: ${record.billing_date||'미정'}, 사유: ${record.reason||'-'}`;
+        logDataChange_('등록', '인상인하', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deletePriceRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_price_changes').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_price_changes').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 구분: ${oldRow.category}, 변동금액: ${(oldRow.diff_amount||0).toLocaleString()}원, 現용역료: ${(oldRow.current_fee||0).toLocaleString()}원` : '[데이터 삭제]';
+      logDataChange_('삭제', '인상인하', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -1074,11 +1209,32 @@
       };
 
       if (payload.id && !String(payload.id).startsWith('tmp_')) {
+        let oldRow = null;
+        try {
+          let oq = client.from('daily_restarts').select('*');
+          if (/^\d+$/.test(String(payload.id))) oq = oq.eq('id', Number(payload.id));
+          else oq = oq.eq('sheet_row_id', String(payload.id));
+          const { data: od } = await oq.limit(1);
+          if (od && od.length) oldRow = od[0];
+        } catch(e) {}
+
         let q = client.from('daily_restarts').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
+
+        let diffs = [];
+        if (oldRow) {
+          if (oldRow.status !== record.status) diffs.push(`상태: ${oldRow.status||'-'} → ${record.status||'-'}`);
+          if (oldRow.restart_date !== record.restart_date) diffs.push(`재개시일: ${oldRow.restart_date||'미정'} → ${record.restart_date||'미정'}`);
+          if (oldRow.monthly_fee !== record.monthly_fee) diffs.push(`용역료: ${(oldRow.monthly_fee||0).toLocaleString()} → ${(record.monthly_fee||0).toLocaleString()}`);
+          if (oldRow.construct_rep !== record.construct_rep) diffs.push(`공사담당: ${oldRow.construct_rep||'-'} → ${record.construct_rep||'-'}`);
+          if (oldRow.customer_name !== record.customer_name) diffs.push(`계약처명: ${oldRow.customer_name||'-'} → ${record.customer_name||'-'}`);
+        }
+        const desc = diffs.length ? diffs.join(' | ') : '정보 수정';
+        logDataChange_('수정', '재개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
@@ -1086,17 +1242,36 @@
         const { data, error } = await client.from('daily_restarts').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
+
+        const desc = `[신규등록] 상태: ${record.status}, 재개시일: ${record.restart_date||'미정'}, 용역료: ${(record.monthly_fee||0).toLocaleString()}원, 담당: ${record.rep_name||'-'}`;
+        logDataChange_('등록', '재개시', record.contract_no, record.customer_name, desc);
+
         return { success: true, id: newId };
       }
     },
 
     deleteRestartRow: async function(token, id) {
       const client = getSupabase();
+      let oldRow = null;
+      try {
+        let oq = client.from('daily_restarts').select('*');
+        if (/^\d+$/.test(String(id))) oq = oq.eq('id', Number(id));
+        else oq = oq.eq('sheet_row_id', String(id));
+        const { data: od } = await oq.limit(1);
+        if (od && od.length) oldRow = od[0];
+      } catch(e) {}
+
       let q = client.from('daily_restarts').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
       const { error } = await q;
       if (error) throw error;
+
+      const cNo = oldRow ? oldRow.contract_no : String(id);
+      const cName = oldRow ? oldRow.customer_name : '미확인';
+      const desc = oldRow ? `[데이터 삭제] 상태: ${oldRow.status}, 재개시일: ${oldRow.restart_date||'미정'}, 용역료: ${(oldRow.monthly_fee||0).toLocaleString()}원` : '[데이터 삭제]';
+      logDataChange_('삭제', '재개시', cNo, cName, desc);
+
       return { success: true };
     },
 
@@ -1493,15 +1668,37 @@
       if (to) q = q.lte('created_at', to + 'T23:59:59');
       const { data, error } = await q;
       if (error) return { success: true, rows: [] };
-      const rows = (data || []).map(r => [
-        r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '',
-        r.consultant || '',
-        r.lead_id || '',
-        r.action || '',
-        '',
-        '',
-        JSON.stringify(r.changes || '')
-      ]);
+
+      // 데이터의 추가, 변경, 삭제 등에 관련한 데이터 변경 이력 중심으로만 필터링하여 조회
+      const filtered = (data || []).filter(r => {
+        const act = String(r.action || '').trim();
+        return act.includes('등록') || act.includes('수정') || act.includes('삭제') || act.includes('추가') || act.includes('변경');
+      });
+
+      const rows = filtered.map(r => {
+        const timeStr = r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '';
+        const consultant = r.consultant || '';
+        const ch = r.changes || {};
+        const scope = (ch && ch.scope) ? ch.scope : (r.company === '외부연동' ? '외부연동' : '데이터');
+        const action = r.action || '변경';
+        const contractNo = r.lead_id || '-';
+        const customerName = r.company || '-';
+        let desc = '';
+        if (typeof ch === 'string') desc = ch;
+        else if (ch.desc) desc = ch.desc;
+        else if (ch.field) desc = `[${ch.field}] ${ch.before !== undefined ? ch.before : ''} → ${ch.after !== undefined ? ch.after : ''}`;
+        else desc = JSON.stringify(ch);
+
+        return [
+          timeStr,      // r[0]: 일시
+          consultant,   // r[1]: 사용자명
+          scope,        // r[2]: 구분 (수주개시, 해약중지 등)
+          action,       // r[3]: 작업 (등록, 수정, 삭제)
+          contractNo,   // r[4]: 계약번호
+          customerName, // r[5]: 계약처명
+          desc          // r[6]: 변경내역 (상세 내용)
+        ];
+      });
       return { success: true, rows: rows };
     },
 
@@ -2419,6 +2616,19 @@
       await client.from('system_settings').upsert({ setting_key: 'TA_PORTAL_URL', setting_value: url });
       return { success: true };
     },
+    getIntroPortalUrl: async function(token) {
+      const client = getSupabase();
+      const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'INTRO_PORTAL_URL').maybeSingle();
+      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
+      return { success: true, url: u };
+    },
+
+    saveIntroPortalUrl: async function(token, url) {
+      const client = getSupabase();
+      await client.from('system_settings').upsert({ setting_key: 'INTRO_PORTAL_URL', setting_value: url });
+      return { success: true };
+    },
+
 
     // 14. 접수함 큐
     submitAiReportMessage: async function(token, text) {
