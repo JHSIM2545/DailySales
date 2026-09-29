@@ -2825,9 +2825,10 @@
 
     submitGaJungjiMessage: async function(token, text) {
       const client = getSupabase();
-      const sess = getSession_();
+      const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : getSession_();
+      const submitter = (sess && sess.name) ? sess.name : 'CS관리자';
       const { error } = await client.from('inbox_gajungji').insert([{
-        submitted_by: sess ? sess.name : 'CS근무자',
+        submitted_by: submitter,
         raw_text: text,
         status: '대기'
       }]);
@@ -3186,7 +3187,7 @@
           const carNum = rec.car ? Number(String(rec.car).replace(/[^0-9]/g, '')) : null;
           const cancelCars = [26, 27, 28, 127, 160, '없음'];
           const 담당차량 = (carNum && cancelCars.indexOf(carNum) !== -1) ? String(carNum) : (rec.car || '');
-          const alreadyRegistered = /^y$/i.test(String(rec.registered || '').trim());
+          const alreadyRegistered = /^(y|유)$/i.test(String(rec.registered || '').trim());
           const 사유 = [rec.restorePlan, rec.note].filter(v => v && String(v).trim()).join(' / ');
           rows.push({
             display: {
@@ -3637,11 +3638,11 @@
  <div>  
  <h1 style="display:flex; align-items:center; margin:0; font-size:18px; font-weight:700;"><img src="data:image/png;base64,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" alt="북서울 영업일보" style="width:28px; height:28px; vertical-align:middle; margin-right:8px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.15);">북서울 영업일보 <span style="font-size:12px; background:#16a34a; color:#fff; padding:2px 8px; border-radius:4px; margin-left:8px; font-weight:600;">v2.8</span></h1>  
  </div>  
- <div style="flex:1; text-align:center;">  
+ <div style="flex:1; text-align:center; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;">  
  <button class="ai-report-topbtn" onclick="openAiReportModal_()">영업보고</button>  
+ <button id="gaJungjiTopBtn" class="ai-report-topbtn" style="display:none; background:#c0392b; border-color:#c0392b;" onclick="openGaJungjiModal_()">가중지 보고</button>  
  </div>  
  <div class="userinfo">  
- <button id="gaJungjiTopBtn" class="ai-report-topbtn" style="display:none; background:#c0392b; margin-right:10px;" onclick="openGaJungjiModal_()">가중지 정보</button>  
  <span id="whoami" style="display:none;"></span>  
  <a id="logoutLink" style="display:none;" onclick="logout()">로그아웃</a>  
  <div class="sync-status" id="syncStatus" style="display:none;"></div>  
@@ -3921,8 +3922,12 @@
 </div>  
   
 <div class="modal-overlay" id="aiReportModalOverlay">  
- <div class="modal" style="width:520px;">  
- <h2>영업보고</h2>  
+ <div class="modal" style="width:580px; max-width:95vw;">  
+ <div style="display:flex; gap:8px; margin-bottom:14px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">
+   <button type="button" style="padding:8px 18px; font-weight:700; border-radius:6px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none;">📝 영업보고</button>
+   <button type="button" onclick="closeAiReportModal_(); openGaJungjiModal_();" style="padding:8px 18px; font-weight:700; border-radius:6px; font-size:14px; cursor:pointer; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">📋 가중지 보고 (CS 일시중지)</button>
+ </div>
+ <h2 style="margin-top:0;">영업보고 (수주/해약/인상/인하)</h2>  
  <textarea id="aiReportInput" rows="10" placeholder="예) 강북구 ABC빌딩 알람 신규 계약, 용역료 20만원, 오늘 계약, 개시는 담주 월요일부터, 영업담당 최영국" style="width:100%; min-height:220px; padding:10px; border:1px solid #c7cfd8; border-radius:6px; font-size:14px; font-family:inherit; box-sizing:border-box;"></textarea>  
  <div id="aiReportResult" style="margin-top:10px;"></div>  
  <div class="modal-actions">  
@@ -3933,16 +3938,27 @@
 </div>  
   
 <div class="modal-overlay" id="gaJungjiModalOverlay">  
- <div class="modal" style="width:900px; max-width:95vw;">  
- <h2>가중지 정보 등록</h2>  
- <div style="color:#888; font-size:12px; margin-bottom:6px;">엑셀의 "일시/경비중지 일일 현황" 표를 헤더행 포함 그대로 복사해 아래에 붙여넣어 주세요. 붙여넣으면 자동으로 표를 인식해 미리보기가 표시됩니다.</div>  
- <textarea id="gaJungjiInput" rows="6" placeholder="엑셀에서 헤더행을 포함해 표 전체를 복사한 뒤 여기에 붙여넣으세요" style="width:100%; padding:10px; border:1px solid #c7cfd8; border-radius:6px; font-size:13px; font-family:inherit; box-sizing:border-box;" oninput="gaJungjiAnalyze_()" onpaste="setTimeout(gaJungjiAnalyze_, 30)"></textarea>  
+ <div class="modal" style="width:960px; max-width:96vw; max-height:92vh; overflow-y:auto;">  
+ <div style="display:flex; gap:8px; margin-bottom:14px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">
+   <button type="button" onclick="closeGaJungjiModal_(); openAiReportModal_();" style="padding:8px 18px; font-weight:700; border-radius:6px; font-size:14px; cursor:pointer; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">📝 영업보고</button>
+   <button type="button" style="padding:8px 18px; font-weight:700; border-radius:6px; font-size:14px; cursor:pointer; background:#c0392b; color:#fff; border:none;">📋 가중지 보고 (CS 일시중지)</button>
+ </div>
+ <h2 style="margin-top:0; color:#c0392b;">📋 가중지(일시/경비중지) 보고 등록</h2>  
+ <div style="color:#64748b; font-size:13px; margin-bottom:8px; line-height:1.5;">
+   CS관리자 일시/경비중지 엑셀 표를 <strong>헤더행(차량, 계약번호, 계약처명 등) 포함</strong>하여 그대로 복사해 붙여넣어 주세요.<br>
+   내용을 붙여넣으면 표가 자동 인식되어 미리보기가 나타나며, [가중지 보고 제출] 시 마스터 접수함으로 안전하게 전송됩니다.
+ </div>  
+ <textarea id="gaJungjiInput" rows="6" placeholder="엑셀에서 헤더행을 포함해 표 전체를 복사한 뒤 여기에 붙여넣으세요 (Ctrl+V)" style="width:100%; min-height:120px; padding:10px; border:1.5px solid #c7cfd8; border-radius:6px; font-size:13px; font-family:Consolas, monospace; box-sizing:border-box;" oninput="gaJungjiAnalyze_()" onpaste="setTimeout(gaJungjiAnalyze_, 30)"></textarea>  
  <div id="gaJungjiPreview" style="margin-top:8px; overflow-x:auto;"></div>  
  <div id="gaJungjiResult" style="margin-top:10px;"></div>  
- <div class="modal-actions">  
- <button onclick="closeGaJungjiModal_()">취소</button>  
- <button class="primary" onclick="gaJungjiSubmit_()">등록</button>  
+ <div class="modal-actions" style="margin-top:14px; display:flex; justify-content:space-between; align-items:center;">  
+   <button type="button" onclick="loadMyRecentGaJungjiReports_()" style="padding:8px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; cursor:pointer;">📬 최근 제출 내역 확인</button>
+   <div style="display:flex; gap:8px;">
+     <button onclick="closeGaJungjiModal_()">취소</button>  
+     <button class="primary" style="background:#c0392b; border-color:#c0392b; padding:8px 24px; font-weight:700;" onclick="gaJungjiSubmit_()">가중지 보고 제출</button>  
+   </div>
  </div>  
+ <div id="myRecentGaJungjiBox" style="margin-top:14px; display:none; border-top:1px dashed #cbd5e1; padding-top:10px;"></div>
  </div>  
 </div>  
   
@@ -5038,7 +5054,7 @@ function onLoginSuccess(res){
  document.getElementById('whoami').style.display = '';  
  document.getElementById('whoami').innerText = res.name + '님' + ' [직무:' + (jobLabel_(res.job) || '미지정') + ']';  
  document.getElementById('logoutLink').style.display = '';  
- document.getElementById('gaJungjiTopBtn').style.display = (SESSION.job === '서비스(CS)') ? '' : 'none';  
+ const gaBtn = document.getElementById('gaJungjiTopBtn'); if (gaBtn) gaBtn.style.display = isCsManager_(SESSION.job, SESSION.role, SESSION.name) ? '' : 'none';  
  renderTabs();  
  selectTab('dashboard');  
  loadAndApplyEditableLists_();  
@@ -5226,6 +5242,20 @@ const JOB_DISPLAY_LABELS_ = {
  '지사관리자': '지사관리자',  
  'CS근무자': 'CS근무자'  
 };  
+// "가중지 정보 등록" 버튼 노출 권한 판별: CS관리자(또는 레거시 서비스(CS)) 직무 전용 (메인마스터 지사장은 검증용 확인 가능)
+function isCsManager_(job, role, name){
+  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : null;
+  const j = String(job || (sess && sess.job) || '').trim();
+  const r = String(role || (sess && sess.role) || '').trim();
+  const n = String(name || (sess && sess.name) || '').trim();
+
+  // 1) CS 관련 직무 (CS관리자, 서비스(CS), CS 등 - 단 순수 CS근무자 제외)
+  if (j === 'CS관리자' || j === '서비스(CS)' || j === 'CS' || (j.includes('CS') && j !== 'CS근무자')) return true;
+  // 2) 메인마스터/지사장 및 관리자 권한은 관리·검증 목적으로 상시 접근 허용
+  if (n === '심정환' || r === '메인마스터' || r === '서브마스터' || r === 'master' || (sess && (sess.isMainMaster || sess.isAdmin || sess.isMaster))) return true;
+  return false;
+}
+
 function jobLabel_(job){ return JOB_DISPLAY_LABELS_[job] || job || ''; }  
 
 // "TA 관리 포털" 연결 버튼: 컨설턴트(영업) 또는 지사관리자가 아니면 아예 안 보이게 숨김
@@ -9196,11 +9226,58 @@ function aiReportSubmit_(){
 /* ===================== 가중지 정보(CS 직무 전용) ===================== */
 let GAJUNGJI_ROWS_ = [];
 function openGaJungjiModal_(){
-  document.getElementById('gaJungjiInput').value = '';
-  document.getElementById('gaJungjiPreview').innerHTML = '';
-  document.getElementById('gaJungjiResult').innerHTML = '';
+  const inp = document.getElementById('gaJungjiInput');
+  if (inp) inp.value = '';
+  const prev = document.getElementById('gaJungjiPreview');
+  if (prev) prev.innerHTML = '';
+  const res = document.getElementById('gaJungjiResult');
+  if (res) res.innerHTML = '';
+  const recentBox = document.getElementById('myRecentGaJungjiBox');
+  if (recentBox) { recentBox.innerHTML = ''; recentBox.style.display = 'none'; }
   GAJUNGJI_ROWS_ = [];
   document.getElementById('gaJungjiModalOverlay').classList.add('open');
+}
+
+async function loadMyRecentGaJungjiReports_(){
+  const box = document.getElementById('myRecentGaJungjiBox');
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px; color:#64748b;">최근 제출 내역 조회 중...</div>';
+  try {
+    const client = (typeof window.getSupabaseClient === 'function') ? window.getSupabaseClient() : (window.supabase ? window.supabase.createClient('https://gpqlximhoqdybcewdfde.supabase.co', 'sb_publishable_xUnGxyLCc5TB5nv4keVQVw__grqGJkP') : null);
+    if (!client) { box.innerHTML = '<div style="font-size:12px; color:#ef4444;">데이터베이스 연결 불가</div>'; return; }
+    const myName = (SESSION && SESSION.name) ? SESSION.name : '';
+    let q = client.from('inbox_gajungji').select('*').order('submitted_at', { ascending: false }).limit(6);
+    if (myName && !isCsManager_(SESSION.job, SESSION.role, SESSION.name)) {
+      q = q.eq('submitted_by', myName);
+    }
+    const { data, error } = await q;
+    if (error || !data || !data.length) {
+      box.innerHTML = '<div style="font-size:12px; color:#64748b; padding:8px 0;">최근 제출된 가중지 보고 내역이 없습니다.</div>';
+      return;
+    }
+    let html = '<div style="font-weight:700; font-size:13px; margin-bottom:6px; color:#1e293b;">📋 최근 제출 현황 (최신 ' + data.length + '건)</div>' +
+      '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:12px;">' +
+      '<thead><tr style="background:#f1f5f9;"><th style="padding:6px; border:1px solid #e2e8f0;">제출시각</th><th style="padding:6px; border:1px solid #e2e8f0;">제출자</th><th style="padding:6px; border:1px solid #e2e8f0;">상태</th><th style="padding:6px; border:1px solid #e2e8f0;">처리자/일시</th></tr></thead><tbody>';
+    data.forEach(r => {
+      const st = r.status || '대기';
+      let stBadge = '<span style="color:#b45309; font-weight:700;">대기(검토중)</span>';
+      if (st === '처리완료') stBadge = '<span style="color:#16a34a; font-weight:700;">✓ 해약중지 등록완료</span>';
+      else if (st === '무시됨') stBadge = '<span style="color:#64748b;">무시됨</span>';
+      const dt = r.submitted_at ? r.submitted_at.slice(0, 16).replace('T', ' ') : '-';
+      const pInfo = r.processed_at ? ((r.processed_by || '마스터') + ' (' + r.processed_at.slice(5, 16).replace('T', ' ') + ')') : '-';
+      html += '<tr>' +
+        '<td style="padding:6px; border:1px solid #e2e8f0; text-align:center;">' + dt + '</td>' +
+        '<td style="padding:6px; border:1px solid #e2e8f0; text-align:center; font-weight:600;">' + escHtml(r.submitted_by || '') + '</td>' +
+        '<td style="padding:6px; border:1px solid #e2e8f0; text-align:center;">' + stBadge + '</td>' +
+        '<td style="padding:6px; border:1px solid #e2e8f0; text-align:center; font-size:11px;">' + escHtml(pInfo) + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = '<div style="font-size:12px; color:#ef4444;">조회 중 오류 발생: ' + escHtml(String(e)) + '</div>';
+  }
 }
 function closeGaJungjiModal_(){
   document.getElementById('gaJungjiModalOverlay').classList.remove('open');
@@ -9227,7 +9304,7 @@ function renderGaJungjiPreview_(){
   const bodyRows = GAJUNGJI_ROWS_.map(function(r){
     const d = r.display;
     totalAmt += Number(String(d.용역료 || '').replace(/[^0-9]/g,'')) || 0;
-    const badge = r.alreadyRegistered ? '<span style="color:#c0392b;">이미등록</span>' : '';
+    const badge = r.alreadyRegistered ? '<span style="color:#c0392b; font-weight:700;">이미등록</span>' : '<span style="color:#16a34a; font-weight:700;">신규</span>';
     return '<tr>' + cols.map(function(c){ return '<td style="padding:4px 6px; border:1px solid #e2e6ea; font-size:12px; white-space:nowrap;">' + escHtml(d[c] || '') + '</td>'; }).join('') +
       '<td style="padding:4px 6px; border:1px solid #e2e6ea; font-size:11px; white-space:nowrap;">' + badge + '</td></tr>';
   }).join('');
@@ -9309,7 +9386,7 @@ if (SESSION && SESSION.token) {
   hideLogin();
   renderLoggedInUser_(SESSION.name, SESSION.role);
   document.getElementById('logoutLink').style.display = '';
-  document.getElementById('gaJungjiTopBtn').style.display = (SESSION.job === '서비스(CS)') ? '' : 'none';
+  const gaBtn = document.getElementById('gaJungjiTopBtn'); if (gaBtn) gaBtn.style.display = isCsManager_(SESSION.job, SESSION.role, SESSION.name) ? '' : 'none';
   renderTabs();
   selectTab('dashboard');
   loadAndApplyEditableLists_();

@@ -86,13 +86,13 @@
       <label>직무</label>
       <select id="reg_job">
         <option value="">선택하세요</option>
-        <option value="컨설턴트(영업)">컨설턴트</option>
-        <option value="엔지니어(기술)">기술</option>
-        <option value="서비스(CS)">CS관리자</option>
-        <option value="Staff(지원)">본사스탭</option>
-        <option value="매니저(관리자)">본사관리자</option>
         <option value="지사관리자">지사관리자</option>
+        <option value="본사관리자">본사관리자</option>
+        <option value="본사스탭">본사스탭</option>
+        <option value="CS관리자">CS관리자</option>
         <option value="CS근무자">CS근무자</option>
+        <option value="컨설턴트">컨설턴트</option>
+        <option value="기술사원">기술사원</option>
       </select>
     </div>
     <div class="field">
@@ -323,9 +323,18 @@ async function doLogin(){
     }
 
     const user = matchedUser;
+
+    // 5. 직무별 접속제한: 영업일보에는 "CS근무자" 직급은 로그인 불가
+    if (user.job === 'CS근무자') {
+      setBusy_(false, 'loginBtn', '로그인');
+      errEl.innerHTML = '시스템 접속 권한이 없습니다<br>담당자에게 문의해 주세요';
+      alert('시스템 접속 권한이 없습니다\n담당자에게 문의해 주세요');
+      return;
+    }
+
     let role = user.role;
     if (!role) {
-      role = (user.job && (user.job.includes('관리자') || user.job === '지사관리자' || user.job === '본사관리자')) ? '메인마스터' : '읽기전용';
+      role = (user.job && (user.job === '지사관리자' || user.job === '본사관리자' || user.job === '매니저(관리자)')) ? '메인마스터' : '읽기전용';
     }
 
     const isAdmin = (role === '메인마스터' || role === '서브마스터' || role === '수정가능' || role === 'master');

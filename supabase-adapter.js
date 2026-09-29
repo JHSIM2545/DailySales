@@ -2681,7 +2681,7 @@
     getIntroPortalUrl: async function(token) {
       const client = getSupabase();
       const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'INTRO_PORTAL_URL').maybeSingle();
-      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
+      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/Lead-app/';
       return { success: true, url: u };
     },
 
@@ -2782,9 +2782,10 @@
 
     submitGaJungjiMessage: async function(token, text) {
       const client = getSupabase();
-      const sess = getSession_();
+      const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : getSession_();
+      const submitter = (sess && sess.name) ? sess.name : 'CS관리자';
       const { error } = await client.from('inbox_gajungji').insert([{
-        submitted_by: sess ? sess.name : 'CS근무자',
+        submitted_by: submitter,
         raw_text: text,
         status: '대기'
       }]);
@@ -3143,7 +3144,7 @@
           const carNum = rec.car ? Number(String(rec.car).replace(/[^0-9]/g, '')) : null;
           const cancelCars = [26, 27, 28, 127, 160, '없음'];
           const 담당차량 = (carNum && cancelCars.indexOf(carNum) !== -1) ? String(carNum) : (rec.car || '');
-          const alreadyRegistered = /^y$/i.test(String(rec.registered || '').trim());
+          const alreadyRegistered = /^(y|유)$/i.test(String(rec.registered || '').trim());
           const 사유 = [rec.restorePlan, rec.note].filter(v => v && String(v).trim()).join(' / ');
           rows.push({
             display: {
