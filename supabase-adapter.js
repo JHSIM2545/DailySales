@@ -1890,58 +1890,82 @@
       const PRODUCTS = ['알람', '정보보안', '휴엔', '블루스캔'];
       const PROD_FILTERS = { '알람': ['알람', '유지보수', '블루스캔'], '정보보안': ['정보보안'], '휴엔': ['휴엔'], '블루스캔': ['블루스캔'] };
 
+      function parseDatePart_(val) {
+        if (!val) return null;
+        const s = String(val).slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+        return { ym: s.slice(0, 7), d: Number(s.slice(8, 10)) };
+      }
+
       const items = PRODUCTS.map(p => {
         const allowed = PROD_FILTERS[p] || [p];
         let ordToday = 0, ordCum = 0, startToday = 0, startCum = 0;
-        let canToday = 0, canCum = 0, incToday = 0, incCum = 0, decToday = 0, decCum = 0, rstToday = 0, rstCum = 0;
+        let canToday = 0, canCum = 0, rstToday = 0, rstCum = 0;
+        let incToday = 0, incCum = 0, decToday = 0, decCum = 0;
 
         (ordRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
           const fee = Number(r.monthly_fee) || 0;
-          if (r.contract_date && r.contract_date.slice(0, 7) === ym) {
-            const d = Number(r.contract_date.slice(8, 10));
-            if (d <= day) ordCum += fee;
-            if (d === day) ordToday += fee;
+          // 수주: 계약일 기준
+          const cPart = parseDatePart_(r.contract_date);
+          if (cPart && cPart.ym === ym) {
+            if (cPart.d <= day) ordCum += fee;
+            if (cPart.d === day) ordToday += fee;
           }
-          if (r.billing_date && r.billing_date.slice(0, 7) === ym) {
-            const d = Number(r.billing_date.slice(8, 10));
-            if (d <= day) startCum += fee;
-            if (d === day) startToday += fee;
+          // 개시: 기산일(billing_date) 또는 개시일(start_date) 기준
+          const bPart = parseDatePart_(r.billing_date || r.start_date);
+          if (bPart && bPart.ym === ym) {
+            if (bPart.d <= day) startCum += fee;
+            if (bPart.d === day) startToday += fee;
           }
         });
 
+        // 해약중지: 확정일(confirm_date) 기준 ('해약방어' 제외)
         (canRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
           const fee = Number(r.monthly_fee) || 0;
-          if (r.confirm_date && r.confirm_date.slice(0, 7) === ym) {
-            const d = Number(r.confirm_date.slice(8, 10));
-            if (d <= day) canCum += fee;
-            if (d === day) canToday += fee;
+          const cPart = parseDatePart_(r.confirm_date);
+          if (cPart && cPart.ym === ym) {
+            if (cPart.d <= day) canCum += fee;
+            if (cPart.d === day) canToday += fee;
           }
         });
 
-        (prcRes.data || []).forEach(r => {
-          if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
-          const amt = Number(r.diff_amount) || 0;
-          if (r.billing_date && r.billing_date.slice(0, 7) === ym) {
-            const d = Number(r.billing_date.slice(8, 10));
-            if (d <= day) { if (amt >= 0) incCum += amt; else decCum += Math.abs(amt); }
-            if (d === day) { if (amt >= 0) incToday += amt; else decToday += Math.abs(amt); }
-          }
-        });
-
+        // 재개시: 재개시일(restart_date) 기준
         (rstRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
           const fee = Number(r.monthly_fee) || 0;
-          if (r.restart_date && r.restart_date.slice(0, 7) === ym) {
-            const d = Number(r.restart_date.slice(8, 10));
-            if (d <= day) rstCum += fee;
-            if (d === day) rstToday += fee;
+          const rPart = parseDatePart_(r.restart_date);
+          if (rPart && rPart.ym === ym) {
+            if (rPart.d <= day) rstCum += fee;
+            if (rPart.d === day) rstToday += fee;
           }
         });
 
-        const dayNet = startToday - (canToday - incToday - decToday - rstToday);
-        const cumNet = startCum - (canCum - incCum - decCum - rstCum);
+        // 인상인하: 기산일(billing_date) 기준
+        (prcRes.data || []).forEach(r => {
+          if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
+          let amt = Number(r.diff_amount) || 0;
+          if (r.category === '인하' && amt > 0) amt = -amt;
+          if (r.category === '인상' && amt < 0) amt = Math.abs(amt);
+
+          const bPart = parseDatePart_(r.billing_date);
+          if (bPart && bPart.ym === ym) {
+            if (bPart.d <= day) {
+              if (amt >= 0) incCum += amt;
+              else decCum += amt; // 음수 유지 (e.g. -30000)
+            }
+            if (bPart.d === day) {
+              if (amt >= 0) incToday += amt;
+              else decToday += amt; // 음수 유지 (e.g. -30000)
+            }
+          }
+        });
+
+        // 사용자 요청 산식: 유지증가 실적 = 개시 - (해약 - 재개시 - 인상 - 인하)
+        // ※ decToday(인하)는 음수로 보정되어 있으므로, "- decToday"가 "+ |인하|"로 정확히 계산됨.
+        const dayNet = startToday - (canToday - rstToday - incToday - decToday);
+        const cumNet = startCum - (canCum - rstCum - incCum - decCum);
         const t = targetMap[p] || {};
 
         return {
