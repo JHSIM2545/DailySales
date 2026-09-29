@@ -2703,6 +2703,44 @@
       return { success: true };
     },
 
+    autoCommitAiInboxItem: async function(token, id) {
+      const client = getSupabase();
+      const sess = getSession_();
+      const userName = (sess && sess.name) ? sess.name : '마스터';
+
+      const { data: item, error: fetchErr } = await client.from('inbox_ai_reports').select('*').eq('id', id).single();
+      if (fetchErr || !item) throw new Error('접수 항목을 찾을 수 없습니다.');
+
+      const parseRes = await this.parseSalesReportText(token, item.raw_text, item.submitted_by, item.report_date_override);
+      if (!parseRes || !parseRes.success) throw new Error(parseRes ? parseRes.error : '분석 실패');
+
+      const f = Object.assign({}, parseRes.fields);
+      const payload = { id: null, fields: f };
+
+      if (parseRes.type === 'cancel') {
+        await this.saveCancelRow(token, payload);
+      } else if (parseRes.type === 'price_change') {
+        await this.savePriceRow(token, payload);
+      } else if (parseRes.type === 'restart') {
+        await this.saveRestartRow(token, payload);
+      } else {
+        await this.saveOrderStartRow(token, payload);
+      }
+
+      await client.from('inbox_ai_reports').update({
+        status: '처리완료',
+        processed_at: new Date().toISOString(),
+        processed_by: userName,
+        registered_type: parseRes.type
+      }).eq('id', id);
+
+      return {
+        success: true,
+        type: parseRes.type,
+        company: f['계약처명'] || f['서비스제공처'] || '미확인'
+      };
+    },
+
     submitGaJungjiMessage: async function(token, text) {
       const client = getSupabase();
       const sess = getSession_();
@@ -2911,6 +2949,7 @@
 
         // ===================== 문장 분석 엔진 (영업보고 & 가중지보고 완벽 구현) =====================
     parseSalesReportText: async function(token, text, reporterName, reportDateOverride) {
+      const sess = getSession_();
       const raw0 = String(text || '').trim();
       if (!raw0) return { success: false, error: '분석할 내용이 없습니다.' };
       try {
@@ -7362,51 +7401,155 @@ function renderAiParsedPreview_(res){
   const curRep = f['영업담당'] || '최영국';
   let repOptions = reps.map(r => '<option value="' + r + '"' + (r === curRep ? ' selected' : '') + '>' + r + '</option>').join('');
 
-  const rawFee = String(f['용역료'] || f['금액'] || '').replace(/[^0-9-]/g, '');
-  const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
+  const products = ['알람', '휴엔', '정보보안', '블루스캔', '유지보수'];
+  const curProd = f['상품'] || '알람';
+  let prodOptions = products.map(p => '<option value="' + p + '"' + (p === curProd ? ' selected' : '') + '>' + p + '</option>').join('');
+
+  const grosses = ['일반', '법인'];
+  const curGross = f['그로스'] || '일반';
+  let grossOptions = grosses.map(g => '<option value="' + g + '"' + (g === curGross ? ' selected' : '') + '>' + g + '</option>').join('');
 
   let html = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; font-family:Malgun Gothic,sans-serif;">' +
-    '<span style="font-size:15px; font-weight:700; color:' + badgeColor + '; background:#f1f5f9; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1;">🎯 분석 결과: [' + typeName + ']</span>' +
-    '<button class="primary" onclick="commitAiParsedRow_()" style="padding:9px 24px; font-weight:700; font-size:14px; background:' + badgeColor + '; border-color:' + badgeColor + '; font-family:Malgun Gothic,sans-serif;">✓ ' + typeName + ' 일보에 바로 등록</button>' +
+    '<span style="font-size:15px; font-weight:700; color:' + badgeColor + '; background:#f1f5f9; padding:5px 12px; border-radius:6px; border:1px solid #cbd5e1;">🎯 분석 결과: [' + typeName + ' 보고]</span>' +
+    '<button class="primary" onclick="commitAiParsedRow_()" style="padding:9px 24px; font-weight:700; font-size:14px; background:' + badgeColor + '; border-color:' + badgeColor + '; font-family:Malgun Gothic,sans-serif; cursor:pointer;">✓ ' + typeName + ' 일보에 바로 등록</button>' +
   '</div>';
 
   html += '<div style="background:#fff; padding:16px; border-radius:8px; border:1px solid #cbd5e1; font-family:Malgun Gothic,sans-serif; box-shadow:0 2px 4px rgba(0,0,0,0.03);">';
 
   if (res.type === 'order_start') {
-    // 수주개시 전용: 보고일, 개시일자, 기산일 명확히 분리 표시
-    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당 (컨설턴트):</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;">' + repOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">금액/용역료:</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+    // 1. 수주개시
+    const rawFee = String(f['용역료'] || '').replace(/[^0-9-]/g, '');
+    const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
+    const motives = ['개척', '콜센터', '사내소개', '고객소개', '대리점', '관내이전', '관외이전', '그로스', '기타'];
+    const curMotive = f['영업동기'] || '개척';
+    let motiveOptions = motives.map(m => '<option value="' + m + '"' + (m === curMotive ? ' selected' : '') + '>' + m + '</option>').join('');
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
     '</div>';
 
-    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><input type="text" id="ai_f_prod" value="' + escAttr(f['상품'] || '알람') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">영업동기:</label><input type="text" id="ai_f_reason" value="' + escAttr(f['영업동기'] || '개척') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 계약일 (보고일):</label><input type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">🚀 개시일자 (개시일):</label><input type="date" id="ai_f_start_date" value="' + escAttr(f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" onchange="onAiStartDateChange_(this.value)"></div>' +
-      '<div><label style="color:#6d28d9; font-weight:700; display:block; margin-bottom:3px;">📌 기산일:</label><input type="date" id="ai_f_accrual_date" value="' + escAttr(f['기산일'] || f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="this.dataset.userEdited=1"></div>' +
-    '</div>';
-  } else {
-    const date1Label = res.type === 'cancel' ? '접수일(보고일):' : (res.type === 'price_change' ? '접수일(보고일):' : '중지일:');
-    const date2Label = res.type === 'cancel' ? '확정일(해약일):' : (res.type === 'price_change' ? '기산일:' : '재개시일:');
-    const reasonLabel = res.type === 'cancel' ? '해약유형:' : (res.type === 'price_change' ? '사유:' : '비고:');
-
-    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당 (컨설턴트):</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;">' + repOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">금액/용역료:</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">그로스구분:</label><select id="ai_f_gross" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + grossOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">영업동기:</label><select id="ai_f_reason" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + motiveOptions + '</select></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 계약일(보고일):</label><input type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">🚀 개시일자:</label><input type="date" id="ai_f_start_date" value="' + escAttr(f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-weight:700; box-sizing:border-box;" onchange="onAiStartDateChange_(this.value)"></div>' +
+      '<div><label style="color:#6d28d9; font-weight:700; display:block; margin-bottom:3px;">📌 기산일:</label><input type="date" id="ai_f_accrual_date" value="' + escAttr(f['기산일'] || f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; box-sizing:border-box;" oninput="this.dataset.userEdited=1"></div>' +
     '</div>';
 
-    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><input type="text" id="ai_f_prod" value="' + escAttr(f['상품'] || '알람') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">' + reasonLabel + '</label><input type="text" id="ai_f_reason" value="' + escAttr(f['해약유형'] || f['사유'] || f['영업동기'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">' + date1Label + '</label><input type="date" id="ai_f_date1" value="' + escAttr(f['보고일'] || f['접수일'] || f['중지일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">' + date2Label + '</label><input type="date" id="ai_f_date2" value="' + escAttr(f['확정일'] || f['기산일'] || f['재개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; font-weight:700; font-family:Malgun Gothic,sans-serif; box-sizing:border-box;"></div>' +
+    html += '<div style="font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
+      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력">' +
+    '</div>';
+
+  } else if (res.type === 'price_change') {
+    // 2. 인상인하 보고
+    const rawDiff = Number(f['금액'] || 0);
+    const isDown = rawDiff < 0 || (f['구분'] === '인하');
+    const rawFee = String(Math.abs(rawDiff) || '').replace(/[^0-9]/g, '');
+    const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
+    const rawCurrFee = String(f['現용역료'] || '').replace(/[^0-9]/g, '');
+    const fmtCurrFee = rawCurrFee ? Number(rawCurrFee).toLocaleString() : '';
+
+    const priceReasons = ['변추가인상', '순수인상', '서비스추가', '경비구역축소', '약정기간', '해약방어인하', '법인인하', '기타'];
+    const curReason = f['사유'] || (isDown ? '해약방어인하' : '순수인상');
+    let reasonOptions = priceReasons.map(r => '<option value="' + r + '"' + (r === curReason ? ' selected' : '') + '>' + r + '</option>').join('');
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">구분 (인상/인하):</label>' +
+        '<select id="ai_f_pc_category" style="width:100%; padding:6px 8px; font-weight:700; color:' + (isDown ? '#dc2626' : '#2563eb') + '; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; box-sizing:border-box;">' +
+          '<option value="인상"' + (!isDown ? ' selected' : '') + '>🔺 인상</option>' +
+          '<option value="인하"' + (isDown ? ' selected' : '') + '>🔻 인하</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>';
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
+      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">변동금액 (인상/인하액):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#7c3aed; border:1px solid #c4b5fd; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">現용역료 (변경 전):</label><input type="text" id="ai_f_curr_fee" value="' + escAttr(fmtCurrFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:600; text-align:right; color:#334155; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">접수자:</label><input type="text" id="ai_f_receiver" value="' + escAttr(f['접수자'] || curRep) + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 접수일:</label><input type="date" id="ai_f_date1" value="' + escAttr(f['접수일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">📌 기산일(반영일):</label><input type="date" id="ai_f_date2" value="' + escAttr(f['기산일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; box-sizing:border-box;"></div>' +
+    '</div>';
+
+    html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">사유:</label><select id="ai_f_reason" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + reasonOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력"></div>' +
+    '</div>';
+
+  } else if (res.type === 'cancel') {
+    // 3. 해약중지 보고
+    const rawFee = String(f['용역료'] || '').replace(/[^0-9-]/g, '');
+    const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
+    const isStop = (f['해약유형'] === '중지') || (f['구분'] === '중지') || /중지/.test(res.typeName || '');
+
+    const cancelTypes = ['폐업', '타사전환', '관외이전', '관내이전', '통합', '공사', '경비절감', '고객사망', '중지', '기타'];
+    const curCancelType = f['해약유형'] || (isStop ? '중지' : '폐업');
+    let cancelTypeOptions = cancelTypes.map(c => '<option value="' + c + '"' + (c === curCancelType ? ' selected' : '') + '>' + c + '</option>').join('');
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">구분 (해약/중지):</label>' +
+        '<select id="ai_f_cancel_category" style="width:100%; padding:6px 8px; font-weight:700; color:#c0392b; border:1px solid #fecaca; border-radius:4px; background:#fef2f2; box-sizing:border-box;">' +
+          '<option value="해약"' + (!isStop ? ' selected' : '') + '>🛑 해약</option>' +
+          '<option value="중지"' + (isStop ? ' selected' : '') + '>⏸️ 중지</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>';
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
+      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#c0392b; border:1px solid #fecaca; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">그로스구분:</label><select id="ai_f_gross" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + grossOptions + '</select></div>' +
+      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">해약유형:</label><select id="ai_f_cancel_type" style="width:100%; padding:6px 8px; font-weight:600; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + cancelTypeOptions + '</select></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 접수일:</label><input type="date" id="ai_f_date1" value="' + escAttr(f['접수일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">🛑 확정일(해약/중지일):</label><input type="date" id="ai_f_date2" value="' + escAttr(f['확정일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #fecaca; border-radius:4px; background:#fef2f2; font-weight:700; box-sizing:border-box;"></div>' +
+    '</div>';
+
+    html += '<div style="font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
+      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상세 사유:</label><input type="text" id="ai_f_reason" value="' + escAttr(f['사유'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="해약/중지 사유 입력">' +
+    '</div>';
+
+  } else if (res.type === 'restart') {
+    // 4. 재개시 보고
+    const rawFee = String(f['용역료'] || '').replace(/[^0-9-]/g, '');
+    const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">현상태:</label>' +
+        '<select id="ai_f_restart_status" style="width:100%; padding:6px 8px; font-weight:700; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;">' +
+          '<option value="재개시" selected>🚀 재개시</option>' +
+          '<option value="중지">⏸️ 중지</option>' +
+        '</select>' +
+      '</div>' +
+    '</div>';
+
+    html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
+      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">공사담당:</label><input type="text" id="ai_f_construct_rep" value="' + escAttr(f['공사담당'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="공사담당자"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">그로스구분:</label><select id="ai_f_gross" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + grossOptions + '</select></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">⏸️ 중지일:</label><input type="date" id="ai_f_date1" value="' + escAttr(f['중지일'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">🚀 재개시일:</label><input type="date" id="ai_f_date2" value="' + escAttr(f['재개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #bbf7d0; border-radius:4px; background:#f0fdf4; font-weight:700; box-sizing:border-box;"></div>' +
+    '</div>';
+
+    html += '<div style="font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
+      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력">' +
     '</div>';
   }
 
@@ -7419,40 +7562,63 @@ function commitAiParsedRow_(){
   const res = CURRENT_PARSED_AI_DATA;
   const f = Object.assign({}, res.fields);
 
-  // 화면에서 수정한 필드 값 반영
+  // 공통 기본 필드 반영
   if (document.getElementById('ai_f_company')) f['계약처명'] = document.getElementById('ai_f_company').value.trim();
   if (document.getElementById('ai_f_contract')) f['계약번호'] = document.getElementById('ai_f_contract').value.trim();
   if (document.getElementById('ai_f_rep')) f['영업담당'] = document.getElementById('ai_f_rep').value;
   if (document.getElementById('ai_f_car')) f['담당차량'] = document.getElementById('ai_f_car').value.trim();
   if (document.getElementById('ai_f_prod')) f['상품'] = document.getElementById('ai_f_prod').value.trim();
+  if (document.getElementById('ai_f_gross')) f['그로스'] = document.getElementById('ai_f_gross').value.trim();
+  if (document.getElementById('ai_f_note')) f['비고'] = document.getElementById('ai_f_note').value.trim();
 
-  if (document.getElementById('ai_f_fee')) {
-    const feeVal = document.getElementById('ai_f_fee').value.replace(/[^0-9-]/g, '');
-    if (res.type === 'price_change') f['금액'] = feeVal;
-    else f['용역료'] = feeVal;
-  }
-
-  if (document.getElementById('ai_f_reason')) {
-    const rVal = document.getElementById('ai_f_reason').value.trim();
-    if (res.type === 'cancel') f['해약유형'] = rVal;
-    else if (res.type === 'price_change') f['사유'] = rVal;
-    else if (res.type === 'order_start') f['영업동기'] = rVal;
-  }
-
+  // 유형별 전용 필드 처리
   if (res.type === 'order_start') {
+    if (document.getElementById('ai_f_fee')) {
+      f['용역료'] = document.getElementById('ai_f_fee').value.replace(/[^0-9]/g, '');
+    }
+    if (document.getElementById('ai_f_reason')) f['영업동기'] = document.getElementById('ai_f_reason').value;
     const reportDate = document.getElementById('ai_f_report_date') ? document.getElementById('ai_f_report_date').value : todayStr();
     f['보고일'] = reportDate;
-    f['계약일'] = reportDate; // 보고일이 계약일!
+    f['계약일'] = reportDate;
     if (document.getElementById('ai_f_start_date')) f['개시일'] = document.getElementById('ai_f_start_date').value;
     if (document.getElementById('ai_f_accrual_date')) f['기산일'] = document.getElementById('ai_f_accrual_date').value;
     if (!f['기산일']) f['기산일'] = f['개시일'] || reportDate;
-  } else if (res.type === 'cancel') {
-    if (document.getElementById('ai_f_date1')) f['접수일'] = document.getElementById('ai_f_date1').value;
-    if (document.getElementById('ai_f_date2')) f['확정일'] = document.getElementById('ai_f_date2').value;
+    f['유형'] = '자동등록';
+
   } else if (res.type === 'price_change') {
+    const isDown = document.getElementById('ai_f_pc_category')?.value === '인하';
+    f['구분'] = isDown ? '인하' : '인상';
+    if (document.getElementById('ai_f_fee')) {
+      const numFee = Number(document.getElementById('ai_f_fee').value.replace(/[^0-9]/g, '') || 0);
+      f['금액'] = String(isDown ? -Math.abs(numFee) : Math.abs(numFee));
+    }
+    if (document.getElementById('ai_f_curr_fee')) {
+      f['現용역료'] = document.getElementById('ai_f_curr_fee').value.replace(/[^0-9]/g, '');
+    }
+    if (document.getElementById('ai_f_receiver')) f['접수자'] = document.getElementById('ai_f_receiver').value.trim();
+    if (document.getElementById('ai_f_reason')) f['사유'] = document.getElementById('ai_f_reason').value;
     if (document.getElementById('ai_f_date1')) f['접수일'] = document.getElementById('ai_f_date1').value;
     if (document.getElementById('ai_f_date2')) f['기산일'] = document.getElementById('ai_f_date2').value;
+    f['유형'] = '자동등록';
+
+  } else if (res.type === 'cancel') {
+    const isStop = document.getElementById('ai_f_cancel_category')?.value === '중지';
+    f['구분'] = isStop ? '중지' : '해약';
+    if (document.getElementById('ai_f_fee')) {
+      f['용역료'] = document.getElementById('ai_f_fee').value.replace(/[^0-9]/g, '');
+    }
+    if (document.getElementById('ai_f_cancel_type')) f['해약유형'] = document.getElementById('ai_f_cancel_type').value;
+    if (document.getElementById('ai_f_reason')) f['사유'] = document.getElementById('ai_f_reason').value.trim();
+    if (document.getElementById('ai_f_date1')) f['접수일'] = document.getElementById('ai_f_date1').value;
+    if (document.getElementById('ai_f_date2')) f['확정일'] = document.getElementById('ai_f_date2').value;
+    f['유형'] = '자동등록';
+
   } else if (res.type === 'restart') {
+    if (document.getElementById('ai_f_restart_status')) f['현상태'] = document.getElementById('ai_f_restart_status').value;
+    if (document.getElementById('ai_f_fee')) {
+      f['용역료'] = document.getElementById('ai_f_fee').value.replace(/[^0-9]/g, '');
+    }
+    if (document.getElementById('ai_f_construct_rep')) f['공사담당'] = document.getElementById('ai_f_construct_rep').value.trim();
     if (document.getElementById('ai_f_date1')) f['중지일'] = document.getElementById('ai_f_date1').value;
     if (document.getElementById('ai_f_date2')) f['재개시일'] = document.getElementById('ai_f_date2').value;
   }
@@ -7460,7 +7626,6 @@ function commitAiParsedRow_(){
   setLoadingCursor(true);
   const payload = { id: null, fields: f };
 
-  let callPromise;
   if (res.type === 'cancel') {
     google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveCancelRow(SESSION.token, payload);
   } else if (res.type === 'price_change') {

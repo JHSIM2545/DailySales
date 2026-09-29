@@ -2680,6 +2680,44 @@
       return { success: true };
     },
 
+    autoCommitAiInboxItem: async function(token, id) {
+      const client = getSupabase();
+      const sess = getSession_();
+      const userName = (sess && sess.name) ? sess.name : '마스터';
+
+      const { data: item, error: fetchErr } = await client.from('inbox_ai_reports').select('*').eq('id', id).single();
+      if (fetchErr || !item) throw new Error('접수 항목을 찾을 수 없습니다.');
+
+      const parseRes = await this.parseSalesReportText(token, item.raw_text, item.submitted_by, item.report_date_override);
+      if (!parseRes || !parseRes.success) throw new Error(parseRes ? parseRes.error : '분석 실패');
+
+      const f = Object.assign({}, parseRes.fields);
+      const payload = { id: null, fields: f };
+
+      if (parseRes.type === 'cancel') {
+        await this.saveCancelRow(token, payload);
+      } else if (parseRes.type === 'price_change') {
+        await this.savePriceRow(token, payload);
+      } else if (parseRes.type === 'restart') {
+        await this.saveRestartRow(token, payload);
+      } else {
+        await this.saveOrderStartRow(token, payload);
+      }
+
+      await client.from('inbox_ai_reports').update({
+        status: '처리완료',
+        processed_at: new Date().toISOString(),
+        processed_by: userName,
+        registered_type: parseRes.type
+      }).eq('id', id);
+
+      return {
+        success: true,
+        type: parseRes.type,
+        company: f['계약처명'] || f['서비스제공처'] || '미확인'
+      };
+    },
+
     submitGaJungjiMessage: async function(token, text) {
       const client = getSupabase();
       const sess = getSession_();
@@ -2888,6 +2926,7 @@
 
         // ===================== 문장 분석 엔진 (영업보고 & 가중지보고 완벽 구현) =====================
     parseSalesReportText: async function(token, text, reporterName, reportDateOverride) {
+      const sess = getSession_();
       const raw0 = String(text || '').trim();
       if (!raw0) return { success: false, error: '분석할 내용이 없습니다.' };
       try {
