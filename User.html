@@ -314,27 +314,54 @@
     const lines = rawText.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
     if (lines.length < 2) return '';
     const cars = [26, 27, 28, 127, 160];
+    const priceReasonList = ['변추가인상', '변추가', '순수인상', '서비스추가', '경비구역축소', '약정기간', '해약방어인하', '해약방어', '법인인하'];
+    const cancelTypeList = ['폐업', '타사전환', '관외이전', '관내이전', '통합', '공사', '경비절감', '고객사망', '중지'];
     const candidates = lines.filter(function(line){
       const lastTok_ = line.split(/\s+/).pop();
       if (AI_REPORT_HEADER_LINES_.indexOf(line) !== -1 || AI_REPORT_HEADER_LINES_.indexOf(lastTok_) !== -1) return false;
-      if (/^[0-9][0-9,]*\s*(원|천원|만원|억원?)?$/.test(line)) return false;
+      if (/^[0-9][0-9,]*\s*(?:억|만|천)?\s*원?$/.test(line) || /->|→/.test(line)) return false;
+      if (/N\d{7,8}/.test(line)) return false;
       const carM = line.match(/^0*([0-9]{1,3})\s*호$/);
       if (carM && cars.indexOf(Number(carM[1])) !== -1) return false;
-      if (motiveList.some(function(mv){ return mv && line.indexOf(mv) === 0; })) return false;
-      if (/개시|기산|공사|반영|확정/.test(line) && /\d/.test(line)) return false;
+      if (motiveList && motiveList.some(function(mv){ return mv && line.indexOf(mv) === 0; })) return false;
+      if (priceReasonList.some(function(pr){ return pr && line.indexOf(pr) === 0; })) return false;
+      if (cancelTypeList.some(function(ct){ return ct && line.indexOf(ct) === 0; })) return false;
+      if (/^(?:영업담당|담당|접수자|공사담당|사유|비고|참고)\s*[:：]/.test(line)) return false;
+      if (/개시|기산|공사|반영|확정|접수|보고/.test(line) && /\d/.test(line)) return false;
       return true;
     });
-    return candidates.join(' ');
+    return candidates.length ? candidates[0] : '';
   }
   function ruleParseCompanyNameByContractLine_(rawText) {
-    const stripLabel = function(s){ return s.replace(/^상호명?\s*[:：]\s*/, '').trim(); };
+    const stripLabel = function(s){
+      return String(s || '').replace(/^(?:상호명?|계약처명?|고객명?|상호|계약처)\s*[:：]\s*/, '').trim();
+    };
     const lines = rawText.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
     for (let i = 0; i < lines.length; i++) {
-      const m = lines[i].match(/(?:^|[\s\t])(N\d{7,8})[\t ]+(.*)$/);
+      const m = lines[i].match(/(?:^|[\s\t\[\(])(N\d{7,8})(?:[\s\t\]\)]|$)/);
       if (!m) continue;
-      if (m[2] && m[2].trim()) return stripLabel(m[2].trim());
-      if (i + 1 < lines.length) return stripLabel(lines[i + 1]);
-      return '';
+      const contractNo = m[1];
+      const sameLineRest = lines[i].replace(contractNo, '').replace(/[\[\]\(\)\-:]/g, ' ').trim();
+      if (sameLineRest && sameLineRest.length >= 2) {
+        return stripLabel(sameLineRest);
+      }
+      if (i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        const isHeader = AI_REPORT_HEADER_LINES_.some(h => nextLine.includes(h));
+        const isAmount = /^[0-9][0-9,]*\s*(?:억|만|천)?\s*원?/.test(nextLine) || /->|→/.test(nextLine);
+        const isCar = /^0*([0-9]{1,3})\s*호$/.test(nextLine);
+        const isDate = /(?:개시|기산|공사|반영|확정|접수|보고일).*\d/.test(nextLine);
+        if (!isHeader && !isAmount && !isCar && !isDate) {
+          return stripLabel(nextLine);
+        }
+      }
+      if (i > 0) {
+        const prevLine = lines[i - 1];
+        const isHeader = AI_REPORT_HEADER_LINES_.some(h => prevLine.includes(h));
+        if (!isHeader) {
+          return stripLabel(prevLine);
+        }
+      }
     }
     return '';
   }
@@ -1434,10 +1461,21 @@
     getUserNames: async function(token) {
       const client = getSupabase();
       const { data, error } = await client.from('app_users').select('name, job');
-      if (error) return { success: true, names: ['최영국', '이수열', '박광춘', '정문재', '임영민'] };
-      const eligible = ['컨설턴트(영업)', '엔지니어(기술)', '서비스(CS)'];
-      const names = (data || []).filter(u => eligible.includes(u.job)).map(u => u.name);
-      return { success: true, names: names.length ? names : ['최영국', '이수열', '박광춘', '정문재', '임영민'] };
+      const fallbackList = ['심정환', '최영국', '박광춘', '이수열', '정문재', '임영민', '김상훈', '박정훈', '박광모', '최문혁', '이재식', '원종범'];
+      if (error || !data || !data.length) return { success: true, names: fallbackList };
+
+      // 본사직원과 CS근무자를 제외한 전직원
+      const names = data.filter(u => {
+        const job = String(u.job || '').trim();
+        // 본사직원 제외 (Staff, 매니저, 본사스탭, 본사관리자 등)
+        if (job.includes('본사') || job.includes('Staff') || job.includes('매니저')) return false;
+        // CS근무자 제외
+        if (job === 'CS근무자' || job.includes('CS근무자')) return false;
+        return Boolean(u.name && u.name.trim());
+      }).map(u => u.name.trim());
+
+      const uniqueNames = Array.from(new Set(names));
+      return { success: true, names: uniqueNames.length ? uniqueNames : fallbackList };
     },
 
         
@@ -7038,7 +7076,7 @@ function submitNewCancelRow(){
 }  
   
 /* ===================== 공용: 등록된 사용자 이름 목록 ===================== */  
-let USER_NAMES = [];  
+let USER_NAMES = ['심정환', '최영국', '박광춘', '이수열', '정문재', '임영민', '김상훈', '박정훈', '박광모', '최문혁', '이재식', '원종범'];  
 function ensureUserNames(callback){  
  if (USER_NAMES.length > 0) { callback(); return; }  
  google.script.run  
