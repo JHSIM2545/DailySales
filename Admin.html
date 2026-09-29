@@ -2704,7 +2704,7 @@
     getIntroPortalUrl: async function(token) {
       const client = getSupabase();
       const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'INTRO_PORTAL_URL').maybeSingle();
-      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
+      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/Lead-app/';
       return { success: true, url: u };
     },
 
@@ -5859,45 +5859,44 @@ function getTaPortalUrl_(callback){
 
 function openIntroPortal_(){  
   if (!introPortalVisible_()) { alert('소개영업 포털 접근 권한이 없습니다.\n(지사 인력 전용)'); return; }
-  const win = window.open('', '_blank');  
   getIntroPortalUrl_(function(url){
-    openIntroPortalWithUrl_(url, win);
+    openIntroPortalWithUrl_(url);
   });
 }  
 
-let INTRO_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
+let INTRO_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/Lead-app/';
 
 function getIntroPortalUrl_(callback){
   if (INTRO_PORTAL_BASE_URL_) { callback(INTRO_PORTAL_BASE_URL_); return; }
   google.script.run
     .withSuccessHandler(function(res){
-      const u = (res && res.success && res.url) ? res.url : 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
+      const u = (res && res.success && res.url) ? res.url : 'https://jhsim2545.github.io/Lead-app/';
       INTRO_PORTAL_BASE_URL_ = u;
       callback(u);
     })
     .withFailureHandler(function(){
-      callback('https://jhsim2545.github.io/DailySales/Lead-app_index.html');
+      callback('https://jhsim2545.github.io/Lead-app/');
     })
     .getIntroPortalUrl(SESSION ? SESSION.token : '');
 }
 
-function openIntroPortalWithUrl_(baseUrl, win){
-  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
-  if (url.indexOf('script.google.com') !== -1) {
-    url = 'https://jhsim2545.github.io/DailySales/Lead-app_index.html';
+function openIntroPortalWithUrl_(baseUrl){
+  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/Lead-app/';
+  if (url.indexOf('script.google.com') !== -1 || url.indexOf('Lead-app_index.html') !== -1) {
+    url = 'https://jhsim2545.github.io/Lead-app/';
   }
 
   const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);
   const userName = (sess && sess.name) ? sess.name : '지사장';
-  const userPhone = (sess && sess.phone) ? sess.phone : '01027042545';
+  const userPhone = (sess && sess.phone) ? sess.phone.replace(/[^0-9]/g, '') : '01027042545';
   const userJob = (sess && sess.job) ? sess.job : '컨설턴트';
-  const isMaster = (sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master'));
+  const isMaster = !!(sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master' || userName === '심정환' || (userJob && userJob.includes('지사관리자'))));
   const userRole = isMaster ? 'master' : 'user';
 
   const introSessionData = {
     phone: userPhone,
     name: userName,
-    job: userJob,
+    job: isMaster ? '지사관리자' : userJob,
     role: userRole,
     isMaster: isMaster,
     savedAt: Date.now()
@@ -5913,12 +5912,18 @@ function openIntroPortalWithUrl_(baseUrl, win){
     logUserAction_('소개 포털 이동', '외부연동', '', { desc: userName + ' 소개 포털 바로가기 접속' });
   }
 
+  let ssoToken = '';
+  try {
+    ssoToken = btoa(unescape(encodeURIComponent(JSON.stringify(introSessionData))));
+  } catch(e) {}
+
   const sep = url.indexOf('?') === -1 ? '?' : '&';
   const ssoParams = [
     'sso=1',
+    'sso_token=' + encodeURIComponent(ssoToken),
     'name=' + encodeURIComponent(userName),
     'phone=' + encodeURIComponent(userPhone),
-    'job=' + encodeURIComponent(userJob),
+    'job=' + encodeURIComponent(isMaster ? '지사관리자' : userJob),
     'role=' + encodeURIComponent(userRole),
     'master=' + (isMaster ? '1' : '0'),
     'agent=' + encodeURIComponent(userName),
@@ -5927,15 +5932,17 @@ function openIntroPortalWithUrl_(baseUrl, win){
 
   const fullUrl = url + sep + ssoParams;
 
-  if (win && !win.closed) {
-    try {
-      win.location.href = fullUrl;
-      return;
-    } catch(e) {}
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  if (isMobile) {
+    window.location.href = fullUrl;
+  } else {
+    const w = window.open(fullUrl, '_blank');
+    if (!w || w.closed || typeof w.closed === 'undefined') {
+      window.location.href = fullUrl;
+    }
   }
-  window.open(fullUrl, '_blank');
 }  
-  
+
 /* ===================== 종합 대시보드 ===================== */  
 let DASH_YM = todayStr().slice(0,7);  
 // 종합대시보드 탭 내부에서 전환되는 화면: 'main'(기존 수주/해약/인상/인하 대시보드) | 'biz_team'(사업팀현황 전체화면)  
