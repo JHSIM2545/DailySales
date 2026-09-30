@@ -9465,6 +9465,25 @@ document.addEventListener('blur', function(e){
     delete t.dataset.focusedOnce;
   }
 }, true);
+
+// 비밀번호 외 전역 자동완성 차단 함수
+function applyGlobalNoAutocomplete_() {
+  try {
+    document.querySelectorAll('input, textarea').forEach(function(el) {
+      var t = (el.type || '').toLowerCase();
+      var name = (el.name || '').toLowerCase();
+      var id = (el.id || '').toLowerCase();
+      var ac = (el.getAttribute('autocomplete') || '').toLowerCase();
+      if (t === 'password' || ac.includes('password') || ac.includes('username') || name === 'username' || name === 'password' || name === 'new-password' || id.includes('pwd') || id.includes('password') || id.includes('phone')) {
+        return;
+      }
+      el.setAttribute('autocomplete', 'off');
+      el.setAttribute('aria-autocomplete', 'none');
+    });
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', applyGlobalNoAutocomplete_);
 </script>
 </body>
 </html>
