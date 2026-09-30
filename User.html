@@ -3660,7 +3660,7 @@
 </div>  
   
 <div id="toolbar-order" class="toolbar" style="display:none;">  
- <input type="text" id="searchBox" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
+ <input type="text" id="searchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
  <select id="repFilterOrder" onchange="render()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3668,7 +3668,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossOrder" onchange="render()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterOrder" value="" onchange="onYmFilterChange_('order', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterOrder" value="" onchange="onYmFilterChange_('order', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
   
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3682,7 +3682,7 @@
  <span class="count" id="rowCount"></span>  
 </div>  
 <div id="toolbar-cancel" class="toolbar" style="display:none;">  
- <input type="text" id="cancelSearchBox" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
+ <input type="text" id="cancelSearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
  <select id="repFilterCancel" onchange="renderCancel()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3690,7 +3690,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossCancel" onchange="renderCancel()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterCancel" value="" onchange="onYmFilterChange_('cancel', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterCancel" value="" onchange="onYmFilterChange_('cancel', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
   
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3704,7 +3704,7 @@
  <span class="count" id="cancelRowCount"></span>  
 </div>  
 <div id="toolbar-price" class="toolbar" style="display:none;">  
- <input type="text" id="priceSearchBox" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
+ <input type="text" id="priceSearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
  <select id="repFilterPrice" onchange="renderPrice()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3717,7 +3717,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossPrice" onchange="renderPrice()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterPrice" value="" onchange="onYmFilterChange_('price', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterPrice" value="" onchange="onYmFilterChange_('price', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
   
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3731,7 +3731,7 @@
  <span class="count" id="priceRowCount"></span>  
 </div>  
 <div id="toolbar-restart" class="toolbar" style="display:none;">  
- <input type="text" id="restartSearchBox" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
+ <input type="text" id="restartSearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
  <select id="repFilterRestart" onchange="renderRestart()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3739,7 +3739,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossRestart" onchange="renderRestart()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterRestart" value="" onchange="onYmFilterChange_('restart', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterRestart" value="" onchange="onYmFilterChange_('restart', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
   
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3757,7 +3757,7 @@
   
 <div id="toolbar-product-daily" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddProductDailyModal()">+ 신규 등록</button>  
- <input type="text" id="productDailySearchBox" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="productDailySearchBox" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
  <select id="repFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">전체</option><option value="박정훈">박정훈</option><option value="박광모">박광모</option><option value="김상훈">김상훈</option><option value="최영국">최영국</option><option value="이수열">이수열</option><option value="박광춘">박광춘</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3767,7 +3767,7 @@
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterProductDaily" value="" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
  </span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily" checked>선택항목</label>  
@@ -3786,7 +3786,7 @@
  <h2>로그인</h2>  
  <div class="field">  
  <label>전화번호</label>  
- <input type="text" id="login_phone" placeholder="01012345678">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="login_phone" placeholder="01012345678">  
  </div>  
  <div class="field">  
  <label>비밀번호</label>  
@@ -3802,7 +3802,7 @@
  <h2>사용자 등록</h2>  
  <div class="field">  
  <label>사용자명</label>  
- <input type="text" id="reg_name" placeholder="홍길동">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="reg_name" placeholder="홍길동">  
  </div>  
  <div class="field">  
  <label>직무</label>  
@@ -3819,7 +3819,7 @@
  </div>  
  <div class="field">  
  <label>전화번호</label>  
- <input type="text" id="reg_phone" placeholder="01012345678">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="reg_phone" placeholder="01012345678">  
  </div>  
  <div class="field">  
  <label>비밀번호</label>  
@@ -3905,10 +3905,10 @@
  <div class="field">  
  <label id="dateEditFieldLabel">날짜</label>  
  <div style="display:flex; gap:6px;">  
- <input type="text" id="dateEditInput" placeholder="YYYY-MM-DD" style="flex:1;" onkeydown="if(event.key==='Enter')submitDateEdit_()">  
+ <input type="text" id="dateEditInput" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="YYYY-MM-DD" style="flex:1;" onkeydown="if(event.key==='Enter')submitDateEdit_()">  
  <div style="position:relative; width:38px; height:32px; flex:0 0 auto;">  
  <button type="button" id="dateEditCalendarBtn" tabindex="-1" title="달력에서 선택" style="width:100%; height:100%; padding:0; border:1px solid #c7cfd8; border-radius:4px; background:#f4f6f8; font-size:16px;">📅</button>  
- <input type="date" id="dateEditCalendarInput" onmousedown="syncDateEditCalendarValue_()" onchange="onDateEditCalendarChange_(this)" style="position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; border:none; opacity:0; cursor:pointer;">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="dateEditCalendarInput" onmousedown="syncDateEditCalendarValue_()" onchange="onDateEditCalendarChange_(this)" style="position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; border:none; opacity:0; cursor:pointer;">  
  </div>  
  </div>  
  </div>  
@@ -4407,12 +4407,12 @@ const DATE_CELL_HANDLERS = {};
 function dateCellInputHtml(scope, id, field, val){  
   const raw = String(val === null || val === undefined ? '' : val).trim();  
   return '<span class="datecell-wrap" style="position:relative; display:inline-flex; align-items:center; width:100%;">' +  
-    '<input type="text" style="text-align:right; width:100%; cursor:pointer;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
+    '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" style="text-align:right; width:100%; cursor:pointer;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
     ' title="' + escAttr(raw) + '"' +  
     ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
     ' onclick="openDateCellPicker_(this)"' +  
     ' onblur="onDateCellBlur(this,\'' + scope + '\',\'' + id + '\',\'' + field + '\')">' +  
-    '<input type="date" class="date-pick-hidden"' +  
+    '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" class="date-pick-hidden"' +  
     ' data-scope="' + scope + '" data-id="' + id + '" data-field="' + field + '"' +  
     ' onchange="onDatePickerChange_(this)">' +  
     '</span>';  
@@ -4520,7 +4520,7 @@ function closeDateEditModal_(){
  document.getElementById('dateEditModalOverlay').classList.remove('open');  
  DATE_EDIT_CTX_ = null;  
 }  
-/** 날짜 팝업의 달력 버튼: 투명한 네이티브 <input type="date">를 📅 버튼 위에 완전히 겹쳐 놓고  
+/** 날짜 팝업의 달력 버튼: 투명한 네이티브 <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date">를 📅 버튼 위에 완전히 겹쳐 놓고  
  * 실제 클릭은 그 input이 직접 받도록 한다(구글 앱스스크립트가 화면을 샌드박스 iframe 안에서  
  * 띄우는 탓에 showPicker()/click()으로 강제로 여는 방식은 동작하지 않는 경우가 있어, 사용자가  
  * 실제로 그 input을 클릭하게 만드는 방식으로 변경 — 이렇게 해야 브라우저가 확실히 달력을 띄운다).  
@@ -6254,7 +6254,7 @@ function renderBizTeamFullScreenView_(){
  '<button onclick="dashShowMainView_()" style="margin-right:10px;">◀ 종합대시보드</button>' +  
  '<h2>사업팀현황</h2>' +  
  '<button type="button" onclick="bizTeamShiftViewDate_(-1)" style="padding:4px 8px;" title="하루 전">◀</button>' +  
- '<input type="date" id="bizTeamViewDate" value="' + escHtml(BIZ_TEAM_VIEW_DATE_) + '" onchange="bizTeamViewFilterChanged_()">' +  
+ '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="bizTeamViewDate" value="' + escHtml(BIZ_TEAM_VIEW_DATE_) + '" onchange="bizTeamViewFilterChanged_()">' +  
  '<span style="font-size:13px; font-weight:700; color:#374151;">(' + escHtml(weekdayKo(BIZ_TEAM_VIEW_DATE_)) + ')</span>' +  
  '<button type="button" onclick="bizTeamShiftViewDate_(1)" style="padding:4px 8px;" title="하루 후">▶</button>' +  
  '<select id="bizTeamViewProduct" onchange="bizTeamViewFilterChanged_()">' +  
@@ -6723,18 +6723,19 @@ function buildForm(){
  el.innerHTML = FIELD_DEFS.map(f => {  
  let input;  
  if (f.type === 'select') {  
- input = `<select id="f_${f.key}"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
+ input = `<select id="f_${f.key}" autocomplete="off"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
  } else if (f.type === 'textarea') {  
- input = `<textarea id="f_${f.key}" rows="2"></textarea>`;  
+ input = `<textarea id="f_${f.key}" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea>`;  
  } else if (f.type === 'money') {  
- input = `<input type="text" inputmode="numeric" id="f_${f.key}" oninput="formatMoneyInput(this)" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
+ input = `<input type="text" inputmode="numeric" id="f_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" oninput="formatMoneyInput(this)" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
  } else {  
- input = `<input type="${f.type}" id="f_${f.key}" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
+ input = `<input type="${f.type}" id="f_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
  }  
  return `<div class="field ${f.full?'full':''}"><label>${f.label}</label>${input}<div class="err" id="err_${f.key}"></div></div>`;  
  }).join('');  
  updateAutoPreview();  
  FIELD_DEFS.forEach(f => { const e = document.getElementById('f_'+f.key); if (e) e.addEventListener('input', updateAutoPreview); });  
+ applyGlobalNoAutocomplete_();  
 }  
   
 function collectFormValues(){  
@@ -7084,20 +7085,21 @@ function buildCancelForm(){
  el.innerHTML = CANCEL_FIELD_DEFS.map(f => {  
  let input;  
  if (f.type === 'select') {  
- input = `<select id="cf_${f.key}"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
+ input = `<select id="cf_${f.key}" autocomplete="off"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
  } else if (f.type === 'datalist') {  
  const dlid = 'cfdl_' + f.key;  
- input = `<input id="cf_${f.key}" list="${dlid}" placeholder="${f.placeholder||''}">  
+ input = `<input id="cf_${f.key}" list="${dlid}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="${f.placeholder||''}">  
  <datalist id="${dlid}">${f.options.map(o => `<option value="${o}">`).join('')}</datalist>`;  
  } else if (f.type === 'textarea') {  
- input = `<textarea id="cf_${f.key}" rows="2"></textarea>`;  
+ input = `<textarea id="cf_${f.key}" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea>`;  
  } else {  
- input = `<input type="${f.type}" id="cf_${f.key}" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
+ input = `<input type="${f.type}" id="cf_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
  }  
  return `<div class="field ${f.full?'full':''}"><label>${f.label}</label>${input}<div class="err" id="cferr_${f.key}"></div></div>`;  
  }).join('');  
  updateCancelAutoPreview();  
  CANCEL_FIELD_DEFS.forEach(f => { const e = document.getElementById('cf_'+f.key); if (e) e.addEventListener('input', updateCancelAutoPreview); });  
+ applyGlobalNoAutocomplete_();  
 }  
 function collectCancelFormValues(){  
  const row = {};  
@@ -7428,21 +7430,22 @@ function buildPriceForm(){
  const defaultReceiver = SESSION.name;  
  const defaultBaseDate = nextWorkingDay(todayStr());  
  el.innerHTML = `  
- <div class="field"><label>계약번호</label><input id="pf_계약번호" placeholder="N1234567"><div class="err" id="pferr_계약번호"></div></div>  
- <div class="field"><label>계약처명</label><input id="pf_계약처명"><div class="err" id="pferr_계약처명"></div></div>  
- <div class="field"><label>영업담당</label><select id="pf_영업담당">${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>접수자</label><select id="pf_접수자">${USER_NAMES.map(o=>`<option value="${o}" ${o===defaultReceiver?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>담당차량</label><select id="pf_담당차량"><option value="">선택</option>${LIST_PRICE_CAR.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
- <div class="field"><label>접수일</label><input type="date" id="pf_접수일" value="${todayStr()}"></div>  
- <div class="field"><label>기산일</label><input id="pf_기산일" value="${defaultBaseDate}" placeholder="YYYY-MM-DD 또는 미정"><div class="err" id="pferr_기산일"></div></div>  
- <div class="field"><label>금액(원, 인하는 음수)</label><input type="number" id="pf_금액"><div class="err" id="pferr_금액"></div></div>  
- <div class="field"><label>변경전 용역료(원)</label><input type="number" id="pf_現용역료"></div>  
- <div class="field"><label>사유</label><select id="pf_사유"><option value="">선택</option>${LIST_PRICE_REASON.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
- <div class="field"><label>상품</label><select id="pf_상품">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>그로스</label><select id="pf_그로스">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>유형</label><select id="pf_유형">${LIST_REG_TYPE.map(o=>`<option value="${o}" ${o==='직접등록'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field full"><label>비고</label><textarea id="pf_비고" rows="2"></textarea></div>  
+ <div class="field"><label>계약번호</label><input id="pf_계약번호" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="N1234567"><div class="err" id="pferr_계약번호"></div></div>  
+ <div class="field"><label>계약처명</label><input id="pf_계약처명" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"><div class="err" id="pferr_계약처명"></div></div>  
+ <div class="field"><label>영업담당</label><select id="pf_영업담당" autocomplete="off">${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>접수자</label><select id="pf_접수자" autocomplete="off">${USER_NAMES.map(o=>`<option value="${o}" ${o===defaultReceiver?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>담당차량</label><select id="pf_담당차량" autocomplete="off"><option value="">선택</option>${LIST_PRICE_CAR.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>접수일</label><input type="date" id="pf_접수일" autocomplete="off" value="${todayStr()}"></div>  
+ <div class="field"><label>기산일</label><input id="pf_기산일" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${defaultBaseDate}" placeholder="YYYY-MM-DD 또는 미정"><div class="err" id="pferr_기산일"></div></div>  
+ <div class="field"><label>금액(원, 인하는 음수)</label><input type="number" id="pf_금액" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"><div class="err" id="pferr_금액"></div></div>  
+ <div class="field"><label>변경전 용역료(원)</label><input type="number" id="pf_現용역료" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></div>  
+ <div class="field"><label>사유</label><select id="pf_사유" autocomplete="off"><option value="">선택</option>${LIST_PRICE_REASON.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>상품</label><select id="pf_상품" autocomplete="off">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>그로스</label><select id="pf_그로스" autocomplete="off">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>유형</label><select id="pf_유형" autocomplete="off">${LIST_REG_TYPE.map(o=>`<option value="${o}" ${o==='직접등록'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field full"><label>비고</label><textarea id="pf_비고" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea></div>  
  `;  
+ applyGlobalNoAutocomplete_();  
  document.getElementById('pf_금액').addEventListener('input', onPriceAmountInput);  
  updatePriceAutoPreview();  
 }  
@@ -8054,24 +8057,25 @@ function buildRestartForm(){
  const el = document.getElementById('restartFormFields');  
  const defaultRep = defaultSalesRep(LIST_RESTART_SALES_REP);  
  el.innerHTML = `  
- <div class="field"><label>현상태</label><select id="rf_현상태">${LIST_RESTART_STATUS.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
- <div class="field"><label>계약번호</label><input id="rf_계약번호" placeholder="N1234567"><div class="err" id="rferr_계약번호"></div></div>  
- <div class="field"><label>계약처명</label><input id="rf_계약처명"><div class="err" id="rferr_계약처명"></div></div>  
- <div class="field"><label>영업담당</label><select id="rf_영업담당">${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>담당차량</label><select id="rf_담당차량"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>현상태</label><select id="rf_현상태" autocomplete="off">${LIST_RESTART_STATUS.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>계약번호</label><input id="rf_계약번호" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="N1234567"><div class="err" id="rferr_계약번호"></div></div>  
+ <div class="field"><label>계약처명</label><input id="rf_계약처명" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"><div class="err" id="rferr_계약처명"></div></div>  
+ <div class="field"><label>영업담당</label><select id="rf_영업담당" autocomplete="off">${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>담당차량</label><select id="rf_담당차량" autocomplete="off"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
  <div class="field">  
  <label>재개시일</label>  
- <input type="date" id="rf_재개시일" value="${todayStr()}">  
+ <input type="date" id="rf_재개시일" autocomplete="off" value="${todayStr()}">  
  <label style="font-weight:400; margin-top:4px;"><input type="checkbox" id="rf_재개시일_미정" onchange="onRestartUnknownToggle()"> 일정 미정</label>  
  <div class="err" id="rferr_재개시일"></div>  
  </div>  
- <div class="field"><label>용역료(원)</label><input type="number" id="rf_용역료"></div>  
- <div class="field"><label>중지일</label><input type="date" id="rf_중지일" value="${todayStr()}"></div>  
- <div class="field"><label>공사담당</label><input id="rf_공사담당" maxlength="10"><div class="err" id="rferr_공사담당"></div></div>  
- <div class="field"><label>상품</label><select id="rf_상품">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>그로스</label><select id="rf_그로스">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field full"><label>비고</label><textarea id="rf_비고" rows="2"></textarea></div>  
+ <div class="field"><label>용역료(원)</label><input type="number" id="rf_용역료" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></div>  
+ <div class="field"><label>중지일</label><input type="date" id="rf_중지일" autocomplete="off" value="${todayStr()}"></div>  
+ <div class="field"><label>공사담당</label><input id="rf_공사담당" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" maxlength="10"><div class="err" id="rferr_공사담당"></div></div>  
+ <div class="field"><label>상품</label><select id="rf_상품" autocomplete="off">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>그로스</label><select id="rf_그로스" autocomplete="off">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field full"><label>비고</label><textarea id="rf_비고" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea></div>  
  `;  
+ applyGlobalNoAutocomplete_();  
  updateRestartAutoPreview();  
  document.getElementById('rf_재개시일').addEventListener('input', updateRestartAutoPreview);  
 }  
@@ -8875,7 +8879,7 @@ function renderDailyReport(){
  <button onclick="shiftDailyReportDate(-1)">◀</button>  
  <h2>${dailyReportDate} 일일실적보고 (자동집계, 단위: 천원)</h2>  
  <button onclick="shiftDailyReportDate(1)">▶</button>  
- <input type="date" id="dailyReportDate" value="${dailyReportDate}" onchange="onDailyReportDateChange()" style="margin-left:8px;">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="dailyReportDate" value="${dailyReportDate}" onchange="onDailyReportDateChange()" style="margin-left:8px;">  
  <button onclick="dailyReportGoToday()">오늘</button>  
  </div>  
  <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">  
@@ -9466,24 +9470,83 @@ document.addEventListener('blur', function(e){
   }
 }, true);
 
-// 비밀번호 외 전역 자동완성 차단 함수
+// 비밀번호 외 전역 자동완성 및 브라우저 저장정보 팝업 완전 차단 함수
 function applyGlobalNoAutocomplete_() {
   try {
-    document.querySelectorAll('input, textarea').forEach(function(el) {
+    var targets = document.querySelectorAll('input, textarea, select');
+    for (var i = 0; i < targets.length; i++) {
+      var el = targets[i];
       var t = (el.type || '').toLowerCase();
       var name = (el.name || '').toLowerCase();
       var id = (el.id || '').toLowerCase();
       var ac = (el.getAttribute('autocomplete') || '').toLowerCase();
-      if (t === 'password' || ac.includes('password') || ac.includes('username') || name === 'username' || name === 'password' || name === 'new-password' || id.includes('pwd') || id.includes('password') || id.includes('phone')) {
-        return;
+
+      // 비밀번호 및 지정된 로그인 자격증명 필드는 브라우저 키체인 편의를 위해 유지
+      if (t === 'password' || ac.includes('password') || name === 'password' || name === 'new-password' || 
+          id === 'loginpwd' || id === 'login_password' || id === 'reg_password' || id === 'master_password' || 
+          id === 'ue_password') {
+        continue;
       }
-      el.setAttribute('autocomplete', 'off');
+
+      // 모든 일반 텍스트 박스, 숫자, 날짜, 검색창, 텍스트에리어에 대해 브라우저 자동완성/이전입력 팝업 완벽 차단
+      if (el.getAttribute('autocomplete') !== 'off') {
+        el.setAttribute('autocomplete', 'off');
+      }
       el.setAttribute('aria-autocomplete', 'none');
-    });
+      el.setAttribute('autocorrect', 'off');
+      el.setAttribute('autocapitalize', 'off');
+      el.setAttribute('spellcheck', 'false');
+      el.setAttribute('data-lpignore', 'true');
+      el.setAttribute('data-form-type', 'other');
+    }
   } catch(e) {}
 }
 
+// 1) DOM 초기화 시 실행
 document.addEventListener('DOMContentLoaded', applyGlobalNoAutocomplete_);
+
+// 2) 신규 등록 모달 열기 또는 동적 HTML 삽입을 실시간 감지하여 자동 적용 (MutationObserver)
+if (window.MutationObserver) {
+  try {
+    var noAcObserver_ = new MutationObserver(function(mutations) {
+      applyGlobalNoAutocomplete_();
+    });
+    noAcObserver_.observe(document.documentElement, { childList: true, subtree: true });
+  } catch(e) {}
+}
+
+// 3) 마우스 포커스(focusin, mousedown, pointerdown)가 텍스트 박스에 닿는 순간 즉시 차단 보장
+document.addEventListener('focusin', function(e) {
+  var el = e.target;
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+  var t = (el.type || '').toLowerCase();
+  var id = (el.id || '').toLowerCase();
+  if (t === 'password' || id.includes('pwd') || id.includes('password')) return;
+  if (el.getAttribute('autocomplete') !== 'off') {
+    el.setAttribute('autocomplete', 'off');
+  }
+  el.setAttribute('aria-autocomplete', 'none');
+  el.setAttribute('autocorrect', 'off');
+  el.setAttribute('autocapitalize', 'off');
+  el.setAttribute('spellcheck', 'false');
+  el.setAttribute('data-lpignore', 'true');
+}, true);
+
+document.addEventListener('mousedown', function(e) {
+  var el = e.target;
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+  var t = (el.type || '').toLowerCase();
+  var id = (el.id || '').toLowerCase();
+  if (t === 'password' || id.includes('pwd') || id.includes('password')) return;
+  if (el.getAttribute('autocomplete') !== 'off') {
+    el.setAttribute('autocomplete', 'off');
+  }
+  el.setAttribute('aria-autocomplete', 'none');
+  el.setAttribute('autocorrect', 'off');
+  el.setAttribute('autocapitalize', 'off');
+  el.setAttribute('spellcheck', 'false');
+  el.setAttribute('data-lpignore', 'true');
+}, true);
 </script>
 </body>
 </html>

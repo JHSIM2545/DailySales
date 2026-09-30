@@ -3887,7 +3887,7 @@
   
 <div id="toolbar-order" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddModal()">+ 신규 등록</button>  
- <input type="text" id="searchBox" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
+ <input type="text" id="searchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
  <select id="repFilterOrder" onchange="render()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3895,7 +3895,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossOrder" onchange="render()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterOrder" value="" onchange="onYmFilterChange_('order', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterOrder" value="" onchange="onYmFilterChange_('order', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3913,7 +3913,7 @@
 </div>  
 <div id="toolbar-cancel" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddCancelModal()">+ 신규 등록</button>  
- <input type="text" id="cancelSearchBox" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
+ <input type="text" id="cancelSearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
  <select id="repFilterCancel" onchange="renderCancel()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3921,7 +3921,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossCancel" onchange="renderCancel()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterCancel" value="" onchange="onYmFilterChange_('cancel', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterCancel" value="" onchange="onYmFilterChange_('cancel', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3939,7 +3939,7 @@
 </div>  
 <div id="toolbar-price" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddPriceModal()">+ 신규 등록</button>  
- <input type="text" id="priceSearchBox" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
+ <input type="text" id="priceSearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
  <select id="repFilterPrice" onchange="renderPrice()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3952,7 +3952,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossPrice" onchange="renderPrice()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterPrice" value="" onchange="onYmFilterChange_('price', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterPrice" value="" onchange="onYmFilterChange_('price', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3970,7 +3970,7 @@
 </div>  
 <div id="toolbar-restart" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddRestartModal()">+ 신규 등록</button>  
- <input type="text" id="restartSearchBox" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
+ <input type="text" id="restartSearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
  <select id="repFilterRestart" onchange="renderRestart()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -3978,7 +3978,7 @@
  <label class="chk"><input type="checkbox" id="excludeGrossRestart" onchange="renderRestart()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterRestart" value="" onchange="onYmFilterChange_('restart', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterRestart" value="" onchange="onYmFilterChange_('restart', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
    </span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
@@ -3996,7 +3996,7 @@
 </div>  
 <div id="toolbar-product-daily" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddProductDailyModal()">+ 신규 등록</button>  
- <input type="text" id="productDailySearchBox" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
+ <input type="text" id="productDailySearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
  <select id="repFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">전체</option><option value="박정훈">박정훈</option><option value="박광모">박광모</option><option value="김상훈">김상훈</option><option value="최영국">최영국</option><option value="이수열">이수열</option><option value="박광춘">박광춘</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
  </select>  
@@ -4006,7 +4006,7 @@
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input type="month" id="ymFilterProductDaily" value="" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
  </span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily" checked>선택항목</label>  
@@ -4026,10 +4026,10 @@
  <label><input type="radio" name="lhMode" value="day" checked onchange="onLoginHistoryModeChange()">특정일</label>  
  <label><input type="radio" name="lhMode" value="range" onchange="onLoginHistoryModeChange()">기간</label>  
  </span>  
- <input type="date" id="lhFrom" onchange="loadLoginHistory()">  
- <span id="lhToWrap" style="display:none;">~ <input type="date" id="lhTo" onchange="loadLoginHistory()"></span>  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="lhFrom" onchange="loadLoginHistory()">  
+ <span id="lhToWrap" style="display:none;">~ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="lhTo" onchange="loadLoginHistory()"></span>  
  <button onclick="loadLoginHistory()">조회</button>  
- <input type="text" id="loginHistorySearchBox" placeholder="사용자명 / 전화번호 검색" oninput="renderLoginHistory()" style="width:160px;">  
+ <input type="text" id="loginHistorySearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="사용자명 / 전화번호 검색" oninput="renderLoginHistory()" style="width:160px;">  
  <span style="color:#8a93a0;">※ 최근 6개월 이내 이력만 조회/보관됩니다.</span>  
  <span class="count" id="loginHistoryCount"></span>  
 </div>  
@@ -4039,15 +4039,15 @@
    <label><input type="radio" name="uhMode" value="range" onchange="onUserHistoryModeChange()">기간</label>  
    <label><input type="radio" name="uhMode" value="all" onchange="onUserHistoryModeChange()">전체</label>  
  </span>  
- <input type="date" id="uhFrom" onchange="loadUserActionHistory()" style="height:30px; padding:0 6px; border:1px solid #cbd5e1; border-radius:4px;">  
- <span id="uhToWrap" style="display:none;">~ <input type="date" id="uhTo" onchange="loadUserActionHistory()" style="height:30px; padding:0 6px; border:1px solid #cbd5e1; border-radius:4px;"></span>  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="uhFrom" onchange="loadUserActionHistory()" style="height:30px; padding:0 6px; border:1px solid #cbd5e1; border-radius:4px;">  
+ <span id="uhToWrap" style="display:none;">~ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="uhTo" onchange="loadUserActionHistory()" style="height:30px; padding:0 6px; border:1px solid #cbd5e1; border-radius:4px;"></span>  
  <button onclick="loadUserActionHistory()" style="height:30px; padding:0 12px; background:#4a86e8; color:#fff; border:none; border-radius:4px; font-weight:600; cursor:pointer;">조회</button>  
  <span style="color:#94a3b8; margin:0 4px;">|</span>
  <label style="font-weight:600; font-size:13px; color:#334155;">사용자: </label>
  <select id="uhUserSelect" onchange="renderUserActionHistory()" style="height:30px; padding:0 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">
    <option value="">전체 사용자</option>
  </select>
- <input type="text" id="userHistorySearchBox" placeholder="계약번호 / 계약처명 / 변경내역 검색" oninput="renderUserActionHistory()" style="width:240px; height:30px; padding:0 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">  
+ <input type="text" id="userHistorySearchBox" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약번호 / 계약처명 / 변경내역 검색" oninput="renderUserActionHistory()" style="width:240px; height:30px; padding:0 8px; border:1px solid #cbd5e1; border-radius:4px; font-size:13px;">  
  <span class="count" id="userHistoryCount" style="font-weight:600; color:#475569; margin-left:auto;"></span>  
 </div>  
   
@@ -4060,7 +4060,7 @@
   
 <div id="toolbar-daily-report" class="toolbar" style="display:none;">  
  <button onclick="shiftDailyReportDate(-1)">◀</button>  
- <input type="date" id="dailyReportDate" onchange="onDailyReportDateChange()" style="width:150px;">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="dailyReportDate" onchange="onDailyReportDateChange()" style="width:150px;">  
  <button onclick="shiftDailyReportDate(1)">▶</button>  
  <button onclick="dailyReportGoToday()">오늘</button>  
  <span style="color:#8a93a0;">[단위:천원]</span>  
@@ -4135,8 +4135,8 @@
 <div class="modal-overlay" id="userEditOverlay">  
  <div class="modal" style="width:420px;">  
  <h2>사용자 정보 수정</h2>  
- <div class="field"><label>이름</label><input type="text" id="ue_name"></div>  
- <div class="field"><label>전화번호</label><input type="text" id="ue_phone" disabled></div>  
+ <div class="field"><label>이름</label><input type="text" id="ue_name" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></div>  
+ <div class="field"><label>전화번호</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ue_phone" disabled></div>  
  <div class="field"><label>새 비밀번호 (변경 시에만 입력)</label><input type="password" id="ue_password" placeholder="비워두면 기존 비밀번호 유지"></div>  
  <div class="field"><label>권한</label>  
  <select id="ue_role">  
@@ -4250,7 +4250,7 @@
  <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">  
  <label style="font-size:13px; color:#555; display:flex; align-items:center; gap:4px;">기준일자:  
  <button type="button" onclick="bizTeamShiftModalDate_(-1)" style="padding:3px 8px; border:1px solid #c7cfd8; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;" title="하루 전">◀</button>
- <input type="date" id="bizTeamDate" onchange="bizTeamDateChanged_()" style="padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="bizTeamDate" onchange="bizTeamDateChanged_()" style="padding:4px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
  <span id="bizTeamDateDow" style="font-weight:700; color:#374151; font-size:13px;"></span>  
  <button type="button" onclick="bizTeamShiftModalDate_(1)" style="padding:3px 8px; border:1px solid #c7cfd8; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;" title="하루 후">▶</button>
  </label>  
@@ -4870,12 +4870,12 @@ const DATE_CELL_HANDLERS = {};
 function dateCellInputHtml(scope, id, field, val){  
   const raw = String(val === null || val === undefined ? '' : val).trim();  
   return '<span class="datecell-wrap" style="position:relative; display:inline-flex; align-items:center; width:100%;">' +  
-    '<input type="text" style="text-align:right; width:100%; cursor:pointer;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
+    '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" style="text-align:right; width:100%; cursor:pointer;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
     ' title="' + escAttr(raw) + '"' +  
     ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
     ' onclick="openDateCellPicker_(this)"' +  
     ' onblur="onDateCellBlur(this,\'' + scope + '\',\'' + id + '\',\'' + field + '\')">' +  
-    '<input type="date" class="date-pick-hidden"' +  
+    '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" class="date-pick-hidden"' +  
     ' data-scope="' + scope + '" data-id="' + id + '" data-field="' + field + '"' +  
     ' onchange="onDatePickerChange_(this)">' +  
     '</span>';  
@@ -6872,7 +6872,7 @@ function settingsCategorySectionHtml_(category, label){
  '<a href="javascript:void(0)" onclick="settingsMoveItem_(\'' + category + '\', ' + idx + ', -1)" title="위로">▲</a>' +  
  '<a href="javascript:void(0)" onclick="settingsMoveItem_(\'' + category + '\', ' + idx + ', 1)" title="아래로">▼</a>' +  
  '</span>' +  
- '<input type="text" class="settings-item-name-input" value="' + escAttr(it.value) + '" ' +  
+ '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="settings-item-name-input" value="' + escAttr(it.value) + '" ' +  
  'title="' + (it.orig ? ('원래 이름: ' + escAttr(it.orig)) : '신규 항목') + '" ' +  
  'onchange="settingsRenameItem_(\'' + category + '\', ' + idx + ', this.value)">' +  
  '<a href="javascript:void(0)" class="settings-default-star' + (isDefault ? ' active' : '') + '" onclick="settingsSetDefault_(\'' + category + '\', \'' + escAttr(it.value) + '\')" title="기본값으로 설정">' + (isDefault ? '★ 기본값' : '☆ 기본값 지정') + '</a>' +  
@@ -6883,7 +6883,7 @@ function settingsCategorySectionHtml_(category, label){
  '<div class="chart-card-title"><span>' + label + '</span></div>' +  
  '<div class="settings-item-list" id="settings_list_' + category + '">' + (rows || '<div style="color:#999; font-size:12px;">항목 없음</div>') + '</div>' +  
  '<div style="display:flex; gap:6px; margin-top:10px;">' +  
- '<input type="text" id="settings_input_' + category + '" placeholder="새 항목 입력" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;" onkeydown="if(event.key===\'Enter\'){settingsAddItem_(\'' + category + '\');}">' +  
+ '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="settings_input_' + category + '" placeholder="새 항목 입력" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;" onkeydown="if(event.key===\'Enter\'){settingsAddItem_(\'' + category + '\');}">' +  
  '<button onclick="settingsAddItem_(\'' + category + '\')">추가</button>' +  
  '</div>' +  
  '</div>';  
@@ -6894,7 +6894,7 @@ function renderSettingsTab_(){
  const taPortalCard = '<div class="chart-card" style="min-width:300px;">' +  
  '<div class="chart-card-title"><span>TA 관리 포털 링크</span></div>' +  
  '<div style="display:flex; gap:6px;">' +  
- '<input type="text" id="settings_ta_portal_url" placeholder="https://..." value="' + escAttr(TA_PORTAL_URL_ || '') + '" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;">' +  
+ '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="settings_ta_portal_url" placeholder="https://..." value="' + escAttr(TA_PORTAL_URL_ || '') + '" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;">' +  
  '<button onclick="saveTaPortalUrlSetting_()">저장</button>' +  
  '</div>' +  
  '</div>';  
@@ -6902,7 +6902,7 @@ function renderSettingsTab_(){
  const introPortalCard = '<div class="chart-card" style="min-width:300px;">' +  
  '<div class="chart-card-title"><span>소개영업 포털 링크</span></div>' +  
  '<div style="display:flex; gap:6px;">' +  
- '<input type="text" id="settings_intro_portal_url" placeholder="https://..." value="' + escAttr(INTRO_PORTAL_URL_ || '') + '" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;">' +  
+ '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="settings_intro_portal_url" placeholder="https://..." value="' + escAttr(INTRO_PORTAL_URL_ || '') + '" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;">' +  
  '<button onclick="saveIntroPortalUrlSetting_()">저장</button>' +  
  '</div>' +  
  '</div>';  
@@ -7361,7 +7361,7 @@ function loadAutoRegisterTab_(){
         '<textarea id="aiInputText" rows="4" style="width:100%; border:1px solid #c7cfd8; border-radius:6px; padding:10px; font-size:13px; font-family:inherit; resize:vertical; background:rgb(255, 255, 0) !important; color:#000000 !important; font-weight:500; box-sizing:border-box;" placeholder="예) 수주보고\n에스원빌딩 N6201234\n최영국 127호 알람 8만 개척 9/30 개시"></textarea>' +
         '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px;">' +
           '<div>' +
-            '<label style="font-size:13px; margin-right:8px; font-weight:600;">보고자: <input type="text" id="aiReporterName" placeholder="이름 (선택)" style="padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px; width:120px; background:rgb(255, 255, 0) !important; color:#000000 !important; font-weight:500;"></label>' +
+            '<label style="font-size:13px; margin-right:8px; font-weight:600;">보고자: <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="aiReporterName" placeholder="이름 (선택)" style="padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px; width:120px; background:rgb(255, 255, 0) !important; color:#000000 !important; font-weight:500;"></label>' +
           '</div>' +
           '<button class="primary" onclick="parseAndPreviewAiReport_()" style="padding:8px 20px; font-size:14px; font-weight:700;">🔍 텍스트 분석하기</button>' +
         '</div>' +
@@ -7514,24 +7514,24 @@ function renderAiParsedPreview_(res){
     let motiveOptions = motives.map(m => '<option value="' + m + '"' + (m === curMotive ? ' selected' : '') + '>' + m + '</option>').join('');
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#0f172a; border:1px solid #93c5fd; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
     '</div>';
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">그로스구분:</label><select id="ai_f_gross" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + grossOptions + '</select></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">영업동기:</label><select id="ai_f_reason" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + motiveOptions + '</select></div>' +
-      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 계약일(보고일):</label><input type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">🚀 개시일자:</label><input type="date" id="ai_f_start_date" value="' + escAttr(f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-weight:700; box-sizing:border-box;" onchange="onAiStartDateChange_(this.value)"></div>' +
-      '<div><label style="color:#6d28d9; font-weight:700; display:block; margin-bottom:3px;">📌 기산일:</label><input type="date" id="ai_f_accrual_date" value="' + escAttr(f['기산일'] || f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; box-sizing:border-box;" oninput="this.dataset.userEdited=1"></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 계약일(보고일):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_report_date" value="' + escAttr(f['보고일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; font-weight:600; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">🚀 개시일자:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_start_date" value="' + escAttr(f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; font-weight:700; box-sizing:border-box;" onchange="onAiStartDateChange_(this.value)"></div>' +
+      '<div><label style="color:#6d28d9; font-weight:700; display:block; margin-bottom:3px;">📌 기산일:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_accrual_date" value="' + escAttr(f['기산일'] || f['개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; box-sizing:border-box;" oninput="this.dataset.userEdited=1"></div>' +
     '</div>';
 
     html += '<div style="font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
-      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력">' +
+      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력">' +
     '</div>';
 
   } else if (res.type === 'price_change') {
@@ -7554,10 +7554,10 @@ function renderAiParsedPreview_(res){
     let reasonOptions = priceReasons.map(r => '<option value="' + r + '"' + (r === curReason ? ' selected' : '') + '>' + r + '</option>').join('');
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">구분 (인상/인하):</label>' +
         '<select id="ai_f_pc_category" style="width:100%; padding:6px 8px; font-weight:700; color:' + (isDown ? '#dc2626' : '#2563eb') + '; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; box-sizing:border-box;">' +
           '<option value="인상"' + (!isDown ? ' selected' : '') + '>🔺 인상</option>' +
@@ -7567,21 +7567,21 @@ function renderAiParsedPreview_(res){
     '</div>';
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
-      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">변동금액 (인상/인하액):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#7c3aed; border:1px solid #c4b5fd; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">現용역료 (변경 전):</label><input type="text" id="ai_f_curr_fee" value="' + escAttr(fmtCurrFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:600; text-align:right; color:#334155; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">변동금액 (인상/인하액):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#7c3aed; border:1px solid #c4b5fd; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">現용역료 (변경 전):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_curr_fee" value="' + escAttr(fmtCurrFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:600; text-align:right; color:#334155; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">접수자:</label>' +
         '<select id="ai_f_receiver" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' +
           receiverOptions +
         '</select>' +
       '</div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
-      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 접수일:</label><input type="date" id="ai_f_date1" value="' + escAttr(f['접수일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">📌 기산일(반영일):</label><input type="date" id="ai_f_date2" value="' + escAttr(f['기산일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 접수일:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_date1" value="' + escAttr(f['접수일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#7c3aed; font-weight:700; display:block; margin-bottom:3px;">📌 기산일(반영일):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_date2" value="' + escAttr(f['기산일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #c4b5fd; border-radius:4px; background:#f5f3ff; font-weight:700; box-sizing:border-box;"></div>' +
     '</div>';
 
     html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">사유:</label><select id="ai_f_reason" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + reasonOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력"></div>' +
     '</div>';
 
   } else if (res.type === 'cancel') {
@@ -7595,10 +7595,10 @@ function renderAiParsedPreview_(res){
     let cancelTypeOptions = cancelTypes.map(c => '<option value="' + c + '"' + (c === curCancelType ? ' selected' : '') + '>' + c + '</option>').join('');
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">구분 (해약/중지):</label>' +
         '<select id="ai_f_cancel_category" style="width:100%; padding:6px 8px; font-weight:700; color:#c0392b; border:1px solid #fecaca; border-radius:4px; background:#fef2f2; box-sizing:border-box;">' +
           '<option value="해약"' + (!isStop ? ' selected' : '') + '>🛑 해약</option>' +
@@ -7608,16 +7608,16 @@ function renderAiParsedPreview_(res){
     '</div>';
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
-      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#c0392b; border:1px solid #fecaca; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#c0392b; border:1px solid #fecaca; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">그로스구분:</label><select id="ai_f_gross" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + grossOptions + '</select></div>' +
       '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">해약유형:</label><select id="ai_f_cancel_type" style="width:100%; padding:6px 8px; font-weight:600; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + cancelTypeOptions + '</select></div>' +
-      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 접수일:</label><input type="date" id="ai_f_date1" value="' + escAttr(f['접수일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">🛑 확정일(해약/중지일):</label><input type="date" id="ai_f_date2" value="' + escAttr(f['확정일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #fecaca; border-radius:4px; background:#fef2f2; font-weight:700; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#047857; font-weight:700; display:block; margin-bottom:3px;">📅 접수일:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_date1" value="' + escAttr(f['접수일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #a7f3d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#c0392b; font-weight:700; display:block; margin-bottom:3px;">🛑 확정일(해약/중지일):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_date2" value="' + escAttr(f['확정일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #fecaca; border-radius:4px; background:#fef2f2; font-weight:700; box-sizing:border-box;"></div>' +
     '</div>';
 
     html += '<div style="font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
-      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상세 사유:</label><input type="text" id="ai_f_reason" value="' + escAttr(f['사유'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="해약/중지 사유 입력">' +
+      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상세 사유:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_reason" value="' + escAttr(f['사유'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="해약/중지 사유 입력">' +
     '</div>';
 
   } else if (res.type === 'restart') {
@@ -7626,10 +7626,10 @@ function renderAiParsedPreview_(res){
     const fmtFee = rawFee ? Number(rawFee).toLocaleString() : '';
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; margin-bottom:12px;">' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약처명:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_company" value="' + escAttr(f['계약처명'] || '') + '" style="width:100%; padding:6px 8px; font-weight:700; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">계약번호:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_contract" value="' + escAttr(f['계약번호'] || 'N') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#1e40af; font-weight:700; display:block; margin-bottom:3px;">영업담당:</label><select id="ai_f_rep" style="width:100%; padding:6px 8px; font-weight:700; color:#1e40af; border:1px solid #93c5fd; border-radius:4px; background:#eff6ff; box-sizing:border-box;">' + repOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">담당차량:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_car" value="' + escAttr(f['담당차량'] || '127') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
       '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">현상태:</label>' +
         '<select id="ai_f_restart_status" style="width:100%; padding:6px 8px; font-weight:700; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; background:#f0fdf4; box-sizing:border-box;">' +
           '<option value="재개시" selected>🚀 재개시</option>' +
@@ -7639,16 +7639,16 @@ function renderAiParsedPreview_(res){
     '</div>';
 
     html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0; margin-bottom:12px;">' +
-      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
+      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">용역료(원):</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_fee" value="' + escAttr(fmtFee) + '" placeholder="0" style="width:100%; padding:6px 8px; font-weight:700; text-align:right; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; box-sizing:border-box;" oninput="fmtMoneyInput_(this)"></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">상품:</label><select id="ai_f_prod" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + prodOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">공사담당:</label><input type="text" id="ai_f_construct_rep" value="' + escAttr(f['공사담당'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="공사담당자"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">공사담당:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_construct_rep" value="' + escAttr(f['공사담당'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="공사담당자"></div>' +
       '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">그로스구분:</label><select id="ai_f_gross" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;">' + grossOptions + '</select></div>' +
-      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">⏸️ 중지일:</label><input type="date" id="ai_f_date1" value="' + escAttr(f['중지일'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
-      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">🚀 재개시일:</label><input type="date" id="ai_f_date2" value="' + escAttr(f['재개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #bbf7d0; border-radius:4px; background:#f0fdf4; font-weight:700; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">⏸️ 중지일:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_date1" value="' + escAttr(f['중지일'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;"></div>' +
+      '<div><label style="color:#16a34a; font-weight:700; display:block; margin-bottom:3px;">🚀 재개시일:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="ai_f_date2" value="' + escAttr(f['재개시일'] || todayStr()) + '" style="width:100%; padding:6px 8px; border:1px solid #bbf7d0; border-radius:4px; background:#f0fdf4; font-weight:700; box-sizing:border-box;"></div>' +
     '</div>';
 
     html += '<div style="font-size:13px; padding-top:10px; border-top:1px dashed #e2e8f0;">' +
-      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력">' +
+      '<label style="color:#475569; font-weight:600; display:block; margin-bottom:3px;">비고:</label><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="ai_f_note" value="' + escAttr(f['비고'] || '') + '" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:4px; box-sizing:border-box;" placeholder="특이사항 입력">' +
     '</div>';
   }
 
@@ -8465,11 +8465,11 @@ function fieldCellHtml(row, field, allRows){
  ${options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
  } else if (field === '용역료') {  
- inner = `<input type="text" inputmode="numeric" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('order', row.id, field, val);  
  } else {  
- inner = `<input type="text" value="${escAttr(val)}" onchange="onFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  const cls = orderCellClass(row, field, val, allRows);  
  const titleAttr = (field === '계약처명' || field === '비고') ? ` title="${escAttr(val)}"` : '';  
@@ -8634,12 +8634,13 @@ function buildForm(){
  const el = document.getElementById('formFields');  
  el.innerHTML = FIELD_DEFS.map(f => {  
  let input;  
- if (f.type === 'select') input = `<select id="f_${f.key}"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
- else if (f.type === 'textarea') input = `<textarea id="f_${f.key}" rows="2"></textarea>`;  
- else if (f.type === 'money') input = `<input type="text" inputmode="numeric" class="money-in" id="f_${f.key}" oninput="formatMoneyInput(this)" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
- else input = `<input type="${f.type}" id="f_${f.key}" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
+ if (f.type === 'select') input = `<select id="f_${f.key}" autocomplete="off"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
+ else if (f.type === 'textarea') input = `<textarea id="f_${f.key}" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea>`;  
+ else if (f.type === 'money') input = `<input type="text" inputmode="numeric" class="money-in" id="f_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" oninput="formatMoneyInput(this)" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
+ else input = `<input type="${f.type}" id="f_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
  return `<div class="field ${f.full?'full':''}"><label>${f.label}</label>${input}${f.extra||''}<div class="err" id="err_${f.key}"></div></div>`;  
  }).join('');  
+ applyGlobalNoAutocomplete_();  
  // 계약일 -> 개시일 -> 기산일 기본값 연동  
  const 계약일El = document.getElementById('f_계약일');  
  const 개시일El = document.getElementById('f_개시일');  
@@ -8942,14 +8943,14 @@ function fieldCellHtmlCancel(row, field, allRows){
  } else if (type === 'datalist') {  
  const options = CANCEL_FIELD_OPTIONS[field];  
  const dlid = 'dl_' + field;  
- inner = `<input list="${dlid}" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<input list="${dlid}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
  <datalist id="${dlid}">${options.map(o => `<option value="${o}">`).join('')}</datalist>`;  
  } else if (CANCEL_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('cancel', row.id, field, val);  
  } else if (field === '용역료') {  
- inner = `<input type="text" inputmode="numeric" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onCancelFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onCancelFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- inner = `<input type="text" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  const cls = cancelCellClass(field, val, allRows);  
  const titleAttr = (field === '계약처명' || field === '사유') ? ` title="${escAttr(val)}"` : '';  
@@ -9060,24 +9061,23 @@ function buildCancelForm(){
  el.innerHTML = CANCEL_FIELD_DEFS.map(f => {  
  let input;  
  if (f.type === 'select') {  
- input = `<select id="cf_${f.key}"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
+ input = `<select id="cf_${f.key}" autocomplete="off"><option value="">선택</option>${f.options.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;  
  } else if (f.type === 'datalist') {  
  const dlid = 'cfdl_' + f.key;  
- // (2026-09-21: 기본값이 채워져 있어도 클릭 시 전체 목록이 보이도록 포커스 시 값을 잠시 비우고,  
- // 아무것도 선택/입력하지 않고 벗어나면 원래 값으로 되돌림)  
- input = `<input id="cf_${f.key}" list="${dlid}" placeholder="${f.placeholder||''}"  
+ input = `<input id="cf_${f.key}" list="${dlid}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="${f.placeholder||''}"  
  onfocus="this.dataset.prevVal=this.value; this.value=''; this.select();"  
  onblur="if(!this.value) this.value=this.dataset.prevVal||'';">  
  <datalist id="${dlid}">${f.options.map(o => `<option value="${o}">`).join('')}</datalist>`;  
  } else if (f.type === 'textarea') {  
- input = `<textarea id="cf_${f.key}" rows="2"></textarea>`;  
+ input = `<textarea id="cf_${f.key}" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea>`;  
  } else if (f.type === 'money') {  
- input = `<input type="text" inputmode="numeric" class="money-in" id="cf_${f.key}" oninput="formatMoneyInput(this)">`;  
+ input = `<input type="text" inputmode="numeric" class="money-in" id="cf_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" oninput="formatMoneyInput(this)">`;  
  } else {  
- input = `<input type="${f.type}" id="cf_${f.key}" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
+ input = `<input type="${f.type}" id="cf_${f.key}" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" ${f.placeholder?`placeholder="${f.placeholder}"`:''}>`;  
  }  
  return `<div class="field ${f.full?'full':''}"><label>${f.label}</label>${input}${f.extra||''}<div class="err" id="cferr_${f.key}"></div></div>`;  
  }).join('');  
+ applyGlobalNoAutocomplete_();  
  // 접수일 기본값 = 오늘, 확정일 기본값 = 접수일  
  const 접수일El = document.getElementById('cf_접수일');  
  const 확정일El = document.getElementById('cf_확정일');  
@@ -9392,11 +9392,11 @@ function fieldCellHtmlPrice(row, field, allRows){
  } else if (PRICE_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('price', row.id, field, val);  
  } else if (field === '금액') {  
- inner = `<input type="text" inputmode="numeric" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
  } else if (field === '現용역료') {  
- inner = `<input type="text" inputmode="numeric" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- inner = `<input type="text" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  if (field === '계약번호' || field === '상품' || field === '그로스') {  
  cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
@@ -9513,21 +9513,22 @@ function buildPriceForm(){
  const defaultReceiver = SESSION.name;  
  const defaultBaseDate = nextWorkingDay(todayStr());  
  el.innerHTML = `  
- <div class="field"><label>계약번호</label><input id="pf_계약번호" placeholder="N1234567"><div class="err" id="pferr_계약번호"></div></div>  
- <div class="field"><label>계약처명</label><input id="pf_계약처명"><div class="err" id="pferr_계약처명"></div></div>  
- <div class="field"><label>영업담당</label><select id="pf_영업담당">${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>접수자</label><select id="pf_접수자">${USER_NAMES.map(o=>`<option value="${o}" ${o===defaultReceiver?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>담당차량</label><select id="pf_담당차량"><option value="">선택</option>${LIST_PRICE_CAR.map(o=>`<option value="${o}" ${String(o)===String(carForSalesRep_(defaultRep))?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>접수일</label><input type="date" id="pf_접수일" value="${todayStr()}"></div>  
- <div class="field"><label>기산일</label><input type="date" id="pf_기산일" value="${defaultBaseDate}"><div class="err" id="pferr_기산일"></div></div>  
- <div class="field"><label>금액(원, 인하는 음수)</label><input type="text" inputmode="numeric" class="money-in" id="pf_금액" oninput="formatSignedMoneyInput(this)"><div class="err" id="pferr_금액"></div></div>  
- <div class="field"><label>변경전 용역료(원)</label><input type="text" inputmode="numeric" class="money-in" id="pf_現용역료" oninput="formatMoneyInput(this)"></div>  
- <div class="field"><label>사유</label><select id="pf_사유"><option value="">선택</option>${LIST_PRICE_REASON.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
- <div class="field"><label>상품</label><select id="pf_상품">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>그로스</label><select id="pf_그로스">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>유형</label><select id="pf_유형">${LIST_REG_TYPE.map(o=>`<option value="${o}" ${o==='직접등록'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field full"><label>비고</label><textarea id="pf_비고" rows="2"></textarea></div>  
+ <div class="field"><label>계약번호</label><input id="pf_계약번호" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="N1234567"><div class="err" id="pferr_계약번호"></div></div>  
+ <div class="field"><label>계약처명</label><input id="pf_계약처명" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"><div class="err" id="pferr_계약처명"></div></div>  
+ <div class="field"><label>영업담당</label><select id="pf_영업담당" autocomplete="off">${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>접수자</label><select id="pf_접수자" autocomplete="off">${USER_NAMES.map(o=>`<option value="${o}" ${o===defaultReceiver?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>담당차량</label><select id="pf_담당차량" autocomplete="off"><option value="">선택</option>${LIST_PRICE_CAR.map(o=>`<option value="${o}" ${String(o)===String(carForSalesRep_(defaultRep))?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>접수일</label><input type="date" id="pf_접수일" autocomplete="off" value="${todayStr()}"></div>  
+ <div class="field"><label>기산일</label><input type="date" id="pf_기산일" autocomplete="off" value="${defaultBaseDate}"><div class="err" id="pferr_기산일"></div></div>  
+ <div class="field"><label>금액(원, 인하는 음수)</label><input type="text" inputmode="numeric" class="money-in" id="pf_금액" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" oninput="formatSignedMoneyInput(this)"><div class="err" id="pferr_금액"></div></div>  
+ <div class="field"><label>변경전 용역료(원)</label><input type="text" inputmode="numeric" class="money-in" id="pf_現용역료" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" oninput="formatMoneyInput(this)"></div>  
+ <div class="field"><label>사유</label><select id="pf_사유" autocomplete="off"><option value="">선택</option>${LIST_PRICE_REASON.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>상품</label><select id="pf_상품" autocomplete="off">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>그로스</label><select id="pf_그로스" autocomplete="off">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>유형</label><select id="pf_유형" autocomplete="off">${LIST_REG_TYPE.map(o=>`<option value="${o}" ${o==='직접등록'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field full"><label>비고</label><textarea id="pf_비고" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea></div>  
  `;  
+ applyGlobalNoAutocomplete_();  
  document.getElementById('pf_금액').addEventListener('input', onPriceAmountInput);  
  const 영업담당El_pf = document.getElementById('pf_영업담당');  
  const 담당차량El_pf = document.getElementById('pf_담당차량');  
@@ -9747,9 +9748,9 @@ function fieldCellHtmlRestart(row, field, allRows){
  } else if (RESTART_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('restart', row.id, field, val);  
  } else if (field === '용역료') {  
- inner = `<input type="text" inputmode="numeric" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onRestartFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onRestartFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- inner = `<input type="text" value="${escAttr(val)}" onchange="onRestartFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onRestartFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  if (field === '계약번호' || field === '상품' || field === '그로스') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  if (field === '계약처명') cls = 'name-cell';  
@@ -9849,25 +9850,26 @@ function buildRestartForm(){
  const el = document.getElementById('restartFormFields');  
  const defaultRep = defaultSalesRep(LIST_RESTART_SALES_REP);  
  el.innerHTML = `  
- <div class="field"><label>현상태</label><select id="rf_현상태">${LIST_RESTART_STATUS.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>현상태</label><select id="rf_현상태" autocomplete="off">${LIST_RESTART_STATUS.map(o=>`<option value="${o}">${o}</option>`).join('')}</select></div>  
  <div class="field"></div>  
- <div class="field"><label>계약번호</label><input id="rf_계약번호" placeholder="N1234567"><div class="err" id="rferr_계약번호"></div></div>  
- <div class="field"><label>계약처명</label><input id="rf_계약처명"><div class="err" id="rferr_계약처명"></div></div>  
- <div class="field"><label>영업담당</label><select id="rf_영업담당">${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>담당차량</label><select id="rf_담당차량"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}" ${String(o)===String(carForSalesRep_(defaultRep))?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>중지일</label><input type="date" id="rf_중지일" value="${todayStr()}"></div>  
+ <div class="field"><label>계약번호</label><input id="rf_계약번호" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="N1234567"><div class="err" id="rferr_계약번호"></div></div>  
+ <div class="field"><label>계약처명</label><input id="rf_계약처명" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"><div class="err" id="rferr_계약처명"></div></div>  
+ <div class="field"><label>영업담당</label><select id="rf_영업담당" autocomplete="off">${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${o===defaultRep?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>담당차량</label><select id="rf_담당차량" autocomplete="off"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}" ${String(o)===String(carForSalesRep_(defaultRep))?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>중지일</label><input type="date" id="rf_중지일" autocomplete="off" value="${todayStr()}"></div>  
  <div class="field">  
  <label>재개시일</label>  
- <input type="date" id="rf_재개시일" value="${todayStr()}">  
+ <input type="date" id="rf_재개시일" autocomplete="off" value="${todayStr()}">  
  <label style="font-weight:400; margin-top:4px;"><input type="checkbox" id="rf_재개시일_미정" onchange="onRestartUnknownToggle()"> 재개시일 미정</label>  
  <div class="err" id="rferr_재개시일"></div>  
  </div>  
- <div class="field"><label>용역료(원)</label><input type="text" inputmode="numeric" class="money-in" id="rf_용역료" oninput="formatMoneyInput(this)"></div>  
- <div class="field"><label>공사담당</label><input id="rf_공사담당" maxlength="10"><div class="err" id="rferr_공사담당"></div></div>  
- <div class="field"><label>상품</label><select id="rf_상품">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field"><label>그로스</label><select id="rf_그로스">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
- <div class="field full"><label>비고</label><textarea id="rf_비고" rows="2"></textarea></div>  
+ <div class="field"><label>용역료(원)</label><input type="text" inputmode="numeric" class="money-in" id="rf_용역료" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" oninput="formatMoneyInput(this)"></div>  
+ <div class="field"><label>공사담당</label><input id="rf_공사담당" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" maxlength="10"><div class="err" id="rferr_공사담당"></div></div>  
+ <div class="field"><label>상품</label><select id="rf_상품" autocomplete="off">${LIST_PRODUCT.map(o=>`<option value="${o}" ${o==='알람'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field"><label>그로스</label><select id="rf_그로스" autocomplete="off">${LIST_GROSS.map(o=>`<option value="${o}" ${o==='일반'?'selected':''}>${o}</option>`).join('')}</select></div>  
+ <div class="field full"><label>비고</label><textarea id="rf_비고" rows="2" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true"></textarea></div>  
  `;  
+ applyGlobalNoAutocomplete_();  
  const 영업담당El_rf = document.getElementById('rf_영업담당');  
  const 담당차량El_rf = document.getElementById('rf_담당차량');  
  if (영업담당El_rf) 영업담당El_rf.addEventListener('change', function(){  
@@ -10146,7 +10148,7 @@ function productDailySummaryTableHtml_(){
     </div>  
     <div style="border:1px solid #90caf9; border-radius:4px; padding:10px 16px; background:#eaf6fd; min-width:170px;">  
       <div style="font-weight:700; font-size:11pt; margin-bottom:8px; color:#0d5c8a;">카드매출 (단위 : 원)</div>  
-      <input type="text" id="cardSalesInput" value="${fmt(cardSales)}" oninput="formatMoneyInput(this)" onchange="onCardSalesChange_(this.value)"
+      <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="cardSalesInput" value="${fmt(cardSales)}" oninput="formatMoneyInput(this)" onchange="onCardSalesChange_(this.value)"
         style="width:140px; padding:6px 8px; border:1px solid #c7cfd8; border-radius:4px; text-align:right; font-size:12pt; background:#ffffff; box-sizing:border-box; font-weight:bold; color:#0d5c8a;">  
     </div>  
   </div>`;  
@@ -10331,17 +10333,17 @@ function fieldCellHtmlProductDaily(row, field, allRows){
       LIST_PRODUCT_DAILY_MOTIVE.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('') +
       `</select>`;
   } else if (field === '계약설치비' || field === '계약기기비') {
-    inner = `<input type="text" inputmode="numeric" style="text-align:right;" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onProductDailyFieldChange('${row.id}','${field}',moneyValue(this))">`;
+    inner = `<input type="text" inputmode="numeric" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="text-align:right;" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onProductDailyFieldChange('${row.id}','${field}',moneyValue(this))">`;
   } else if (field === '보고일') {
     inner = dateCellInputHtml('productdaily', row.id, '보고일', val);
   } else if (field === '매출예상') {
     inner = `<span class="datecell-wrap" style="position:relative;">` +
-      `<input type="text" style="text-align:center; min-width:85px;" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','매출예상',this.value)">` +
+      `<input type="text" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="text-align:center; min-width:85px;" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','매출예상',this.value)">` +
       `<button type="button" class="date-pick-btn" title="월 선택" onclick="openMonthPickerForPd_(this, '${row.id}')">📅</button>` +
-      `<input type="month" class="date-pick-hidden" onchange="onPdMonthPicked_(this, '${row.id}')">` +
+      `<input type="month" class="date-pick-hidden" autocomplete="off" onchange="onPdMonthPicked_(this, '${row.id}')">` +
       `</span>`;
   } else {
-    inner = `<input type="text" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','${field}',this.value)">`;
+    inner = `<input type="text" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','${field}',this.value)">`;
   }
 
   const tdStyle = (field === '보고일') ? ' style="background-color:#ffff00;"' : '';
@@ -10462,24 +10464,25 @@ function buildProductDailyForm(){
   const ymFormatted = ymNow.slice(0, 4) + '년 ' + ymNow.slice(5, 7) + '월';
 
   container.innerHTML = `
-    <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" placeholder="T8588826" onfocus="setTimeout(()=>this.select(),0)"></div>
-    <div class="field"><label>서비스제공처</label><input type="text" id="pdf_서비스제공처" placeholder="고객사/서비스처 명칭"></div>
-    <div class="field"><label>보고일</label><input type="date" id="pdf_보고일" value="${today}"></div>
-    <div class="field"><label>계약담당자</label><select id="pdf_계약담당자">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
+    <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="T8588826" onfocus="setTimeout(()=>this.select(),0)"></div>
+    <div class="field"><label>서비스제공처</label><input type="text" id="pdf_서비스제공처" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="고객사/서비스처 명칭"></div>
+    <div class="field"><label>보고일</label><input type="date" id="pdf_보고일" autocomplete="off" value="${today}"></div>
+    <div class="field"><label>계약담당자</label><select id="pdf_계약담당자" autocomplete="off">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
     <div class="field">
       <label>매출예상</label>
       <div style="position:relative; display:flex; align-items:center; width:100%;">
-        <input type="text" id="pdf_매출예상" value="${ymFormatted}" placeholder="2026년 09월" style="width:100%; padding-right:38px; cursor:pointer;" onclick="openMonthPickerForModal_(this)">
+        <input type="text" id="pdf_매출예상" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${ymFormatted}" placeholder="2026년 09월" style="width:100%; padding-right:38px; cursor:pointer;" onclick="openMonthPickerForModal_(this)">
         <span style="position:absolute; right:10px; pointer-events:none; font-size:16px;">📅</span>
-        <input type="month" id="pdf_매출예상_hidden" value="${ymNow}" style="position:absolute; right:4px; top:50%; transform:translateY(-50%); width:28px; height:28px; opacity:0; cursor:pointer; z-index:2;" onchange="onModalMonthPicked_(this)">
+        <input type="month" id="pdf_매출예상_hidden" autocomplete="off" value="${ymNow}" style="position:absolute; right:4px; top:50%; transform:translateY(-50%); width:28px; height:28px; opacity:0; cursor:pointer; z-index:2;" onchange="onModalMonthPicked_(this)">
       </div>
     </div>
-    <div class="field"><label>계약동기</label><select id="pdf_계약동기">${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
-    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" class="money-in" value="0" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
-    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" class="money-in" value="0" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
-    <div class="field"><label>구분</label><select id="pdf_구분">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
-    <div class="field"><label>매출여부</label><select id="pdf_매출여부">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
+    <div class="field"><label>계약동기</label><select id="pdf_계약동기" autocomplete="off">${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
+    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" class="money-in" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="0" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" class="money-in" autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="0" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>구분</label><select id="pdf_구분" autocomplete="off">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
+    <div class="field"><label>매출여부</label><select id="pdf_매출여부" autocomplete="off">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
   `;
+  applyGlobalNoAutocomplete_();
 }
 
 function openMonthPickerForModal_(el){
@@ -11178,16 +11181,16 @@ function renderTargetInput(){
       <tr>
         <td rowspan="2" style="border:1px solid #dce3ea; font-weight:700; text-align:center; vertical-align:middle; background:#ffffff !important; font-size:13px; color:#1c2f4a;">${p}</td>
         <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; background:#ffffff !important; font-size:13px; color:#334155;">목표</td>
-        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="tgt_ord_${p}" value="${fmt(ordTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
-        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="tgt_start_${p}" value="${fmt(startTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
-        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="tgt_dec_${p}" value="${fmt(decTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="tgt_ord_${p}" value="${fmt(ordTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="tgt_start_${p}" value="${fmt(startTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="tgt_dec_${p}" value="${fmt(decTgt)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
         <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:600; color:#1e293b; font-size:13px; background:#ffffff !important;" id="tgt_inc_disp_${p}">${fmt(incTgt)}</td>
       </tr>
       <tr>
         <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; background:#ffffff !important; font-size:13px; color:#334155;">계획</td>
-        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="pln_ord_${p}" value="${fmt(ordPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
-        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="pln_start_${p}" value="${fmt(startPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
-        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="pln_dec_${p}" value="${fmt(decPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="pln_ord_${p}" value="${fmt(ordPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="pln_start_${p}" value="${fmt(startPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
+        <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="pln_dec_${p}" value="${fmt(decPln)}" oninput="formatMoneyInput(this); onTargetProductChange_('${p}');"></td>
         <td style="border:1px solid #dce3ea; padding:6px 10px; text-align:right; font-weight:600; color:#1e293b; font-size:13px; background:#ffffff !important;" id="pln_inc_disp_${p}">${fmt(incPln)}</td>
       </tr>
     `;
@@ -11246,21 +11249,21 @@ function renderTargetInput(){
           <td style="border:1px solid #dce3ea; font-weight:700; text-align:center; padding:6px 8px; font-size:13px; color:#1c2f4a; background:#ffffff !important;">${rep}</td>
           <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:center; background:#ffffff !important;">
             <div style="display:inline-flex; align-items:center; justify-content:center; gap:3px;">
-              <input type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;" id="ratio_${p}_${rep}_수주" value="${rOrd.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '수주');">
+              <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;" id="ratio_${p}_${rep}_수주" value="${rOrd.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '수주');">
               <span style="font-size:12px; color:#475569; font-weight:500;">%</span>
             </div>
             <div style="font-size:11px; color:#64748b; margin-top:2px;" id="amt_${p}_${rep}_수주">${fmt(amtOrd)}천원</div>
           </td>
           <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:center; background:#ffffff !important;">
             <div style="display:inline-flex; align-items:center; justify-content:center; gap:3px;">
-              <input type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;" id="ratio_${p}_${rep}_개시" value="${rStart.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '개시');">
+              <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;" id="ratio_${p}_${rep}_개시" value="${rStart.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '개시');">
               <span style="font-size:12px; color:#475569; font-weight:500;">%</span>
             </div>
             <div style="font-size:11px; color:#64748b; margin-top:2px;" id="amt_${p}_${rep}_개시">${fmt(amtStart)}천원</div>
           </td>
           <td style="border:1px solid #dce3ea; padding:4px 6px; text-align:center; background:#ffffff !important;">
             <div style="display:inline-flex; align-items:center; justify-content:center; gap:3px;">
-              <input type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;" id="ratio_${p}_${rep}_유지감소" value="${rDec.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '유지감소');">
+              <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;" id="ratio_${p}_${rep}_유지감소" value="${rDec.toFixed(2)}" oninput="onRepRatioChange_('${p}', '${rep}', '유지감소');">
               <span style="font-size:12px; color:#475569; font-weight:500;">%</span>
             </div>
             <div style="font-size:11px; color:#64748b; margin-top:2px;" id="amt_${p}_${rep}_유지감소">${fmt(amtDec)}천원</div>
@@ -11388,13 +11391,13 @@ function renderTargetInput(){
             <tbody>
               <tr>
                 <td style="border:1px solid #dce3ea !important; font-weight:700; text-align:center; padding:6px; background:#ffffff !important; color:#334155;">목표</td>
-                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_tgt_ord" value="${fmt(safety.목표_수주)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
-                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_tgt_sales" value="${fmt(safety.목표_매출)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_tgt_ord" value="${fmt(safety.목표_수주)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_tgt_sales" value="${fmt(safety.목표_매출)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
               </tr>
               <tr>
                 <td style="border:1px solid #dce3ea !important; font-weight:700; text-align:center; padding:6px; background:#ffffff !important; color:#334155;">계획</td>
-                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_pln_ord" value="${fmt(safety.계획_수주)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
-                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_pln_sales" value="${fmt(safety.계획_매출)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_pln_ord" value="${fmt(safety.계획_수주)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
+                <td style="border:1px solid #dce3ea !important; padding:4px 6px; text-align:right; background:#ffffff !important;"><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-num-input" style="background:rgb(255,255,0) !important;" id="safety_pln_sales" value="${fmt(safety.계획_매출)}" oninput="formatMoneyInput(this); markTargetDirty_();"></td>
               </tr>
             </tbody>
           </table>
@@ -11870,13 +11873,13 @@ function extraDoorcamTableHtml(){
     '<tr><th style="font-weight:700;">실적</th><th style="font-weight:700;">당일</th><th style="font-weight:700;">누계</th></tr></thead><tbody>';
 
   html += '<tr><th rowspan="3" style="vertical-align:middle; font-weight:700;">판매량(대)</th><th style="font-weight:700;">목표</th>' +
-    '<td><input type="number" id="dc_target" value="' + tgt + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
+    '<td><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="number" id="dc_target" value="' + tgt + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
     '<td class="num" id="dc_target_today" style="font-size:13px;">' + tgt + '</td>' +
     '<td class="num" id="dc_target_cum" style="font-size:13px;">' + tgt + '</td></tr>';
 
   html += '<tr class="daily-actual-row"><th style="font-weight:700;">실적</th>' +
-    '<td><input type="number" id="dc_prev" value="' + prev + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; color:#1155cc; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
-    '<td><input type="number" id="dc_today" value="' + today + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; color:#1155cc; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
+    '<td><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="number" id="dc_prev" value="' + prev + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; color:#1155cc; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
+    '<td><input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="number" id="dc_today" value="' + today + '" style="width:65px; text-align:right; background:#ffff00; border:1px solid #c7cfd8; padding:3px 5px; font-weight:700; color:#1155cc; font-size:13px;" oninput="recalcDoorcamLive_()"></td>' +
     '<td class="num" id="dc_cum" style="color:#1155cc; font-weight:700; font-size:13px;">' + cum + '</td></tr>';
 
   html += '<tr><th style="font-weight:700;">달성률</th>' +
@@ -12126,7 +12129,7 @@ function renderDailyReport(){
  <button onclick="shiftDailyReportDate(-1)">◀</button>  
  <h2>${dailyReportDate} 일일실적보고 (자동집계, 단위: 천원)</h2>  
  <button onclick="shiftDailyReportDate(1)">▶</button>  
- <input type="date" id="dailyReportDateInput" value="${dailyReportDate}" onchange="onDailyReportDateInputChanged_(this.value)" style="margin-left:8px; padding:3px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
+ <input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="dailyReportDateInput" value="${dailyReportDate}" onchange="onDailyReportDateInputChanged_(this.value)" style="margin-left:8px; padding:3px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
  <button onclick="dailyReportGoToday()">오늘</button>  
  </div>  
  <div style="display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;">  
@@ -13212,7 +13215,7 @@ function renderBizTeamFullScreenView_(){
  '<button onclick="dashShowMainView_()" style="margin-right:10px;">◀ 종합대시보드</button>' +  
  '<h2>사업팀현황</h2>' +  
  '<button type="button" onclick="bizTeamShiftViewDate_(-1)" style="padding:4px 8px;" title="하루 전">◀</button>' +  
- '<input type="date" id="bizTeamViewDate" value="' + escHtml(BIZ_TEAM_VIEW_DATE_) + '" onchange="bizTeamViewFilterChanged_()">' +  
+ '<input autocomplete="off" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="bizTeamViewDate" value="' + escHtml(BIZ_TEAM_VIEW_DATE_) + '" onchange="bizTeamViewFilterChanged_()">' +  
  '<span style="font-size:13px; font-weight:700; color:#374151;">(' + escHtml(weekdayKo(BIZ_TEAM_VIEW_DATE_)) + ')</span>' +  
  '<button type="button" onclick="bizTeamShiftViewDate_(1)" style="padding:4px 8px;" title="하루 후">▶</button>' +  
  '<select id="bizTeamViewProduct" onchange="bizTeamViewFilterChanged_()">' +  
@@ -13617,24 +13620,83 @@ document.addEventListener('blur', function(e){
   }
 }, true);
 
-// 비밀번호 외 전역 자동완성 차단 함수
+// 비밀번호 외 전역 자동완성 및 브라우저 저장정보 팝업 완전 차단 함수
 function applyGlobalNoAutocomplete_() {
   try {
-    document.querySelectorAll('input, textarea').forEach(function(el) {
+    var targets = document.querySelectorAll('input, textarea, select');
+    for (var i = 0; i < targets.length; i++) {
+      var el = targets[i];
       var t = (el.type || '').toLowerCase();
       var name = (el.name || '').toLowerCase();
       var id = (el.id || '').toLowerCase();
       var ac = (el.getAttribute('autocomplete') || '').toLowerCase();
-      if (t === 'password' || ac.includes('password') || ac.includes('username') || name === 'username' || name === 'password' || name === 'new-password' || id.includes('pwd') || id.includes('password') || id.includes('phone')) {
-        return;
+
+      // 비밀번호 및 지정된 로그인 자격증명 필드는 브라우저 키체인 편의를 위해 유지
+      if (t === 'password' || ac.includes('password') || name === 'password' || name === 'new-password' || 
+          id === 'loginpwd' || id === 'login_password' || id === 'reg_password' || id === 'master_password' || 
+          id === 'ue_password') {
+        continue;
       }
-      el.setAttribute('autocomplete', 'off');
+
+      // 모든 일반 텍스트 박스, 숫자, 날짜, 검색창, 텍스트에리어에 대해 브라우저 자동완성/이전입력 팝업 완벽 차단
+      if (el.getAttribute('autocomplete') !== 'off') {
+        el.setAttribute('autocomplete', 'off');
+      }
       el.setAttribute('aria-autocomplete', 'none');
-    });
+      el.setAttribute('autocorrect', 'off');
+      el.setAttribute('autocapitalize', 'off');
+      el.setAttribute('spellcheck', 'false');
+      el.setAttribute('data-lpignore', 'true');
+      el.setAttribute('data-form-type', 'other');
+    }
   } catch(e) {}
 }
 
+// 1) DOM 초기화 시 실행
 document.addEventListener('DOMContentLoaded', applyGlobalNoAutocomplete_);
+
+// 2) 신규 등록 모달 열기 또는 동적 HTML 삽입을 실시간 감지하여 자동 적용 (MutationObserver)
+if (window.MutationObserver) {
+  try {
+    var noAcObserver_ = new MutationObserver(function(mutations) {
+      applyGlobalNoAutocomplete_();
+    });
+    noAcObserver_.observe(document.documentElement, { childList: true, subtree: true });
+  } catch(e) {}
+}
+
+// 3) 마우스 포커스(focusin, mousedown, pointerdown)가 텍스트 박스에 닿는 순간 즉시 차단 보장
+document.addEventListener('focusin', function(e) {
+  var el = e.target;
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+  var t = (el.type || '').toLowerCase();
+  var id = (el.id || '').toLowerCase();
+  if (t === 'password' || id.includes('pwd') || id.includes('password')) return;
+  if (el.getAttribute('autocomplete') !== 'off') {
+    el.setAttribute('autocomplete', 'off');
+  }
+  el.setAttribute('aria-autocomplete', 'none');
+  el.setAttribute('autocorrect', 'off');
+  el.setAttribute('autocapitalize', 'off');
+  el.setAttribute('spellcheck', 'false');
+  el.setAttribute('data-lpignore', 'true');
+}, true);
+
+document.addEventListener('mousedown', function(e) {
+  var el = e.target;
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+  var t = (el.type || '').toLowerCase();
+  var id = (el.id || '').toLowerCase();
+  if (t === 'password' || id.includes('pwd') || id.includes('password')) return;
+  if (el.getAttribute('autocomplete') !== 'off') {
+    el.setAttribute('autocomplete', 'off');
+  }
+  el.setAttribute('aria-autocomplete', 'none');
+  el.setAttribute('autocorrect', 'off');
+  el.setAttribute('autocapitalize', 'off');
+  el.setAttribute('spellcheck', 'false');
+  el.setAttribute('data-lpignore', 'true');
+}, true);
 </script>
 </body>
 </html>
