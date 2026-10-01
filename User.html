@@ -6334,17 +6334,25 @@ function applyEditableListsToClient_(lists, defaults){
 
 /* ===================== 엑셀일보 데이터 동기화 및 일괄 반영 탭 ===================== */
 let EXCEL_DAILY_CURRENT_TYPE = 'order_start'; // 'order_start' | 'cancel' | 'restart' | 'price_change'
-let EXCEL_DAILY_ROWS = []; // [{ id, selected, status: 'NEW'|'MODIFIED'|'IDENTICAL', contract_no, customer_name, diffs, excelFields, dbRow }]
-let EXCEL_DAILY_FILTER = 'all'; // 'all' | 'diff' | 'new' | 'same'
+let EXCEL_DAILY_ROWS = []; // [{ id, selected, status: 'NEW'|'MODIFIED'|'IDENTICAL', contract_no, customer_name, diffs, yearDiffs, excelFields, dbRow }]
+let EXCEL_DAILY_FILTER = 'all'; // 'all' | 'diff' | 'new' | 'same' | 'year_diff'
 let EXCEL_DAILY_IS_PROCESSING = false;
+let EXCEL_DAILY_BASE_YEAR = (new Date()).getFullYear(); // 기본 2026년
 
 const EXCEL_DAILY_SAMPLES_ = {
-  order_start: `확정\t9월\t10월\t당월\t미개시\tN6256994\t본가솥뚜껑삼겹살쌍문점영상\t임영민\t고객소개\t127\t9/28\t9/28\t10/1\t10/1\t 40,000 \t 알람 \t 일반 \t비고사항\t
-확정\t9월\t10월\t당월\t미개시\tN6252767\t에반더필라테스중계은행사거리점영상\t최영국\t개척\t160\t9/8\t9/8\t9/8\t10/7\t 55,000 \t 알람 \t 일반 \t비고사항\t
-확정\t9월\t10월\t당월\t미개시\tN6256402\t신사동인동\t임영민\t관외이전\t127\t9/22\t9/22\t10/14\t10/15\t 60,000 \t 알람 \t 일반 \t\t
-예정\t8월\t11월\t이월\t미개시\tN6244580\t유니클로스타필드마켓월계점\t박광춘\t그로스\t26\t8/6\t8/6\t11/13\t11/13\t 207,500 \t 알람 \t 법인 \t\t
-예정\t7월\t11월\t이월\t미개시\tN6240860\t무인양품월계점\t박광춘\t그로스\t26\t7/24\t7/24\t11/13\t11/13\t 370,000 \t 알람 \t 법인 \t\t
-예정\t8월\t11월\t이월\t미개시\tN6245535\t오패산포차\t이수열\t개척\t27\t8/11\t8/11\t8/13\t11/30\t 40,000 \t 알람 \t 일반`,
+  order_start: `예정\t8월\t12월\t이월\t미개시\tN6248949\t하늘건재\t이수열\t대리점\t127\t8/24\t8/25\t26/8/27\t26/12/31\t 60,000 \t 알람 \t 일반 \t\t
+예정\t8월\t12월\t이월\t미개시\tN6248816\t금광당\t이수열\t대리점\t127\t8/24\t8/25\t26/8/27\t26/12/31\t 100,000 \t 알람 \t 일반 \t\t
+예정\t8월\t12월\t이월\t미개시\tN6247322\t솔트와인\t이수열\t대리점\t27\t8/18\t8/18\t26/8/20\t26/12/31\t 50,000 \t 알람 \t 일반 \t\t
+예정\t8월\t12월\t이월\t미개시\tN6246929\t대명텔레콤\t이수열\t대리점\t27\t8/14\t8/14\t26/12/31\t26/12/31\t 60,000 \t 알람 \t 일반 \t\t
+예정\t7월\t12월\t이월\t미개시\tN6238092\t하계종합사회복지관출입영상\t최영국\t개척\t160\t7/13\t7/14\t26/10/5\t26/12/31\t 250,000 \t 알람 \t 일반 \t\t
+예정\t9월\t1월\t이월\t미개시\tN6256908\t서영즈헤어샵\t이수열\t대리점\t27\t9/28\t9/28\t26/9/30\t27/1/1\t 50,000 \t 알람 \t 일반 \t\t
+예정\t9월\t1월\t이월\t미개시\tN6256465\t광운중학교화재블루스캔\t정문재\t사내소개\t26\t9/22\t9/22\t26/10/1\t27/1/1\t 140,000 \t 알람 \t 일반 \t블루스캔\t
+예정\t9월\t1월\t이월\t미개시\tN6255052\t우리동네키움센터강북7호점\t이수열\t대리점\t27\t9/16\t9/16\t26/9/22\t27/1/1\t 200,000 \t 알람 \t 일반 \t\t
+예정\t9월\t1월\t이월\t미개시\tN6254674\t야산빌딩(AHD)영상\t이수열\t대리점\t27\t9/15\t9/15\t26/9/16\t27/1/1\t 100,000 \t 알람 \t 일반 \t\t
+예정\t10월\t1월\t이월\t미개시\tN6257852\t이쁜여우\t이수열\t대리점\t27\t10/1\t10/1\t26/10/2\t27/1/1\t 50,000 \t 알람 \t 일반 \t\t
+예정\t10월\t1월\t이월\t미개시\tN6258135\t삼창마트\t이수열\t대리점\t27\t10/1\t10/1\t26/10/6\t27/1/1\t 50,000 \t 알람 \t 일반 \t\t
+예정\t9월\t1월\t이월\t미개시\tN6254170\t원당어린이집\t이수열\t대리점\t127\t9/10\t9/11\t26/9/21\t27/1/4\t 220,000 \t 알람 \t 일반 \t\t
+예정\t9월\t1월\t이월\t미개시\tN6250903\t강북육아종합지원센터\t이수열\t대리점\t27\t9/1\t9/2\t26/9/7\t27/1/4\t 318,182 \t 알람 \t 일반`,
 
   cancel: `해약\t당월\t10월\tN6133499\t유영언님영상렌탈\t정문재\t26\t10/2\t10/2\t 40,000 \t 알람 \t일반\t이사
 해약\t당월\t10월\tN5390446\t아주관리\t최영국\t28\t9/30\t10/3\t 80,000 \t 알람 \t일반\t타사전환
@@ -6363,20 +6371,84 @@ const EXCEL_DAILY_SAMPLES_ = {
 인상\t당월\t10월\tN5688736\t풍천장어마을\t임영민\tTM\t\t9/30\t10/1\t 20,000 \t 187,000 \t11%\tTM 인상\t알람\t일반`
 };
 
-function edCleanDate_(val, defaultYear) {
-  if (!val) return '';
+// 지능형 날짜 파싱 헬퍼
+// 규칙: 원본에 년도가 표시되지 않은 날짜는 당해년도(current year), 년도 표시가 있는 경우는 해당 날짜(26/ -> 2026, 27/ -> 2027 등)로 변환
+function edParseFlexibleDate_(val, baseYear) {
+  if (!val) {
+    return { str: '', hasExplicitYear: false, year: null, isUnknown: false };
+  }
   const s = String(val).trim();
-  if (s === '미정' || s === '해약방어') return s;
-  const m1 = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
-  if (m1) {
-    return `${m1[1]}-${String(m1[2]).padStart(2, '0')}-${String(m1[3]).padStart(2, '0')}`;
+  if (s === '미정' || s === '해약방어') {
+    return { str: s, hasExplicitYear: true, year: null, isUnknown: true };
   }
-  const m2 = s.match(/^(\d{1,2})[./-](\d{1,2})/);
+
+  // 1. 엑셀 날짜 일련번호 (예: 45901 -> 2025-09-01, 46266 -> 2026-09-01)
+  if (/^\d{5}$/.test(s)) {
+    const serial = parseInt(s, 10);
+    if (serial >= 35000 && serial <= 65000) {
+      const utcDays = serial - 25569;
+      const d = new Date(utcDays * 86400 * 1000);
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return {
+        str: `${y}-${m}-${day}`,
+        hasExplicitYear: true,
+        year: y,
+        isUnknown: false
+      };
+    }
+  }
+
+  // 2. 4자리 년도 포함: YYYY.MM.DD, YYYY-MM-DD, YYYY/MM/DD (예: 2026/8/27, 2027/1/1)
+  const m4 = s.match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (m4) {
+    const y = parseInt(m4[1], 10);
+    const m = String(parseInt(m4[2], 10)).padStart(2, '0');
+    const d = String(parseInt(m4[3], 10)).padStart(2, '0');
+    return {
+      str: `${y}-${m}-${d}`,
+      hasExplicitYear: true,
+      year: y,
+      isUnknown: false
+    };
+  }
+
+  // 3. 2자리 년도 포함: YY/M/D, YY.M.D, YY-M-D (예: 26/8/27 -> 2026, 27/1/1 -> 2027)
+  const m2 = s.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})$/);
   if (m2) {
-    const y = defaultYear || (new Date()).getFullYear();
-    return `${y}-${String(m2[1]).padStart(2, '0')}-${String(m2[2]).padStart(2, '0')}`;
+    const y = 2000 + parseInt(m2[1], 10);
+    const m = String(parseInt(m2[2], 10)).padStart(2, '0');
+    const d = String(parseInt(m2[3], 10)).padStart(2, '0');
+    return {
+      str: `${y}-${m}-${d}`,
+      hasExplicitYear: true,
+      year: y,
+      isUnknown: false
+    };
   }
-  return s;
+
+  // 4. 년도 미포함: M/D, M.D, M-D (예: 8/24, 8/25, 9/28, 10/1)
+  // 사용자 명시 규칙: "원본에 년도가 표시되지않은 날자는 당해년도"
+  const mmd = s.match(/^(\d{1,2})[./-](\d{1,2})$/);
+  if (mmd) {
+    const m = parseInt(mmd[1], 10);
+    const d = parseInt(mmd[2], 10);
+
+    const currentYear = baseYear || (new Date()).getFullYear();
+    const mStr = String(m).padStart(2, '0');
+    const dStr = String(d).padStart(2, '0');
+    return {
+      str: `${currentYear}-${mStr}-${dStr}`,
+      hasExplicitYear: false,
+      year: currentYear,
+      month: m,
+      day: d,
+      isUnknown: false
+    };
+  }
+
+  return { str: s, hasExplicitYear: false, year: null, isUnknown: false };
 }
 
 function edCleanMoney_(val) {
@@ -6390,216 +6462,15 @@ function edCleanStr_(val) {
   return val ? String(val).trim() : '';
 }
 
-function edParseOrderRow_(cols) {
-  let cIdx = -1;
-  for (let i = 0; i < cols.length; i++) {
-    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
-  }
-  if (cIdx === 5 || cols.length >= 17) {
-    return {
-      '개시': edCleanStr_(cols[0]),
-      '수주월': edCleanStr_(cols[1]),
-      '개시월': edCleanStr_(cols[2]),
-      '이월': edCleanStr_(cols[3]),
-      '구분': edCleanStr_(cols[4]),
-      '계약번호': edCleanStr_(cols[5]),
-      '계약처명': edCleanStr_(cols[6]),
-      '영업담당': edCleanStr_(cols[7]),
-      '영업동기': edCleanStr_(cols[8]),
-      '담당차량': edCleanStr_(cols[9]),
-      '보고일': edCleanDate_(cols[10]),
-      '계약일': edCleanDate_(cols[11]),
-      '개시일': edCleanDate_(cols[12]),
-      '기산일': edCleanDate_(cols[13]),
-      '용역료': edCleanMoney_(cols[14]),
-      '상품': edCleanStr_(cols[15]) || '알람',
-      '그로스': edCleanStr_(cols[16]) || '일반',
-      '비고': edCleanStr_(cols[17]),
-      '유형': '엑셀등록'
-    };
-  }
-  if (cIdx === 0 && cols.length >= 8) {
-    return {
-      '계약번호': edCleanStr_(cols[0]),
-      '계약처명': edCleanStr_(cols[1]),
-      '영업담당': edCleanStr_(cols[2]),
-      '영업동기': edCleanStr_(cols[3]),
-      '담당차량': edCleanStr_(cols[4]),
-      '보고일': edCleanDate_(cols[5]),
-      '계약일': edCleanDate_(cols[6]),
-      '개시일': edCleanDate_(cols[7]),
-      '기산일': edCleanDate_(cols[8]),
-      '용역료': edCleanMoney_(cols[9]),
-      '상품': edCleanStr_(cols[10]) || '알람',
-      '그로스': edCleanStr_(cols[11]) || '일반',
-      '비고': edCleanStr_(cols[12]),
-      '유형': '엑셀등록'
-    };
-  }
-  return null;
-}
-
-function edParseCancelRow_(cols) {
-  let cIdx = -1;
-  for (let i = 0; i < cols.length; i++) {
-    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
-  }
-  if (cIdx === 3 || cols.length >= 12) {
-    const rawReason = edCleanStr_(cols[13]);
-    const rawType = edCleanStr_(cols[12]);
-    return {
-      '구분': edCleanStr_(cols[0]) || '해약',
-      '기준': edCleanStr_(cols[1]),
-      '해약월': edCleanStr_(cols[2]),
-      '계약번호': edCleanStr_(cols[3]),
-      '계약처명': edCleanStr_(cols[4]),
-      '영업담당': edCleanStr_(cols[5]),
-      '담당차량': edCleanStr_(cols[6]),
-      '접수일': edCleanDate_(cols[7]),
-      '확정일': edCleanDate_(cols[8]),
-      '용역료': edCleanMoney_(cols[9]),
-      '상품': edCleanStr_(cols[10]) || '알람',
-      '그로스': edCleanStr_(cols[11]) || '일반',
-      '해약유형': rawType || '기타',
-      '사유': rawReason || rawType,
-      '유형': '엑셀등록'
-    };
-  }
-  if (cIdx === 0 && cols.length >= 8) {
-    return {
-      '계약번호': edCleanStr_(cols[0]),
-      '계약처명': edCleanStr_(cols[1]),
-      '영업담당': edCleanStr_(cols[2]),
-      '담당차량': edCleanStr_(cols[3]),
-      '접수일': edCleanDate_(cols[4]),
-      '확정일': edCleanDate_(cols[5]),
-      '용역료': edCleanMoney_(cols[6]),
-      '상품': edCleanStr_(cols[7]) || '알람',
-      '그로스': edCleanStr_(cols[8]) || '일반',
-      '해약유형': edCleanStr_(cols[9]) || '기타',
-      '사유': edCleanStr_(cols[10]) || edCleanStr_(cols[9]),
-      '유형': '엑셀등록'
-    };
-  }
-  return null;
-}
-
-function edParseRestartRow_(cols) {
-  let cIdx = -1;
-  for (let i = 0; i < cols.length; i++) {
-    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
-  }
-  if (cIdx === 3 || cols.length >= 13) {
-    return {
-      '현상태': edCleanStr_(cols[0]) || '중지',
-      '재개시월': edCleanStr_(cols[2]),
-      '계약번호': edCleanStr_(cols[3]),
-      '계약처명': edCleanStr_(cols[4]),
-      '영업담당': edCleanStr_(cols[5]),
-      '담당차량': edCleanStr_(cols[6]),
-      '재개시일': edCleanDate_(cols[7]),
-      '용역료': edCleanMoney_(cols[8]),
-      '중지일': edCleanDate_(cols[9]),
-      '공사담당': edCleanStr_(cols[10]),
-      '상품': edCleanStr_(cols[11]) || '알람',
-      '그로스': edCleanStr_(cols[12]) || '일반',
-      '비고': edCleanStr_(cols[13]),
-      '유형': '엑셀등록'
-    };
-  }
-  if (cIdx === 2 && cols.length >= 12) {
-    return {
-      '현상태': edCleanStr_(cols[0]) || '중지',
-      '재개시월': edCleanStr_(cols[1]),
-      '계약번호': edCleanStr_(cols[2]),
-      '계약처명': edCleanStr_(cols[3]),
-      '영업담당': edCleanStr_(cols[4]),
-      '담당차량': edCleanStr_(cols[5]),
-      '재개시일': edCleanDate_(cols[6]),
-      '용역료': edCleanMoney_(cols[7]),
-      '중지일': edCleanDate_(cols[8]),
-      '공사담당': edCleanStr_(cols[9]),
-      '상품': edCleanStr_(cols[10]) || '알람',
-      '그로스': edCleanStr_(cols[11]) || '일반',
-      '비고': edCleanStr_(cols[12]),
-      '유형': '엑셀등록'
-    };
-  }
-  if (cIdx === 0 && cols.length >= 8) {
-    return {
-      '계약번호': edCleanStr_(cols[0]),
-      '계약처명': edCleanStr_(cols[1]),
-      '영업담당': edCleanStr_(cols[2]),
-      '담당차량': edCleanStr_(cols[3]),
-      '재개시일': edCleanDate_(cols[4]),
-      '용역료': edCleanMoney_(cols[5]),
-      '중지일': edCleanDate_(cols[6]),
-      '공사담당': edCleanStr_(cols[7]),
-      '상품': edCleanStr_(cols[8]) || '알람',
-      '그로스': edCleanStr_(cols[9]) || '일반',
-      '비고': edCleanStr_(cols[10]),
-      '유형': '엑셀등록'
-    };
-  }
-  return null;
-}
-
-function edParsePriceRow_(cols) {
-  let cIdx = -1;
-  for (let i = 0; i < cols.length; i++) {
-    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
-  }
-  if (cIdx === 3 || cols.length >= 15) {
-    const rawNote = (cols.length > 17 && cols[17].trim()) ? cols[17].trim() : ((cols.length > 16 && cols[16].trim() && !['직접등록','자동등록','엑셀등록'].includes(cols[16].trim())) ? cols[16].trim() : '');
-    return {
-      '구분': edCleanStr_(cols[0]) || '인하',
-      '기준': edCleanStr_(cols[1]),
-      '반영월': edCleanStr_(cols[2]),
-      '계약번호': edCleanStr_(cols[3]),
-      '계약처명': edCleanStr_(cols[4]),
-      '영업담당': edCleanStr_(cols[5]),
-      '접수자': edCleanStr_(cols[6]),
-      '담당차량': edCleanStr_(cols[7]),
-      '접수일': edCleanDate_(cols[8]),
-      '기산일': edCleanDate_(cols[9]),
-      '금액': edCleanMoney_(cols[10]),
-      '現용역료': edCleanMoney_(cols[11]),
-      '사유': edCleanStr_(cols[13]),
-      '상품': edCleanStr_(cols[14]) || '알람',
-      '그로스': edCleanStr_(cols[15]) || '일반',
-      '비고': rawNote,
-      '유형': '엑셀등록'
-    };
-  }
-  if (cIdx === 0 && cols.length >= 8) {
-    return {
-      '계약번호': edCleanStr_(cols[0]),
-      '계약처명': edCleanStr_(cols[1]),
-      '영업담당': edCleanStr_(cols[2]),
-      '접수자': edCleanStr_(cols[3]),
-      '담당차량': edCleanStr_(cols[4]),
-      '접수일': edCleanDate_(cols[5]),
-      '기산일': edCleanDate_(cols[6]),
-      '금액': edCleanMoney_(cols[7]),
-      '現용역료': edCleanMoney_(cols[8]),
-      '사유': edCleanStr_(cols[9]),
-      '상품': edCleanStr_(cols[10]) || '알람',
-      '그로스': edCleanStr_(cols[11]) || '일반',
-      '비고': edCleanStr_(cols[12]),
-      '유형': '엑셀등록'
-    };
-  }
-  return null;
-}
-
 function loadExcelDailyTab_() {
   const container = document.getElementById('content');
   if (!container) return;
 
   const currentType = EXCEL_DAILY_CURRENT_TYPE || 'order_start';
+  const curBaseYear = EXCEL_DAILY_BASE_YEAR || (new Date()).getFullYear();
 
   container.innerHTML = `
-    <div style="padding:20px; max-width:1400px; margin:0 auto; font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;">
+    <div style="padding:20px; max-width:1440px; margin:0 auto; font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;">
       <!-- 상단 헤더 카드 -->
       <div style="background:#fff; border-radius:10px; border:1px solid #e2e8f0; padding:20px 24px; margin-bottom:20px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
@@ -6608,23 +6479,38 @@ function loadExcelDailyTab_() {
               <span>📋</span> 엑셀일보 데이터 동기화 및 일괄 반영
             </h2>
             <p style="margin:6px 0 0 0; font-size:13.5px; color:#64748b;">
-              엑셀 시트에서 복사한 데이터를 붙여넣으면 DB 데이터와 비교하여 불일치 항목을 확인하고 일괄 추가/수정합니다.
+              엑셀 시트에서 복사한 데이터를 붙여넣으면 DB 데이터와 비교하여 불일치 및 <strong>년도 상이 내역</strong>을 검증하고 일괄 추가/수정합니다.
             </p>
           </div>
-          <!-- 4대 옵션 선택 탭 버튼 -->
-          <div style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:8px; border:1px solid #cbd5e1;">
-            <button id="edTypeBtn_order_start" onclick="switchExcelDailyType_('order_start')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='order_start'?'background:#5c1c2f; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
-              🟢 수주개시
-            </button>
-            <button id="edTypeBtn_cancel" onclick="switchExcelDailyType_('cancel')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='cancel'?'background:#dc2626; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
-              🔴 해약중지
-            </button>
-            <button id="edTypeBtn_restart" onclick="switchExcelDailyType_('restart')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='restart'?'background:#0284c7; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
-              🔵 재개시
-            </button>
-            <button id="edTypeBtn_price_change" onclick="switchExcelDailyType_('price_change')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='price_change'?'background:#7c3aed; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
-              🟣 인상인하
-            </button>
+
+          <!-- 우측: 기준 연도 선택 & 4대 옵션 선택 탭 버튼 -->
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <!-- 기준 연도 선택 드롭다운 -->
+            <div style="display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #cbd5e1; padding:4px 10px; border-radius:8px;">
+              <span style="font-size:12.5px; font-weight:700; color:#334155;">📅 기준 연도:</span>
+              <select id="excelDailyBaseYearSelect" onchange="onExcelDailyBaseYearChange_(this.value)" style="border:1px solid #94a3b8; border-radius:5px; padding:3px 6px; font-size:13px; font-weight:700; color:#5c1c2f; background:#fff; cursor:pointer;" title="년도가 명시되지 않은 '9/1' 형태 날짜의 기본 적용 연도">
+                <option value="2026" ${curBaseYear===2026?'selected':''}>2026년 (당해년도)</option>
+                <option value="2025" ${curBaseYear===2025?'selected':''}>2025년</option>
+                <option value="2024" ${curBaseYear===2024?'selected':''}>2024년</option>
+                <option value="2027" ${curBaseYear===2027?'selected':''}>2027년</option>
+              </select>
+            </div>
+
+            <!-- 4대 카테고리 전환 버튼 -->
+            <div style="display:flex; gap:6px; background:#f1f5f9; padding:4px; border-radius:8px; border:1px solid #cbd5e1;">
+              <button id="edTypeBtn_order_start" onclick="switchExcelDailyType_('order_start')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='order_start'?'background:#5c1c2f; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
+                🟢 수주개시
+              </button>
+              <button id="edTypeBtn_cancel" onclick="switchExcelDailyType_('cancel')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='cancel'?'background:#dc2626; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
+                🔴 해약중지
+              </button>
+              <button id="edTypeBtn_restart" onclick="switchExcelDailyType_('restart')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='restart'?'background:#0284c7; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
+                🔵 재개시
+              </button>
+              <button id="edTypeBtn_price_change" onclick="switchExcelDailyType_('price_change')" style="padding:8px 16px; border:none; border-radius:6px; font-weight:700; font-size:13.5px; cursor:pointer; transition:all 0.2s; ${currentType==='price_change'?'background:#7c3aed; color:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.1);':'background:transparent; color:#475569;'}">
+                🟣 인상인하
+              </button>
+            </div>
           </div>
         </div>
 
@@ -6647,7 +6533,7 @@ function loadExcelDailyTab_() {
           
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:8px;">
             <div style="font-size:12.5px; color:#64748b;">
-              💡 <strong>안내:</strong> 엑셀의 헤더(열 제목)가 포함되어 있어도 자동으로 인식합니다. 계약번호 기준으로 기존 DB와 일치 여부를 대조합니다.
+              💡 <strong>스마트 날짜·년도 검증:</strong> 엑셀에 '9/1'처럼 년도가 없어도 기존 DB의 계약 년도를 자동 추적하여 비교합니다. 년도가 다를 경우 붉은색 경고로 명확하게 표시되며 행별로 년도를 간편히 변경할 수 있습니다.
             </div>
             <button onclick="analyzeExcelDailyData_()" style="background:#5c1c2f; color:#fff; border:none; border-radius:6px; padding:10px 24px; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 2px 4px rgba(92,28,47,0.25); display:inline-flex; align-items:center; gap:6px;">
               <span>🔍</span> DB 데이터와 비교 분석
@@ -6674,6 +6560,14 @@ function updateExcelDailyGuideText_() {
     price_change: '🟣 [인상인하] 엑셀 데이터 붙여넣기 (Ctrl+V)'
   };
   lbl.innerHTML = titles[EXCEL_DAILY_CURRENT_TYPE] || '📝 엑셀 데이터 붙여넣기 (Ctrl+V)';
+}
+
+function onExcelDailyBaseYearChange_(newYear) {
+  EXCEL_DAILY_BASE_YEAR = parseInt(newYear, 10) || (new Date()).getFullYear();
+  const textarea = document.getElementById('excelDailyPasteArea');
+  if (textarea && textarea.value.trim()) {
+    analyzeExcelDailyData_();
+  }
 }
 
 function switchExcelDailyType_(typeKey) {
@@ -6764,6 +6658,12 @@ async function fetchAllDbRowsForType_(typeKey) {
   });
 }
 
+function parseRowDateWithContext_(field, rawVal, baseYear, dbRow, rowContextYear) {
+  const dbDate = dbRow ? (dbRow[field] || '') : '';
+  const parsed = edParseFlexibleDate_(rawVal, baseYear, dbDate, rowContextYear);
+  return parsed;
+}
+
 async function analyzeExcelDailyData_() {
   const textarea = document.getElementById('excelDailyPasteArea');
   const rawText = textarea ? textarea.value.trim() : '';
@@ -6778,13 +6678,14 @@ async function analyzeExcelDailyData_() {
       <div style="background:#fff; border-radius:10px; border:1px solid #e2e8f0; padding:40px; text-align:center;">
         <div style="font-size:28px; margin-bottom:12px;">⏳</div>
         <div style="font-weight:700; font-size:16px; color:#1e293b;">DB 데이터를 불러와 엑셀과 비교 분석 중입니다...</div>
-        <div style="font-size:13px; color:#64748b; margin-top:4px;">기존 계약건 조회 및 불일치 항목 확인 중</div>
+        <div style="font-size:13px; color:#64748b; margin-top:4px;">계약번호 대조 및 날짜/년도 검증 수행 중</div>
       </div>
     `;
   }
 
   try {
     const currentType = EXCEL_DAILY_CURRENT_TYPE;
+    const baseYear = EXCEL_DAILY_BASE_YEAR || (new Date()).getFullYear();
     const dbRows = await fetchAllDbRowsForType_(currentType);
 
     const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -6799,18 +6700,40 @@ async function analyzeExcelDailyData_() {
         continue;
       }
 
+      // 1. 임시 파싱 수행 (원천 문자열 획득)
       let parsed = null;
-      if (currentType === 'order_start') parsed = edParseOrderRow_(cols);
-      else if (currentType === 'cancel') parsed = edParseCancelRow_(cols);
-      else if (currentType === 'restart') parsed = edParseRestartRow_(cols);
-      else if (currentType === 'price_change') parsed = edParsePriceRow_(cols);
+      let dateFields = [];
+      let compareFields = [];
+      let numFields = [];
+
+      if (currentType === 'order_start') {
+        parsed = edParseOrderRow_(cols);
+        dateFields = ['보고일', '계약일', '개시일', '기산일'];
+        compareFields = ['계약처명', '영업담당', '영업동기', '담당차량', '보고일', '계약일', '개시일', '기산일', '용역료', '상품', '그로스', '비고'];
+        numFields = ['용역료'];
+      } else if (currentType === 'cancel') {
+        parsed = edParseCancelRow_(cols);
+        dateFields = ['접수일', '확정일'];
+        compareFields = ['구분', '계약처명', '영업담당', '담당차량', '접수일', '확정일', '용역료', '상품', '그로스', '해약유형', '사유'];
+        numFields = ['용역료'];
+      } else if (currentType === 'restart') {
+        parsed = edParseRestartRow_(cols);
+        dateFields = ['재개시일', '중지일'];
+        compareFields = ['현상태', '계약처명', '영업담당', '담당차량', '재개시일', '용역료', '중지일', '공사담당', '상품', '그로스', '비고'];
+        numFields = ['용역료'];
+      } else if (currentType === 'price_change') {
+        parsed = edParsePriceRow_(cols);
+        dateFields = ['접수일', '기산일'];
+        compareFields = ['구분', '계약처명', '영업담당', '접수자', '담당차량', '접수일', '기산일', '금액', '現용역료', '사유', '상품', '그로스', '비고'];
+        numFields = ['금액', '現용역료'];
+      }
 
       if (!parsed) continue;
 
       const contractNo = parsed['계약번호'] || '';
       const custName = parsed['계약처명'] || '';
 
-      // DB 일치 대조
+      // 2. DB 일치 대조 (계약번호 1순위, 계약처명 2순위)
       let dbRow = null;
       if (contractNo && contractNo !== 'N') {
         dbRow = dbRows.find(r => r['계약번호'] && r['계약번호'].trim().toUpperCase() === contractNo.toUpperCase());
@@ -6819,36 +6742,58 @@ async function analyzeExcelDailyData_() {
         dbRow = dbRows.find(r => r['계약처명'] && r['계약처명'].trim() === custName);
       }
 
+      // 3. 기존 DB 계약의 기준 년도 탐색 (계약 년도 또는 수주월/해약월 등)
+      let dbContractYear = null;
+      if (dbRow) {
+        for (const ymKey of ['수주월', '개시월', '해약월', '재개시월', '반영월', 'order_ym', 'cancel_ym', 'start_ym', 'apply_ym']) {
+          const v = dbRow[ymKey];
+          const m = String(v || '').match(/^(\d{4})/);
+          if (m) { dbContractYear = parseInt(m[1], 10); break; }
+        }
+        if (!dbContractYear) {
+          for (const df of dateFields) {
+            const v = dbRow[df];
+            const m = String(v || '').match(/^(\d{4})/);
+            if (m) { dbContractYear = parseInt(m[1], 10); break; }
+          }
+        }
+      }
+
+      // 4. 지능형 날짜 파싱 및 년도 상이(Year Difference) 검출
+      const yearDiffs = {}; // { fieldName: { dbYear, excelYear, dbDate, excelDate, hasExplicitYear } }
+      const rawDateValues = {};
+
+      dateFields.forEach(df => {
+        const rawDate = parsed[df];
+        rawDateValues[df] = rawDate;
+        const dbDate = dbRow ? (dbRow[df] || '') : '';
+
+        const pRes = parseRowDateWithContext_(df, rawDate, baseYear, dbRow, dbContractYear);
+        parsed[df] = pRes.str;
+
+        // DB에 날짜가 있고, 엑셀 날짜의 년도와 DB 날짜의 년도가 다른 경우 체크!
+        if (dbDate && /^\d{4}-\d{2}-\d{2}$/.test(dbDate) && pRes.year) {
+          const dbY = parseInt(dbDate.split('-')[0], 10);
+          if (dbY !== pRes.year) {
+            yearDiffs[df] = {
+              dbYear: dbY,
+              excelYear: pRes.year,
+              dbDate: dbDate,
+              excelDate: pRes.str,
+              hasExplicitYear: pRes.hasExplicitYear
+            };
+          }
+        }
+      });
+
+      // 5. 항목별 값 비교
       const diffs = {};
       let status = 'NEW';
       let selected = true;
 
-      // 비교 대상 필드 목록
-      let compareFields = [];
-      let numFields = [];
-      let dateFields = [];
-
-      if (currentType === 'order_start') {
-        compareFields = ['계약처명', '영업담당', '영업동기', '담당차량', '보고일', '계약일', '개시일', '기산일', '용역료', '상품', '그로스', '비고'];
-        numFields = ['용역료'];
-        dateFields = ['보고일', '계약일', '개시일', '기산일'];
-      } else if (currentType === 'cancel') {
-        compareFields = ['구분', '계약처명', '영업담당', '담당차량', '접수일', '확정일', '용역료', '상품', '그로스', '해약유형', '사유'];
-        numFields = ['용역료'];
-        dateFields = ['접수일', '확정일'];
-      } else if (currentType === 'restart') {
-        compareFields = ['현상태', '계약처명', '영업담당', '담당차량', '재개시일', '용역료', '중지일', '공사담당', '상품', '그로스', '비고'];
-        numFields = ['용역료'];
-        dateFields = ['재개시일', '중지일'];
-      } else if (currentType === 'price_change') {
-        compareFields = ['구분', '계약처명', '영업담당', '접수자', '담당차량', '접수일', '기산일', '금액', '現용역료', '사유', '상품', '그로스', '비고'];
-        numFields = ['금액', '現용역료'];
-        dateFields = ['접수일', '기산일'];
-      }
-
       if (!dbRow) {
         status = 'NEW';
-        selected = true; // DB 에 없는 데이터는 적용여부를 디폴트로 체크해주고
+        selected = true; // DB 에 없는 데이터는 적용여부 디폴트 체크
       } else {
         compareFields.forEach(f => {
           let ev = parsed[f] !== undefined ? parsed[f] : '';
@@ -6861,10 +6806,10 @@ async function analyzeExcelDailyData_() {
               diffs[f] = { excel: ev, db: dv };
             }
           } else if (dateFields.includes(f)) {
-            ev = edCleanDate_(ev);
-            dv = edCleanDate_(dv);
+            ev = String(ev).trim();
+            dv = String(dv).trim();
             if (ev !== dv) {
-              diffs[f] = { excel: ev, db: dv };
+              diffs[f] = { excel: ev, db: dv, isYearDiff: !!yearDiffs[f] };
             }
           } else {
             ev = String(ev).trim();
@@ -6877,10 +6822,10 @@ async function analyzeExcelDailyData_() {
 
         if (Object.keys(diffs).length > 0) {
           status = 'MODIFIED';
-          selected = true; // 이미 DB 에 있는 데이터와 엑셀의 데이터가 불일치하는 경우 선택 가능 (디폴트 체크)
+          selected = true; // 불일치 항목: 디폴트 체크
         } else {
           status = 'IDENTICAL';
-          selected = false; // 동일한 데이터는 적용여부의 체크를 빼줘
+          selected = false; // 동일 데이터: 체크 해제
         }
       }
 
@@ -6891,6 +6836,8 @@ async function analyzeExcelDailyData_() {
         contract_no: contractNo,
         customer_name: custName,
         diffs: diffs,
+        yearDiffs: yearDiffs,
+        rawDateValues: rawDateValues,
         excelFields: parsed,
         dbRow: dbRow
       });
@@ -6913,6 +6860,106 @@ async function analyzeExcelDailyData_() {
   }
 }
 
+function recalculateRowDiffs_(item) {
+  const currentType = EXCEL_DAILY_CURRENT_TYPE;
+  let dateFields = [];
+  let compareFields = [];
+  let numFields = [];
+
+  if (currentType === 'order_start') {
+    dateFields = ['보고일', '계약일', '개시일', '기산일'];
+    compareFields = ['계약처명', '영업담당', '영업동기', '담당차량', '보고일', '계약일', '개시일', '기산일', '용역료', '상품', '그로스', '비고'];
+    numFields = ['용역료'];
+  } else if (currentType === 'cancel') {
+    dateFields = ['접수일', '확정일'];
+    compareFields = ['구분', '계약처명', '영업담당', '담당차량', '접수일', '확정일', '용역료', '상품', '그로스', '해약유형', '사유'];
+    numFields = ['용역료'];
+  } else if (currentType === 'restart') {
+    dateFields = ['재개시일', '중지일'];
+    compareFields = ['현상태', '계약처명', '영업담당', '담당차량', '재개시일', '용역료', '중지일', '공사담당', '상품', '그로스', '비고'];
+    numFields = ['용역료'];
+  } else if (currentType === 'price_change') {
+    dateFields = ['접수일', '기산일'];
+    compareFields = ['구분', '계약처명', '영업담당', '접수자', '담당차량', '접수일', '기산일', '금액', '現용역료', '사유', '상품', '그로스', '비고'];
+    numFields = ['금액', '現용역료'];
+  }
+
+  const dbRow = item.dbRow;
+  item.yearDiffs = {};
+  item.diffs = {};
+
+  if (!dbRow) {
+    item.status = 'NEW';
+    return;
+  }
+
+  dateFields.forEach(df => {
+    const ev = item.excelFields[df];
+    const dbDate = dbRow[df] || '';
+    if (dbDate && /^\d{4}-\d{2}-\d{2}$/.test(dbDate) && ev && /^\d{4}-\d{2}-\d{2}$/.test(ev)) {
+      const dbY = parseInt(dbDate.split('-')[0], 10);
+      const evY = parseInt(ev.split('-')[0], 10);
+      if (dbY !== evY) {
+        item.yearDiffs[df] = {
+          dbYear: dbY,
+          excelYear: evY,
+          dbDate: dbDate,
+          excelDate: ev
+        };
+      }
+    }
+  });
+
+  compareFields.forEach(f => {
+    let ev = item.excelFields[f] !== undefined ? item.excelFields[f] : '';
+    let dv = dbRow[f] !== undefined ? dbRow[f] : '';
+
+    if (numFields.includes(f)) {
+      ev = edCleanMoney_(ev);
+      dv = edCleanMoney_(dv);
+      if (ev !== dv) {
+        item.diffs[f] = { excel: ev, db: dv };
+      }
+    } else if (dateFields.includes(f)) {
+      ev = String(ev).trim();
+      dv = String(dv).trim();
+      if (ev !== dv) {
+        item.diffs[f] = { excel: ev, db: dv, isYearDiff: !!item.yearDiffs[f] };
+      }
+    } else {
+      ev = String(ev).trim();
+      dv = String(dv).trim();
+      if (ev !== dv) {
+        item.diffs[f] = { excel: ev, db: dv };
+      }
+    }
+  });
+
+  if (Object.keys(item.diffs).length > 0) {
+    item.status = 'MODIFIED';
+  } else {
+    item.status = 'IDENTICAL';
+  }
+}
+
+function changeRowDateYear_(rowId, fieldName, targetYear) {
+  const item = EXCEL_DAILY_ROWS.find(r => r.id === rowId);
+  if (!item) return;
+
+  const curVal = item.excelFields[fieldName];
+  if (!curVal) return;
+
+  const m = String(curVal).match(/^(\d{4})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (m) {
+    const newY = parseInt(targetYear, 10);
+    const mStr = m[2];
+    const dStr = m[3];
+    item.excelFields[fieldName] = `${newY}-${mStr}-${dStr}`;
+    recalculateRowDiffs_(item);
+    renderExcelDailyResult_();
+  }
+}
+
 function renderExcelDailyResult_() {
   const resSec = document.getElementById('excelDailyResultSection');
   if (!resSec) return;
@@ -6931,6 +6978,7 @@ function renderExcelDailyResult_() {
   const newCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'NEW').length;
   const modCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'MODIFIED').length;
   const sameCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'IDENTICAL').length;
+  const yearDiffCount = EXCEL_DAILY_ROWS.filter(r => Object.keys(r.yearDiffs || {}).length > 0).length;
   const selectedCount = EXCEL_DAILY_ROWS.filter(r => r.selected).length;
 
   const currentType = EXCEL_DAILY_CURRENT_TYPE;
@@ -6942,6 +6990,7 @@ function renderExcelDailyResult_() {
   if (EXCEL_DAILY_FILTER === 'diff') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'MODIFIED');
   else if (EXCEL_DAILY_FILTER === 'new') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'NEW');
   else if (EXCEL_DAILY_FILTER === 'same') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'IDENTICAL');
+  else if (EXCEL_DAILY_FILTER === 'year_diff') visibleRows = EXCEL_DAILY_ROWS.filter(r => Object.keys(r.yearDiffs || {}).length > 0);
 
   const allVisibleChecked = visibleRows.length > 0 && visibleRows.every(r => r.selected);
 
@@ -6955,6 +7004,11 @@ function renderExcelDailyResult_() {
           <span style="background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; padding:3px 10px; border-radius:14px; font-size:12.5px; font-weight:700;">
             ⚠️ 불일치(수정) ${modCount}건
           </span>
+          ${yearDiffCount > 0 ? `
+            <span style="background:#fef2f2; color:#b91c1c; border:1.5px solid #ef4444; padding:3px 10px; border-radius:14px; font-size:12.5px; font-weight:800; cursor:pointer;" onclick="filterExcelDailyView_('year_diff')" title="클릭시 년도 상이 건만 필터링">
+              🚨 년도 상이 ${yearDiffCount}건
+            </span>
+          ` : ''}
           <span style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:3px 10px; border-radius:14px; font-size:12.5px; font-weight:700;">
             ✨ 신규 추가 ${newCount}건
           </span>
@@ -6974,7 +7028,7 @@ function renderExcelDailyResult_() {
 
       <!-- 보기 필터 & 빠른 선택 버튼 -->
       <div style="padding:12px 20px; background:#ffffff; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-        <div style="display:flex; gap:6px; align-items:center;">
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <span style="font-size:12.5px; font-weight:600; color:#475569; margin-right:4px;">보기 필터:</span>
           <button onclick="filterExcelDailyView_('all')" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:5px; border:1px solid #cbd5e1; cursor:pointer; ${EXCEL_DAILY_FILTER==='all'?'background:#1e293b; color:#fff;':'background:#fff; color:#475569;'}">
             전체 (${total})
@@ -6982,6 +7036,11 @@ function renderExcelDailyResult_() {
           <button onclick="filterExcelDailyView_('diff')" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:5px; border:1px solid #fca5a5; cursor:pointer; ${EXCEL_DAILY_FILTER==='diff'?'background:#dc2626; color:#fff;':'background:#fff; color:#dc2626;'}">
             불일치만 (${modCount})
           </button>
+          ${yearDiffCount > 0 ? `
+            <button onclick="filterExcelDailyView_('year_diff')" style="padding:4px 10px; font-size:12px; font-weight:700; border-radius:5px; border:1.5px solid #ef4444; cursor:pointer; ${EXCEL_DAILY_FILTER==='year_diff'?'background:#b91c1c; color:#fff;':'background:#fef2f2; color:#b91c1c;'}">
+              🚨 년도 상이만 (${yearDiffCount})
+            </button>
+          ` : ''}
           <button onclick="filterExcelDailyView_('new')" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:5px; border:1px solid #86efac; cursor:pointer; ${EXCEL_DAILY_FILTER==='new'?'background:#15803d; color:#fff;':'background:#fff; color:#15803d;'}">
             신규만 (${newCount})
           </button>
@@ -7015,10 +7074,10 @@ function renderExcelDailyResult_() {
               <th style="padding:10px 8px; width:95px;">계약번호</th>
               <th style="padding:10px 8px; min-width:140px;">계약처명</th>
               <th style="padding:10px 8px; width:75px;">영업담당</th>
-              <th style="padding:10px 8px; width:130px;">주요 일자</th>
+              <th style="padding:10px 8px; width:150px;">주요 일자 (년/월/일)</th>
               <th style="padding:10px 8px; width:100px; text-align:right;">용역료/금액</th>
               <th style="padding:10px 8px; width:100px;">상품/그로스</th>
-              <th style="padding:10px 8px; min-width:240px; background:#fff7ed; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; color:#9a3412;">
+              <th style="padding:10px 8px; min-width:250px; background:#fff7ed; border-left:1px solid #fed7aa; border-right:1px solid #fed7aa; color:#9a3412;">
                 ⚠️ 불일치 항목 상세 (기존 DB ➔ 엑셀 입력)
               </th>
               <th style="padding:10px 8px; min-width:120px;">사유 / 비고</th>
@@ -7031,15 +7090,14 @@ function renderExcelDailyResult_() {
     const f = r.excelFields;
     const isNew = r.status === 'NEW';
     const isMod = r.status === 'MODIFIED';
-    const isSame = r.status === 'IDENTICAL';
+    const hasYearDiff = Object.keys(r.yearDiffs || {}).length > 0;
 
-    // 행 배경 스타일
     let rowBg = '#ffffff';
-    if (isMod) rowBg = '#fffafa';
+    if (hasYearDiff) rowBg = '#fff5f5';
+    else if (isMod) rowBg = '#fffafa';
     else if (isNew) rowBg = '#f0fdf4';
     else if (idx % 2 === 1) rowBg = '#f8fafc';
 
-    // 셀별 불일치 하이라이트 헬퍼
     const diffStyle = (field) => {
       if (r.diffs && r.diffs[field]) {
         return 'background:#fee2e2 !important; color:#dc2626 !important; font-weight:bold; border:1.5px solid #ef4444; border-radius:4px; padding:2px 4px; display:inline-block;';
@@ -7047,46 +7105,74 @@ function renderExcelDailyResult_() {
       return '';
     };
 
-    // 상태 배지
     let statusBadge = '';
     if (isNew) statusBadge = '<span style="background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:700;">✨ 신규</span>';
+    else if (hasYearDiff) statusBadge = '<span style="background:#fee2e2; color:#b91c1c; border:1px solid #ef4444; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:800;">🚨 년도상이</span>';
     else if (isMod) statusBadge = '<span style="background:#fee2e2; color:#dc2626; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:700;">⚠️ 불일치</span>';
     else statusBadge = '<span style="background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:600;">✔️ 일치</span>';
 
-    // 주요 일자 표시 구성
+    // 주요 일자 렌더링 (년도 버튼 및 년도 상이 경고 배지 포함)
+    const renderDateField_ = (label, fieldKey) => {
+      const val = f[fieldKey] || '-';
+      const isDiff = !!(r.diffs && r.diffs[fieldKey]);
+      const yd = r.yearDiffs && r.yearDiffs[fieldKey];
+      
+      let yearToggleHtml = '';
+      if (yd && val && /^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        yearToggleHtml = `
+          <div style="margin-top:2px; font-size:11px;">
+            <button onclick="changeRowDateYear_('${r.id}', '${fieldKey}', ${yd.dbYear})" style="background:#fff; border:1px solid #dc2626; color:#dc2626; border-radius:3px; padding:1px 4px; font-size:10px; font-weight:700; cursor:pointer;" title="기존 DB의 ${yd.dbYear}년으로 변경">
+              ${yd.dbYear}년
+            </button>
+            <button onclick="changeRowDateYear_('${r.id}', '${fieldKey}', ${yd.excelYear})" style="background:#dc2626; border:1px solid #dc2626; color:#fff; border-radius:3px; padding:1px 4px; font-size:10px; font-weight:700; cursor:pointer;" title="엑셀 분석값 ${yd.excelYear}년 유지">
+              ${yd.excelYear}년
+            </button>
+          </div>
+        `;
+      }
+
+      return `
+        <div style="margin-bottom:2px;">
+          <span style="color:#64748b; font-size:11px;">${label}:</span> 
+          <span style="${diffStyle(fieldKey)}">${val}</span>
+          ${yd ? `<span style="background:#fee2e2; color:#dc2626; font-size:10px; font-weight:800; padding:0 3px; border-radius:3px; border:1px solid #f87171;" title="DB(${yd.dbYear}년) ≠ 엑셀(${yd.excelYear}년)">⚠️년도</span>` : ''}
+          ${yearToggleHtml}
+        </div>
+      `;
+    };
+
     let dateDisp = '';
     if (currentType === 'order_start') {
       dateDisp = `
         <div style="font-size:12px;">
-          <div>계약: <span style="${diffStyle('계약일')}">${f['계약일']||'-'}</span></div>
-          <div>개시: <span style="${diffStyle('개시일')}">${f['개시일']||'-'}</span></div>
-          <div>기산: <span style="${diffStyle('기산일')}">${f['기산일']||'-'}</span></div>
+          ${renderDateField_('계약', '계약일')}
+          ${renderDateField_('개시', '개시일')}
+          ${renderDateField_('기산', '기산일')}
         </div>
       `;
     } else if (currentType === 'cancel') {
       dateDisp = `
         <div style="font-size:12px;">
-          <div>접수: <span style="${diffStyle('접수일')}">${f['접수일']||'-'}</span></div>
-          <div>확정: <span style="${diffStyle('확정일')}">${f['확정일']||'-'}</span></div>
+          ${renderDateField_('접수', '접수일')}
+          ${renderDateField_('확정', '확정일')}
         </div>
       `;
     } else if (currentType === 'restart') {
       dateDisp = `
         <div style="font-size:12px;">
-          <div>재개시: <span style="${diffStyle('재개시일')}">${f['재개시일']||'-'}</span></div>
-          <div>중지일: <span style="${diffStyle('중지일')}">${f['중지일']||'-'}</span></div>
+          ${renderDateField_('재개시', '재개시일')}
+          ${renderDateField_('중지', '중지일')}
         </div>
       `;
     } else if (currentType === 'price_change') {
       dateDisp = `
         <div style="font-size:12px;">
-          <div>접수: <span style="${diffStyle('접수일')}">${f['접수일']||'-'}</span></div>
-          <div>기산: <span style="${diffStyle('기산일')}">${f['기산일']||'-'}</span></div>
+          ${renderDateField_('접수', '접수일')}
+          ${renderDateField_('기산', '기산일')}
         </div>
       `;
     }
 
-    // 용역료/금액 표시 구성
     let moneyDisp = '';
     if (currentType === 'price_change') {
       moneyDisp = `
@@ -7104,7 +7190,6 @@ function renderExcelDailyResult_() {
       moneyDisp = `<span style="${diffStyle('용역료')} font-weight:700;">${feeNum.toLocaleString()}원</span>`;
     }
 
-    // 상품/그로스
     const prodDisp = `
       <div>
         <span style="${diffStyle('상품')}">${f['상품']||'-'}</span> / 
@@ -7112,7 +7197,6 @@ function renderExcelDailyResult_() {
       </div>
     `;
 
-    // 사유/비고
     let noteDisp = '';
     if (currentType === 'cancel') {
       noteDisp = `<div><span style="${diffStyle('해약유형')} font-weight:600;">[${f['해약유형']||'기타'}]</span> <span style="${diffStyle('사유')}">${f['사유']||''}</span></div>`;
@@ -7122,11 +7206,10 @@ function renderExcelDailyResult_() {
       noteDisp = `<span style="${diffStyle('비고')}">${f['비고']||'-'}</span>`;
     }
 
-    // 불일치 상세 내역 (DB값 ➔ 엑셀값)
     let diffDetailHtml = '';
     if (isNew) {
       diffDetailHtml = '<span style="color:#15803d; font-size:12px; font-weight:600;">✨ DB에 없는 신규 계약건 (신규 추가)</span>';
-    } else if (isSame) {
+    } else if (r.status === 'IDENTICAL') {
       diffDetailHtml = '<span style="color:#64748b; font-size:12px;">✔️ 모든 항목 일치 (변경사항 없음)</span>';
     } else {
       const diffKeys = Object.keys(r.diffs);
@@ -7138,12 +7221,21 @@ function renderExcelDailyResult_() {
           dbTxt = Number(dbTxt) ? Number(dbTxt).toLocaleString() + '원' : dbTxt;
           exTxt = Number(exTxt) ? Number(exTxt).toLocaleString() + '원' : exTxt;
         }
+
+        const isYd = !!(r.yearDiffs && r.yearDiffs[k]);
+        let yearWarningTag = '';
+        if (isYd) {
+          const yd = r.yearDiffs[k];
+          yearWarningTag = ` <span style="background:#fee2e2; color:#b91c1c; font-size:11px; font-weight:800; padding:1px 4px; border-radius:3px; border:1px solid #ef4444;">🚨 년도변경 (${yd.dbYear}년 ➔ ${yd.excelYear}년)</span>`;
+        }
+
         return `
           <div style="margin-bottom:3px; line-height:1.4;">
             <strong style="color:#b91c1c; font-size:12px;">• ${k}:</strong> 
             <span style="text-decoration:line-through; color:#94a3b8; font-size:12px;">${dbTxt}</span> 
             <span style="color:#dc2626; font-size:12px;">➔</span> 
             <span style="background:#fee2e2; color:#dc2626; font-weight:700; padding:1px 5px; border-radius:3px; font-size:12px; border:1px solid #fca5a5;">${exTxt}</span>
+            ${yearWarningTag}
           </div>
         `;
       }).join('');
@@ -7198,6 +7290,7 @@ function toggleExcelDailySelectAll_(checked) {
   if (EXCEL_DAILY_FILTER === 'diff') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'MODIFIED');
   else if (EXCEL_DAILY_FILTER === 'new') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'NEW');
   else if (EXCEL_DAILY_FILTER === 'same') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'IDENTICAL');
+  else if (EXCEL_DAILY_FILTER === 'year_diff') targetRows = EXCEL_DAILY_ROWS.filter(r => Object.keys(r.yearDiffs || {}).length > 0);
 
   targetRows.forEach(r => { r.selected = checked; });
   renderExcelDailyResult_();
@@ -7272,10 +7365,12 @@ async function submitExcelDailyBatch_() {
   const newCount = selectedRows.filter(r => r.status === 'NEW').length;
   const modCount = selectedRows.filter(r => r.status === 'MODIFIED').length;
   const sameCount = selectedRows.filter(r => r.status === 'IDENTICAL').length;
+  const yearDiffCount = selectedRows.filter(r => Object.keys(r.yearDiffs || {}).length > 0).length;
 
   let msg = `선택한 총 ${selectedRows.length}건을 DB에 일괄 반영하시겠습니까?\n\n`;
   if (newCount > 0) msg += `- 신규 추가: ${newCount}건\n`;
   if (modCount > 0) msg += `- 데이터 수정: ${modCount}건\n`;
+  if (yearDiffCount > 0) msg += `  (⚠️ 이 중 ${yearDiffCount}건에 년도 변경이 포함되어 있습니다)\n`;
   if (sameCount > 0) msg += `- 동일 데이터 덮어쓰기: ${sameCount}건\n`;
   msg += `\n모든 반영 데이터의 [유형] 항목은 "엑셀등록"으로 자동 저장됩니다.`;
 
@@ -7305,8 +7400,6 @@ async function submitExcelDailyBatch_() {
     const fields = Object.assign({}, item.excelFields);
     fields['유형'] = '엑셀등록';
 
-    // 신규건: id = null, allowDuplicate = true
-    // 기존수정건: id = item.dbRow.id, allowDuplicate = true
     const targetId = (item.status !== 'NEW' && item.dbRow && item.dbRow.id) ? item.dbRow.id : null;
     const payload = {
       id: targetId,
@@ -7336,7 +7429,6 @@ async function submitExcelDailyBatch_() {
   hideExcelDailyProgress_();
   EXCEL_DAILY_IS_PROCESSING = false;
 
-  // 캐시 무효화 및 해당 화면 갱신 플래그 설정
   try {
     if (typeof SCOPE_LOADED_ !== 'undefined') {
       if (currentType === 'order_start') SCOPE_LOADED_.order = false;
@@ -7349,18 +7441,20 @@ async function submitExcelDailyBatch_() {
     }
     if (typeof logUserAction_ === 'function') {
       const typeNames = { order_start: '수주개시', cancel: '해약중지', restart: '재개시', price_change: '인상인하' };
-      logUserAction_('엑셀일보 일괄반영', `[${typeNames[currentType]}] 성공 ${successCount}건 (신규 ${newCount}, 수정 ${modCount}), 실패 ${failCount}건`);
+      logUserAction_('엑셀일보 일괄반영', `[${typeNames[currentType]}] 성공 ${successCount}건 (신규 ${newCount}, 수정 ${modCount}, 년도상이 ${yearDiffCount}), 실패 ${failCount}건`);
     }
   } catch(e) {}
 
   let finishMsg = `🎉 일괄 반영 작업이 완료되었습니다!\n\n- 성공: ${successCount}건 (신규 ${newCount}건, 수정 ${modCount}건)\n`;
+  if (yearDiffCount > 0) {
+    finishMsg += `  (⚠️ 년도 변경 반영 포함: ${yearDiffCount}건)\n`;
+  }
   if (failCount > 0) {
     finishMsg += `- 실패: ${failCount}건\n\n실패 상세:\n` + errors.slice(0, 5).join('\n');
   }
   finishMsg += `\n데이터 대조 화면을 최신 DB 상태로 자동 재조회합니다.`;
   alert(finishMsg);
 
-  // 최신 DB로 재비교 수행 (반영된 항목들이 이제 '일치'로 표시됨!)
   analyzeExcelDailyData_();
 }
 
