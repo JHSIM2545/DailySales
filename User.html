@@ -3359,9 +3359,34 @@
  tbody tr.unsynced{ box-shadow: inset 3px 0 0 #e0a800; }  
  tbody tr.sync-error{ box-shadow: inset 3px 0 0 #c00000; }  
  td.auto{ padding:5px 8px; }  
- td input, td select{ width:100%; border:1px solid transparent; background:transparent; padding:4px 6px; font-size:16px; font-family:inherit; border-radius:3px; }  
- td input:hover, td select:hover{ border-color:#c7cfd8; }  
- td input:focus, td select:focus{ border-color:#4a86e8; background:#fff; outline:none; }  
+ td input, td select,
+ .grid-wrap td input, .grid-wrap td select,
+ .datecell-wrap, .datecell-wrap input,
+ td input[readonly], td select[readonly],
+ .grid-wrap td input[readonly], .grid-wrap td select[readonly] {
+   width:100%;
+   border:1px solid transparent !important;
+   background:transparent !important;
+   background-color:transparent !important;
+   padding:4px 6px;
+   font-size:16px;
+   font-family:inherit;
+   border-radius:3px;
+   box-shadow:none !important;
+   outline:none;
+ }  
+ td input:hover, td select:hover,
+ .grid-wrap td input:hover, .grid-wrap td select:hover {
+   border-color:rgba(74, 134, 232, 0.4) !important;
+ }  
+ td input:focus, td select:focus,
+ .grid-wrap td input:focus, .grid-wrap td select:focus {
+   border-color:#4a86e8 !important;
+   background:transparent !important;
+   background-color:transparent !important;
+   box-shadow:inset 0 0 0 1px #4a86e8 !important;
+   outline:none;
+ }  
  td.num input{ text-align:right; }  
  td.center select{ text-align:center; }  
  td.fee input{ color:var(--blue); text-align:right; font-weight:500; }  
@@ -3372,9 +3397,16 @@
  td.status-defense{ color:#1155cc; font-weight:600; }  
  td.amount-neg input{ color:var(--red); text-align:right; font-weight:500; }  
  td.amount-pos input{ color:var(--blue); text-align:right; font-weight:500; }  
- /* 소팅 기준 열 강조 (노랑) */  
- td.sort-col{ background:rgb(255,255,0); font-weight:700; }  
- td.sort-col input, td.sort-col select{ background:rgb(255,255,0); font-weight:700; }  
+ /* 소팅 기준 열 강조 (노랑) - 전체 셀 및 내부 입력창 빈틈없이 노란색 통일 */  
+ td.sort-col, 
+ td.sort-col input, 
+ td.sort-col select,
+ td.sort-col .datecell-wrap,
+ td.sort-col .datecell-wrap input {
+   background:rgb(255,255,0) !important;
+   background-color:rgb(255,255,0) !important;
+   font-weight:700;
+ }  
  /* 오늘 날짜 강조 (녹색) */  
  td.today-hl{ background:rgb(198,239,206); color:rgb(0,97,0); font-weight:600; }  
  td.today-hl input, td.today-hl select{ background:rgb(198,239,206); color:rgb(0,97,0); font-weight:600; }  
@@ -3387,7 +3419,7 @@
  /* 계약번호: 8자리 기준 폭 + 형식/중복 오류 강조 */  
  td.contract-cell{ width:92px; max-width:92px; }  
  td.contract-cell input{ text-align:center; }  
- td.contract-bad, td.contract-bad input{ background:rgb(255,200,200) !important; color:rgb(150,0,0) !important; text-align:center; font-weight:700; }  
+ td.contract-bad, td.contract-bad input{ background:rgb(255,200,200) !important; background-color:rgb(255,200,200) !important; color:rgb(150,0,0) !important; text-align:center; font-weight:700; }  
  /* 계약처명: 넓게 + 넘치면 말줄임(마우스오버 시 전체 명칭 툴팁) */  
  td.name-cell{ min-width:180px; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }  
  td.name-cell input{ width:100%; text-overflow:ellipsis; }  
@@ -3407,14 +3439,28 @@
  td.wide-note{ min-width:240px; }  
  th.wide-note{ min-width:240px; }  
  /* 인상인하 구분/금액 강조 */  
- td.pc-up, td.pc-up input{ background:rgb(200,255,255) !important; color:rgb(0,150,150) !important; font-weight:600; }  
- td.pc-down, td.pc-down input{ background:rgb(255,200,100) !important; color:rgb(150,100,0) !important; font-weight:600; }  
+ td.pc-up, td.pc-up input, 
+ td.pcbg-up, td.pcbg-up input, 
+ td.pcbg-up .datecell-wrap, 
+ td.pcbg-up .datecell-wrap input {
+   background:rgb(200,255,255) !important;
+   background-color:rgb(200,255,255) !important;
+   color:rgb(0,150,150) !important;
+   font-weight:600;
+ }  
+ td.pc-down, td.pc-down input, 
+ td.pcbg-down, td.pcbg-down input, 
+ td.pcbg-down .datecell-wrap, 
+ td.pcbg-down .datecell-wrap input {
+   background:rgb(255,200,100) !important;
+   background-color:rgb(255,200,100) !important;
+   color:rgb(150,100,0) !important;
+   font-weight:600;
+ }  
  td.amt-up, td.amt-up input{ color:rgb(0,0,255) !important; text-align:right; font-weight:600; }  
  td.amt-down, td.amt-down input{ color:rgb(255,0,0) !important; text-align:right; font-weight:600; }  
  td.rate-up{ color:rgb(0,0,255); text-align:center; font-weight:600; }  
  td.rate-down{ color:rgb(255,0,0); text-align:center; font-weight:600; }  
- td.pcbg-up, td.pcbg-up input{ background:rgb(200,255,255) !important; }  
- td.pcbg-down, td.pcbg-down input{ background:rgb(255,200,100) !important; }  
  td.money-black, td.money-black input{ text-align:right; color:#222222 !important; }  
  .status-wrap .grid-wrap table th, .status-wrap .grid-wrap table td{ width:66px; min-width:66px; text-align:right; }  
  .status-wrap .grid-wrap table th{ text-align:center; }  
@@ -3631,8 +3677,9 @@
 
 .date-pick-hidden{ position:absolute; right:0; top:0; width:1px; height:1px; opacity:0; pointer-events:none; border:0; padding:0; }
 
-/* 마우스 포커스 시 브라우저 자동완성 팝업 차단용 readonly 스타일 정상화 */
-input[readonly]:not([disabled]), textarea[readonly]:not([disabled]) {
+/* 마우스 포커스 시 브라우저 자동완성 팝업 차단용 readonly 스타일 정상화 (테이블 내부 셀 제외) */
+input[readonly]:not([disabled]):not(td input):not(.grid-wrap input),
+textarea[readonly]:not([disabled]):not(td textarea):not(.grid-wrap textarea) {
   cursor: text !important;
   background-color: #ffffff !important;
   user-select: text !important;
@@ -4439,8 +4486,8 @@ function endColResize(e) {
 const DATE_CELL_HANDLERS = {};  
 function dateCellInputHtml(scope, id, field, val){  
   const raw = String(val === null || val === undefined ? '' : val).trim();  
-  return '<span class="datecell-wrap" style="position:relative; display:inline-flex; align-items:center; width:100%;">' +  
-    '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" style="text-align:right; width:100%; cursor:pointer;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
+  return '<span class="datecell-wrap" style="position:relative; display:inline-flex; align-items:center; width:100%; background:transparent !important;">' +  
+    '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" style="text-align:right; width:100%; cursor:pointer; background:transparent !important; background-color:transparent !important; border:1px solid transparent !important;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
     ' title="' + escAttr(raw) + '"' +  
     ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
     ' onclick="openDateCellPicker_(this)"' +  
