@@ -7498,6 +7498,218 @@ function edCleanStr_(val) {
   return val ? String(val).trim() : '';
 }
 
+function edCleanDate_(val) {
+  return edParseFlexibleDate_(val, EXCEL_DAILY_BASE_YEAR).str;
+}
+
+function edParseOrderRow_(cols) {
+  let cIdx = -1;
+  for (let i = 0; i < cols.length; i++) {
+    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
+  }
+  if (cIdx === 5 || cols.length >= 17) {
+    return {
+      '개시': edCleanStr_(cols[0]),
+      '수주월': edCleanStr_(cols[1]),
+      '개시월': edCleanStr_(cols[2]),
+      '이월': edCleanStr_(cols[3]),
+      '구분': edCleanStr_(cols[4]),
+      '계약번호': edCleanStr_(cols[5]),
+      '계약처명': edCleanStr_(cols[6]),
+      '영업담당': edCleanStr_(cols[7]),
+      '영업동기': edCleanStr_(cols[8]),
+      '담당차량': edCleanStr_(cols[9]),
+      '보고일': edCleanStr_(cols[10]),
+      '계약일': edCleanStr_(cols[11]),
+      '개시일': edCleanStr_(cols[12]),
+      '기산일': edCleanStr_(cols[13]),
+      '용역료': edCleanMoney_(cols[14]),
+      '상품': edCleanStr_(cols[15]) || '알람',
+      '그로스': edCleanStr_(cols[16]) || '일반',
+      '비고': edCleanStr_(cols[17]),
+      '유형': '엑셀등록'
+    };
+  }
+  if (cIdx === 0 && cols.length >= 8) {
+    return {
+      '계약번호': edCleanStr_(cols[0]),
+      '계약처명': edCleanStr_(cols[1]),
+      '영업담당': edCleanStr_(cols[2]),
+      '영업동기': edCleanStr_(cols[3]),
+      '담당차량': edCleanStr_(cols[4]),
+      '보고일': edCleanStr_(cols[5]),
+      '계약일': edCleanStr_(cols[6]),
+      '개시일': edCleanStr_(cols[7]),
+      '기산일': edCleanStr_(cols[8]),
+      '용역료': edCleanMoney_(cols[9]),
+      '상품': edCleanStr_(cols[10]) || '알람',
+      '그로스': edCleanStr_(cols[11]) || '일반',
+      '비고': edCleanStr_(cols[12]),
+      '유형': '엑셀등록'
+    };
+  }
+  return null;
+}
+const edParseOrderRow = edParseOrderRow_;
+
+function edParseCancelRow_(cols) {
+  let cIdx = -1;
+  for (let i = 0; i < cols.length; i++) {
+    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
+  }
+  if (cIdx === 3 || cols.length >= 12) {
+    const rawReason = edCleanStr_(cols[13]);
+    const rawType = edCleanStr_(cols[12]);
+    return {
+      '구분': edCleanStr_(cols[0]) || '해약',
+      '기준': edCleanStr_(cols[1]),
+      '해약월': edCleanStr_(cols[2]),
+      '계약번호': edCleanStr_(cols[3]),
+      '계약처명': edCleanStr_(cols[4]),
+      '영업담당': edCleanStr_(cols[5]),
+      '담당차량': edCleanStr_(cols[6]),
+      '접수일': edCleanStr_(cols[7]),
+      '확정일': edCleanStr_(cols[8]),
+      '용역료': edCleanMoney_(cols[9]),
+      '상품': edCleanStr_(cols[10]) || '알람',
+      '그로스': edCleanStr_(cols[11]) || '일반',
+      '해약유형': rawType || '기타',
+      '사유': rawReason || rawType,
+      '유형': '엑셀등록'
+    };
+  }
+  if (cIdx === 0 && cols.length >= 8) {
+    return {
+      '계약번호': edCleanStr_(cols[0]),
+      '계약처명': edCleanStr_(cols[1]),
+      '영업담당': edCleanStr_(cols[2]),
+      '담당차량': edCleanStr_(cols[3]),
+      '접수일': edCleanStr_(cols[4]),
+      '확정일': edCleanStr_(cols[5]),
+      '용역료': edCleanMoney_(cols[6]),
+      '상품': edCleanStr_(cols[7]) || '알람',
+      '그로스': edCleanStr_(cols[8]) || '일반',
+      '해약유형': edCleanStr_(cols[9]) || '기타',
+      '사유': edCleanStr_(cols[10]) || edCleanStr_(cols[9]),
+      '유형': '엑셀등록'
+    };
+  }
+  return null;
+}
+const edParseCancelRow = edParseCancelRow_;
+
+function edParseRestartRow_(cols) {
+  let cIdx = -1;
+  for (let i = 0; i < cols.length; i++) {
+    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
+  }
+  if (cIdx === 3 || cols.length >= 13) {
+    return {
+      '현상태': edCleanStr_(cols[0]) || '중지',
+      '재개시월': edCleanStr_(cols[2]),
+      '계약번호': edCleanStr_(cols[3]),
+      '계약처명': edCleanStr_(cols[4]),
+      '영업담당': edCleanStr_(cols[5]),
+      '담당차량': edCleanStr_(cols[6]),
+      '재개시일': edCleanStr_(cols[7]),
+      '용역료': edCleanMoney_(cols[8]),
+      '중지일': edCleanStr_(cols[9]),
+      '공사담당': edCleanStr_(cols[10]),
+      '상품': edCleanStr_(cols[11]) || '알람',
+      '그로스': edCleanStr_(cols[12]) || '일반',
+      '비고': edCleanStr_(cols[13]),
+      '유형': '엑셀등록'
+    };
+  }
+  if (cIdx === 2 && cols.length >= 12) {
+    return {
+      '현상태': edCleanStr_(cols[0]) || '중지',
+      '재개시월': edCleanStr_(cols[1]),
+      '계약번호': edCleanStr_(cols[2]),
+      '계약처명': edCleanStr_(cols[3]),
+      '영업담당': edCleanStr_(cols[4]),
+      '담당차량': edCleanStr_(cols[5]),
+      '재개시일': edCleanStr_(cols[6]),
+      '용역료': edCleanMoney_(cols[7]),
+      '중지일': edCleanDate_(cols[8]),
+      '공사담당': edCleanStr_(cols[9]),
+      '상품': edCleanStr_(cols[10]) || '알람',
+      '그로스': edCleanStr_(cols[11]) || '일반',
+      '비고': edCleanStr_(cols[12]),
+      '유형': '엑셀등록'
+    };
+  }
+  if (cIdx === 0 && cols.length >= 8) {
+    return {
+      '계약번호': edCleanStr_(cols[0]),
+      '계약처명': edCleanStr_(cols[1]),
+      '영업담당': edCleanStr_(cols[2]),
+      '담당차량': edCleanStr_(cols[3]),
+      '재개시일': edCleanStr_(cols[4]),
+      '용역료': edCleanMoney_(cols[5]),
+      '중지일': edCleanStr_(cols[6]),
+      '공사담당': edCleanStr_(cols[7]),
+      '상품': edCleanStr_(cols[8]) || '알람',
+      '그로스': edCleanStr_(cols[9]) || '일반',
+      '비고': edCleanStr_(cols[10]),
+      '유형': '엑셀등록'
+    };
+  }
+  return null;
+}
+const edParseRestartRow = edParseRestartRow_;
+
+function edParsePriceRow_(cols) {
+  let cIdx = -1;
+  for (let i = 0; i < cols.length; i++) {
+    if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
+  }
+  if (cIdx === 3 || cols.length >= 15) {
+    const rawNote = (cols.length > 17 && cols[17].trim()) ? cols[17].trim() : ((cols.length > 16 && cols[16].trim() && !['직접등록','자동등록','엑셀등록'].includes(cols[16].trim())) ? cols[16].trim() : '');
+    return {
+      '구분': edCleanStr_(cols[0]) || '인하',
+      '기준': edCleanStr_(cols[1]),
+      '반영월': edCleanStr_(cols[2]),
+      '계약번호': edCleanStr_(cols[3]),
+      '계약처명': edCleanStr_(cols[4]),
+      '영업담당': edCleanStr_(cols[5]),
+      '접수자': edCleanStr_(cols[6]),
+      '담당차량': edCleanStr_(cols[7]),
+      '접수일': edCleanStr_(cols[8]),
+      '기산일': edCleanStr_(cols[9]),
+      '금액': edCleanMoney_(cols[10]),
+      '現용역료': edCleanMoney_(cols[11]),
+      '사유': edCleanStr_(cols[13]),
+      '상품': edCleanStr_(cols[14]) || '알람',
+      '그로스': edCleanStr_(cols[15]) || '일반',
+      '비고': rawNote,
+      '유형': '엑셀등록'
+    };
+  }
+  if (cIdx === 0 && cols.length >= 8) {
+    return {
+      '계약번호': edCleanStr_(cols[0]),
+      '계약처명': edCleanStr_(cols[1]),
+      '영업담당': edCleanStr_(cols[2]),
+      '접수자': edCleanStr_(cols[3]),
+      '담당차량': edCleanStr_(cols[4]),
+      '접수일': edCleanStr_(cols[5]),
+      '기산일': edCleanStr_(cols[6]),
+      '금액': edCleanMoney_(cols[7]),
+      '現용역료': edCleanMoney_(cols[8]),
+      '사유': edCleanStr_(cols[9]),
+      '상품': edCleanStr_(cols[10]) || '알람',
+      '그로스': edCleanStr_(cols[11]) || '일반',
+      '비고': edCleanStr_(cols[12]),
+      '유형': '엑셀등록'
+    };
+  }
+  return null;
+}
+const edParsePriceRow = edParsePriceRow_;
+
+
+
 function loadExcelDailyTab_() {
   const container = document.getElementById('content');
   if (!container) return;
