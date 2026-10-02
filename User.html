@@ -8173,6 +8173,7 @@ function render(){
  document.getElementById('rowCount').innerText = `총 ${rows.length}건`;  
  document.getElementById('rowSumOrder').innerText = flaggedSumText_(rows, '용역료');  
  updateCopyButtonState_('order', rows);  
+ setTimeout(enforceGridCellTransparency_, 0);
 }  
   
 /* ===================== 낙관적 업데이트: 인라인 수정 ===================== */  
@@ -8592,6 +8593,7 @@ function renderCancel(){
  document.getElementById('cancelRowCount').innerText = `총 ${rows.length}건`;  
  document.getElementById('rowSumCancel').innerText = flaggedSumText_(rows, '용역료');  
  updateCopyButtonState_('cancel', rows);  
+ setTimeout(enforceGridCellTransparency_, 0);
 }  
   
 function onCancelFieldChange(id, field, value){  
@@ -8932,6 +8934,24 @@ function priceAutoCellHtml(row, h){
  return `<td class="${cls.trim()}">${escHtml(disp)}</td>`;  
 }  
   
+
+function enforceGridCellTransparency_() {
+  try {
+    var els = document.querySelectorAll('.grid-wrap td input, .grid-wrap td select, .grid-wrap td textarea, td input, td select, td textarea');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.closest && (el.closest('.modal') || el.closest('#newReportModal') || el.closest('#userModal'))) continue;
+      el.style.setProperty('background', 'transparent', 'important');
+      el.style.setProperty('background-color', 'transparent', 'important');
+      el.style.setProperty('border', 'none', 'important');
+      el.style.setProperty('box-shadow', 'none', 'important');
+      el.style.setProperty('border-radius', '0px', 'important');
+      el.style.setProperty('-webkit-appearance', 'none', 'important');
+      el.style.setProperty('appearance', 'none', 'important');
+    }
+  } catch(e) {}
+}
+
 function renderPrice(){  
  const rows = sortedPriceRows();  
  let html = '<div class="grid-wrap"><table><thead><tr>' + flagHeaderHtml('price');  
@@ -8951,6 +8971,7 @@ function renderPrice(){
  document.getElementById('priceRowCount').innerText = `총 ${rows.length}건`;  
  document.getElementById('rowSumPrice').innerText = flaggedSumText_(rows, '금액');  
  updateCopyButtonState_('price', rows);  
+ setTimeout(enforceGridCellTransparency_, 0);
 }  
   
 function onPriceFieldChange(id, field, value){  
@@ -9252,6 +9273,7 @@ function renderRestart(){
  document.getElementById('restartRowCount').innerText = `총 ${rows.length}건`;  
  document.getElementById('rowSumRestart').innerText = flaggedSumText_(rows, '용역료');  
  updateCopyButtonState_('restart', rows);  
+ setTimeout(enforceGridCellTransparency_, 0);
 }  
   
 const PRODUCT_DAILY_HEADERS = ['계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부'];  
@@ -9579,6 +9601,7 @@ function renderProductDaily(){
  document.getElementById('productDailyTopCount').innerText = `총 ${rows.length}건`;  
  document.getElementById('productDailyTopSum').innerText = flaggedSumText_(rows, '합계');  
  fitGridWrapToViewport_();  
+ setTimeout(enforceGridCellTransparency_, 0);
 }  
   
   
@@ -11117,6 +11140,7 @@ function applyGlobalNoAutocomplete_() {
 
 // 1) DOM 초기화 시 실행
 document.addEventListener('DOMContentLoaded', applyGlobalNoAutocomplete_);
+window.addEventListener('load', enforceGridCellTransparency_);
 
 // 2) 신규 등록 모달 열기 또는 동적 HTML 삽입을 실시간 감지하여 자동 적용 (MutationObserver)
 if (window.MutationObserver) {
