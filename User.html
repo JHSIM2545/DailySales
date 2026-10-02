@@ -3677,14 +3677,162 @@
 
 .date-pick-hidden{ position:absolute; right:0; top:0; width:1px; height:1px; opacity:0; pointer-events:none; border:0; padding:0; }
 
-/* 마우스 포커스 시 브라우저 자동완성 팝업 차단용 readonly 스타일 정상화 (테이블 내부 셀 제외) */
-input[readonly]:not([disabled]):not(td input):not(.grid-wrap input),
-textarea[readonly]:not([disabled]):not(td textarea):not(.grid-wrap textarea) {
-  cursor: text !important;
-  background-color: #ffffff !important;
-  user-select: text !important;
-  -webkit-user-select: text !important;
+/* 마우스 포커스 시 브라우저 자동완성 팝업 차단용 readonly 스타일 정상화 (모달/폼 전용) */
+.modal input[readonly]:not([disabled]),
+.modal textarea[readonly]:not([disabled]),
+.field input[readonly]:not([disabled]),
+.field textarea[readonly]:not([disabled]) {
+  cursor: text;
+  background-color: #ffffff;
+  user-select: text;
+  -webkit-user-select: text;
 }
+
+
+/* ==========================================================================
+   엑셀 스타일 완벽 일체화 (셀 색상 100% 풀 채우기 & 내부 흰색 박스 원천 제거)
+   ========================================================================== */
+.grid-wrap table {
+  border-collapse: collapse !important;
+}
+.grid-wrap tbody td, tbody td {
+  padding: 0 !important;
+  border: 1px solid var(--grid-line) !important;
+  height: 28px !important;
+  vertical-align: middle !important;
+  position: relative;
+}
+
+/* 그리드 테이블 내부의 모든 입력창/선택창: 여백, 테두리, 배경 제거하여 셀 색상 100% 투과 */
+.grid-wrap td input,
+.grid-wrap td select,
+.grid-wrap td textarea,
+.grid-wrap td .datecell-wrap,
+.grid-wrap td .datecell-wrap input,
+td input,
+td select,
+td textarea,
+td .datecell-wrap,
+td .datecell-wrap input,
+td input[readonly],
+td select[readonly] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 26px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 4px 6px !important;
+  font-family: inherit !important;
+  font-size: 10pt !important;
+  color: inherit !important;
+  box-sizing: border-box !important;
+}
+
+/* 마우스 호버 시 미세한 음영 효과 */
+.grid-wrap td input:hover,
+.grid-wrap td select:hover,
+td input:hover,
+td select:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* 포커스(편집) 시 엑셀 활성 셀처럼 2px 파란색 안쪽 테두리만 표시하고 배경색은 완벽 유지 */
+.grid-wrap td input:focus,
+.grid-wrap td select:focus,
+td input:focus,
+td select:focus {
+  box-shadow: inset 0 0 0 2px #4a86e8 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  outline: none !important;
+}
+
+/* 1. 소팅 기준 열 강조 (노랑 #ffff00) - 기산일 등: 셀 전체와 텍스트까지 100% 노란색 일체화 */
+td.sort-col, 
+td.sort-col input, 
+td.sort-col select,
+td.sort-col .datecell-wrap,
+td.sort-col .datecell-wrap input {
+  background: #ffff00 !important;
+  background-color: #ffff00 !important;
+  font-weight: 700 !important;
+  color: #000000 !important;
+}
+
+/* 2. 인상/인하 금액 및 구분 강조 (인하: 주황 #ffc864 / 인상: 하늘 #c8ffff) */
+td.pcbg-down, 
+td.pcbg-down input, 
+td.pc-down, 
+td.pc-down input,
+td.pcbg-down .datecell-wrap, 
+td.pcbg-down .datecell-wrap input {
+  background: rgb(255,200,100) !important;
+  background-color: rgb(255,200,100) !important;
+}
+td.pcbg-up, 
+td.pcbg-up input, 
+td.pc-up, 
+td.pc-up input,
+td.pcbg-up .datecell-wrap, 
+td.pcbg-up .datecell-wrap input {
+  background: rgb(200,255,255) !important;
+  background-color: rgb(200,255,255) !important;
+}
+
+/* 3. 계약번호 오류/중복 (연분홍 #ffc8c8) */
+td.contract-bad, 
+td.contract-bad input {
+  background: rgb(255,200,200) !important;
+  background-color: rgb(255,200,200) !important;
+  color: rgb(150,0,0) !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+}
+
+/* 4. 오늘 날짜 (연녹색 #c6efce) */
+td.today-hl, 
+td.today-hl input, 
+td.today-hl select, 
+td.today-hl .datecell-wrap input {
+  background: rgb(198,239,206) !important;
+  background-color: rgb(198,239,206) !important;
+  color: rgb(0,97,0) !important;
+  font-weight: 600 !important;
+}
+
+/* 5. 깃발 체크 행 (연하늘 #dce6f0) */
+tbody tr.flagged td, 
+tbody tr.flagged td input, 
+tbody tr.flagged td select {
+  background: rgb(220,230,240) !important;
+  background-color: rgb(220,230,240) !important;
+  color: rgb(0,0,255) !important;
+}
+
+/* 6. 일일실적보고 입력 셀 (연노랑 #fff2cc) */
+td.daily-input-cell, 
+td.daily-input-cell input {
+  background: rgb(255,242,204) !important;
+  background-color: rgb(255,242,204) !important;
+  text-align: right !important;
+  font-weight: 500 !important;
+}
+
+/* 7. 그로스 법인 (회색 #b9bec4) */
+td.gross-corp, 
+td.gross-corp select, 
+td.gross-corp input {
+  background: #b9bec4 !important;
+  background-color: #b9bec4 !important;
+  color: rgb(0,0,255) !important;
+  font-weight: 700 !important;
+}
+
 </style>  
 </head>  
 <body>  
@@ -4486,8 +4634,8 @@ function endColResize(e) {
 const DATE_CELL_HANDLERS = {};  
 function dateCellInputHtml(scope, id, field, val){  
   const raw = String(val === null || val === undefined ? '' : val).trim();  
-  return '<span class="datecell-wrap" style="position:relative; display:inline-flex; align-items:center; width:100%; background:transparent !important;">' +  
-    '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" style="text-align:right; width:100%; cursor:pointer; background:transparent !important; background-color:transparent !important; border:1px solid transparent !important;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
+  return '<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%; background:transparent !important; background-color:transparent !important; margin:0; padding:0;">' +  
+    '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" style="text-align:center; width:100%; height:100%; min-height:26px; cursor:pointer; background:transparent !important; background-color:transparent !important; border:none !important; border-radius:0 !important; margin:0 !important; padding:4px 6px !important; box-shadow:none !important; outline:none !important;" value="' + escAttr(fmtMD(raw)) + '" data-raw="' + escAttr(raw) + '"' +  
     ' title="' + escAttr(raw) + '"' +  
     ' onfocus="this.value=this.dataset.raw||\'\';this.select();"' +  
     ' onclick="openDateCellPicker_(this)"' +  
@@ -4495,7 +4643,7 @@ function dateCellInputHtml(scope, id, field, val){
     '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" class="date-pick-hidden"' +  
     ' data-scope="' + scope + '" data-id="' + id + '" data-field="' + field + '"' +  
     ' onchange="onDatePickerChange_(this)">' +  
-    '</span>';  
+    '</div>';  
 }  
 function openDateCellPicker_(textEl) {  
   const wrap = textEl.closest('.datecell-wrap');  
@@ -10911,6 +11059,11 @@ function applyGlobalNoAutocomplete_() {
 
       // 날짜, 파일, 체크박스, 라디오, 버튼 등은 텍스트 팝업 대상이 아니므로 제외
       if (t === 'date' || t === 'month' || t === 'datetime-local' || t === 'checkbox' || t === 'radio' || t === 'file' || t === 'hidden' || t === 'submit' || t === 'button') {
+        continue;
+      }
+
+      // 테이블 및 그리드 내부 요소는 엑셀처럼 셀 배경색이 투과되어야 하므로 readonly 자동 잠금 제외
+      if (el.closest('table') || el.closest('.grid-wrap') || el.closest('td')) {
         continue;
       }
 
