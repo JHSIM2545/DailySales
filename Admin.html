@@ -10041,7 +10041,7 @@ function productCellClass_(val){
 }  
 function orderCellClass(row, field, val, allRows){  
  let cls = '';  
- if (field === '계약번호' || field === '상품' || field === '그로스') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  else if (field === '계약처명') cls = 'name-cell';  
  else if (field === '영업담당') cls = 'rep-col';  
  else if (field === '용역료') cls = 'fee money';  
@@ -10515,7 +10515,7 @@ DATE_CELL_HANDLERS.cancel = function(id, field, value){ onCancelFieldChange(id, 
   
 function cancelCellClass(field, val, allRows){  
  let cls = '';  
- if (field === '계약번호' || field === '상품' || field === '그로스') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  else if (field === '계약처명') cls = 'name-cell';  
  else if (field === '용역료') cls = 'fee money';  
  else if (field === '담당차량') cls = 'center center-cell narrow';  
@@ -11003,7 +11003,7 @@ function fieldCellHtmlPrice(row, field, allRows){
  } else {  
  inner = `<input type="text" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
  }  
- if (field === '계약번호' || field === '상품' || field === '그로스') {  
+ if (field === '계약번호') {  
  cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  }  
  if (field === '계약처명') cls = 'name-cell';  
@@ -11388,7 +11388,7 @@ function fieldCellHtmlRestart(row, field, allRows){
  } else {  
  inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onRestartFieldChange('${row.id}','${field}',this.value)">`;  
  }  
- if (field === '계약번호' || field === '상품' || field === '그로스') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  if (field === '계약처명') cls = 'name-cell';  
  if (field === '비고') cls = 'wide-note';  
  if (field === '용역료') cls = 'fee money';  
@@ -11914,7 +11914,7 @@ function productDailyMotiveStyle(val){
 
 function productDailyCellClass(field, val, allRows){  
   let cls = '';  
-  if (field === '계약번호' || field === '상품' || field === '그로스') cls = 'contract-cell' + (productDailyContractBad(val, allRows) ? ' contract-bad' : '');  
+  if (field === '계약번호') cls = 'contract-cell' + (productDailyContractBad(val, allRows) ? ' contract-bad' : '');  
   else if (field === '서비스제공처') cls = 'name-cell';  
   else if (field === '계약설치비' || field === '계약기기비') cls = 'fee money num';  
   if (PRODUCT_DAILY_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
