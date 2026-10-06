@@ -4681,7 +4681,7 @@ input[type="checkbox"] {
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <button type="button" onclick="shiftProductDailyGridMonth(-1)" title="이전달" style="padding:2px 6px; cursor:pointer; border:1px solid #c7cfd8; border-radius:3px; background:#f8fafc; font-size:11px;">◀</button><input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;"><button type="button" onclick="shiftProductDailyGridMonth(1)" title="다음달" style="padding:2px 6px; cursor:pointer; border:1px solid #c7cfd8; border-radius:3px; background:#f8fafc; font-size:11px;">▶</button>  
+   <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
  </span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily">선택항목</label>  
@@ -12610,11 +12610,12 @@ function fieldCellHtmlProductDaily(row, field, allRows){
   } else if (field === '보고일') {
     inner = dateCellInputHtml('productdaily', row.id, '보고일', val);
   } else if (field === '매출예상') {
-    inner = `<span class="datecell-wrap" style="position:relative; width:100%; display:inline-flex; align-items:center;">` +
-      `<input type="text" class="cell-align-center" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="text-align:center !important; width:100%; min-width:85px; cursor:pointer;" value="${escAttr(val)}" readonly onclick="openMonthPickerForPd_(this, '${row.id}')">` +
-      `<button type="button" class="date-pick-btn" title="월 선택" onclick="openMonthPickerForPd_(this, '${row.id}')" style="border:none; background:transparent; cursor:pointer; padding:0 2px;">📅</button>` +
-      `<input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:100%; height:100%; opacity:0; pointer-events:none;" onchange="onPdMonthPicked_(this, '${row.id}')">` +
-      `</span>`;
+    const fVal = parseForecastYm_(val, row.보고일);
+    inner = `<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%;">` +
+      `<input type="text" class="cell-align-center" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="text-align:center !important; width:100%; height:100%; cursor:pointer;" value="${escAttr(val)}" readonly>` +
+      `<button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:2px; z-index:1; border:none; background:transparent; pointer-events:none;">📅</button>` +
+      `<input type="month" class="date-pick-hidden" style="position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
+      `</div>`;
   } else {
     inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','${field}',this.value)">`;
   }
@@ -12745,10 +12746,10 @@ function buildProductDailyForm(){
     <div class="field"><label>계약담당자</label><select id="pdf_계약담당자" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
     <div class="field">
       <label>매출예상</label>
-      <div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%;">
-        <input type="text" id="pdf_매출예상" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${ymFormatted}" placeholder="2026년 10월" style="width:100%; cursor:pointer;" readonly onclick="openMonthPickerForPd_(this, '')">
-        <button type="button" class="date-pick-btn" title="월 선택" onclick="openMonthPickerForPd_(this, '')" style="position:absolute; right:4px; border:none; background:transparent; cursor:pointer; font-size:16px;">📅</button>
-        <input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:100%; height:100%; opacity:0; pointer-events:none;" onchange="onPdMonthPicked_(this, '')">
+      <div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:32px;">
+        <input type="text" id="pdf_매출예상" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${ymFormatted}" placeholder="2026년 10월" style="width:100%; height:100%; cursor:pointer;" readonly>
+        <button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:4px; z-index:1; border:none; background:transparent; pointer-events:none; font-size:16px;">📅</button>
+        <input type="month" class="date-pick-hidden" style="position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${ymNow}" onchange="document.getElementById('pdf_매출예상').value=this.value.slice(0,4)+'년 '+this.value.slice(5,7)+'월'">
       </div>
     </div>
     <div class="field"><label>계약동기</label><select id="pdf_계약동기" autocomplete="one-time-code"><option value="">선택</option>${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>

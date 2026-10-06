@@ -4474,7 +4474,7 @@ td.prod-col, td.gross-col,
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
  </span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily">선택항목</label>  
@@ -8893,6 +8893,17 @@ function toggleProductDailySummaryUnconfirmed(){
  renderProductDaily();  
 }  
   
+function shiftProductDailyGridMonth(delta){
+  const el = document.getElementById('ymFilterProductDaily');
+  const cur = (el && el.value) ? el.value : (productDailyGridYm || todayStr().slice(0, 7));
+  const [y, m] = cur.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  const newYm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (el) el.value = newYm;
+  productDailyGridYm = newYm;
+  renderProductDaily();
+}
+
 function shiftProductDailySummaryMonth(delta){  
  const [y, m] = productDailySummaryYm.split('-').map(Number);  
  const d = new Date(y, m - 1 + delta, 1);  
@@ -8915,16 +8926,77 @@ function loadProductDailySummaryTarget_(cb){
  .getSafetyProductSummary(SESSION.token, productDailySummaryYm);  
 }  
   
-// 매출예상 문자열(26.10월, 2026년 10월, 2026-10 등)을 YYYY-MM 형식으로 표준화
-function parseForecastYm_(val) {
+// 매출예상 문자열(26.10월, 2026년 10월, 2026-10, 10월, 10월말, 10/15 등)을 YYYY-MM 형식으로 표준화
+function parseForecastYm_(val, reportDate) {
   if (!val) return '';
   const s = String(val).trim();
+  if (!s) return '';
+
+  let refYear = '2026';
+  let refMonth = 10;
+  const curYm = (typeof todayStr === 'function' ? todayStr() : new Date().toISOString().slice(0, 10));
+  if (curYm) {
+    refYear = curYm.slice(0, 4);
+    refMonth = Number(curYm.slice(5, 7));
+  }
+  if (reportDate && String(reportDate).trim()) {
+    const rdMatch = String(reportDate).trim().match(/(20\d{2})[-./년\s]+(\d{1,2})/);
+    if (rdMatch) {
+      refYear = rdMatch[1];
+      refMonth = Number(rdMatch[2]);
+    }
+  }
+
+  // 1. Full 4-digit year + month (e.g. 2026-10, 2026.10, 2026년 10월, 2026년 10월말, 2026/10/15)
   let m = s.match(/(20\d{2})[-./년\s]+(\d{1,2})/);
-  if (m) return m[1] + '-' + String(m[2]).padStart(2, '0');
+  if (m) {
+    return m[1] + '-' + String(m[2]).padStart(2, '0');
+  }
+
+  // 2. 2-digit year + month (e.g. 26.10, 26-10, 26.10월, 26.10월말, 26년 10월)
   m = s.match(/(\d{2})[-./년\s]+(\d{1,2})/);
-  if (m) return '20' + m[1] + '-' + String(m[2]).padStart(2, '0');
+  if (m) {
+    const yVal = Number(m[1]);
+    const mVal = Number(m[2]);
+    if (yVal >= 20 && yVal <= 45 && mVal >= 1 && mVal <= 12) {
+      return '20' + String(yVal).padStart(2, '0') + '-' + String(mVal).padStart(2, '0');
+    }
+    if (yVal >= 1 && yVal <= 12) {
+      return refYear + '-' + String(yVal).padStart(2, '0');
+    }
+  }
+
+  // 3. Compact 6-digit (e.g. 202610)
   m = s.match(/(20\d{2})(\d{2})/);
-  if (m) return m[1] + '-' + m[2];
+  if (m) {
+    const mVal = Number(m[2]);
+    if (mVal >= 1 && mVal <= 12) {
+      return m[1] + '-' + String(m[2]).padStart(2, '0');
+    }
+  }
+
+  // 4. Month with '월' (e.g. 10월, 11월, 10월말, 10월초, 10월 중순, 10월경, 9월)
+  m = s.match(/(\d{1,2})\s*월/);
+  if (m) {
+    const mNum = Number(m[1]);
+    if (mNum >= 1 && mNum <= 12) {
+      let yNum = Number(refYear);
+      if (refMonth >= 10 && mNum <= 3) {
+        yNum += 1;
+      }
+      return String(yNum) + '-' + String(mNum).padStart(2, '0');
+    }
+  }
+
+  // 5. Just a standalone month number 1~12 (e.g. '10', '11')
+  m = s.match(/^(\d{1,2})$/);
+  if (m) {
+    const mNum = Number(m[1]);
+    if (mNum >= 1 && mNum <= 12) {
+      return refYear + '-' + String(mNum).padStart(2, '0');
+    }
+  }
+
   return '';
 }
 
@@ -9141,7 +9213,7 @@ function sortedProductDailyRows(){
   // 1 & 5. 테이블 표시 기준은 메뉴바의 년월 기준으로 매출예상 월이 메뉴바의 지정된 월을 포함한 그 이후인 경우의 자료만 표시
   if (ymFilter) {  
     list = list.filter(r => {
-      const fYm = parseForecastYm_(r.매출예상);
+      const fYm = parseForecastYm_(r.매출예상, r.보고일);
       return Boolean(fYm && fYm >= ymFilter);
     });  
   }  
@@ -9204,9 +9276,32 @@ function productDailyCellClass(field, val, allRows){
  return cls.trim();  
 }  
   
+function onPdMonthPicked_(inp, id){
+  if (!inp.value) return;
+  const [y, m] = inp.value.split('-');
+  const formatted = y + '년 ' + m + '월';
+  const wrap = inp.parentElement;
+  if (wrap) {
+    const textInp = wrap.querySelector('input[type="text"]');
+    if (textInp) textInp.value = formatted;
+  }
+  if (id && typeof onProductDailyFieldChange === 'function') {
+    onProductDailyFieldChange(id, '매출예상', formatted);
+  }
+}
+
 function fieldCellHtmlProductDaily(row, field, allRows){  
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
  const cls = productDailyCellClass(field, val, allRows);  
+ if (field === '매출예상') {
+   const fVal = parseForecastYm_(val, row.보고일);
+   const inner = `<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%;">` +
+     `<input type="text" class="cell-align-center" style="text-align:center !important; width:100%; height:100%; cursor:pointer; background:transparent; border:none; outline:none;" value="${escAttr(val)}" readonly>` +
+     `<button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:2px; z-index:1; border:none; background:transparent; pointer-events:none;">📅</button>` +
+     `<input type="month" class="date-pick-hidden" style="position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
+     `</div>`;
+   return `<td class="${cls}" style="text-align:center !important;">${inner}</td>`;
+ }
  let disp;  
  if (field === '계약설치비' || field === '계약기기비') disp = commaFmt(val);  
  else if (PRODUCT_DAILY_DATE_FIELDS.indexOf(field) !== -1) disp = fmtMD(val);  
