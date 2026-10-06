@@ -9035,14 +9035,18 @@ function productDailySummaryTableHtml_(){
   
   const summary = PRODUCT_DAILY_SUMMARY_EXTRA || {};  
   const tgt = summary.목표 || {}, pln = summary.계획 || {};  
-  const ordTarget = (Number(tgt.수주) || 0) * 1000;  
-  const saleTarget = (Number(tgt.매출) || 0) * 1000;  
-  const ordTargetTotal = ordTarget * 2;  
-  const saleTargetTotal = saleTarget * 2;  
-  const ordPlan = (Number(pln.수주) || 0) * 1000;  
-  const salePlan = (Number(pln.매출) || 0) * 1000;  
-  const ordPlanTotal = ordPlan + ordTarget;  
-  const salePlanTotal = salePlan + saleTarget;  
+  
+  // toWon_: 천원 단위 및 원 단위 모두 안전하게 원 단위로 환산
+  const toWon_ = (v) => {
+    const n = Number(v) || 0;
+    if (n === 0) return 0;
+    return (Math.abs(n) < 1000000) ? n * 1000 : n;
+  };
+
+  const ordTarget = toWon_(tgt.수주);  
+  const saleTarget = toWon_(tgt.매출);  
+  const ordPlan = toWon_(pln.수주);  
+  const salePlan = toWon_(pln.매출);  
   
   const rate = (actual, target) => target > 0 ? (Math.round((actual/target)*1000)/10) + '%' : '-';  
   const fmt = (v) => fmtK ? fmtK(v) : Number(v||0).toLocaleString('ko-KR');  
@@ -9103,26 +9107,26 @@ function productDailySummaryTableHtml_(){
           <td style="${B}">${fmt(ordTarget)}</td>  
           <td style="${B}">${dash}</td>  
           <td style="${B}">${dash}</td>  
-          <td style="${B}">${fmt(ordTarget)}</td>  
-          <td style="${B} font-weight:700;">${fmt(ordTargetTotal)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B} font-weight:700;">${fmt(ordTarget)}</td>  
           <td style="${B}">${fmt(saleTarget)}</td>  
           <td style="${B}">${dash}</td>  
           <td style="${B}">${dash}</td>  
-          <td style="${B}">${fmt(saleTarget)}</td>  
-          <td style="${B} font-weight:700;">${fmt(saleTargetTotal)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B} font-weight:700;">${fmt(saleTarget)}</td>  
         </tr>  
         <tr>  
           <td style="${BLBL} background:#eef5ff;">계획</td>  
           <td style="${B} background:#eef5ff;">${fmt(ordPlan)}</td>  
           <td style="${B} background:#eef5ff;">${dash}</td>  
           <td style="${B} background:#eef5ff;">${dash}</td>  
-          <td style="${B} background:#eef5ff;">${fmt(ordTarget)}</td>  
-          <td style="${B} background:#eef5ff; font-weight:700;">${fmt(ordPlanTotal)}</td>  
+          <td style="${B} background:#eef5ff;">${dash}</td>  
+          <td style="${B} background:#eef5ff; font-weight:700;">${fmt(ordPlan)}</td>  
           <td style="${B} background:#eef5ff;">${fmt(salePlan)}</td>  
           <td style="${B} background:#eef5ff;">${dash}</td>  
           <td style="${B} background:#eef5ff;">${dash}</td>  
-          <td style="${B} background:#eef5ff;">${fmt(saleTarget)}</td>  
-          <td style="${B} background:#eef5ff; font-weight:700;">${fmt(salePlanTotal)}</td>  
+          <td style="${B} background:#eef5ff;">${dash}</td>  
+          <td style="${B} background:#eef5ff; font-weight:700;">${fmt(salePlan)}</td>  
         </tr>  
         <tr>  
           <td style="${BLBL} background:#ffff00;">실적</td>  
@@ -9142,13 +9146,13 @@ function productDailySummaryTableHtml_(){
           <td style="${B}">${rate(ord계, ordTarget)}</td>  
           <td style="${B}">${dash}</td>  
           <td style="${B}">${dash}</td>  
-          <td style="${B}">${rate(ord잔략협력, ordTarget)}</td>  
-          <td style="${B} font-weight:700;">${rate(ord합계, ordTargetTotal)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B} font-weight:700;">${rate(ord합계, ordTarget)}</td>  
           <td style="${B}">${rate(sale계, saleTarget)}</td>  
           <td style="${B}">${dash}</td>  
           <td style="${B}">${dash}</td>  
-          <td style="${B}">${rate(sale잔략협력, saleTarget)}</td>  
-          <td style="${B} font-weight:700;">${rate(sale합계, saleTargetTotal)}</td>  
+          <td style="${B}">${dash}</td>  
+          <td style="${B} font-weight:700;">${rate(sale합계, saleTarget)}</td>  
         </tr>  
       </table>  
     </div>  
@@ -9276,10 +9280,27 @@ function productDailyCellClass(field, val, allRows){
  return cls.trim();  
 }  
   
+function formatForecastYmDisplay_(val) {
+  if (!val) return '';
+  const s = String(val).replace(/[\s\u00a0\u3000]+/g, '').trim();
+  let m = s.match(/(20\d{2})[-./년]?(\d{1,2})/);
+  if (m) return m[1].slice(2) + '.' + String(m[2]).padStart(2, '0') + '월';
+  m = s.match(/(\d{2})[-./년]?(\d{1,2})/);
+  if (m) return String(m[1]).padStart(2, '0') + '.' + String(m[2]).padStart(2, '0') + '월';
+  m = s.match(/(\d{1,2})월/);
+  if (m) {
+    const curYy = (typeof todayStr === 'function' ? todayStr() : new Date().toISOString()).slice(2, 4);
+    return curYy + '.' + String(m[1]).padStart(2, '0') + '월';
+  }
+  return val;
+}
+
 function onPdMonthPicked_(inp, id){
   if (!inp.value) return;
   const [y, m] = inp.value.split('-');
-  const formatted = y + '년 ' + m + '월';
+  const yy = String(y).slice(2);
+  const mm = String(m).padStart(2, '0');
+  const formatted = yy + '.' + mm + '월';
   const wrap = inp.parentElement;
   if (wrap) {
     const textInp = wrap.querySelector('input[type="text"]');
@@ -9296,7 +9317,7 @@ function fieldCellHtmlProductDaily(row, field, allRows){
  if (field === '매출예상') {
    const fVal = parseForecastYm_(val, row.보고일);
    const inner = `<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%;">` +
-     `<input type="text" class="cell-align-center" style="text-align:center !important; width:100%; height:100%; cursor:pointer; background:transparent; border:none; outline:none;" value="${escAttr(val)}" readonly>` +
+     `<input type="text" class="cell-align-center" style="text-align:center !important; width:100%; height:100%; cursor:pointer; background:transparent; border:none; outline:none;" value="${escAttr(formatForecastYmDisplay_(val) || val)}" readonly>` +
      `<button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:2px; z-index:1; border:none; background:transparent; pointer-events:none;">📅</button>` +
      `<input type="month" class="date-pick-hidden" style="position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
      `</div>`;
