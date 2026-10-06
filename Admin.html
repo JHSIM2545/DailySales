@@ -3760,7 +3760,63 @@
  /* 오늘 날짜 강조 (녹색) */  
  td.today-hl{ background:rgb(198,239,206); color:rgb(0,97,0); font-weight:600; }  
  td.today-hl input, td.today-hl select{ background:rgb(198,239,206); color:rgb(0,97,0); font-weight:600; }  
- /* ===== 공통 그리드 표시 사양 (2026 개편) ===== */  
+ 
+/* ===== 그리드 테이블 필드별 데이터 표시 정렬 기준 (2026 표준) ===== */
+/* 1. 기본값: 중앙 정렬 */
+tbody td,
+.grid-wrap table tbody td,
+.grid-wrap table tbody td.auto,
+.grid-wrap table tbody td input,
+.grid-wrap table tbody td select,
+.grid-wrap table tbody td textarea,
+.grid-wrap table tbody td .datecell-wrap,
+.grid-wrap table tbody td .datecell-wrap input,
+td.cell-align-center,
+td.cell-align-center input,
+td.cell-align-center select {
+  text-align: center !important;
+  text-align-last: center !important;
+}
+
+/* 2. 좌측 정렬: 계약처명, 비고, (해약중지) 사유 */
+td.cell-align-left,
+td.cell-align-left input,
+td.cell-align-left select,
+td.cell-align-left textarea,
+td.name-cell,
+td.name-cell input,
+td.name-cell select,
+td.wide-note,
+td.wide-note input,
+td.wide-note select {
+  text-align: left !important;
+  text-align-last: left !important;
+}
+
+/* 3. 우측 정렬: 용역료, 금액, 現용역료 */
+td.cell-align-right,
+td.cell-align-right input,
+td.cell-align-right select,
+td.cell-align-right textarea,
+td.fee,
+td.fee input,
+td.money,
+td.money input,
+td.money-black,
+td.money-black input,
+td.amt-up,
+td.amt-up input,
+td.amt-down,
+td.amt-down input,
+td.amount-pos,
+td.amount-pos input,
+td.amount-neg,
+td.amount-neg input {
+  text-align: right !important;
+  text-align-last: right !important;
+}
+
+/* ===== 공통 그리드 표시 사양 (2026 개편) ===== */  
  th.flag-col{ width:30px; cursor:default; }  
  th.flag-col:hover{ background:var(--header-bg); }  
  td.flag-cell{ width:30px; text-align:center; padding:2px; }  
@@ -3784,7 +3840,7 @@
  /* 정렬/폭 보조 */  
  td.money, td.money input{ text-align:right; }  
  td.center-cell, td.center-cell input{ text-align:center; }  
- td.datecol{ width:110px; max-width:110px; text-align:right; }  
+ td.datecol{ width:110px; max-width:110px; text-align:center !important; }  
  td.datecol input{ text-align:center; }  
  td.monthcol{ width:66px; max-width:66px; text-align:center; }  
  td.narrow{ width:64px; max-width:64px; }  
@@ -10435,14 +10491,15 @@ function productCellClass_(val){
 }  
 function orderCellClass(row, field, val, allRows){  
  let cls = '';  
- if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
- else if (field === '계약처명') cls = 'name-cell';  
- else if (field === '영업담당') cls = 'rep-col';  
- else if (field === '용역료') cls = 'fee money';  
- else if (field === '담당차량') cls = 'center center-cell narrow';  
- else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol';  
- else if (field === '비고') cls = 'wide-note';  
- else if (field === '유형') cls = 'regtype-col';  
+ if (field === '계약번호') cls = 'contract-cell cell-align-center' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ else if (field === '계약처명') cls = 'name-cell cell-align-left';  
+ else if (field === '비고') cls = 'wide-note cell-align-left';  
+ else if (field === '용역료') cls = 'fee money cell-align-right';  
+ else if (field === '영업담당') cls = 'rep-col cell-align-center';  
+ else if (field === '담당차량') cls = 'center center-cell narrow cell-align-center';  
+ else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol cell-align-center';  
+ else if (field === '유형') cls = 'regtype-col cell-align-center';  
+ else cls = 'cell-align-center';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
  if (['개시일','기산일'].indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
@@ -11361,29 +11418,29 @@ function fieldCellHtmlPrice(row, field, allRows){
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
  let inner, cls = '';  
   if (field === '영업담당') {  
-    cls += ' rep-col';  
+    cls += ' rep-col cell-align-center';  
     inner = `<select class="rep-select no-arrow" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
     <option value="">선택</option>${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
     </select>`;  
  } else if (field === '접수자') {  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>${USER_NAMES.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
  } else if (field === '담당차량') {  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>${LIST_PRICE_CAR.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
- cls = 'center';  
+ cls = 'center cell-align-center';  
  } else if (field === '상품') {  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_PRODUCT.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_PRODUCT.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '그로스') {  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_GROSS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_GROSS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '유형') {  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_REG_TYPE.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_REG_TYPE.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '사유') {  
  const options = LIST_PRICE_REASON || [];  
  const hasVal = val && !options.includes(val);  
- inner = `<select onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
  ${hasVal ? `<option value="${escAttr(val)}" selected>${escAttr(val)}</option>` : ''}  
@@ -11391,22 +11448,27 @@ function fieldCellHtmlPrice(row, field, allRows){
  } else if (PRICE_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('price', row.id, field, val);  
  } else if (field === '금액') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
  } else if (field === '現용역료') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- inner = `<input type="text" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
+ const alignStyle = (field === '계약처명' || field === '비고') ? 'text-align:left !important;' : 'text-align:center !important;';  
+ inner = `<input type="text" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;${alignStyle}padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  if (field === '계약번호') {  
- cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
- }  
- if (field === '계약처명') cls = 'name-cell';  
- if (field === '비고') cls = 'wide-note';  
- if (field === '現용역료') cls = 'money-black';  
- if (field === '금액') {  
+ cls = 'contract-cell cell-align-center' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ } else if (field === '계약처명') {  
+ cls = 'name-cell cell-align-left';  
+ } else if (field === '비고') {  
+ cls = 'wide-note cell-align-left';  
+ } else if (field === '現용역료') {  
+ cls = 'money-black cell-align-right';  
+ } else if (field === '금액') {  
  const n = Number(val);  
  const up = !isNaN(n) && val !== '' ? (n < 0 ? false : true) : null;  
- cls = up === null ? 'money' : (up ? 'amt-up pcbg-up' : 'amt-down pcbg-down');  
+ cls = (up === null ? 'money' : (up ? 'amt-up pcbg-up' : 'amt-down pcbg-down')) + ' cell-align-right';  
+ } else {  
+ cls = 'cell-align-center';  
  }  
  if (PRICE_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
@@ -11420,7 +11482,7 @@ function fieldCellHtmlPrice(row, field, allRows){
 function priceAutoCellHtml(row, h){  
  const val = row[h] !== undefined && row[h] !== null ? row[h] : '';  
  const 구분 = row.구분 || '';  
- let cls = 'auto ' + statusClassPrice(h, val);  
+ let cls = 'auto cell-align-center ' + statusClassPrice(h, val);  
  let disp = val;  
  if (h === '반영월') { disp = fmtMonth(val); cls += ' monthcol'; }  
  if (h === '구분' && 구분) cls += (구분 === '인상' ? ' pc-up' : ' pc-down');  
@@ -11782,12 +11844,15 @@ function fieldCellHtmlRestart(row, field, allRows){
  } else {  
  inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onRestartFieldChange('${row.id}','${field}',this.value)">`;  
  }  
- if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
- if (field === '계약처명') cls = 'name-cell';  
- if (field === '비고') cls = 'wide-note';  
- if (field === '용역료') cls = 'fee money';  
- if (RESTART_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
- if (['현상태','공사담당','영업담당'].indexOf(field) !== -1) cls += ' narrow';  
+ if (field === '계약번호') cls = 'contract-cell cell-align-center' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ else if (field === '계약처명') cls = 'name-cell cell-align-left';  
+ else if (field === '비고') cls = 'wide-note cell-align-left';  
+ else if (field === '용역료') cls = 'fee money cell-align-right';  
+ else if (field === '담당차량') cls = 'center center-cell narrow cell-align-center';  
+ else if (RESTART_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol cell-align-center';  
+ else if (field === '영업담당') cls = 'rep-col narrow cell-align-center';  
+ else if (['현상태','공사담당'].indexOf(field) !== -1) cls = 'narrow cell-align-center';  
+ else cls = 'cell-align-center';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
  if (field === '재개시일' && String(val) === todayStr()) cls += ' today-hl';  
@@ -15014,7 +15079,9 @@ function printGridData(scope) {
  printWindow.document.write('body { font-family: "Malgun Gothic", sans-serif; font-size: 12pt; color: #222; margin: 10px; }');  
  printWindow.document.write('table { border-collapse: collapse; width: 100%; white-space: nowrap; }');  
  printWindow.document.write('th { background: #4a86e8 !important; color: #fff !important; padding: 7px 8px; border: 1px solid #3a6fc4; text-align: center; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }');  
- printWindow.document.write('td { padding: 6px 6px; border: 1px solid #cfd6dc; font-size: 12pt; }');  
+ printWindow.document.write('td { padding: 6px 6px; border: 1px solid #cfd6dc; font-size: 12pt; text-align: center; }');
+ printWindow.document.write('td.cell-align-left, td.name-cell, td.wide-note { text-align: left !important; }');
+ printWindow.document.write('td.cell-align-right, td.fee, td.money, td.money-black, td.amt-up, td.amt-down, td.amount-pos, td.amount-neg { text-align: right !important; }');  
  // 소팅된 컬럼 셀 노란색 바탕 유지  
  printWindow.document.write('td.sort-col, td.sort-col input, td.sort-col select { background: rgb(255,255,0) !important; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }');  
  printWindow.document.write('tr.status-total-row { background: #dfe6ee !important; font-weight: 700; -webkit-print-color-adjust: exact; print-color-adjust: exact; }');  
