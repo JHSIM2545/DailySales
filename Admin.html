@@ -4681,7 +4681,7 @@ input[type="checkbox"] {
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
    <span style="font-weight:600;">년월:</span>  
-   <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
+   <button type="button" onclick="shiftProductDailyGridMonth(-1)" title="이전달" style="padding:2px 6px; cursor:pointer; border:1px solid #c7cfd8; border-radius:3px; background:#f8fafc; font-size:11px;">◀</button><input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;"><button type="button" onclick="shiftProductDailyGridMonth(1)" title="다음달" style="padding:2px 6px; cursor:pointer; border:1px solid #c7cfd8; border-radius:3px; background:#f8fafc; font-size:11px;">▶</button>  
  </span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily">선택항목</label>  
@@ -8063,7 +8063,7 @@ function selectTab(key){
  else if (key === 'cancel') { document.getElementById('toolbar-cancel').style.display = 'flex'; if (SCOPE_LOADED_.cancel) renderCancel(); else loadCancelData(); }  
  else if (key === 'price_change') { document.getElementById('toolbar-price').style.display = 'flex'; if (SCOPE_LOADED_.price) ensureUserNames(renderPrice); else loadPriceData(); }  
  else if (key === 'restart') { document.getElementById('toolbar-restart').style.display = 'flex'; if (SCOPE_LOADED_.restart) renderRestart(); else loadRestartData(); }  
- else if (key === 'product_daily') { document.getElementById('toolbar-product-daily').style.display = 'flex'; if (SCOPE_LOADED_.productdaily) renderProductDaily(); else loadProductDailyData(); }  
+ else if (key === 'product_daily') { const ymEl = document.getElementById('ymFilterProductDaily'); if (ymEl) { if (!ymEl.value) ymEl.value = productDailyGridYm || todayStr().slice(0, 7); productDailyGridYm = ymEl.value; } document.getElementById('toolbar-product-daily').style.display = 'flex'; if (SCOPE_LOADED_.productdaily) renderProductDaily(); else loadProductDailyData(); }  
  else if (key === 'sales_status') { loadSalesStatus(); }
  else if (key === 'excel_daily') { loadExcelDailyTab_(); }  
  else if (key === 'ai_report') { loadAutoRegisterTab_(); }  
@@ -12141,6 +12141,17 @@ function toggleProductDailySummaryUnconfirmed(){
   renderProductDaily();  
 }  
 
+function shiftProductDailyGridMonth(delta){
+  const el = document.getElementById('ymFilterProductDaily');
+  const cur = (el && el.value) ? el.value : (productDailyGridYm || todayStr().slice(0, 7));
+  const [y, m] = cur.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  const newYm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  if (el) el.value = newYm;
+  productDailyGridYm = newYm;
+  renderProductDaily();
+}
+
 function shiftProductDailySummaryMonth(delta){  
   const [y, m] = productDailySummaryYm.split('-').map(Number);  
   const d = new Date(y, m - 1 + delta, 1);  
@@ -12167,16 +12178,77 @@ function loadProductDailySummaryTarget_(cb){
     .getSafetyProductSummary(SESSION.token, productDailySummaryYm);  
 }  
 
-// 매출예상 문자열(26.10월, 2026년 10월, 2026-10 등)을 YYYY-MM 형식으로 표준화
-function parseForecastYm_(val) {
+// 매출예상 문자열(26.10월, 2026년 10월, 2026-10, 10월, 10월말, 10/15 등)을 YYYY-MM 형식으로 표준화
+function parseForecastYm_(val, reportDate) {
   if (!val) return '';
   const s = String(val).trim();
+  if (!s) return '';
+
+  let refYear = '2026';
+  let refMonth = 10;
+  const curYm = (typeof todayStr === 'function' ? todayStr() : new Date().toISOString().slice(0, 10));
+  if (curYm) {
+    refYear = curYm.slice(0, 4);
+    refMonth = Number(curYm.slice(5, 7));
+  }
+  if (reportDate && String(reportDate).trim()) {
+    const rdMatch = String(reportDate).trim().match(/(20\d{2})[-./년\s]+(\d{1,2})/);
+    if (rdMatch) {
+      refYear = rdMatch[1];
+      refMonth = Number(rdMatch[2]);
+    }
+  }
+
+  // 1. Full 4-digit year + month (e.g. 2026-10, 2026.10, 2026년 10월, 2026년 10월말, 2026/10/15)
   let m = s.match(/(20\d{2})[-./년\s]+(\d{1,2})/);
-  if (m) return m[1] + '-' + String(m[2]).padStart(2, '0');
+  if (m) {
+    return m[1] + '-' + String(m[2]).padStart(2, '0');
+  }
+
+  // 2. 2-digit year + month (e.g. 26.10, 26-10, 26.10월, 26.10월말, 26년 10월)
   m = s.match(/(\d{2})[-./년\s]+(\d{1,2})/);
-  if (m) return '20' + m[1] + '-' + String(m[2]).padStart(2, '0');
+  if (m) {
+    const yVal = Number(m[1]);
+    const mVal = Number(m[2]);
+    if (yVal >= 20 && yVal <= 45 && mVal >= 1 && mVal <= 12) {
+      return '20' + String(yVal).padStart(2, '0') + '-' + String(mVal).padStart(2, '0');
+    }
+    if (yVal >= 1 && yVal <= 12) {
+      return refYear + '-' + String(yVal).padStart(2, '0');
+    }
+  }
+
+  // 3. Compact 6-digit (e.g. 202610)
   m = s.match(/(20\d{2})(\d{2})/);
-  if (m) return m[1] + '-' + m[2];
+  if (m) {
+    const mVal = Number(m[2]);
+    if (mVal >= 1 && mVal <= 12) {
+      return m[1] + '-' + String(m[2]).padStart(2, '0');
+    }
+  }
+
+  // 4. Month with '월' (e.g. 10월, 11월, 10월말, 10월초, 10월 중순, 10월경, 9월)
+  m = s.match(/(\d{1,2})\s*월/);
+  if (m) {
+    const mNum = Number(m[1]);
+    if (mNum >= 1 && mNum <= 12) {
+      let yNum = Number(refYear);
+      if (refMonth >= 10 && mNum <= 3) {
+        yNum += 1;
+      }
+      return String(yNum) + '-' + String(mNum).padStart(2, '0');
+    }
+  }
+
+  // 5. Just a standalone month number 1~12 (e.g. '10', '11')
+  m = s.match(/^(\d{1,2})$/);
+  if (m) {
+    const mNum = Number(m[1]);
+    if (mNum >= 1 && mNum <= 12) {
+      return refYear + '-' + String(mNum).padStart(2, '0');
+    }
+  }
+
   return '';
 }
 
@@ -12414,7 +12486,7 @@ function sortedProductDailyRows(){
   // 1 & 5. 테이블 표시 기준은 메뉴바의 년월 기준으로 매출예상 월이 메뉴바의 지정된 월을 포함한 그 이후인 경우의 자료만 표시
   if (ymFilter) {  
     list = list.filter(r => {
-      const fYm = parseForecastYm_(r.매출예상);
+      const fYm = parseForecastYm_(r.매출예상, r.보고일);
       return Boolean(fYm && fYm >= ymFilter);
     });  
   }  
