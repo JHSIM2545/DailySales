@@ -3779,6 +3779,16 @@ td.cell-align-center select {
 }
 
 /* 2. 좌측 정렬: 계약처명, 비고, (해약중지) 사유 */
+.grid-wrap table tbody td.cell-align-left,
+.grid-wrap table tbody td.cell-align-left input,
+.grid-wrap table tbody td.cell-align-left select,
+.grid-wrap table tbody td.cell-align-left textarea,
+.grid-wrap table tbody td.name-cell,
+.grid-wrap table tbody td.name-cell input,
+.grid-wrap table tbody td.name-cell select,
+.grid-wrap table tbody td.wide-note,
+.grid-wrap table tbody td.wide-note input,
+.grid-wrap table tbody td.wide-note select,
 td.cell-align-left,
 td.cell-align-left input,
 td.cell-align-left select,
@@ -3794,6 +3804,24 @@ td.wide-note select {
 }
 
 /* 3. 우측 정렬: 용역료, 금액, 現용역료 */
+.grid-wrap table tbody td.cell-align-right,
+.grid-wrap table tbody td.cell-align-right input,
+.grid-wrap table tbody td.cell-align-right select,
+.grid-wrap table tbody td.cell-align-right textarea,
+.grid-wrap table tbody td.fee,
+.grid-wrap table tbody td.fee input,
+.grid-wrap table tbody td.money,
+.grid-wrap table tbody td.money input,
+.grid-wrap table tbody td.money-black,
+.grid-wrap table tbody td.money-black input,
+.grid-wrap table tbody td.amt-up,
+.grid-wrap table tbody td.amt-up input,
+.grid-wrap table tbody td.amt-down,
+.grid-wrap table tbody td.amt-down input,
+.grid-wrap table tbody td.amount-pos,
+.grid-wrap table tbody td.amount-pos input,
+.grid-wrap table tbody td.amount-neg,
+.grid-wrap table tbody td.amount-neg input,
 td.cell-align-right,
 td.cell-align-right input,
 td.cell-align-right select,
@@ -10489,17 +10517,44 @@ function productCellClass_(val){
   if (s === '유지보수') return ' prod-maint';  
   return '';  
 }  
+// ===== 그리드 필드별 정렬 헬퍼 (2026 표준) =====
+function getGridAlignStyle_(scope, field) {
+  if (scope === 'order') {
+    if (field === '계약처명' || field === '비고') return 'left';
+    if (field === '용역료') return 'right';
+    return 'center';
+  } else if (scope === 'restart') {
+    if (field === '계약처명' || field === '비고') return 'left';
+    if (field === '용역료') return 'right';
+    return 'center';
+  } else if (scope === 'cancel') {
+    if (field === '계약처명' || field === '사유') return 'left';
+    if (field === '용역료') return 'right';
+    return 'center';
+  } else if (scope === 'price') {
+    if (field === '계약처명' || field === '비고') return 'left';
+    if (field === '금액' || field === '現용역료') return 'right';
+    return 'center';
+  }
+  return 'center';
+}
+
+function getGridAlignClass_(scope, field) {
+  const a = getGridAlignStyle_(scope, field);
+  return a === 'left' ? 'cell-align-left' : (a === 'right' ? 'cell-align-right' : 'cell-align-center');
+}
+
 function orderCellClass(row, field, val, allRows){  
- let cls = '';  
- if (field === '계약번호') cls = 'contract-cell cell-align-center' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
- else if (field === '계약처명') cls = 'name-cell cell-align-left';  
- else if (field === '비고') cls = 'wide-note cell-align-left';  
- else if (field === '용역료') cls = 'fee money cell-align-right';  
- else if (field === '영업담당') cls = 'rep-col cell-align-center';  
- else if (field === '담당차량') cls = 'center center-cell narrow cell-align-center';  
- else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol cell-align-center';  
- else if (field === '유형') cls = 'regtype-col cell-align-center';  
- else cls = 'cell-align-center';  
+ const alignCls = getGridAlignClass_('order', field);
+ let cls = alignCls;  
+ if (field === '계약번호') cls += ' contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ else if (field === '계약처명') cls += ' name-cell';  
+ else if (field === '비고') cls += ' wide-note';  
+ else if (field === '용역료') cls += ' fee money num';  
+ else if (field === '영업담당') cls += ' rep-col';  
+ else if (field === '담당차량') cls += ' center center-cell narrow';  
+ else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
+ else if (field === '유형') cls += ' regtype-col';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
  if (['개시일','기산일'].indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
@@ -10510,24 +10565,26 @@ function orderCellClass(row, field, val, allRows){
 function fieldCellHtml(row, field, allRows){  
  const type = FIELD_TYPE[field];  
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
+ const align = getGridAlignStyle_('order', field);
+ const alignCls = getGridAlignClass_('order', field);
  let inner;  
  if (type === 'select') {  
  const options = FIELD_OPTIONS[field];  
- const repCls = (field === '영업담당') ? ' class="rep-select no-arrow"' : '';  
- inner = `<select${repCls} onchange="onFieldChange('${row.id}','${field}',this.value)">  
+ const repCls = (field === '영업담당') ? ' class="rep-select no-arrow ' + alignCls + '"' : ' class="' + alignCls + '"';  
+ inner = `<select${repCls} style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
  } else if (field === '용역료') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" style="text-align:${align} !important;" inputmode="numeric" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else if (ORDER_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('order', row.id, field, val);  
  } else {  
- inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" class="${alignCls}" style="text-align:${align} !important;" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  const cls = orderCellClass(row, field, val, allRows);  
  const titleAttr = (field === '계약처명' || field === '비고') ? ` title="${escAttr(val)}"` : '';  
- return `<td class="${cls}"${titleAttr}>${inner}</td>`;  
+ return `<td class="${cls}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
 }  
   
 function render(){  
@@ -10543,7 +10600,7 @@ function render(){
  const isMonth = ORDER_MONTH_FIELDS.indexOf(h) !== -1;  
  const disp = isMonth ? fmtMonth(row[h]) : row[h];  
  const autoCls = ('auto ' + statusClass(row[h]) + (isMonth ? ' monthcol' : '') + (sortState.key === h ? ' sort-col' : '')).trim();  
- html += `<td class="${autoCls}">${escHtml(disp)}</td>`;  
+ html += `<td class="${autoCls}" style="text-align:center !important;">${escHtml(disp)}</td>`;  
  } else html += fieldCellHtml(row, h, rows);  
  });  
  html += `<td class="actions">  
@@ -10965,19 +11022,20 @@ const CANCEL_DATE_FIELDS = ['접수일','확정일'];
 DATE_CELL_HANDLERS.cancel = function(id, field, value){ onCancelFieldChange(id, field, value); };  
   
 function cancelCellClass(field, val, allRows){  
- let cls = '';  
- if (field === '계약번호') cls = 'contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
- else if (field === '계약처명') cls = 'name-cell';  
- else if (field === '용역료') cls = 'fee money';  
- else if (field === '담당차량') cls = 'center center-cell narrow';  
- else if (CANCEL_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol';  
- else if (field === '사유') cls = 'wide-note';  
- else if (field === '영업담당') cls = 'rep-col';  
- else if (field === '유형') cls = 'regtype-col';  
- else if (field === '해약유형') cls = 'canceltype-col';  
+ const alignCls = getGridAlignClass_('cancel', field);
+ let cls = alignCls;  
+ if (field === '계약번호') cls += ' contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ else if (field === '계약처명') cls += ' name-cell';  
+ else if (field === '사유') cls += ' wide-note';  
+ else if (field === '용역료') cls += ' fee money num';  
+ else if (field === '담당차량') cls += ' center center-cell narrow';  
+ else if (CANCEL_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
+ else if (field === '영업담당') cls += ' rep-col';  
+ else if (field === '유형') cls += ' regtype-col';  
+ else if (field === '해약유형') cls += ' canceltype-col';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
- if (field === '확정일' && String(val) === todayStr()) cls += ' today-hl';  
+ if (['접수일','확정일'].indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
  else if (cancelSortState.key === field) cls += ' sort-col';  
  return cls.trim();  
 }  
@@ -10985,12 +11043,14 @@ function cancelCellClass(field, val, allRows){
 function fieldCellHtmlCancel(row, field, allRows){  
  const type = CANCEL_FIELD_TYPE[field];  
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
+ const align = getGridAlignStyle_('cancel', field);
+ const alignCls = getGridAlignClass_('cancel', field);
  let inner;  
  if (type === 'select') {  
  const options = CANCEL_FIELD_OPTIONS[field] || [];  
- const repCls = (field === '영업담당') ? ' class="rep-select no-arrow"' : '';  
+ const repCls = (field === '영업담당') ? ' class="rep-select no-arrow ' + alignCls + '"' : ' class="' + alignCls + '"';  
  const hasVal = val && !options.includes(val);  
- inner = `<select${repCls} onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select${repCls} style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  ${hasVal ? `<option value="${escAttr(val)}" selected>${escAttr(val)}</option>` : ''}  
@@ -10998,18 +11058,18 @@ function fieldCellHtmlCancel(row, field, allRows){
  } else if (type === 'datalist') {  
  const options = CANCEL_FIELD_OPTIONS[field];  
  const dlid = 'dl_' + field;  
- inner = `<input list="${dlid}" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<input list="${dlid}" class="${alignCls}" style="text-align:${align} !important;" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">  
  <datalist id="${dlid}">${options.map(o => `<option value="${o}">`).join('')}</datalist>`;  
  } else if (CANCEL_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('cancel', row.id, field, val);  
  } else if (field === '용역료') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onCancelFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" style="text-align:${align} !important;" inputmode="numeric" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onCancelFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" class="${alignCls}" style="text-align:${align} !important;" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onCancelFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  const cls = cancelCellClass(field, val, allRows);  
  const titleAttr = (field === '계약처명' || field === '사유') ? ` title="${escAttr(val)}"` : '';  
- return `<td class="${cls}"${titleAttr}>${inner}</td>`;  
+ return `<td class="${cls}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
 }  
   
 function renderCancel(){  
@@ -11026,7 +11086,7 @@ function renderCancel(){
  const isMonth = (h === '해약월');  
  const disp = isMonth ? fmtMonth(row[h]) : row[h];  
  const autoCls = ('auto ' + statusClassCancel(row[h]) + (isMonth ? ' monthcol' : '') + (cancelSortState.key === h ? ' sort-col' : '')).trim();  
- html += `<td class="${autoCls}">${escHtml(disp)}</td>`;  
+ html += `<td class="${autoCls}" style="text-align:center !important;">${escHtml(disp)}</td>`;  
  } else html += fieldCellHtmlCancel(row, h, rows);  
  });  
  html += `<td class="actions">  
@@ -11416,31 +11476,33 @@ function headerCellPrice(h){
 function fieldCellHtmlPrice(row, field, allRows){  
  const type = PRICE_FIELD_TYPE[field];  
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
- let inner, cls = '';  
+ const align = getGridAlignStyle_('price', field);
+ const alignCls = getGridAlignClass_('price', field);
+ let inner, cls = alignCls;  
   if (field === '영업담당') {  
-    cls += ' rep-col cell-align-center';  
-    inner = `<select class="rep-select no-arrow" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+    cls += ' rep-col';  
+    inner = `<select class="rep-select no-arrow ${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
     <option value="">선택</option>${LIST_PRICE_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
     </select>`;  
  } else if (field === '접수자') {  
- inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>${USER_NAMES.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
  } else if (field === '담당차량') {  
- inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>${LIST_PRICE_CAR.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}  
  </select>`;  
- cls = 'center cell-align-center';  
+ cls += ' center narrow';  
  } else if (field === '상품') {  
- inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_PRODUCT.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_PRODUCT.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '그로스') {  
- inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_GROSS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_GROSS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '유형') {  
- inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_REG_TYPE.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_REG_TYPE.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '사유') {  
  const options = LIST_PRICE_REASON || [];  
  const hasVal = val && !options.includes(val);  
- inner = `<select class="cell-align-center" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">  
  <option value="">선택</option>  
  ${options.map(o => `<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}  
  ${hasVal ? `<option value="${escAttr(val)}" selected>${escAttr(val)}</option>` : ''}  
@@ -11448,27 +11510,24 @@ function fieldCellHtmlPrice(row, field, allRows){
  } else if (PRICE_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('price', row.id, field, val);  
  } else if (field === '금액') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
  } else if (field === '現용역료') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- const alignStyle = (field === '계약처명' || field === '비고') ? 'text-align:left !important;' : 'text-align:center !important;';  
- inner = `<input type="text" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;${alignStyle}padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" class="${alignCls}" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:${align} !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
  }  
  if (field === '계약번호') {  
- cls = 'contract-cell cell-align-center' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ cls += ' contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
  } else if (field === '계약처명') {  
- cls = 'name-cell cell-align-left';  
+ cls += ' name-cell';  
  } else if (field === '비고') {  
- cls = 'wide-note cell-align-left';  
+ cls += ' wide-note';  
  } else if (field === '現용역료') {  
- cls = 'money-black cell-align-right';  
+ cls += ' money-black num';  
  } else if (field === '금액') {  
  const n = Number(val);  
  const up = !isNaN(n) && val !== '' ? (n < 0 ? false : true) : null;  
- cls = (up === null ? 'money' : (up ? 'amt-up pcbg-up' : 'amt-down pcbg-down')) + ' cell-align-right';  
- } else {  
- cls = 'cell-align-center';  
+ cls += (up === null ? ' money num' : (up ? ' amt-up pcbg-up num' : ' amt-down pcbg-down num'));  
  }  
  if (PRICE_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
@@ -11476,7 +11535,7 @@ function fieldCellHtmlPrice(row, field, allRows){
  if (field === '기산일' && String(val) === todayStr()) cls += ' today-hl';  
  else if (priceSortState.key === field) cls += ' sort-col';  
  const titleAttr = (field === '계약처명' || field === '비고' || field === '사유') ? ` title="${escAttr(val)}"` : '';  
- return `<td class="${cls.trim()}"${titleAttr}>${inner}</td>`;  
+ return `<td class="${cls.trim()}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
 }  
   
 function priceAutoCellHtml(row, h){  
@@ -11488,7 +11547,7 @@ function priceAutoCellHtml(row, h){
  if (h === '구분' && 구분) cls += (구분 === '인상' ? ' pc-up' : ' pc-down');  
  if (h === '인상인하율' && 구분) cls += (구분 === '인상' ? ' rate-up' : ' rate-down');  
  if (priceSortState.key === h) cls += ' sort-col';  
- return `<td class="${cls.trim()}">${escHtml(disp)}</td>`;  
+ return `<td class="${cls.trim()}" style="text-align:center !important;">${escHtml(disp)}</td>`;  
 }  
   
 
@@ -11824,41 +11883,42 @@ function headerCellRestart(h){
 }  
 function fieldCellHtmlRestart(row, field, allRows){  
  const val = row[field] !== undefined && row[field] !== null ? row[field] : '';  
- let inner, cls = '';  
+ const align = getGridAlignStyle_('restart', field);
+ const alignCls = getGridAlignClass_('restart', field);
+ let inner, cls = alignCls;  
  if (field === '현상태') {  
- inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_STATUS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_STATUS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '영업담당') {  
- inner = `<select class="rep-select no-arrow" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="rep-select no-arrow ${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_SALES_REP.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  cls += ' rep-col';  
  } else if (field === '담당차량') {  
- inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}</select>`;  
- cls = 'center';  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_RESTART_CAR.map(o=>`<option value="${o}" ${String(val)===String(o)?'selected':''}>${o}</option>`).join('')}</select>`;  
+ cls += ' center narrow';  
  } else if (field === '상품') {  
- inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_PRODUCT.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_PRODUCT.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (field === '그로스') {  
- inner = `<select onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_GROSS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
+ inner = `<select class="${alignCls}" style="text-align:${align} !important; text-align-last:${align} !important;" onchange="onRestartFieldChange('${row.id}','${field}',this.value)"><option value="">선택</option>${LIST_GROSS.map(o=>`<option value="${o}" ${String(val)===o?'selected':''}>${o}</option>`).join('')}</select>`;  
  } else if (RESTART_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('restart', row.id, field, val);  
  } else if (field === '용역료') {  
- inner = `<input type="text" inputmode="numeric" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onRestartFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" style="text-align:${align} !important;" inputmode="numeric" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onRestartFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
- inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onRestartFieldChange('${row.id}','${field}',this.value)">`;  
+ inner = `<input type="text" class="${alignCls}" style="text-align:${align} !important;" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onRestartFieldChange('${row.id}','${field}',this.value)">`;  
  }  
- if (field === '계약번호') cls = 'contract-cell cell-align-center' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
- else if (field === '계약처명') cls = 'name-cell cell-align-left';  
- else if (field === '비고') cls = 'wide-note cell-align-left';  
- else if (field === '용역료') cls = 'fee money cell-align-right';  
- else if (field === '담당차량') cls = 'center center-cell narrow cell-align-center';  
- else if (RESTART_DATE_FIELDS.indexOf(field) !== -1) cls = 'datecol cell-align-center';  
- else if (field === '영업담당') cls = 'rep-col narrow cell-align-center';  
- else if (['현상태','공사담당'].indexOf(field) !== -1) cls = 'narrow cell-align-center';  
- else cls = 'cell-align-center';  
+ if (field === '계약번호') cls += ' contract-cell' + (contractCellBad(val, allRows, '계약번호') ? ' contract-bad' : '');  
+ else if (field === '계약처명') cls += ' name-cell';  
+ else if (field === '비고') cls += ' wide-note';  
+ else if (field === '용역료') cls += ' fee money num';  
+ else if (field === '담당차량') cls += ' center center-cell narrow';  
+ else if (RESTART_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
+ else if (field === '영업담당') cls += ' rep-col narrow';  
+ else if (['현상태','공사담당'].indexOf(field) !== -1) cls += ' narrow';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
  if (field === '재개시일' && String(val) === todayStr()) cls += ' today-hl';  
  else if (restartSortState.key === field) cls += ' sort-col';  
  const titleAttr = (field === '계약처명' || field === '비고') ? ` title="${escAttr(val)}"` : '';  
- return `<td class="${cls.trim()}"${titleAttr}>${inner}</td>`;  
+ return `<td class="${cls.trim()}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
 }  
   
 function renderRestart(){  
@@ -11873,7 +11933,7 @@ function renderRestart(){
  if (RESTART_AUTO_FIELDS.includes(h)) {  
  const disp = (h === '재개시월') ? fmtMonth(row[h]) : row[h];  
  const autoCls = ('auto monthcol' + (restartSortState.key === h ? ' sort-col' : '')).trim();  
- html += `<td class="${autoCls}">${escHtml(disp)}</td>`;  
+ html += `<td class="${autoCls}" style="text-align:center !important;">${escHtml(disp)}</td>`;  
  } else html += fieldCellHtmlRestart(row, h, rows);  
  });  
  html += `<td class="actions">  
