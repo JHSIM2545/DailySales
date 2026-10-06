@@ -3387,7 +3387,7 @@
       }
     },
 
-    adminGetStoredFile: async function(token, id) {
+        adminGetStoredFile: async function(token, id) {
       try {
         // 1. 로컬 캐시에서 먼저 빠른 조회
         try {
@@ -3398,17 +3398,35 @@
           }
         } catch(e) {}
 
-        // 2. Supabase에서 개별 파일 데이터 본문 조회
         const client = getSupabase();
         if (client) {
-          const { data, error } = await client
-            .from('system_settings')
-            .select('setting_value')
-            .eq('setting_key', 'FILE_DATA_' + id)
-            .maybeSingle();
-          if (!error && data && data.setting_value) {
-            return { success: true, dataUrl: data.setting_value };
-          }
+          // 2. Supabase에서 개별 파일 데이터 본문 조회 (FILE_DATA_{id})
+          try {
+            const { data, error } = await client
+              .from('system_settings')
+              .select('setting_value')
+              .eq('setting_key', 'FILE_DATA_' + id)
+              .maybeSingle();
+            if (!error && data && data.setting_value) {
+              return { success: true, dataUrl: data.setting_value };
+            }
+          } catch(e) {}
+
+          // 3. 만약 이전 방식으로 ADMIN_STORED_FILES에 dataUrl이 함께 들어있던 경우를 위한 폴백
+          try {
+            const { data } = await client
+              .from('system_settings')
+              .select('setting_value')
+              .eq('setting_key', 'ADMIN_STORED_FILES')
+              .maybeSingle();
+            if (data && data.setting_value) {
+              const list = JSON.parse(data.setting_value);
+              const found = list.find(function(f){ return f.id === id; });
+              if (found && found.dataUrl) {
+                return { success: true, dataUrl: found.dataUrl, name: found.name };
+              }
+            }
+          } catch(e) {}
         }
         return { success: false, error: '파일 데이터를 찾을 수 없습니다.' };
       } catch(err) {

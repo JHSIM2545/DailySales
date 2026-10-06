@@ -3367,7 +3367,7 @@
       }
     },
 
-    adminGetStoredFile: async function(token, id) {
+        adminGetStoredFile: async function(token, id) {
       try {
         // 1. 로컬 캐시에서 먼저 빠른 조회
         try {
@@ -3378,17 +3378,35 @@
           }
         } catch(e) {}
 
-        // 2. Supabase에서 개별 파일 데이터 본문 조회
         const client = getSupabase();
         if (client) {
-          const { data, error } = await client
-            .from('system_settings')
-            .select('setting_value')
-            .eq('setting_key', 'FILE_DATA_' + id)
-            .maybeSingle();
-          if (!error && data && data.setting_value) {
-            return { success: true, dataUrl: data.setting_value };
-          }
+          // 2. Supabase에서 개별 파일 데이터 본문 조회 (FILE_DATA_{id})
+          try {
+            const { data, error } = await client
+              .from('system_settings')
+              .select('setting_value')
+              .eq('setting_key', 'FILE_DATA_' + id)
+              .maybeSingle();
+            if (!error && data && data.setting_value) {
+              return { success: true, dataUrl: data.setting_value };
+            }
+          } catch(e) {}
+
+          // 3. 만약 이전 방식으로 ADMIN_STORED_FILES에 dataUrl이 함께 들어있던 경우를 위한 폴백
+          try {
+            const { data } = await client
+              .from('system_settings')
+              .select('setting_value')
+              .eq('setting_key', 'ADMIN_STORED_FILES')
+              .maybeSingle();
+            if (data && data.setting_value) {
+              const list = JSON.parse(data.setting_value);
+              const found = list.find(function(f){ return f.id === id; });
+              if (found && found.dataUrl) {
+                return { success: true, dataUrl: found.dataUrl, name: found.name };
+              }
+            }
+          } catch(e) {}
         }
         return { success: false, error: '파일 데이터를 찾을 수 없습니다.' };
       } catch(err) {
@@ -14138,7 +14156,7 @@ function downloadGridImgPreview_(){
   document.body.removeChild(a);
 }
 
-/* ===================== 파일 저장소 기능 (100% 원본 복원: 다중 선택/다운/삭제/중복체크/아이콘) ===================== */
+/* ===================== 파일 저장소 기능 (Supabase 영구 연동: 다중 선택/다운/삭제/중복체크/아이콘) ===================== */
 let FILE_STORE_CACHED_FILES = [];
 let FILE_STORE_SORT_DESC = true;
 
@@ -14146,7 +14164,7 @@ function openFileStoreModal_(){
   const overlay = document.getElementById('fileStoreModalOverlay');
   if (overlay) {
     overlay.classList.add('open');
-    fileStoreRefresh_(); // 모달 열자마자 즉시 저장된 파일 목록 로드!
+    fileStoreRefresh_(); // 모달 열자마자 최신 파일 목록 자동 로드!
   }
 }
 
@@ -14187,18 +14205,15 @@ function fileStoreRefresh_(){
   google.script.run
     .withSuccessHandler(function(res){
       let files = (res && res.files) || [];
-      // 초기 기본 파일이 비어있는 경우 기본 샘플 파일 제공
-      if (!files.length && !localStorage.getItem('ADMIN_STORED_FILES_INITIALIZED')) {
-        files = [
-          { id: 'f_code_gs', name: 'Code.gs', size: '67.6 KB', createdDate: '2026-08-25 07:29', regDate: '2026-09-26 10:15', dataUrl: 'data:text/plain;charset=utf-8,// Code.gs' },
-          { id: 'f_index_html', name: 'Index.html', size: '77.2 KB', createdDate: '2026-08-25 07:29', regDate: '2026-09-26 10:15', dataUrl: 'data:text/html;charset=utf-8,<!-- Index.html -->' },
-          { id: 'f_admin_html', name: 'Admin.html', size: '85.4 KB', createdDate: '2026-08-25 07:29', regDate: '2026-09-26 10:14', dataUrl: 'data:text/html;charset=utf-8,<!-- Admin.html -->' }
-        ];
-        localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(files));
-        localStorage.setItem('ADMIN_STORED_FILES_INITIALIZED', 'true');
-      }
+      // 더미 파일 완전 필터링
+      files = files.filter(function(f){
+        return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html';
+      });
       FILE_STORE_CACHED_FILES = files;
       renderFileStoreTable_();
+    })
+    .withFailureHandler(function(err){
+      if (listEl) listEl.innerHTML = '<div style="padding:40px; text-align:center; color:#ef4444;">파일 목록을 불러오지 못했습니다: ' + escHtml(String(err)) + '</div>';
     })
     .adminListStoredFiles(SESSION ? SESSION.token : '');
 }
@@ -14317,7 +14332,7 @@ function fileStoreFileSelected_(e){
     if (existing) {
       const replace = confirm('동일한 이름의 파일 [' + file.name + '] 이(가) 이미 존재합니다.\n기존 파일을 덮어쓰시겠습니까?');
       if (!replace) {
-        continue; // 덮어쓰기 취소 시 건너뜀
+        continue;
       }
     }
     validFiles.push(file);
@@ -14328,14 +14343,19 @@ function fileStoreFileSelected_(e){
     return;
   }
 
-  let processed = 0;
-  validFiles.forEach(function(file){
+  // 순차적 업로드로 동시 실행 경쟁 방지
+  let idx = 0;
+  function uploadNext() {
+    if (idx >= validFiles.length) {
+      fileStoreRefresh_();
+      document.getElementById('fileStoreInput').value = '';
+      return;
+    }
+    const file = validFiles[idx];
     const reader = new FileReader();
     reader.onload = function(evt) {
       const lastMod = file.lastModified ? new Date(file.lastModified) : now;
       const createdDateStr = fmtFileStoreDateTime_(lastMod);
-
-      // 기존 파일이 있으면 동일 id로 덮어쓰기
       const existing = FILE_STORE_CACHED_FILES.find(function(it){ return it.name === file.name; });
       const targetId = existing ? existing.id : ('file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
 
@@ -14350,28 +14370,58 @@ function fileStoreFileSelected_(e){
       };
 
       google.script.run
-        .withSuccessHandler(function(){
-          processed++;
-          if (processed === validFiles.length) {
-            fileStoreRefresh_();
-            document.getElementById('fileStoreInput').value = '';
-          }
+        .withSuccessHandler(function(res){
+          idx++;
+          uploadNext();
+        })
+        .withFailureHandler(function(err){
+          alert('파일 업로드 실패 [' + file.name + ']: ' + err);
+          idx++;
+          uploadNext();
         })
         .adminUploadStoredFile(SESSION ? SESSION.token : '', payload);
     };
     reader.readAsDataURL(file);
-  });
+  }
+  uploadNext();
+}
+
+function triggerBrowserDownload_(dataUrl, fileName){
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = fileName || 'download';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function downloadStoredFile_(id){
   const f = FILE_STORE_CACHED_FILES.find(function(it){ return String(it.id) === String(id); });
-  if (!f || !f.dataUrl) { alert('다운로드할 파일 데이터를 찾을 수 없습니다.'); return; }
-  const a = document.createElement('a');
-  a.href = f.dataUrl;
-  a.download = f.name || 'download';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if (!f) { alert('다운로드할 파일 정보를 찾을 수 없습니다.'); return; }
+  
+  // 1. 이미 캐시에 dataUrl이 존재하는 경우 즉시 다운로드
+  if (f.dataUrl) {
+    triggerBrowserDownload_(f.dataUrl, f.name);
+    return;
+  }
+
+  // 2. dataUrl이 없는 경우 서버(Supabase)에서 실시간으로 데이터 조회 후 다운로드
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      if (res && res.success && res.dataUrl) {
+        f.dataUrl = res.dataUrl; // 다음 다운로드를 위해 캐시 보존
+        triggerBrowserDownload_(res.dataUrl, f.name);
+      } else {
+        alert('파일 데이터를 불러오지 못했습니다: ' + ((res && res.error) || '데이터 없음'));
+      }
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('파일 다운로드 오류: ' + err);
+    })
+    .adminGetStoredFile(SESSION ? SESSION.token : '', id);
 }
 
 function deleteStoredFile_(id){
@@ -14380,6 +14430,7 @@ function deleteStoredFile_(id){
   if (!confirm('정말 [' + name + '] 파일을 삭제하시겠습니까?')) return;
   google.script.run
     .withSuccessHandler(function(){ fileStoreRefresh_(); })
+    .withFailureHandler(function(err){ alert('파일 삭제 오류: ' + err); })
     .adminDeleteStoredFile(SESSION ? SESSION.token : '', id);
 }
 
@@ -14404,6 +14455,12 @@ function fileStoreMultiDelete_(){
   ids.forEach(function(id){
     google.script.run
       .withSuccessHandler(function(){
+        done++;
+        if (done === ids.length) {
+          fileStoreRefresh_();
+        }
+      })
+      .withFailureHandler(function(){
         done++;
         if (done === ids.length) {
           fileStoreRefresh_();
