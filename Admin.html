@@ -10677,16 +10677,11 @@ function onFieldChange(id, field, value){
 function pushSave(row){  
  scheduleDependentCachesRefresh_(); // 이 화면 자체의 ROWS는 이미 최신이므로 자기 자신의 캐시/재로딩은 건드리지 않음  
  setSyncStatus('saving');  
- if (getVal('계약번호') && !/^[A-Za-z]\d{0,7}$/i.test(getVal('계약번호'))) { alert('계약번호는 영문 1자리(T, M 등) 또는 영문+숫자(최대 8자리)로 입력하세요.'); return; }
   const fields = {};  
  EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) {
-   row._unsynced = false; row._syncError = false; setSyncStatus('ok');
-   alert('[임시 진단] 저장 응답 확인\n\n보낸 id: ' + row.id + '\n보낸 계약번호: ' + fields['계약번호'] + '\n서버 응답: ' + JSON.stringify(res));
-   onDataChanged_('order');
- }
+ if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); alert('저장 실패 (order): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.'); }  
  if (!updateRowSyncClassOnly_(row, 'order')) render();  
  })  
@@ -11136,7 +11131,6 @@ function onCancelFieldChange(id, field, value){
 function pushSaveCancel(row){  
  scheduleDependentCachesRefresh_(); // 이 화면 자체의 ROWS는 이미 최신이므로 자기 자신의 캐시/재로딩은 건드리지 않음  
  setSyncStatus('saving');  
- if (getVal('계약번호') && !/^[A-Za-z]\d{0,7}$/i.test(getVal('계약번호'))) { alert('계약번호는 영문 1자리(T, M 등) 또는 영문+숫자(최대 8자리)로 입력하세요.'); return; }
   const fields = {};  
  CANCEL_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
@@ -11639,7 +11633,6 @@ function onPriceFieldChange(id, field, value){
 function pushSavePrice(row){  
  scheduleDependentCachesRefresh_(); // 이 화면 자체의 ROWS는 이미 최신이므로 자기 자신의 캐시/재로딩은 건드리지 않음  
  setSyncStatus('saving');  
- if (getVal('계약번호') && !/^[A-Za-z]\d{0,7}$/i.test(getVal('계약번호'))) { alert('계약번호는 영문 1자리(T, M 등) 또는 영문+숫자(최대 8자리)로 입력하세요.'); return; }
   const fields = {};  
  PRICE_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
@@ -11984,7 +11977,6 @@ function onRestartFieldChange(id, field, value){
 function pushSaveRestart(row){  
  scheduleDependentCachesRefresh_(); // 이 화면 자체의 ROWS는 이미 최신이므로 자기 자신의 캐시/재로딩은 건드리지 않음  
  setSyncStatus('saving');  
- if (getVal('계약번호') && !/^[A-Za-z]\d{0,7}$/i.test(getVal('계약번호'))) { alert('계약번호는 영문 1자리(T, M 등) 또는 영문+숫자(최대 8자리)로 입력하세요.'); return; }
   const fields = {};  
  RESTART_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
@@ -12680,7 +12672,6 @@ function onProductDailyFieldChange(id, field, value){
 
 function pushSaveProductDaily(row){  
   setSyncStatus('saving');  
-  if (getVal('계약번호') && !/^[A-Za-z]\d{0,7}$/i.test(getVal('계약번호'))) { alert('계약번호는 영문 1자리(T, M 등) 또는 영문+숫자(최대 8자리)로 입력하세요.'); return; }
   const fields = {};  
   PRODUCT_DAILY_HEADERS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
   google.script.run  
