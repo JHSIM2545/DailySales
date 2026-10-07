@@ -10683,10 +10683,10 @@ function pushSave(row){
  google.script.run  
  .withSuccessHandler(function(res){  
  if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
- else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
+ else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); alert('저장 실패 (order): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.'); }  
  if (!updateRowSyncClassOnly_(row, 'order')) render();  
  })  
- .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); if (!updateRowSyncClassOnly_(row, 'order')) render(); })  
+ .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); alert('저장 실패 (order): ' + err + '\n\n네트워크 또는 서버 권한 문제일 수 있습니다.'); if (!updateRowSyncClassOnly_(row, 'order')) render(); })  
  .saveOrderStartRow(SESSION.token, { id: row.id, fields: fields });  
 }  
 function retrySave(id){ const row = ROWS.find(r => r.id === id); if (row) pushSave(row); }  
@@ -11138,10 +11138,10 @@ function pushSaveCancel(row){
  google.script.run  
  .withSuccessHandler(function(res){  
  if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
- else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
+ else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); alert('저장 실패 (cancel): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.'); }  
  if (!updateRowSyncClassOnly_(row, 'cancel')) renderCancel();  
  })  
- .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); if (!updateRowSyncClassOnly_(row, 'cancel')) renderCancel(); })  
+ .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); alert('저장 실패 (cancel): ' + err + '\n\n네트워크 또는 서버 권한 문제일 수 있습니다.'); if (!updateRowSyncClassOnly_(row, 'cancel')) renderCancel(); })  
  .saveCancelRow(SESSION.token, { id: row.id, fields: fields });  
 }  
 function retrySaveCancel(id){ const row = CANCEL_ROWS.find(r => r.id === id); if (row) pushSaveCancel(row); }  
@@ -11641,10 +11641,10 @@ function pushSavePrice(row){
  google.script.run  
  .withSuccessHandler(function(res){  
  if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
- else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
+ else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); alert('저장 실패 (price): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.'); }  
  if (!updateRowSyncClassOnly_(row, 'price')) renderPrice();  
  })  
- .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); if (!updateRowSyncClassOnly_(row, 'price')) renderPrice(); })  
+ .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); alert('저장 실패 (price): ' + err + '\n\n네트워크 또는 서버 권한 문제일 수 있습니다.'); if (!updateRowSyncClassOnly_(row, 'price')) renderPrice(); })  
  .savePriceRow(SESSION.token, { id: row.id, fields: fields });  
 }  
 function retrySavePrice(id){ const row = PRICE_ROWS.find(r => r.id === id); if (row) pushSavePrice(row); }  
@@ -11986,10 +11986,10 @@ function pushSaveRestart(row){
  google.script.run  
  .withSuccessHandler(function(res){  
  if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
- else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
+ else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); alert('저장 실패 (restart): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.'); }  
  if (!updateRowSyncClassOnly_(row, 'restart')) renderRestart();  
  })  
- .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); if (!updateRowSyncClassOnly_(row, 'restart')) renderRestart(); })  
+ .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); alert('저장 실패 (restart): ' + err + '\n\n네트워크 또는 서버 권한 문제일 수 있습니다.'); if (!updateRowSyncClassOnly_(row, 'restart')) renderRestart(); })  
  .saveRestartRow(SESSION.token, { id: row.id, fields: fields });  
 }  
 function retrySaveRestart(id){ const row = RESTART_ROWS.find(r => r.id === id); if (row) pushSaveRestart(row); }  
@@ -12686,11 +12686,14 @@ function pushSaveProductDaily(row){
         loadProductDailySummaryTarget_(function(){ renderProductDaily(); });
       } else { 
         row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); 
+        alert('저장 실패 (productdaily): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.');
         renderProductDaily();
       }  
     })  
     .withFailureHandler(function(err){ 
-      row._syncError = true; setSyncStatus('error', err); renderProductDaily(); 
+      row._syncError = true; setSyncStatus('error', err); 
+      alert('저장 실패 (productdaily): ' + err + '\n\n네트워크 또는 서버 권한 문제일 수 있습니다.');
+      renderProductDaily(); 
     })  
     .saveProductDailyRow(SESSION.token, { id: row.id, fields: fields });  
 }  
