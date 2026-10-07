@@ -10682,7 +10682,11 @@ function pushSave(row){
  EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('order'); }  
+ if (res && res.success) {
+   row._unsynced = false; row._syncError = false; setSyncStatus('ok');
+   alert('[임시 진단] 저장 응답 확인\n\n보낸 id: ' + row.id + '\n보낸 계약번호: ' + fields['계약번호'] + '\n서버 응답: ' + JSON.stringify(res));
+   onDataChanged_('order');
+ }
  else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); alert('저장 실패 (order): ' + (res && res.error ? res.error : '알 수 없는 오류') + '\n\n서버 권한(RLS) 문제일 수 있습니다. 관리자에게 문의하세요.'); }  
  if (!updateRowSyncClassOnly_(row, 'order')) render();  
  })  
