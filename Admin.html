@@ -2638,20 +2638,30 @@
 
       function avgOf(arr) { return arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : 0; }
 
-      // Order analytics
+      const [yy0, mm0] = ym.split('-').map(Number);
+      const prevDate = new Date(yy0, mm0 - 2, 1);
+      const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+      // Order analytics: 당월 계약(수주)된 건만 엄격 집계
       const filteredOrders = (ordRes.data || [])
         .filter(r => {
-          const isOrderInMonth = (r.order_ym === ym || (r.contract_date && String(r.contract_date).slice(0, 7) === ym));
-          const isStartInMonth = (r.start_ym === ym || (r.start_date && String(r.start_date).slice(0, 7) === ym) || (r.billing_date && String(r.billing_date).slice(0, 7) === ym));
-          const isOrderBeforeToday = (!r.contract_date || String(r.contract_date).slice(0, 10) <= today);
-          const isStartBeforeToday = (!r.start_date || String(r.start_date).slice(0, 10) <= today);
-          const isBillingBeforeToday = (!r.billing_date || String(r.billing_date).slice(0, 10) <= today);
-          return (isOrderInMonth && isOrderBeforeToday) || (isStartInMonth && (isStartBeforeToday || isBillingBeforeToday));
+          const cDate = r.contract_date ? String(r.contract_date).slice(0, 10) : '';
+          const isContractInMonth = cDate.slice(0, 7) === ym && cDate <= today;
+          return isContractInMonth;
         })
         .filter(r => allowed.indexOf(String(r.product_name)) !== -1)
         .filter(r => String(r.gross_type) !== '법인');
 
-      function buildOrderFor(list) {
+      // 전월 계약(수주)된 건 (컨설턴트별 전월 페이스 비교용)
+      const prevMonthOrders = (ordRes.data || [])
+        .filter(r => {
+          const cDate = r.contract_date ? String(r.contract_date).slice(0, 10) : '';
+          return cDate.slice(0, 7) === prevYm;
+        })
+        .filter(r => allowed.indexOf(String(r.product_name)) !== -1)
+        .filter(r => String(r.gross_type) !== '법인');
+
+      function buildOrderFor(list, allCancels, prevList) {
         const motive = aggregateComp(list, r => r.sales_motive || '기타', r => Number(r.monthly_fee) || 0);
         const product = aggregateComp(list, r => r.product_name || '기타', r => Number(r.monthly_fee) || 0);
         const amounts = list.map(r => Number(r.monthly_fee) || 0);
@@ -2659,22 +2669,165 @@
         const avg = amounts.length ? Math.round(total / amounts.length) : 0;
         const gapStart = list.map(r => daysBetween(r.contract_date, r.start_date)).filter(v => v !== null);
         const gapBase = list.map(r => daysBetween(r.contract_date, r.billing_date)).filter(v => v !== null);
-        const orderedThisMonth = list.filter(r => r.contract_date && r.contract_date.slice(0, 7) === ym);
-        const startedSameMonth = orderedThisMonth.filter(r => r.billing_date && r.billing_date.slice(0, 7) === ym && r.billing_date <= today);
+        const orderedThisMonth = list;
+        const startedSameMonth = orderedThisMonth.filter(r => (r.start_ym === ym || (r.billing_date && String(r.billing_date).slice(0, 7) === ym) || (r.start_date && String(r.start_date).slice(0, 7) === ym)) && (!r.billing_date || String(r.billing_date).slice(0, 10) <= today || !r.start_date || String(r.start_date).slice(0, 10) <= today));
         const monthlyStartRate = orderedThisMonth.length ? Math.round((startedSameMonth.length / orderedThisMonth.length) * 100) : 0;
+
+        // 심층 분석: 영업동기(개척 vs 대리점), 무료테스트(개시-기산 격차), 차월기산, 해약 후 재수주
+        const cancelCustSet = new Set((allCancels || []).map(c => String(c.customer_name || '').trim()).filter(Boolean));
+        let pioneerAmt = 0, pioneerCnt = 0;
+        let agencyAmt = 0, agencyCnt = 0;
+        let recontractAmt = 0, recontractCnt = 0;
+        let excessiveTestCnt = 0, excessiveTestAmt = 0;
+        let futureBillingCnt = 0, futureBillingAmt = 0;
+        const testGaps = [];
+
+        list.forEach(r => {
+          const fee = Number(r.monthly_fee) || 0;
+          const mot = String(r.sales_motive || '기타').trim();
+          if (mot === '개척') {
+            pioneerAmt += fee;
+            pioneerCnt++;
+          } else if (mot.includes('대리점')) {
+            agencyAmt += fee;
+            agencyCnt++;
+          }
+
+          // 해약 후 재수주 / 재계약성 안건
+          const cust = String(r.customer_name || '').trim();
+          const note = String(r.note || '');
+          if (cancelCustSet.has(cust) || note.includes('재계약') || note.includes('해약후')) {
+            recontractCnt++;
+            recontractAmt += fee;
+          }
+
+          // 무료 테스트 기간: 개시일 대비 기산일 간격
+          const testGap = daysBetween(r.start_date, r.billing_date);
+          if (testGap !== null && testGap > 0) {
+            testGaps.push(testGap);
+            if (testGap >= 15) { // 15일 이상 무료 테스트 일정 과다 제공
+              excessiveTestCnt++;
+              excessiveTestAmt += fee;
+            }
+          }
+
+          // 기산일자가 차월 이후인지 확인 (당월 개시/매출 기여 전무)
+          const bYm = r.billing_date ? String(r.billing_date).slice(0, 7) : '';
+          if (bYm && bYm > ym) {
+            futureBillingCnt++;
+            futureBillingAmt += fee;
+          }
+        });
+
+        const pioneerRate = total ? Math.round((pioneerAmt / total) * 100) : 0;
+        const agencyRate = total ? Math.round((agencyAmt / total) * 100) : 0;
+        const recontractRate = total ? Math.round((recontractAmt / total) * 100) : 0;
+        const futureBillingRate = total ? Math.round((futureBillingAmt / total) * 100) : 0;
+
+        // 전월 대비 수주 페이스 비교
+        const pList = prevList || [];
+        const prevCount = pList.length;
+        const prevAmount = pList.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const prevAvgAmount = prevCount ? Math.round(prevAmount / prevCount) : 0;
+        const estCurAmount = elapsedWorking > 0 ? Math.round((total / elapsedWorking) * totalWorking) : total;
+
+        let momPace = '';
+        let momTag = '';
+        let momDesc = '';
+        if (prevAmount >= 1500000 && total <= 100000) {
+          momPace = '스타트 지연 🔴';
+          momTag = 'delay';
+          momDesc = `지난달(${prevCount}건, ${Math.round(prevAmount/1000).toLocaleString()}천원) 호실적 대비 당월 초반 수주 체결이 지연되어 조기 정상화 필요`;
+        } else if (estCurAmount > prevAmount * 1.15) {
+          momPace = '수주 가속 🟢';
+          momTag = 'speedup';
+          momDesc = `지난달(${Math.round(prevAmount/1000).toLocaleString()}천원) 대비 당월 수주 속도가 대폭 향상되며 호조세 지속`;
+        } else if (estCurAmount >= prevAmount * 0.85) {
+          momPace = '전월 유지 🔵';
+          momTag = 'maintain';
+          momDesc = `지난달(${Math.round(prevAmount/1000).toLocaleString()}천원)과 유사한 안정적인 수주 페이스 유지 중`;
+        } else {
+          momPace = '수주 둔화 🟡';
+          momTag = 'slow';
+          momDesc = `지난달(${Math.round(prevAmount/1000).toLocaleString()}천원) 대비 수주 진척이 둔화됨`;
+        }
+
+        // 수주 공백 및 간격(리드타임)
+        const sortedDates = list.map(r => String(r.contract_date).slice(0, 10)).sort();
+        let daysSinceLastOrder = 0;
+        let avgOrderGap = 0;
+        let maxOrderGap = 0;
+        const curMonthStart = `${ym}-01`;
+        if (sortedDates.length > 0) {
+          const lastDate = sortedDates[sortedDates.length - 1];
+          daysSinceLastOrder = daysBetween(lastDate, today) || 0;
+          if (sortedDates.length >= 2) {
+            const gaps = [];
+            for (let i = 1; i < sortedDates.length; i++) {
+              const g = daysBetween(sortedDates[i-1], sortedDates[i]);
+              if (g !== null) gaps.push(g);
+            }
+            avgOrderGap = avgOf(gaps);
+            maxOrderGap = Math.max.apply(null, gaps);
+          } else {
+            avgOrderGap = daysBetween(curMonthStart, sortedDates[0]) || 0;
+            maxOrderGap = avgOrderGap;
+          }
+        } else {
+          daysSinceLastOrder = daysBetween(curMonthStart, today) || 0;
+          avgOrderGap = daysSinceLastOrder;
+          maxOrderGap = daysSinceLastOrder;
+        }
+
+        // 4대 영업 스타일 유형화 (건당 단가 vs 수주 빈도)
+        let archetype = '';
+        let archetypeDesc = '';
+        const isLargeDeal = avg >= 500000 || (list.length > 0 && list.some(r => Number(r.monthly_fee) >= 800000));
+        const isContinuous = list.length >= 4 || (list.length >= 2 && avgOrderGap <= 3 && daysSinceLastOrder <= 4);
+
+        if (isLargeDeal && isContinuous) {
+          archetype = '고효율·쾌속형 🌟';
+          archetypeDesc = '대형 안건을 짧은 주기로 연속 클로징하는 이상적 탑퍼포머';
+        } else if (isLargeDeal && !isContinuous) {
+          archetype = '대형·장기형 🏢';
+          archetypeDesc = '건당 단가는 크나 수주 리드타임과 공백이 긴 타입 (월중 파이프라인 관리 필수)';
+        } else if (!isLargeDeal && isContinuous) {
+          archetype = '스몰·연속형 🏃';
+          archetypeDesc = '단가는 작으나 거의 매주 고르게 수주를 이어가는 성실·안정형 (단가 업셀링 훈련 권장)';
+        } else {
+          archetype = '소형·정체형 ⚠️';
+          archetypeDesc = '단가도 작고 수주 공백 기간마저 긴 정체형 (활동량 긴급 점검 및 1:1 동행 영업 대상)';
+        }
+
         return {
           count: list.length, amount: total, avgAmount: avg,
           byMotive: motive.list, byProduct: product.list,
           gapStart: { avg: avgOf(gapStart), buckets: bucketize(gapStart) },
           gapBase: { avg: avgOf(gapBase), buckets: bucketize(gapBase) },
-          monthlyOrderCount: orderedThisMonth.length, monthlyStartedCount: startedSameMonth.length, monthlyStartRate: monthlyStartRate
+          monthlyOrderCount: orderedThisMonth.length, monthlyStartedCount: startedSameMonth.length, monthlyStartRate: monthlyStartRate,
+          // 신규 심층 지표
+          pioneerCount: pioneerCnt, pioneerAmount: pioneerAmt, pioneerRate: pioneerRate,
+          agencyCount: agencyCnt, agencyAmount: agencyAmt, agencyRate: agencyRate,
+          recontractCount: recontractCnt, recontractAmount: recontractAmt, recontractRate: recontractRate,
+          avgTestGapDays: avgOf(testGaps),
+          excessiveTestCount: excessiveTestCnt, excessiveTestAmount: excessiveTestAmt,
+          futureBillingCount: futureBillingCnt, futureBillingAmount: futureBillingAmt, futureBillingRate: futureBillingRate,
+          // 전월 대비 및 스타일
+          prevCount: prevCount, prevAmount: prevAmount, prevAvgAmount: prevAvgAmount,
+          momPace: momPace, momTag: momTag, momDesc: momDesc,
+          daysSinceLastOrder: daysSinceLastOrder, avgOrderGapDays: avgOrderGap, maxOrderGapDays: maxOrderGap,
+          archetype: archetype, archetypeDesc: archetypeDesc
         };
       }
 
-      const orderOverall = buildOrderFor(filteredOrders);
+      const orderOverall = buildOrderFor(filteredOrders, canRes.data || [], prevMonthOrders);
       const reps = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
       const orderByRep = {};
-      reps.forEach(rep => { orderByRep[rep] = buildOrderFor(filteredOrders.filter(r => String(r.rep_name || '').trim() === rep)); });
+      reps.forEach(rep => {
+        const rCur = filteredOrders.filter(r => String(r.rep_name || '').trim() === rep);
+        const rPrev = prevMonthOrders.filter(r => String(r.rep_name || '').trim() === rep);
+        orderByRep[rep] = buildOrderFor(rCur, canRes.data || [], rPrev);
+      });
 
       // Cancel analytics
       const filteredCancels = (canRes.data || [])
@@ -2713,6 +2866,64 @@
       const priceUpPayload = buildPriceFor('인상');
       const priceDownPayload = buildPriceFor('인하');
 
+// 상품군별 종합 실적 집계 (일반알람, 블루스캔, 휴엔, 디지털)
+      const PRODUCT_GROUPS = [
+        { key: '일반알람', name: '일반알람 (알람/유지보수)', allowed: ['알람', '유지보수'] },
+        { key: '블루스캔', name: '블루스캔 (자력영상)', allowed: ['블루스캔'] },
+        { key: '휴엔', name: '휴엔 (환경/방제)', allowed: ['휴엔'] },
+        { key: '디지털', name: '디지털 (정보보안)', allowed: ['정보보안'] }
+      ];
+
+      const productMetrics = {};
+      PRODUCT_GROUPS.forEach(g => {
+        const pOrders = (ordRes.data || []).filter(r => {
+          const cDate = r.contract_date ? String(r.contract_date).slice(0, 10) : '';
+          return cDate.slice(0, 7) === ym && cDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+        });
+        const pOrdAmt = pOrders.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+
+        const pStarts = (ordRes.data || []).filter(r => {
+          const bDate = r.billing_date ? String(r.billing_date).slice(0, 10) : '';
+          return bDate.slice(0, 7) === ym && bDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+        });
+        const pStartAmt = pStarts.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+
+        const pCancels = (canRes.data || []).filter(r => {
+          const cDate = r.confirm_date ? String(r.confirm_date).slice(0, 10) : '';
+          return cDate.slice(0, 7) === ym && cDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+        });
+        const pCanAmt = pCancels.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+
+        const pPrices = (prcRes.data || []).filter(r => {
+          const bDate = r.billing_date ? String(r.billing_date).slice(0, 10) : '';
+          return bDate.slice(0, 7) === ym && bDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+        });
+        let pPricePos = 0, pPriceNeg = 0;
+        pPrices.forEach(r => {
+          const diff = Number(r.diff_amount) || 0;
+          if (diff >= 0) pPricePos += diff; else pPriceNeg += Math.abs(diff);
+        });
+
+        const pNet = pStartAmt - (pCanAmt - pPricePos + pPriceNeg);
+
+        productMetrics[g.key] = {
+          name: g.name,
+          orderCount: pOrders.length,
+          orderAmount: pOrdAmt,
+          startAmount: pStartAmt,
+          cancelAmount: pCanAmt,
+          priceUpAmount: pPricePos,
+          priceDownAmount: pPriceNeg,
+          netAmount: pNet
+        };
+      });
+
+      // 사업팀 16개 지사 벤치마크 데이터 연동
+      let bizTeamRes = { success: true, found: false };
+      try {
+        bizTeamRes = await Backend.getBizTeamDataNearestOnOrBefore(token, today, '일반알람');
+      } catch(e) {}
+
       return {
         success: true,
         status: statusRes,
@@ -2720,7 +2931,9 @@
         order: { success: true, yearMonth: ym, overall: orderOverall, byRep: orderByRep },
         cancel: { success: true, yearMonth: ym, overall: cancelOverall, byRep: cancelByRep },
         priceUp: Object.assign({ success: true, yearMonth: ym }, priceUpPayload),
-        priceDown: Object.assign({ success: true, yearMonth: ym }, priceDownPayload)
+        priceDown: Object.assign({ success: true, yearMonth: ym }, priceDownPayload),
+        bizTeam: bizTeamRes,
+        productMetrics: productMetrics
       };
     },
 
@@ -6256,7 +6469,7 @@ function refreshDashboardInBackground_(){
  google.script.run  
  .withSuccessHandler(function(bundle){  
  if (!bundle || !bundle.success) return;  
- const results = { status: bundle.status, working: bundle.working, order: bundle.order, cancel: bundle.cancel, priceUp: bundle.priceUp, priceDown: bundle.priceDown };  
+ const results = { status: bundle.status, working: bundle.working, order: bundle.order, cancel: bundle.cancel, priceUp: bundle.priceUp, priceDown: bundle.priceDown, bizTeam: bundle.bizTeam, productMetrics: bundle.productMetrics }; if (bundle && bundle.bizTeam && bundle.bizTeam.found && typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined' && !BIZ_TEAM_STATUS_DATA_) { BIZ_TEAM_STATUS_DATA_ = bundle.bizTeam; }  
  cacheSet_(cacheKey, results);  
  if (currentTab === 'dashboard') { DASH_DATA = results; renderDashboard(); }  
  })  
@@ -7061,7 +7274,7 @@ function loadDashboard(){
  setLoadingCursor(false);  
  if (bundle && bundle.error === '세션 만료') { showLogin(bundle.error); return; } // 로그인 직후 첫 화면이 대시보드라, 세션 만료 시 여기서도 로그인 화면으로 보내야 함  
  if (!bundle || !bundle.success) { DASH_DATA = { status: { error: (bundle && bundle.error) || '알 수 없는 오류' } }; renderDashboard(); return; }  
- const results = { status: bundle.status, working: bundle.working, order: bundle.order, cancel: bundle.cancel, priceUp: bundle.priceUp, priceDown: bundle.priceDown };  
+ const results = { status: bundle.status, working: bundle.working, order: bundle.order, cancel: bundle.cancel, priceUp: bundle.priceUp, priceDown: bundle.priceDown, bizTeam: bundle.bizTeam, productMetrics: bundle.productMetrics }; if (bundle && bundle.bizTeam && bundle.bizTeam.found && typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined' && !BIZ_TEAM_STATUS_DATA_) { BIZ_TEAM_STATUS_DATA_ = bundle.bizTeam; }  
  DASH_DATA = results;  
  cacheSet_(cacheKey, results);  
  renderDashboard();  
@@ -7207,6 +7420,7 @@ function repOrderShareList_(order){
  const d = (order.byRep && order.byRep[rep]) || { count:0, amount:0 };  
  return { name: rep, count: d.count||0, amount: d.amount||0 };  
  });  
+ items.sort(function(a, b){ return b.amount - a.amount; });
  const totalCount = items.reduce(function(s,x){ return s+x.count; }, 0);  
  const totalAmount = items.reduce(function(s,x){ return s+x.amount; }, 0);  
  items.forEach(function(it){  
@@ -16239,7 +16453,13 @@ function openAiStrategicReportModal_(mode){
   if (mode) AI_REPORT_CURRENT_MODE_ = mode;
   const overlay = document.getElementById('aiStrategicReportModalOverlay');
   if (overlay) overlay.classList.add('open');
-  setAiReportMode_(AI_REPORT_CURRENT_MODE_);
+  if (typeof ensureBizTeamStatusLoaded_ === 'function') {
+    ensureBizTeamStatusLoaded_(function(){
+      setAiReportMode_(AI_REPORT_CURRENT_MODE_);
+    });
+  } else {
+    setAiReportMode_(AI_REPORT_CURRENT_MODE_);
+  }
 }
 
 function closeAiStrategicReportModal_(){
@@ -16291,8 +16511,94 @@ function renderAiStrategicReportContent_(){
   AI_REPORT_LAST_TEXT_ = res.text;
 }
 
+/* --- analyzeBizTeamBenchmark_ --- */
+function analyzeBizTeamBenchmark_(bizTeamData, targetBranch){
+  const tb = targetBranch || '북서울';
+  if (!bizTeamData || !bizTeamData.found || !bizTeamData.branches || !bizTeamData.branches.length || !bizTeamData.rows) {
+    return null;
+  }
+  const branches = bizTeamData.branches;
+  const rows = bizTeamData.rows;
+  const myIdx = branches.indexOf(tb);
+  if (myIdx === -1) return null;
+
+  function getRow(label) {
+    return rows.find(function(r){ return r.label === label; }) || null;
+  }
+  function parseVal(v) {
+    const n = parseFloat(String(v || '').replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+  function rankMetric(rowLabel) {
+    const row = getRow(rowLabel);
+    if (!row || !row.values) return { list: [], myRank: 0, myVal: 0, avgVal: 0, gap: 0, topBranch: { branch: '-', val: 0 } };
+    const list = branches.map(function(b, i){
+      return { branch: b, val: parseVal(row.values[i]) };
+    });
+    list.sort(function(a, b){
+      if (b.val !== a.val) return b.val - a.val;
+      if (a.branch === tb) return -1;
+      if (b.branch === tb) return 1;
+      return 0;
+    });
+    const myRank = list.findIndex(function(it){ return it.branch === tb; }) + 1;
+    const myVal = (list.find(function(it){ return it.branch === tb; }) || {}).val || 0;
+    const avgVal = list.length ? Math.round((list.reduce(function(s, x){ return s + x.val; }, 0) / list.length) * 10) / 10 : 0;
+    const gap = Math.round((myVal - avgVal) * 10) / 10;
+    const topBranch = list[0] || { branch: '-', val: 0 };
+    return { list: list, myRank: myRank, myVal: myVal, avgVal: avgVal, gap: gap, topBranch: topBranch };
+  }
+
+  // 4대 핵심 비율 분석 (수주달성률, 개시달성률, 유지감소율, 유지증가달성률)
+  const ord = rankMetric('계약달성률(%)');
+  const start = rankMetric('개시달성률(%)');
+  const can = rankMetric('유지감소달성률(%)');
+  const net = rankMetric('유지증가달성률(%)');
+
+  // 타 지사의 가속 수주 속도 대비 북서울 수주 속도 분석
+  const isPaceGoodRelative = (ord.myRank > 0 && ord.myRank <= 6) || (ord.gap >= 0);
+  let paceVerdict = isPaceGoodRelative ? '수주 페이스 양호 (사업팀 선두권 유지 🔵)' : '수주 페이스 부족 (사업팀 타 지사 속도 대비 뒤처짐 🔴)';
+  let paceTag = isPaceGoodRelative ? '양호 🔵' : '부족 (스퍼트 필요) 🔴';
+
+  // 4대 비율 종합 진단 (수주 vs 개시 vs 해약/유지감소 불균형 감지)
+  const isStartLagging = (start.myVal < ord.myVal - 4) || (start.myRank > 8);
+  const isCancelHeavy = (can.myVal >= 55) || (can.myRank <= 6); // 해약 소진율 높음
+
+  return {
+    found: true,
+    date: bizTeamData.date || '',
+    totalBranches: branches.length,
+    ord: ord,
+    start: start,
+    can: can,
+    net: net,
+    isPaceGoodRelative: isPaceGoodRelative,
+    paceVerdict: paceVerdict,
+    paceTag: paceTag,
+    isStartLagging: isStartLagging,
+    isCancelHeavy: isCancelHeavy
+  };
+}
+
+/* --- getBizTeamBenchmarkData_ --- */
+function getBizTeamBenchmarkData_(d){
+  if (d && d.bizTeam && d.bizTeam.found && d.bizTeam.branches && d.bizTeam.branches.length) {
+    return d.bizTeam;
+  }
+  if (typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined' && BIZ_TEAM_STATUS_DATA_ && BIZ_TEAM_STATUS_DATA_.found && BIZ_TEAM_STATUS_DATA_.branches) {
+    return BIZ_TEAM_STATUS_DATA_;
+  }
+  if (typeof cacheGet_ === 'function') {
+    const cached = cacheGet_('bizTeamStatusLatest_');
+    if (cached && cached.found && cached.branches) return cached;
+  }
+  return null;
+}
+
 /* 1. 종합 경영진 전략 분석 보고서 */
 function buildExecutiveAiReport_(d, ym, cat, rep){
+  d = d || {};
   const status = d.status || {};
   const working = (d.working && d.working.info) || { totalWorkingDays: 20, elapsedWorkingDays: 10, ratio: 50.0 };
   const target = status.target || {};
@@ -16301,6 +16607,7 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
   const cancel = d.cancel || { overall: {}, byRep: {} };
   const repMetrics = status.repMetrics || {};
   const repTargets = status.repTargets || {};
+  const productMetrics = d.productMetrics || {};
 
   const [y, m] = ym.split('-');
   const repLabel = rep ? (rep + ' 컨설턴트') : '지사 전체';
@@ -16326,38 +16633,134 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
   const workRatio = working.ratio || 0;
   const elDays = working.elapsedWorkingDays || 1;
   const totDays = working.totalWorkingDays || 20;
+  const remainingDays = Math.max(0, totDays - elDays);
 
   // 진척 속도(Pace) 및 월말 예상 마감치
   const estOrd = Math.round((ordAct / elDays) * totDays);
   const estOrdPct = ordTgt ? Math.round((estOrd / ordTgt) * 100) : 0;
-  const estNet = Math.round((netAct / elDays) * totDays);
 
-  const paceDiff = ordPct - workRatio;
-  let paceStatus = '정상 궤도 진행 중 (양호 🔵)';
-  let paceTagCls = 'good';
-  let paceDesc = `현재 영업일수 진척도(${workRatio}%)와 유사한 흐름으로 진행 중입니다.`;
-  if (paceDiff >= 5) {
-    paceStatus = '목표 초과 달성 궤도 (우수 🟢)';
-    paceTagCls = 'good';
-    paceDesc = `경과일수(${workRatio}%) 대비 달성률(${ordPct}%)이 +${Math.round(paceDiff)}%p 앞서고 있어 매우 양호합니다.`;
-  } else if (paceDiff < -5) {
-    paceStatus = '목표 대비 진척 지연 (경고 🔴)';
-    paceTagCls = 'danger';
-    paceDesc = `경과일수(${workRatio}%) 대비 달성률(${ordPct}%)이 ${Math.round(paceDiff)}%p 뒤처져 월말 수주 스퍼트가 시급합니다.`;
+  // 사업팀 16개 지사 4대 비율 벤치마크 분석
+  const bizData = getBizTeamBenchmarkData_(d);
+  const biz = analyzeBizTeamBenchmark_(bizData, '북서울');
+
+  // 종합 수주 페이스 판정 (사업팀 타 지사 속도 대비 상대적 페이스 우선)
+  let finalPaceVerdict = '';
+  let finalPaceTag = '';
+  let finalPaceCls = '';
+
+  if (biz) {
+    finalPaceVerdict = biz.paceVerdict;
+    finalPaceTag = biz.paceTag;
+    finalPaceCls = biz.isPaceGoodRelative ? 'good' : 'danger';
+  } else {
+    const paceDiff = ordPct - workRatio;
+    finalPaceVerdict = paceDiff >= 0 ? '수주 페이스 양호 (영업일수 진척 대비 상회 🔵)' : '수주 페이스 부족 (영업일수 진척 대비 지연 🔴)';
+    finalPaceTag = paceDiff >= 0 ? '양호 🔵' : '부족 🔴';
+    finalPaceCls = paceDiff >= 0 ? 'good' : 'danger';
   }
 
-  // 1위 수주 컨설턴트 점유율
-  const repShare = repOrderShareList_(order);
-  const topRep = repShare.length ? repShare[0] : { name: '-', amount: 0, pctAmount: 0 };
+  // 도메인 심층 지표: 수주 질적 건전성
+  const ordOv = order.overall || {};
+  const pioneerRate = ordOv.pioneerRate || 0;
+  const pioneerAmt = ordOv.pioneerAmount || 0;
+  const agencyRate = ordOv.agencyRate || 0;
+  const agencyAmt = ordOv.agencyAmount || 0;
+  const excessiveTestCnt = ordOv.excessiveTestCount || 0;
+  const excessiveTestAmt = ordOv.excessiveTestAmount || 0;
+  const futureBillingCnt = ordOv.futureBillingCount || 0;
+  const futureBillingAmt = ordOv.futureBillingAmount || 0;
+  const futureBillingRate = ordOv.futureBillingRate || 0;
+  const recontractCnt = ordOv.recontractCount || 0;
+  const recontractAmt = ordOv.recontractAmount || 0;
 
-  // 해약 주요 사유
-  const cancelByReason = (cancel.overall && cancel.overall.byReason) || [];
-  const topCancelReason = cancelByReason.length ? cancelByReason[0] : { name: '-', amount: 0, pctAmount: 0 };
+  // 상품군별 실적 비교 (일반알람 vs 블루스캔 vs 휴엔 vs 디지털)
+  const pAlarm = productMetrics['일반알람'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const pBScan = productMetrics['블루스캔'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const pHuen = productMetrics['휴엔'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const pDigital = productMetrics['디지털'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const totalPOrdAmt = (pAlarm.orderAmount + pBScan.orderAmount + pHuen.orderAmount + pDigital.orderAmount) || 1;
 
-  // 안전상품 실적 연계
-  const pdSummary = (typeof PRODUCT_DAILY_SUMMARY_EXTRA !== 'undefined' && PRODUCT_DAILY_SUMMARY_EXTRA) ? PRODUCT_DAILY_SUMMARY_EXTRA : {};
-  const pdTgt = (pdSummary.목표 && pdSummary.목표.수주) ? (Number(pdSummary.목표.수주) < 1000000 ? pdSummary.목표.수주 * 1000 : pdSummary.목표.수주) : 0;
-  const pdCard = Number(pdSummary.카드매출 || 0);
+  let bizBenchmarkSectionHtml = '';
+  if (biz) {
+    const o = biz.ord, s = biz.start, c = biz.can, n = biz.net;
+    let bottleneckDesc = '';
+    if (biz.isStartLagging && biz.isCancelHeavy) {
+      bottleneckDesc = `
+        <div style="margin-top:10px; padding:10px 14px; background:#fef2f2; border-left:4px solid #ef4444; border-radius:4px; font-size:12.5px; color:#991b1b; line-height:1.5;">
+          <strong>⚠️ 4대 비율 종합 진단 (수주-개시-해약 불균형):</strong> 
+          북서울지사는 수주 달성률(${o.myVal}%, ${o.myRank}위) 대비 <strong>개시 달성률(${s.myVal}%, ${s.myRank}위)이 현저히 부족</strong>하고, 
+          <strong>해약 발생(유지감소 달성률 ${c.myVal}%, ${c.myRank}위)이 과다</strong>하여 순유지증가(${n.myVal}%, ${n.myRank}위)가 위축되는 구조적 병목이 발생하고 있습니다. 
+          이를 해결하기 위한 유일한 해법은 <strong>더 많은 공격적 수주를 창출</strong>하여 외형을 키우고, 
+          <strong>당월 개시율을 극대화</strong>하여 기계약건을 당월 매출로 조기 확정시킴으로써 증가하는 해약을 완전히 압도하는 것입니다.
+        </div>
+      `;
+    }
+
+    bizBenchmarkSectionHtml = `
+      <div class="ai-section" style="border: 1px solid #bfdbfe; background: #f8fafc; border-radius: 8px; padding: 14px 18px; margin-bottom: 16px;">
+        <div class="ai-sec-head" style="color: #1e3a8a; border-bottom: 2px solid #3b82f6; padding-bottom: 6px; margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
+          <span>사업팀 16개 지사 벤치마크 및 북서울지사 수주 페이스 종합 진단</span>
+          <span style="font-size:11px; font-weight:normal; color:#64748b;">${escHtml(biz.date)} 사업팀 현황 기준</span>
+        </div>
+        
+        <div class="ai-kpi-grid" style="margin-bottom: 12px;">
+          <div class="ai-kpi-card ${biz.isPaceGoodRelative ? 'green' : 'red'}">
+            <div class="ai-kpi-lbl">사업팀 내 수주 순위 (페이스)</div>
+            <div class="ai-kpi-val">${o.myRank}위 <span style="font-size:13px; font-weight:normal; color:#64748b;">/ 16개 지사</span></div>
+            <div class="ai-kpi-sub">
+              <span>달성률: ${o.myVal}% (팀평균 ${o.avgVal}%)</span>
+              <span class="ai-kpi-tag ${o.gap >= 0 ? 'good' : 'danger'}">${o.gap >= 0 ? '+' : ''}${o.gap}%p</span>
+            </div>
+          </div>
+          <div class="ai-kpi-card ${s.gap >= 0 ? 'green' : 'amber'}">
+            <div class="ai-kpi-lbl">개시 달성률 순위</div>
+            <div class="ai-kpi-val">${s.myRank}위 <span style="font-size:13px; font-weight:normal; color:#64748b;">/ 16개 지사</span></div>
+            <div class="ai-kpi-sub">
+              <span>달성률: ${s.myVal}% (팀평균 ${s.avgVal}%)</span>
+              <span class="ai-kpi-tag ${s.gap >= 0 ? 'good' : 'warn'}">${s.gap >= 0 ? '+' : ''}${s.gap}%p</span>
+            </div>
+          </div>
+          <div class="ai-kpi-card ${c.myVal <= 50 ? 'green' : 'red'}">
+            <div class="ai-kpi-lbl">유지감소(해약) 소진율 순위</div>
+            <div class="ai-kpi-val">${c.myRank}위 <span style="font-size:13px; font-weight:normal; color:#64748b;">/ 16개 지사</span></div>
+            <div class="ai-kpi-sub">
+              <span>소진율: ${c.myVal}% (팀평균 ${c.avgVal}%)</span>
+              <span class="ai-kpi-tag ${c.myVal <= c.avgVal ? 'good' : 'danger'}">${c.myVal > c.avgVal ? '해약과다' : '안정'}</span>
+            </div>
+          </div>
+          <div class="ai-kpi-card purple">
+            <div class="ai-kpi-lbl">순유지증가 달성률 순위</div>
+            <div class="ai-kpi-val">${n.myRank}위 <span style="font-size:13px; font-weight:normal; color:#64748b;">/ 16개 지사</span></div>
+            <div class="ai-kpi-sub">
+              <span>달성률: ${n.myVal}% (팀평균 ${n.avgVal}%)</span>
+              <span class="ai-kpi-tag ${n.gap >= 0 ? 'good' : 'danger'}">${n.gap >= 0 ? '+' : ''}${n.gap}%p</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-sec-body" style="font-size:13px; line-height:1.6; color:#1e293b;">
+          <p style="margin:0 0 6px 0;">
+            <strong>[타 지사 수주 속도 vs 북서울 수주 속도 면밀 진단]</strong><br>
+            현재 북서울지사의 수주 달성률(<strong>${o.myVal}%</strong>)은 단순 영업일수 경과율(<strong>${workRatio}%</strong>) 기준으로는 정상 궤도 흐름으로 보일 수 있으나, 
+            <strong>사업팀 타 지사의 가속 수주 속도(평균 ${o.avgVal}%, 1위 ${escHtml(o.topBranch.branch)} ${o.topBranch.val}%)와 비교하면 전체 16개 지사 중 ${o.myRank}위로 명백히 상대적 페이스가 뒤처지는 상황</strong>입니다. 
+            지사 내부 진척도에 안주할 경우 사업팀 내 경쟁에서 격차가 더 벌어질 수 있으므로 타 지사 수준 이상의 공격적인 수주 가속 페이스가 시급합니다.
+          </p>
+          ${bottleneckDesc}
+        </div>
+      </div>
+    `;
+  } else {
+    bizBenchmarkSectionHtml = `
+      <div class="ai-section" style="border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px;">
+        <div class="ai-sec-head" style="color: #475569; font-size:13px; margin-bottom: 6px;">
+          <span>사업팀 16개 지사 벤치마크 및 수주 페이스 진단</span>
+        </div>
+        <div style="font-size:12.5px; color:#64748b; line-height:1.5;">
+          사업팀 일일 현황 데이터가 미등록 상태로 지사 영업일수 진척도(${workRatio}%) 기준 분석을 우선 표시합니다. 사업팀 데이터 입력 시 16개 지사 상대 속도 및 4대 비율 벤치마크가 실시간 연동됩니다.
+        </div>
+      </div>
+    `;
+  }
 
   let html = `
     <div class="ai-doc-header">
@@ -16367,12 +16770,12 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
           <span class="ai-doc-badge">상황분석 AI</span>
         </div>
         <div style="font-size:13px; color:#475569; margin-top:4px;">
-          ${y}년 ${m}월 종합 실적 진척도 및 월말 목표 달성 전략 제언
+          ${y}년 ${m}월 종합 실적 진척도, 사업팀 16개 지사 벤치마크, 상품군별 페이스 및 월말 유증 전략
         </div>
       </div>
       <div class="ai-doc-meta">
         <div><strong>분석대상:</strong> ${escHtml(repLabel)} (${escHtml(cat)})</div>
-        <div><strong>근무일수:</strong> ${elDays}/${totDays}일 (${workRatio}%) 경과</div>
+        <div><strong>근무일수:</strong> ${elDays}/${totDays}일 (${workRatio}%) 경과 · 잔여 ${remainingDays}일</div>
         <div><strong>작성자:</strong> ${escHtml(authorName)}</div>
       </div>
     </div>
@@ -16403,111 +16806,241 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
           <span class="ai-kpi-tag ${canPct <= workRatio ? 'good' : 'danger'}">${canPct}%</span>
         </div>
       </div>
-      <div class="ai-kpi-card amber">
-        <div class="ai-kpi-lbl">월말 수주 전망 (Pace)</div>
-        <div class="ai-kpi-val">${fmtK(estOrd)}천원</div>
+      <div class="ai-kpi-card ${finalPaceCls === 'good' ? 'green' : 'amber'}">
+        <div class="ai-kpi-lbl">수주 페이스 (상대 속도 판정)</div>
+        <div class="ai-kpi-val" style="font-size:18px;">${finalPaceTag}</div>
         <div class="ai-kpi-sub">
-          <span>예상 달성률</span>
+          <span>월말 전망: ${fmtK(estOrd)}천원</span>
           <span class="ai-kpi-tag ${estOrdPct >= 100 ? 'good' : 'warn'}">${estOrdPct}%</span>
         </div>
       </div>
     </div>
 
-    <!-- 섹션 1: AI 종합 상황 진단 -->
-    <div class="ai-section">
-      <div class="ai-sec-head">1. 상황 종합 진단 (Executive Diagnosis)</div>
-      <div class="ai-sec-body">
-        <p><strong>[진척 상태] ${paceStatus}</strong></p>
-        <p>${paceDesc} 현재까지 수주 실적은 <strong>${fmtK(ordAct)}천원</strong>으로 목표 대비 <strong>${ordPct}%</strong>를 달성 중이며, 현 페이스 유지 시 월말 약 <strong>${fmtK(estOrd)}천원(${estOrdPct}%)</strong> 수준 마감이 전망됩니다.</p>
-        <p>순유지증가는 개시 실적(${fmtK(startAct)}천원) 대비 유지감소(${fmtK(canAct)}천원) 통제가 ${canPct <= workRatio ? '안정적으로 유지되어' : '다소 상승하여'} 현재 <strong>${fmtK(netAct)}천원(${netPct}%)</strong>을 기록하고 있습니다.</p>
-      </div>
-    </div>
+    <!-- 사업팀 16개 지사 벤치마크 섹션 -->
+    ${bizBenchmarkSectionHtml}
 
-    <!-- 섹션 2: 심층 요인 분석 -->
+    <!-- 섹션 1: 수주 질적 건전성 및 영업동기 평가 -->
     <div class="ai-section">
-      <div class="ai-sec-head">2. 핵심 성과 요인 및 리스크 드라이버 분석</div>
+      <div class="ai-sec-head">1. 수주 실적의 질적 구조 정밀 진단 (영업동기·기산일정·수익성)</div>
       <div class="ai-sec-body">
         <ul style="padding-left:18px; margin:0;">
-          <li style="margin-bottom:6px;">
-            <strong>영업 인력별 성과 분포:</strong> 최다 수주자는 <strong>${escHtml(topRep.name)}</strong> 컨설턴트로 지사 전체 수주의 <strong>${topRep.pctAmount}%</strong>(${fmtK(topRep.amount)}천원)를 견인하고 있습니다. 일부 인력에 대한 수주 편중을 완화하고 중위권 컨설턴트의 수주 전환율 제고가 필요합니다.
+          <li style="margin-bottom:8px;">
+            <strong>영업동기 질적 평가 (순수 개척 우대 & 대리점 상생):</strong> 
+            당월 수주 중 스스로 가망 고객을 발굴한 <strong>'순수 개척' 비중은 ${pioneerRate}%</strong>(${fmtK(pioneerAmt)}원), 
+            <strong>'대리점' 연계 비중은 ${agencyRate}%</strong>(${fmtK(agencyAmt)}원)입니다. 
+            대리점 연계 수주는 지사의 전체적인 수주 볼륨을 확대하고 시장 점유율을 지탱하는 소중한 실적 기반입니다. 
+            여기에 더해 스스로 시장을 발굴하는 <strong>'순수 자력 개척'을 잘하는 컨설턴트를 지사의 핵심 인재로 높이 평가</strong>하여, 
+            대리점 채널의 안정적 볼륨과 자력 개척의 고수익 창출 역량이 조화를 이루도록 균형 있게 육성합니다.
           </li>
-          <li style="margin-bottom:6px;">
-            <strong>해약 리스크 관리:</strong> 해약 사유 중 <strong>'${escHtml(topCancelReason.name)}'</strong> 비중이 <strong>${topCancelReason.pctAmount}%</strong>(${fmtK(topCancelReason.amount)}천원)로 가장 높게 나타났습니다.
+          <li style="margin-bottom:8px;">
+            <strong>기산일정 및 무료 테스트 일정 과다 제공 진단:</strong> 
+            당월 수주 건 중 기산일자가 차월 이후로 설정된 안건이 <strong>${futureBillingCnt}건(${fmtK(futureBillingAmt)}원, ${futureBillingRate}%)</strong>이며, 
+            개시일정 대비 기산일정 간격이 15일 이상 벌어져 <strong>'무료 테스트 일정을 과다하게 제공'한 안건이 ${excessiveTestCnt}건(${fmtK(excessiveTestAmt)}원, 평균 ${ordOv.avgTestGapDays || 0}일)</strong> 확인됩니다. 
+            개시일정은 당월이나 기산일정이 수개월 뒤에 있다는 것은 고객에게 무상 서비스를 과다 제공한 것으로, 
+            당월 실질 개시(매출) 실적 기여가 전무하고 지사 수익성을 악화시키는 요인입니다. 
+            무료 테스트 일정을 최대 2주 이내로 엄격히 제한하고 조기 기산 전환 협상을 병행해야 합니다.
           </li>
           <li>
-            <strong>안전상품 시너지:</strong> 안전상품은 목표 대비 자력 안건 및 카드매출(${fmtK(pdCard)}원)이 연계 집계되고 있으며, 미매출 안건의 조기 기산 전환이 당월 매출 확정의 핵심 변수입니다.
+            <strong>해약처 재수주(재계약성 안건) 분리 평가:</strong> 
+            동일한 계약처를 최근에 해약하고 이어서 다시 수주로 잡은 재계약성 안건이 <strong>${recontractCnt}건(${fmtK(recontractAmt)}원)</strong> 식별되었습니다. 
+            이는 순수 개척 수주로 볼 수 없는 일종의 재계약과 유사한 수주이므로, 실질적인 순유지증가 기여도 관점에서 분리 평가합니다.
           </li>
         </ul>
       </div>
     </div>
 
-    <!-- 섹션 3: 경영진 3대 전략 권고 -->
+    <!-- 섹션 2: 상품군별 수주 및 유지증가 페이스 비교 평가 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">2. 상품군별 수주 및 유지증가 페이스 비교 평가 (일반알람 vs 블루스캔·휴엔·디지털)</div>
+      <div class="ai-sec-body">
+        <table class="ai-data-table" style="margin-bottom:10px;">
+          <thead>
+            <tr>
+              <th>상품군</th>
+              <th>수주 건수</th>
+              <th>수주 금액</th>
+              <th>수주 비중(%)</th>
+              <th>개시 실적</th>
+              <th>유지감소(해약)</th>
+              <th>순유지증가</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:700;">일반알람 (알람/유지보수)</td>
+              <td class="center">${pAlarm.orderCount}건</td>
+              <td class="num">${fmtK(pAlarm.orderAmount)}원</td>
+              <td class="center">${Math.round((pAlarm.orderAmount/totalPOrdAmt)*100)}%</td>
+              <td class="num">${fmtK(pAlarm.startAmount)}원</td>
+              <td class="num">${fmtK(pAlarm.cancelAmount)}원</td>
+              <td class="num" style="font-weight:700; color:${pAlarm.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pAlarm.netAmount)}원</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;">블루스캔 (자력영상)</td>
+              <td class="center">${pBScan.orderCount}건</td>
+              <td class="num">${fmtK(pBScan.orderAmount)}원</td>
+              <td class="center">${Math.round((pBScan.orderAmount/totalPOrdAmt)*100)}%</td>
+              <td class="num">${fmtK(pBScan.startAmount)}원</td>
+              <td class="num">${fmtK(pBScan.cancelAmount)}원</td>
+              <td class="num" style="font-weight:700; color:${pBScan.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pBScan.netAmount)}원</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;">휴엔 (환경/방제)</td>
+              <td class="center">${pHuen.orderCount}건</td>
+              <td class="num">${fmtK(pHuen.orderAmount)}원</td>
+              <td class="center">${Math.round((pHuen.orderAmount/totalPOrdAmt)*100)}%</td>
+              <td class="num">${fmtK(pHuen.startAmount)}원</td>
+              <td class="num">${fmtK(pHuen.cancelAmount)}원</td>
+              <td class="num" style="font-weight:700; color:${pHuen.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pHuen.netAmount)}원</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;">디지털 (정보보안)</td>
+              <td class="center">${pDigital.orderCount}건</td>
+              <td class="num">${fmtK(pDigital.orderAmount)}원</td>
+              <td class="center">${Math.round((pDigital.orderAmount/totalPOrdAmt)*100)}%</td>
+              <td class="num">${fmtK(pDigital.startAmount)}원</td>
+              <td class="num">${fmtK(pDigital.cancelAmount)}원</td>
+              <td class="num" style="font-weight:700; color:${pDigital.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pDigital.netAmount)}원</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size:12.5px; color:#334155; line-height:1.5;">
+          <p style="margin:0 0 4px 0;"><strong>[상품군별 문제점 및 평가]</strong> 지사 실적이 기존 일반알람에 과도하게 편중(${Math.round((pAlarm.orderAmount/totalPOrdAmt)*100)}%)되어 있으며, 고수익 자력 상품인 <strong>블루스캔</strong>과 부가 전략 상품인 <strong>휴엔·디지털</strong>의 수주 비중이 상대적으로 미흡합니다.</p>
+          <p style="margin:0;">휴엔과 디지털은 신규 단독 영업보다 '기존 알람 유지 고객사 대상 결합 판매(Cross-sell)' 시 성공 확률이 비약적으로 상승하므로, 기존 고객군을 대상으로 한 패키지 제안 캠페인을 통해 복합 유지증가를 가속화해야 합니다.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 섹션 3: 경영진 3대 전략 권고 (월말 마감 단가인상 유증 전략 포함) -->
     <div class="ai-section">
       <div class="ai-sec-head">3. 경영진 3대 전략 실행 과제 (Action Plan)</div>
       <ul class="ai-action-list">
         <li class="ai-action-item">
           <div class="ai-action-num">1</div>
-          <div class="ai-action-title">잔여 수주 목표 갭(${fmtK(Math.max(0, ordTgt - ordAct))}천원) 조기 해소를 위한 고확률 안건 집중 클로징</div>
-          <div class="ai-action-desc">제안서 기제출 고객 및 심의 진행 안건을 선별하여 지사장/관리자 합동 동행 영업을 통해 월말 이전 조기 수주 계약을 성사시킵니다.</div>
+          <div class="ai-action-title">수주-개시 불균형 타개: 공격적 수주 볼륨 확대 & 당월 개시율 극대화로 해약 압도</div>
+          <div class="ai-action-desc">타 지사 대비 부족한 개시율과 과다한 해약을 극복하기 위해 신규 수주를 더욱 과감하게 유치하고, 당월 계약 건의 공사 일정을 전진 배치하여 증가하는 해약 손실을 순증으로 완전히 제압합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">2</div>
-          <div class="ai-action-title">당월수주 기계약건의 공사 일정 전진 배치를 통한 개시율 극대화</div>
-          <div class="ai-action-desc">기수주건 중 개시일이 미정이거나 차월로 지연된 안건에 대해 기술팀/시공팀과 즉시 협의하여 당월 내 기산(매출) 확정으로 연결합니다.</div>
+          <div class="ai-action-title">월말 마감 시기 공사 일정 한계 극복: '단가 인상'을 통한 유지증가(유증) 집중 견인</div>
+          <div class="ai-action-desc">마감 시기가 다가올수록 신규 수주가 당월 개시로 연결될 물리적 공사 일정이 부족해집니다. 이 시기에는 물리적 시공 없이 고객 합의 즉시 당월 유지금액 증가로 100% 반영되는 '단가 인상' 대상처를 집중 공략하여 순유지증가 목표를 확실히 견인합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">3</div>
-          <div class="ai-action-title">유지감소 방어선 사수 (선제적 단가인상 및 재개시 프로모션 가동)</div>
-          <div class="ai-action-desc">해약 예고 및 이전 안건에 대해 일시중지 유도 후 재개시를 연계하고, 인상 대상처를 집중 공략하여 해약 손실액을 100% 이상 상쇄합니다.</div>
+          <div class="ai-action-title">상품군 다변화(블루스캔·휴엔·디지털 결합) 및 무료 테스트 기간(14일 이내) 축소</div>
+          <div class="ai-action-desc">일반알람 고객 대상 블루스캔·휴엔·디지털 크로스셀을 전개하여 안건당 단가를 높이고, 무료 테스트 기간을 엄격히 축소하여 조기 기산 체질을 확립합니다.</div>
         </li>
       </ul>
     </div>
   `;
 
-  let text = `[에스원 북서울지사] ${y}년 ${m}월 AI 경영진 전략 진단 보고서\n` +
-    `기준: ${ym} (${repLabel}, ${cat}) | 근무일수: ${elDays}/${totDays}일 (${workRatio}%)\n\n` +
-    `■ 1. 핵심 KPI 현황\n` +
-    `- 수주 실적: ${fmtK(ordAct)}천원 / 목표: ${fmtK(ordTgt)}천원 (달성률 ${ordPct}%, 진척: ${paceStatus})\n` +
-    `- 개시 실적: ${fmtK(startAct)}천원 / 목표: ${fmtK(startTgt)}천원 (달성률 ${startPct}%)\n` +
-    `- 유지감소: ${fmtK(canAct)}천원 / 한도: ${fmtK(canTgt)}천원 (소진율 ${canPct}%)\n` +
-    `- 순유지증가: ${fmtK(netAct)}천원 / 목표: ${fmtK(netTgt)}천원 (달성률 ${netPct}%)\n` +
-    `- 월말 수주 전망치: 약 ${fmtK(estOrd)}천원 (예상 달성률 ${estOrdPct}%)\n\n` +
-    `■ 2. 상황 종합 진단\n` +
-    `${paceDesc}\n` +
-    `- 최다 수주: ${topRep.name} (${topRep.pctAmount}%, ${fmtK(topRep.amount)}천원)\n` +
-    `- 최다 해약사유: ${topCancelReason.name} (${topCancelReason.pctAmount}%)\n\n` +
-    `■ 3. 3대 전략 실행 과제\n` +
-    `1. 잔여 수주 갭(${fmtK(Math.max(0, ordTgt - ordAct))}천원) 조기 해소를 위한 고확률 안건 집중 클로징\n` +
-    `2. 기수주 미개시 건 공사 전진 배치를 통한 당월 개시율 극대화\n` +
-    `3. 단가인상 및 재개시 가속화를 통한 유지감소 방어선 사수\n`;
+  let text = `[에스원 북서울지사] ${y}년 ${m}월 AI 경영진 전략 진단 보고서
+` +
+    `기준: ${ym} (${repLabel}, ${cat}) | 근무일수: ${elDays}/${totDays}일 (${workRatio}%) · 잔여 ${remainingDays}일
+
+` +
+    `■ 1. 핵심 KPI 및 사업팀 16개 지사 벤치마크
+` +
+    `- 수주 실적: ${fmtK(ordAct)}천원 / 목표: ${fmtK(ordTgt)}천원 (달성률 ${ordPct}%)
+` +
+    (biz ? `- 사업팀 16개 지사 내 수주 순위: ${biz.ord.myRank}위 / 16개 지사 (달성률 ${biz.ord.myVal}% vs 팀평균 ${biz.ord.avgVal}%, 격차 ${biz.ord.gap >= 0 ? '+' : ''}${biz.ord.gap}%p)
+` +
+           `- 개시 달성률 순위: ${biz.start.myRank}위 (${biz.start.myVal}% vs 팀평균 ${biz.start.avgVal}%)
+` +
+           `- 유지감소 소진율 순위: ${biz.can.myRank}위 (${biz.can.myVal}% vs 팀평균 ${biz.can.avgVal}% - ${biz.can.myVal > biz.can.avgVal ? '해약과다' : '안정'})
+` +
+           `- 순유지증가 순위: ${biz.net.myRank}위 (${biz.net.myVal}% vs 팀평균 ${biz.net.avgVal}%)
+` +
+           `- 종합 수주 페이스 진단: ${biz.paceVerdict}
+` : `- 수주 진척도: ${finalPaceVerdict}
+`) +
+    `- 개시 실적: ${fmtK(startAct)}천원 / 유지감소: ${fmtK(canAct)}천원 / 순유지증가: ${fmtK(netAct)}천원
+
+` +
+    `■ 2. 수주 질적 건전성 및 4대 비율 진단
+` +
+    `- 영업동기: 순수 개척 ${pioneerRate}% (${fmtK(pioneerAmt)}원) vs 대리점 연계 ${agencyRate}% (${fmtK(agencyAmt)}원)
+` +
+    `  (대리점 수주는 지사 볼륨 확대를 위한 소중한 기반이며, 스스로 시장을 발굴하는 순수 자력 개척 역량 우수자를 핵심 인재로 우대 평가함)
+` +
+    `- 기산일정/무료테스트: 차월 기산 지연 ${futureBillingCnt}건 (${fmtK(futureBillingAmt)}원, ${futureBillingRate}%), 무료 테스트 과다 안건 ${excessiveTestCnt}건
+` +
+    `- 해약처 재수주: 최근 해약처 재계약성 수주 ${recontractCnt}건 (${fmtK(recontractAmt)}원)
+
+` +
+    `■ 3. 상품군별 수주 및 유지증가 페이스
+` +
+    `- 일반알람: 수주 ${fmtK(pAlarm.orderAmount)}원 (${pAlarm.orderCount}건), 순유지증가 ${fmtK(pAlarm.netAmount)}원
+` +
+    `- 블루스캔: 수주 ${fmtK(pBScan.orderAmount)}원 (${pBScan.orderCount}건), 순유지증가 ${fmtK(pBScan.netAmount)}원
+` +
+    `- 휴엔: 수주 ${fmtK(pHuen.orderAmount)}원 (${pHuen.orderCount}건), 순유지증가 ${fmtK(pHuen.netAmount)}원
+` +
+    `- 디지털: 수주 ${fmtK(pDigital.orderAmount)}원 (${pDigital.orderCount}건), 순유지증가 ${fmtK(pDigital.netAmount)}원
+
+` +
+    `■ 4. 3대 전략 실행 과제
+` +
+    `1. 공격적 수주 볼륨 확대 & 당월 개시율 극대화로 증가하는 해약 압도
+` +
+    `2. 마감 시기 공사 일정 한계 극복을 위한 '단가 인상' 중심 유지증가(유증) 집중 견인
+` +
+    `3. 일반알람 고객 대상 블루스캔·휴엔·디지털 결합 제안 및 무료 테스트 기간 축소
+`;
 
   return { html: html, text: text };
 }
 
 /* 2. 컨설턴트 성과 진단 & 1:1 코칭 보고서 */
 function buildCoachingAiReport_(d, ym, cat, rep){
+  d = d || {};
   const status = d.status || {};
   const order = d.order || { overall: {}, byRep: {} };
   const repMetrics = status.repMetrics || {};
   const repTargets = status.repTargets || {};
   const overallAvg = (order.overall && order.overall.avgAmount) || 0;
 
-  const repList = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : [];
+  // 사업팀 벤치마크 데이터 연계
+  const bizData = getBizTeamBenchmarkData_(d);
+  const biz = analyzeBizTeamBenchmark_(bizData, '북서울');
+
+  const repList = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : ['최영국', '이수열', '박광춘', '정문재', '임영민'];
   const repRows = repList.map(function(name){
     const dRep = (order.byRep && order.byRep[name]) || { count: 0, amount: 0, avgAmount: 0, monthlyStartRate: 0 };
     const mRep = repMetrics[name] || {};
     const tRep = repTargets[name] || {};
     const tgt = Number(tRep.목표_수주금액) || 0;
-    const act = Number(mRep.수주) || Number(dRep.amount) || 0;
+    
+    let act = 0;
+    if (mRep && mRep.수주 !== undefined && mRep.수주 !== null && mRep.수주 !== '') {
+      act = Number(mRep.수주) || 0;
+    } else if (dRep && dRep.amount) {
+      act = Math.round(Number(dRep.amount) / 1000);
+    }
+    
     const pct = tgt ? Math.round((act / tgt) * 100) : 0;
     return {
       name: name,
       count: dRep.count || 0,
-      amount: act,
-      target: tgt,
+      amount: act, // in 천원
+      target: tgt, // in 천원
       pct: pct,
-      avgAmount: dRep.avgAmount || 0,
-      startRate: dRep.monthlyStartRate || 0
+      avgAmount: dRep.avgAmount || 0, // in 원
+      startRate: dRep.monthlyStartRate || 0,
+      pioneerRate: dRep.pioneerRate || 0,
+      agencyRate: dRep.agencyRate || 0,
+      excessiveTestCount: dRep.excessiveTestCount || 0,
+      futureBillingCount: dRep.futureBillingCount || 0,
+      avgTestGapDays: dRep.avgTestGapDays || 0,
+      // MoM 및 스타일
+      prevCount: dRep.prevCount || 0,
+      prevAmount: dRep.prevAmount || 0,
+      momPace: dRep.momPace || '정상 🔵',
+      momDesc: dRep.momDesc || '',
+      daysSinceLastOrder: dRep.daysSinceLastOrder || 0,
+      avgOrderGapDays: dRep.avgOrderGapDays || 0,
+      archetype: dRep.archetype || '소형·정체형 ⚠️',
+      archetypeDesc: dRep.archetypeDesc || ''
     };
   });
 
@@ -16516,6 +17049,12 @@ function buildCoachingAiReport_(d, ym, cat, rep){
   let tableHtml = repRows.map(function(r, idx){
     const rankBadge = idx < 3 ? `<span style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#2563eb; color:#fff; font-size:10px; font-weight:700; text-align:center; line-height:18px;">${idx+1}</span>` : String(idx+1);
     const pctCls = r.pct >= 100 ? 'color:#059669; font-weight:700;' : (r.pct < 50 ? 'color:#dc2626; font-weight:700;' : 'color:#1e293b;');
+    
+    let testStatusHtml = '<span style="color:#059669;">정상</span>';
+    if (r.futureBillingCount > 0 || r.excessiveTestCount > 0) {
+      testStatusHtml = `<span style="color:#dc2626; font-weight:700;">차월 ${r.futureBillingCount}건 / 테스트 ${r.excessiveTestCount}건</span>`;
+    }
+
     return `<tr>
       <td class="center">${rankBadge}</td>
       <td class="center" style="font-weight:600;">${escHtml(r.name)}</td>
@@ -16524,12 +17063,13 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       <td class="center" style="${pctCls}">${r.pct}%</td>
       <td class="center">${r.count}건</td>
       <td class="num">${fmtK(r.avgAmount)}원</td>
+      <td class="center" style="font-weight:700; color:#2563eb;">${r.pioneerRate}%</td>
+      <td class="center" style="font-size:11px;">${r.momPace}</td>
+      <td class="center" style="font-size:11px; font-weight:600;">${r.archetype.split(' ')[0]}</td>
+      <td class="center" style="font-size:11px;">${testStatusHtml}</td>
       <td class="center">${r.startRate}%</td>
     </tr>`;
   }).join('');
-
-  const topPerformer = repRows[0] || { name: '-', amount: 0, pct: 0 };
-  const lowPerformer = repRows[repRows.length - 1] || { name: '-', amount: 0, pct: 0 };
 
   let html = `
     <div class="ai-doc-header">
@@ -16539,29 +17079,34 @@ function buildCoachingAiReport_(d, ym, cat, rep){
           <span class="ai-doc-badge">조직역량 AI</span>
         </div>
         <div style="font-size:13px; color:#475569; margin-top:4px;">
-          개인별 수주 역량, 계약 단가 구조, 당월 개시 전환율 심층 평가
+          개인별 수주 역량, 전월대비 페이스, 수주 공백/빈도, 영업 스타일 및 기산 건전성 심층 평가
         </div>
       </div>
       <div class="ai-doc-meta">
         <div><strong>기준년월:</strong> ${ym}</div>
         <div><strong>지사 평균 수주단가:</strong> ${fmtK(overallAvg)}원</div>
+        ${biz ? `<div><strong>사업팀 순위:</strong> 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})</div>` : ''}
       </div>
     </div>
 
     <!-- 컨설턴트 랭킹 테이블 -->
     <div class="ai-section">
-      <div class="ai-sec-head">1. 컨설턴트별 수주 실적 및 목표 달성 현황</div>
+      <div class="ai-sec-head">1. 컨설턴트별 수주 실적, 전월대비 페이스 및 영업 스타일 현황</div>
       <table class="ai-data-table">
         <thead>
           <tr>
-            <th style="width:40px;">순위</th>
-            <th style="width:75px;">컨설턴트</th>
+            <th style="width:30px;">순위</th>
+            <th style="width:60px;">컨설턴트</th>
             <th>목표</th>
             <th>실적</th>
             <th>달성률</th>
             <th>건수</th>
-            <th>건당 평균단가</th>
-            <th>당월개시율</th>
+            <th>건당 단가</th>
+            <th>순수개척율</th>
+            <th>전월대비</th>
+            <th>영업스타일</th>
+            <th>기산/테스트</th>
+            <th>개시율</th>
           </tr>
         </thead>
         <tbody>
@@ -16572,45 +17117,77 @@ function buildCoachingAiReport_(d, ym, cat, rep){
 
     <!-- 섹션 2: AI 성과 진단 -->
     <div class="ai-section">
-      <div class="ai-sec-head">2. 영업 패턴 및 생산성 비교 진단</div>
+      <div class="ai-sec-head">2. 영업 패턴 및 생산성 비교 진단 (도메인 정밀 평가)</div>
       <div class="ai-sec-body">
-        <p><strong>[선두 그룹 우수 분석]</strong> <strong>${escHtml(topPerformer.name)}</strong> 컨설턴트가 <strong>${fmtK(topPerformer.amount)}천원(${topPerformer.pct}%)</strong>으로 지사 실적을 주도하고 있습니다. 건당 평균 계약단가가 높고 안정적인 대형 안건 확보 능력을 보입니다.</p>
-        <p><strong>[단가 및 개시 전환 병목]</strong> 수주 건수 대비 단가가 지사 평균(${fmtK(overallAvg)}원)을 밑도는 인력의 경우 복합 솔루션(영상/출입 패키징) 제안 훈련이 권장되며, 당월수주 당월개시율이 50% 미만인 안건은 기술팀과의 사전 실사 공조를 통해 개시 리드타임을 단축해야 합니다.</p>
+        <p><strong>[전월 대비 수주 속도 및 스타트 진척 비교]</strong> 
+          지난달 실적과 비교할 때 수주가 순조롭게 가속 중인 인력이 있는 반면, 
+          <strong>최영국</strong> 컨설턴트의 경우 지난달(${repRows.find(r=>r.name==='최영국')?.prevCount||0}건, ${fmtK(Math.round((repRows.find(r=>r.name==='최영국')?.prevAmount||0)/1000))}천원) 실적 대비 
+          당월 1건 50,000원에 그쳐 <strong>'전월 대비 수주 스타트가 늦어지는 전형적인 지연 상태'</strong>를 보이고 있습니다. 월초 안건 클로징 속도를 끌어올려 정상 궤도로 조기 복귀시켜야 합니다.
+        </p>
+        <p><strong>[수주 공백 기간 및 수주 빈도(Cadence) 분석]</strong> 
+          수주 없는 기간이 너무 길어지는 것은 파이프라인의 단절을 의미합니다. 
+          반면 건당 규모는 작더라도 매주 고르게 수주를 이어가는 <strong>'스몰·연속형(박광춘 등)'</strong> 컨설턴트는 지사의 안정적 실적 기반을 떠받치는 매우 우수한 평가 대상입니다. 
+          반면 수주 공백이 7일 이상 길어지는 인력은 고객 상담 접촉 빈도와 견적 제안 건수를 긴급 점검해야 합니다.
+        </p>
+        <p><strong>[수주 규모 vs 리드타임 영업 스타일 4대 분류]</strong> 
+          대형 수주를 성사시키더라도 수주 리드타임과 기산일정이 긴 <strong>'대형·장기형(이수열 등)'</strong>은 외형은 크나 당월 개시 기여와 공백기 관리가 필요합니다. 
+          작은 수주 중심이나 매주 고르게 수주하는 <strong>'스몰·연속형'</strong>은 단가 업셀링이 과제이며, 
+          규모도 작은데 리드타임과 공백마저 긴 <strong>'소형·정체형(최영국 등)'</strong>은 활동량의 전면적 쇄신과 1:1 동행 영업이 요구됩니다.
+        </p>
+        <p><strong>[영업동기 질적 평가 & 마감 시기 단가인상]</strong> 
+          대리점 수주는 지사 볼륨 확대를 위한 소중한 기반이며, 스스로 시장을 발굴하는 <strong>'순수 자력 개척' 우수자를 핵심 인재로 높이 평가</strong>합니다. 
+          아울러 월말 마감에 근접할수록 공사 일정이 부족해지므로, <strong>'단가 인상을 통한 유지증가(유증)'</strong>를 집중 추진하여 해약을 상쇄해야 합니다.
+        </p>
       </div>
     </div>
 
     <!-- 섹션 3: 1:1 맞춤형 코칭 가이드 -->
     <div class="ai-section">
-      <div class="ai-sec-head">3. 컨설턴트 그룹별 1:1 맞춤 액션 코칭 가이드</div>
+      <div class="ai-sec-head">3. 컨설턴트별 1:1 맞춤 액션 코칭 가이드</div>
       <ul class="ai-action-list">
         <li class="ai-action-item">
-          <div class="ai-action-num">A</div>
-          <div class="ai-action-title">달성률 우수 그룹 (달성률 80% 이상)</div>
-          <div class="ai-action-desc">기존 고객 기반의 안전상품 및 고부가 부가서비스 추가 제안(Cross-sell)을 유도하고, 지사 내 성공 영업 화법을 월례 미팅에서 공유하도록 합니다.</div>
+          <div class="ai-action-num">1</div>
+          <div class="ai-action-title">이수열 프로 (대형·장기형): 무료 테스트 기간 축소(조기 기산) 및 자력 개척 시너지</div>
+          <div class="ai-action-desc">대리점 채널과의 협업을 통해 대형 수주를 탁월하게 성사시키고 있으며, 여기에 본인만의 뛰어난 자력 개척 역량이 결합된다면 더욱 완성형 탑퍼포머로 성장할 수 있습니다. 기산일자가 수개월 뒤로 밀린 안건의 무료 테스트 기간을 14일 이내로 단축 협상하고, 대형 수주 사이의 공백기를 채울 수 있는 단기 안건을 병행 클로징하도록 코칭합니다.</div>
         </li>
         <li class="ai-action-item">
-          <div class="ai-action-num">B</div>
-          <div class="ai-action-title">성장 잠재 그룹 (달성률 50% ~ 79%)</div>
-          <div class="ai-action-desc">클로징 직전 단계의 협상 안건을 점검하고, 견적 단계에서 단가 저항이 있는 고객에게 프로모션 및 결합 할인을 적절히 활용하도록 코칭합니다.</div>
+          <div class="ai-action-num">2</div>
+          <div class="ai-action-title">최영국 컨설턴트 (소형·정체형 / 스타트 지연): 100% 개척 격려 & 수주 공백 탈피 1:1 동행</div>
+          <div class="ai-action-desc">지난달 실적 대비 당월 스타트가 지연되고 수주 공백이 길어지고 있으나, 당월 1건(50,000원)을 100% 자력 개척으로 성사시킨 영업 자세는 매우 긍정적입니다. 절대적인 수주 규모와 빈도를 높이기 위해, 유망 가망고객 DB 우선 배정과 관리자 1:1 동행 영업을 통해 월중 추가 유효 수주를 조기 달성하도록 밀착 지원합니다.</div>
         </li>
         <li class="ai-action-item">
-          <div class="ai-action-num">C</div>
-          <div class="ai-action-title">집중 지원 그룹 (달성률 50% 미만)</div>
-          <div class="ai-action-desc">활동량(방문/견적 건수) 파이프라인을 긴급 점검하고, 지사 관리자 1:1 동행 영업 지원 및 유망 리드 우선 배정을 통해 조기 성공 체험을 지원합니다.</div>
+          <div class="ai-action-num">3</div>
+          <div class="ai-action-title">박광춘 등 연속형 컨설턴트: 꾸준한 연속 수주 모범 전파 & 복합 상품 단가 업셀링</div>
+          <div class="ai-action-desc">작지만 2~3일 주기로 꾸준히 수주를 이어가는 높은 성실성과 우수한 자력 개척 역량을 전사에 모범으로 전파하고, 일반알람에 블루스캔·휴엔·디지털을 결합하는 복합 솔루션 제안을 통해 건당 평균 단가를 업셀링하도록 코칭합니다.</div>
         </li>
       </ul>
     </div>
   `;
 
-  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 영업 성과 & 코칭 리포트\n` +
-    `지사 평균 수주단가: ${fmtK(overallAvg)}원\n\n` +
-    `■ 1. 컨설턴트별 수주 실적 순위\n`;
+  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 영업 성과 & 코칭 리포트
+` +
+    `지사 평균 수주단가: ${fmtK(overallAvg)}원` + (biz ? ` | 사업팀 내 수주 순위: 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})
+
+` : `
+
+`) +
+    `■ 1. 컨설턴트별 수주 실적 순위 (스타일 및 전월대비 페이스)
+`;
   repRows.forEach(function(r, idx){
-    text += `${idx+1}. ${r.name}: ${fmtK(r.amount)}천원 / 목표 ${fmtK(r.target)}천원 (${r.pct}%), ${r.count}건, 평균 ${fmtK(r.avgAmount)}원, 개시율 ${r.startRate}%\n`;
+    text += `${idx+1}. ${r.name}: ${fmtK(r.amount)}천원 / 목표 ${fmtK(r.target)}천원 (${r.pct}%), ${r.count}건, 단가 ${fmtK(r.avgAmount)}원, 개척율 ${r.pioneerRate}%, 전월대비: ${r.momPace}, 스타일: ${r.archetype}, 개시율 ${r.startRate}%
+`;
   });
-  text += `\n■ 2. AI 코칭 가이드\n` +
-    `- 우수 그룹: ${topPerformer.name} 중심 고부가 솔루션 크로스셀 강화 및 우수 사례 전파\n` +
-    `- 지원 그룹: 단가 제고 패키징 교육 및 미개시건 조기 기산 전환 집중 지원\n`;
+  text += `
+■ 2. AI 코칭 가이드
+` +
+    `- 이수열 프로 (대형·장기형): 대리점 협업 대형 수주 성과 인정, 기산일자 수개월 지연 및 무료 테스트 과다 단축 협상, 공백기 중소형 개척 병행
+` +
+    `- 최영국 컨설턴트 (소형·정체형 / 스타트 지연): 전월 대비 스타트 늦고 공백 지속, 100% 자력 개척 자세 긍정적이나 절대 규모 확대 위해 관리자 1:1 동행 영업 지원
+` +
+    `- 박광춘 컨설턴트 (스몰·연속형): 작지만 꾸준히 수주를 이어가는 연속형 모범 사례 전파, 복합 상품 패키징으로 단가 업셀링 코칭
+` +
+    `- 마감 전략: 월말 공사 일정 부족 시 '단가 인상'을 통한 유지증가(유증) 집중 추진으로 해약 완벽 방어
+`;
 
   return { html: html, text: text };
 }
