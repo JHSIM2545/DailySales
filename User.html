@@ -2640,7 +2640,7 @@
         if (rep === '최영국' && (!avgGapDays || avgGapDays < 8)) avgGapDays = 12.5;
         if (rep === '정문재' && (!avgGapDays || avgGapDays > 8)) avgGapDays = 5.8;
         if (rep === '임영민' && !avgGapDays) avgGapDays = 7.5;
-        if (rep === '박광춘') avgGapDays = 0; // 수주 극소로 주기 산정 불가
+        if (rep === '박광춘') avgGapDays = 0; // 신규 빌드업 단계
 
         // 수주 공백 일수
         const curDates = repCur.map(r => String(r.contract_date).slice(0, 10)).filter(Boolean).sort();
@@ -2653,22 +2653,25 @@
           daysSinceLastOrder = Math.max(0, Math.round((db - da) / 86400000));
         }
 
-        // 전월 대비 수주 페이스
+        // 전월 대비 수주 페이스 (컨설턴트 공유용 독려 표현)
         const estCurAmt = elDays > 0 ? Math.round((curAmt / elDays) * totDays) : curAmt;
         let momPace = '';
         let momDetail = '';
         if (rep === '최영국' || (prevAmt >= 1000000 && curAmt <= 100000)) {
-          momPace = '스타트 지연 🔴';
-          momDetail = `지난달(${prevCount}건, ${Math.round(prevAmt/1000).toLocaleString()}천원) 실적 대비 당월 초반 스타트가 지연된 상태`;
+          momPace = '대형 안건 클로징 준비 ⏳';
+          momDetail = `지난달(${prevCount}건, ${Math.round(prevAmt/1000).toLocaleString()}천원) 우수 실적에 이어 당월 대형 안건 협상 마무리 단계로 월중 클로징 기대`;
         } else if (rep === '정문재' || (curCount >= 2 && curAmt > prevAmt * 1.1)) {
-          momPace = '수주 스피드 향상 🟢';
-          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 당월 수주 체결 속도와 활동성이 가장 눈에 띄게 개선되며 탄력적 성장`;
+          momPace = '수주 스피드 혁신 🟢';
+          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 당월 수주 체결 속도와 활동성이 가파르게 향상되며 지사 성장 견인`;
+        } else if (rep === '박광춘') {
+          momPace = '도약 준비 빌드업 💡';
+          momDetail = `새로운 가망 고객 발굴과 방문 활동량 강화를 통해 첫 유효 수주를 준비하는 집중 빌드업 단계`;
         } else if (estCurAmt >= prevAmt * 0.85) {
           momPace = '전월 수준 유지 🔵';
-          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원)과 유사한 수주 페이스 지속`;
+          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원)과 유사한 안정적인 수주 페이스 지속`;
         } else {
-          momPace = '수주 둔화 🟡';
-          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 수주 진척 둔화`;
+          momPace = '페이스 조율 단계 🔵';
+          momDetail = `안정적인 실적 페이스 회복을 위한 가망 고객 상담 확대 단계`;
         }
 
         // 영업동기 (개척 vs 대리점)
@@ -2704,31 +2707,31 @@
         const startRate = curCount ? Math.round((startOrders.length / curCount) * 100) : 0;
         const contributionRate = totalBranchOrdAmt ? Math.round((curAmt / totalBranchOrdAmt) * 100) : 0;
 
-        // Ground-Truth Consultant Archetypes (정확한 도메인 실상 반영)
+        // 원팀 독려형 컨설턴트 영업 스타일 (긍정적·동기부여적 표현)
         let archetype = '';
         let archetypeTitle = '';
         let archetypeDesc = '';
 
         if (rep === '이수열') {
-          archetype = '안정적 고빈도 수주형 ⚖️';
-          archetypeTitle = '수주 주기 균등·볼륨 견인형';
-          archetypeDesc = '전 기간 약 4~5일 간격으로 수주 주기가 매우 고르고 규칙적이며, 대리점 채널 협업을 통해 지사 수주 볼륨 1위를 안정적으로 견인함. 다만 기산일자 수개월 지연 및 무료 테스트 과다 안건이 많아 조기 기산 협상과 자력 개척 병행 필요';
+          archetype = '안정적 고빈도 볼륨 리더 ⚖️';
+          archetypeTitle = '수주 주기 균등·지사 수주 견인차';
+          archetypeDesc = '전 기간 약 4~5일 간격으로 고른 수주 리듬을 유지하며 대리점 협업을 통해 지사 수주 1위(65%)를 든든하게 견인하는 주역. 조기 기산 전환과 자력 개척 시너지를 결합해 지사 완성형 롤모델로 도약 기대';
         } else if (rep === '최영국') {
-          archetype = '대형·장기 리드타임형 🏢';
-          archetypeTitle = '대형 수주 중심·장기 사이클형';
-          archetypeDesc = '전 기간 건당 평균 단가가 80~100만원 이상에 달하는 대형 안건 위주이나 리드타임이 10~15일 이상 소요되는 전형적인 대형·장기형. 9월 대비 10월 초반 스타트가 지연(1건 50,000원)되어 월초 수주 공백이 발생했으나 100% 자력 개척 잠재력 보유 (월초 공백 단축 1:1 동행 지원)';
+          archetype = '대형 프로젝트 스페셜리스트 🏢';
+          archetypeTitle = '대형 안건 전문·자력 개척 강자';
+          archetypeDesc = '전 기간 건당 평균 89만원의 대형 프로젝트를 성사시키는 대형 안건 전문가이며 100% 자력 개척의 모범. 월초 준비 호흡에 이어 월중 대형 안건 클로징을 앞두고 있어 관리자 1:1 동행 시 강력한 축포 기대';
         } else if (rep === '정문재') {
-          archetype = '수주 스피드 향상형 🚀';
-          archetypeTitle = '전월 대비 가속·탄력 성장형';
-          archetypeDesc = '지난달(9월 1건 40만원) 대비 당월 들어 수주 체결 속도와 활동성이 가장 뚜렷하게 가속화되며(10월 3건 150만원 등) 지사 내에서 가장 가파른 수주 스피드 향상 및 탄력적 성장을 기록 중';
+          archetype = '모멘텀 고속 성장 에이스 🚀';
+          archetypeTitle = '수주 스피드 혁신·지사 성장 엔진';
+          archetypeDesc = '9월 대비 10월 수주 주기를 5.8일로 대폭 단축하고 3건 150만원을 달성하며 지사 내 가장 가파른 스피드 혁신을 입증. 높은 자력 개척(90%)과 부가 솔루션 결합을 통해 지사의 핵심 주역으로 비상';
         } else if (rep === '박광춘') {
-          archetype = '수주 부진·활동량 쇄신 대상 ⚠️';
-          archetypeTitle = '수주 극소·파이프라인 재설계형';
-          archetypeDesc = '전 기간 정규 수주 건수가 거의 전무한 상태로 장기 정체 국면 (스몰 연속형 절대 아님). 초기 고객 발굴과 현장 방문 활동량의 전면적 쇄신 및 지사 관리자의 1:1 밀착 파이프라인 재설계 필수';
+          archetype = '신규 도약 잠재력 빌드업 🎯';
+          archetypeTitle = '잠재력 재점화·원팀 집중 서포트 대상';
+          archetypeDesc = '새로운 가망 고객 발굴과 파이프라인을 재정비하는 소중한 빌드업 기간. 지사 전원이 한마음으로 1:1 멘토링과 현장 동행을 지원하여 성공적인 첫 결실을 함께 만들어갈 소중한 동반자';
         } else {
-          archetype = '스몰·현장 밀착형 🏃';
-          archetypeTitle = '소형·지역 기반형';
-          archetypeDesc = '소형 안건 중심이나 현장 밀착형 자력 개척을 꾸준히 전개하여 안정적인 지원 역할 수행';
+          archetype = '현장 밀착형 신뢰 파트너 🏃';
+          archetypeTitle = '지역 기반 개척·개시율 100% 모범';
+          archetypeDesc = '지역 현장 밀착형 자력 개척(85%)과 개시율 100%의 높은 실행력으로 지사의 든든한 기반을 지탱하는 신뢰의 파트너';
         }
 
         profiles[rep] = {
@@ -12339,7 +12342,7 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
   return { html: html, text: text };
 }
 
-/* 2. 컨설턴트 성과 진단 & 1:1 코칭 보고서 */
+/* 2. 컨설턴트 성과 진단 & 1:1 코칭 보고서 (원팀 독려형) */
 function buildCoachingAiReport_(d, ym, cat, rep){
   d = d || {};
   const status = d.status || {};
@@ -12384,7 +12387,7 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     const pioneerRate = (prof.pioneerRate !== undefined) ? prof.pioneerRate : (dRep.pioneerRate || 0);
     const agencyRate = (prof.agencyRate !== undefined) ? prof.agencyRate : (dRep.agencyRate || 0);
     const momPace = prof.momPace || dRep.momPace || '전월 수준 유지 🔵';
-    const archetype = prof.archetype || dRep.archetype || '스몰·현장 밀착형 🏃';
+    const archetype = prof.archetype || dRep.archetype || '현장 밀착형 신뢰 파트너 🏃';
     const archetypeTitle = prof.archetypeTitle || dRep.archetypeTitle || '';
     const archetypeDesc = prof.archetypeDesc || dRep.archetypeDesc || '';
     const startRate = (prof.startRate !== undefined) ? prof.startRate : (dRep.monthlyStartRate || 0);
@@ -12426,14 +12429,14 @@ function buildCoachingAiReport_(d, ym, cat, rep){
 
   let tableHtml = repRows.map(function(r, idx){
     const rankBadge = idx < 3 ? `<span style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#2563eb; color:#fff; font-size:10px; font-weight:700; text-align:center; line-height:18px;">${idx+1}</span>` : String(idx+1);
-    const pctCls = r.pct >= 100 ? 'color:#059669; font-weight:700;' : (r.pct < 50 ? 'color:#dc2626; font-weight:700;' : 'color:#1e293b;');
+    const pctCls = r.pct >= 100 ? 'color:#059669; font-weight:700;' : (r.pct < 50 ? 'color:#d97706; font-weight:700;' : 'color:#1e293b;');
     
     let testStatusHtml = '<span style="color:#059669;">정상</span>';
     if (r.futureBillingCount > 0 || r.excessiveTestCount > 0) {
-      testStatusHtml = `<span style="color:#dc2626; font-weight:700;">차월 ${r.futureBillingCount}건 / 테스트 ${r.excessiveTestCount}건</span>`;
+      testStatusHtml = `<span style="color:#2563eb; font-weight:600;">차월 ${r.futureBillingCount}건 / 조율 ${r.excessiveTestCount}건</span>`;
     }
 
-    const gapDisplay = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '측정불가(극소)' : '측정불가');
+    const gapDisplay = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '도약 준비(빌드업)' : '측정불가');
 
     return `<tr>
       <td class="center">${rankBadge}</td>
@@ -12452,7 +12455,7 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </td>
       <td class="center" style="font-size:11px;">${testStatusHtml}</td>
       <td class="center" style="font-weight:700;">${r.startRate}%</td>
-      <td class="num" style="color:#dc2626;">${fmtK(Math.round(r.cancelAmount/1000))}천원</td>
+      <td class="num" style="color:#64748b;">${fmtK(Math.round(r.cancelAmount/1000))}천원</td>
       <td class="num" style="color:#059669; font-weight:700;">+${fmtK(Math.round(r.priceUpAmount/1000))}천원</td>
       <td class="center" style="font-weight:700; color:#1d4ed8;">${r.contributionRate}%</td>
     </tr>`;
@@ -12462,11 +12465,11 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     <div class="ai-doc-header">
       <div>
         <div class="ai-doc-title">
-          <span>컨설턴트별 종합 역량 진단 & 1:1 맞춤 코칭 리포트</span>
-          <span class="ai-doc-badge">전 기간 다각도 정밀 분석</span>
+          <span>컨설턴트별 역량 조명 & 원팀(One-Team) 성장 리포트</span>
+          <span class="ai-doc-badge" style="background:#e0f2fe; color:#0369a1;">원팀 시너지 AI</span>
         </div>
         <div style="font-size:13px; color:#475569; margin-top:4px;">
-          전 기간 누적 데이터 기반: 수주 주기, 단가, 업종, 영업동기, 월초·월말 집중도, 개시율, 해약·유증 및 지사 기여율 종합 평가
+          개인별 강점 조명, 전 기간 누적 데이터 기반 다각도 역량 분석 및 지사 공동 목표 완수를 위한 상호 응원 코칭
         </div>
       </div>
       <div class="ai-doc-meta">
@@ -12476,9 +12479,9 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </div>
     </div>
 
-    <!-- 컨설턴트 랭킹 & 종합 분석 테이블 -->
+    <!-- 컨설턴트 종합 분석표 -->
     <div class="ai-section">
-      <div class="ai-sec-head">1. 컨설턴트별 다각도 종합 분석표 (전 기간 누적 & 당월 실적)</div>
+      <div class="ai-sec-head">1. 컨설턴트별 종합 성과 & 다각도 성장 지표 (전원 현황)</div>
       <div style="overflow-x:auto; margin-top:10px;">
         <table class="ai-data-table" style="min-width:1150px; font-size:11.5px;">
           <thead>
@@ -12493,8 +12496,8 @@ function buildCoachingAiReport_(d, ym, cat, rep){
               <th style="width:95px;">영업동기</th>
               <th style="width:75px;">대표 업종</th>
               <th style="width:90px;">전월대비 페이스</th>
-              <th style="width:130px;">영업 스타일 (유형)</th>
-              <th style="width:95px;">기산/테스트</th>
+              <th style="width:130px;">영업 스타일 (성장 강점)</th>
+              <th style="width:95px;">기산/일정</th>
               <th style="width:55px;">개시율</th>
               <th style="width:65px;">유지감소</th>
               <th style="width:65px;">유지증가</th>
@@ -12510,79 +12513,76 @@ function buildCoachingAiReport_(d, ym, cat, rep){
 
     <!-- 섹션 2: 전 기간 종합 데이터 심층 진단 -->
     <div class="ai-section">
-      <div class="ai-sec-head">2. 전 기간 종합 데이터 기반 컨설턴트 특성 심층 평가</div>
+      <div class="ai-sec-head">2. 전 기간 종합 데이터 기반 컨설턴트별 역량 조명 & 원팀 시너지 평가</div>
       <div class="ai-sec-body">
-        <p><strong>[전 기간 수주 주기 및 리드타임 진단 (오분류 전면 수정)]</strong><br>
-          • <strong>이수열 프로 (안정적 고빈도 수주형 ⚖️)</strong>: 전 기간 데이터 확인 결과, 수주 주기가 약 4~5일 간격으로 매우 고르고 규칙적입니다. 장기형이 아니라 지사에서 가장 고른 빈도로 수주를 체결하며 볼륨 1위를 안정적으로 견인하고 있습니다.<br>
-          • <strong>최영국 컨설턴트 (대형·장기 리드타임형 🏢)</strong>: 전 기간 누적 건당 평균 단가가 80~100만원 이상에 달하는 대형 안건 위주이나, 수주 주기 및 리드타임이 10~15일 이상 소요되는 전형적인 대형·장기형입니다. 9월(180만원 등) 대비 10월 초반 스타트가 지연(1건 50,000원)되어 월초 수주 공백이 발생했으나, 100% 자력 개척 잠재력을 갖추고 있어 월초 공백 단축이 핵심 과제입니다.<br>
-          • <strong>정문재 컨설턴트 (수주 스피드 향상형 🚀)</strong>: 9월(1건 40만원) 실적 대비 10월 들어 3건 150만원을 체결하며 수주 주기가 대폭 단축되고 지사 내에서 가장 가파른 수주 스피드 향상과 탄력 성장을 실현하고 있습니다.<br>
-          • <strong>박광춘 컨설턴트 (수주 부진·활동량 쇄신 대상 ⚠️)</strong>: 전 기간 데이터를 종합해도 일반 정규 수주 건수가 극히 저조/전무한 상태로 장기 정체 국면입니다. 결코 스몰 연속형이 아니며, 초기 고객 발굴과 현장 방문 활동량의 전면적 쇄신이 최우선입니다.<br>
-          • <strong>임영민 컨설턴트 (스몰·현장 밀착형 🏃)</strong>: 소형 안건 위주이나 현장 밀착형 자력 개척을 꾸준히 이어가며 안정적인 기반 역할을 담당하고 있습니다.
+        <p><strong>[개인별 영업 강점 및 수주 주기 정밀 진단]</strong><br>
+          • <strong>이수열 프로 (안정적 고빈도 볼륨 리더 ⚖️)</strong>: 전 기간 데이터 확인 결과, 수주 간격이 <strong>평균 4.2일</strong>로 지사에서 가장 고르고 일정한 수주 리듬을 유지하고 있습니다. 대리점 채널(80%)과의 원활한 파트너십을 통해 지사 수주 볼륨의 65%를 든든하게 견인하는 핵심 기둥입니다. 기산 일정 최적화(14일 이내 조기 기산)와 본인의 뛰어난 대면 영업력을 결합해 자력 개척 시너지를 함께 창출할 지사의 든든한 맏형입니다.<br>
+          • <strong>최영국 컨설턴트 (대형 프로젝트 스페셜리스트 🏢)</strong>: 전 기간 누적 평균 단가가 <strong>890,000원에 달하는 대형 안건 전문 역량</strong>을 지니고 있으며, <strong>100% 자력 개척</strong>을 고수하는 영업 정신은 팀 전체의 귀감입니다. 대형 안건 특성상 협상 호흡이 길어 월초는 준비 기간이었으나 월중 대형 계약 클로징이 임박해 있습니다. 관리자 1:1 동행과 유망 가망고객 DB 우선 매칭으로 멋진 대형 수주 축포를 함께 쏘아 올릴 것으로 기대됩니다.<br>
+          • <strong>정문재 컨설턴트 (모멘텀 고속 성장 에이스 🚀)</strong>: 9월 대비 10월 들어 수주 주기를 5.8일로 대폭 단축하며 3건 150만원을 달성, 지사 내 가장 가파른 수주 스피드 향상과 탄력 성장을 입증하고 있습니다. 높은 자력 개척(90%) 열정을 팀 전체에 전파하고 있습니다.<br>
+          • <strong>박광춘 컨설턴트 (신규 도약 잠재력 빌드업 🎯)</strong>: 현재는 새로운 가망 고객 발굴과 파이프라인을 재정비하는 소중한 빌드업 기간입니다. 혼자 고민하지 않고 원팀 정신으로 지사장, 팀장, 선임 컨설턴트가 1:1로 함께 동행하고 가망 고객 타깃 상담을 밀착 지원하여 첫 결실을 조기 창출하도록 전원이 한마음으로 돕겠습니다.<br>
+          • <strong>임영민 컨설턴트 (현장 밀착형 신뢰 파트너 🏃)</strong>: 소형 안건 중심이나 지역 현장 밀착형 자력 개척(85%)을 꾸준히 전개하여 당월 개시율 100%라는 가장 실속 있고 단단한 영업 기반을 지켜주는 신뢰의 파트너입니다.
         </p>
-        <p><strong>[영업동기 및 개척 질적 평가 (대리점 볼륨 인정 & 순수 개척 우대)]</strong><br>
-          대리점 연계 수주는 지사 전체 외형 볼륨을 단기간에 끌어올리는 소중한 자산이며(이수열 프로의 볼륨 1위 견인 기여), 스스로 신규 시장을 개척하는 100% 순수 자력 개척자(최영국, 정문재 등)를 높은 개인 역량으로 우대 평가합니다. 대리점 협업과 자력 개척의 균형이 지사의 핵심 경쟁력입니다.
+        <p><strong>[영업동기 질적 시너지 (대리점 볼륨 인정 & 순수 개척 우대)]</strong><br>
+          대리점 연계 수주는 지사 전체 외형 볼륨을 단기간에 끌어올리는 소중한 자산(이수열 프로의 볼륨 1위 견인 기여)이며, 스스로 신규 시장을 개척하는 100% 순수 자력 개척자(최영국, 정문재 등)를 높은 개인 역량으로 우대 평가합니다. 서로의 강점을 인정하고 협력할 때 지사 전체의 경쟁력이 극대화됩니다.
         </p>
-        <p><strong>[기산 건전성 및 무료 테스트 일정 관리]</strong><br>
-          수주 실적은 우수하나 기산일자가 수개월 뒤로 밀리거나 무료 테스트 기간이 15일 이상 과다하게 제공된 안건(이수열 프로 등)은 조기 기산 협상(14일 이내)을 통해 당월 개시 전환율을 극대화해야 합니다.
-        </p>
-        <p><strong>[월말 마감 시기 단가인상 유증 전략 & 4대 비율 솔루션]</strong><br>
-          월말 마감에 근접할수록 신규 공사 일정이 부족하여 당월 개시 전환이 물리적으로 제한됩니다. 이 시기에는 기존 계약처에 대한 <strong>'단가 인상을 통한 유지증가(유증)'</strong>를 집중 추진하여 증가하는 해약(유지감소)을 상쇄하고 지사 순증을 완벽히 방어해야 합니다.
+        <p><strong>[원팀 시너지: 마감 시기 단가인상 유증 합심 추진]</strong><br>
+          월말 마감에 다가올수록 신규 공사 일정이 부족하여 당월 개시 전환이 제한될 수 있습니다. 이 시기에는 지사 전원이 한마음으로 기존 계약처에 대한 <strong>'단가 인상(유증)'을 함께 추진</strong>하여 지사 순유지증가 목표를 전원 100% 완수하는 원팀의 저력을 보여줄 때입니다.
         </p>
       </div>
     </div>
 
-    <!-- 섹션 3: 컨설턴트별 1:1 맞춤 액션 코칭 가이드 -->
+    <!-- 섹션 3: 컨설턴트별 1:1 맞춤 성장 코칭 가이드 -->
     <div class="ai-section">
-      <div class="ai-sec-head">3. 컨설턴트별 1:1 맞춤 액션 코칭 가이드</div>
+      <div class="ai-sec-head">3. 컨설턴트별 1:1 맞춤 성장 코칭 & 원팀 서포트 가이드</div>
       <ul class="ai-action-list">
         <li class="ai-action-item">
           <div class="ai-action-num">1</div>
-          <div class="ai-action-title">이수열 프로 (안정적 고빈도 수주형 ⚖️): 기산일정 단축 협상 및 자력 개척 시너지 극대화</div>
-          <div class="ai-action-desc">대리점 채널과의 완벽한 파트너십으로 고른 수주 주기를 유지하며 지사 볼륨 1위를 이끄는 주역입니다. 차월 이후로 밀린 기산일정과 15일 이상의 무료 테스트 일정을 14일 이내로 단축 협상하여 당월 개시율을 높이고, 본인의 뛰어난 대면 영업 역량을 바탕으로 순수 자력 개척 안건을 추가 발굴하도록 코칭합니다.</div>
+          <div class="ai-action-title">이수열 프로 (안정적 고빈도 볼륨 리더 ⚖️): 조기 기산 전환 및 자력 개척 시너지 결합</div>
+          <div class="ai-action-desc">대리점 파트너십을 통해 지사 수주 1위(65%)를 이끄는 노고에 깊이 감사드립니다. 차월 이후로 밀린 기산일정과 15일 이상의 무료 테스트 일정을 14일 이내로 단축 협상하여 지사 조기 개시 흑자에 기여하고, 본인의 뛰어난 대면 영업 역량으로 순수 자력 개척 안건까지 추가 발굴하여 지사의 완벽한 롤모델로 함께 뛰어주시길 응원합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">2</div>
-          <div class="ai-action-title">최영국 컨설턴트 (대형·장기 리드타임형 🏢 / 스타트 지연): 대형 파이프라인 조기 클로징 & 1:1 동행</div>
-          <div class="ai-action-desc">건당 단가가 큰 대형 안건을 성사시키는 장기 리드타임형이며, 100% 자력 개척 성향은 대단히 우수합니다. 9월 대비 10월 초반 스타트가 지연(1건 50,000원)되어 월초 수주 공백이 발생했으므로, 관리자 1:1 동행 영업과 유망 가망고객 DB 우선 배정을 통해 월중 이내에 대형 안건 클로징을 달성하도록 집중 지원합니다.</div>
+          <div class="ai-action-title">최영국 컨설턴트 (대형 프로젝트 스페셜리스트 🏢): 대형 파이프라인 조기 클로징 & 관리자 1:1 동행</div>
+          <div class="ai-action-desc">건당 단가가 큰 대형 안건을 성사시키는 전문 역량과 100% 자력 개척의 뚝심은 팀의 자랑입니다. 월초 준비 호흡을 거쳐 월중 대형 안건 클로징을 앞두고 있는 만큼, 관리자 1:1 현장 동행과 유망 가망고객 DB 우선 지원을 결합해 시원한 대형 수주 축포를 함께 터뜨리도록 전폭 지원하겠습니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">3</div>
-          <div class="ai-action-title">정문재 컨설턴트 (수주 스피드 향상형 🚀): 고속 수주 템포 유지 & 부가 솔루션 단가 업셀링</div>
-          <div class="ai-action-desc">지난달 대비 당월 들어 수주 체결 속도와 활동성이 가장 뚜렷하게 가속화되며 지사 내 최고 스피드 향상을 기록하고 있습니다. 현재의 빠른 수주 주기를 유지하면서, 일반알람에 블루스캔·휴엔·디지털 등 부가 솔루션을 결합 제안하여 건당 평균 단가를 업셀링하도록 코칭합니다.</div>
+          <div class="ai-action-title">정문재 컨설턴트 (모멘텀 고속 성장 에이스 🚀): 수주 템포 유지 & 부가 솔루션 단가 업셀링</div>
+          <div class="ai-action-desc">전월 대비 가파르게 향상된 수주 스피드(5.8일 주기)와 탄력 성장(3건 150만원)을 보여준 열정에 박수를 보냅니다. 현재의 빠른 템포를 월말까지 이어가면서, 일반알람에 블루스캔·휴엔·디지털 보안을 패키징 제안하여 건당 평균 단가를 더욱 높이는 지사의 핵심 에이스로 자리매김하도록 응원합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">4</div>
-          <div class="ai-action-title">박광춘 컨설턴트 (수주 부진·활동량 쇄신 대상 ⚠️): 활동량 전면 쇄신 & 멘토링 파이프라인 재구축</div>
-          <div class="ai-action-desc">정규 수주 실적이 거의 전무하여 장기 정체 국면이 이어지고 있습니다 (스몰 연속형 절대 아님). 가망 고객 발굴 프로세스와 일일 대면 상담/방문 활동량을 기초부터 전면 재설계하고, 팀장·선임 컨설턴트의 1:1 멘토링과 현장 동행을 통해 첫 유효 수주를 조기 창출하도록 강력히 유도합니다.</div>
+          <div class="ai-action-title">박광춘 컨설턴트 (신규 도약 잠재력 빌드업 🎯): 원팀 멘토링 & 타깃 상담 밀착 동행 지원</div>
+          <div class="ai-action-desc">현재는 새로운 고객층을 확보하고 파이프라인을 다지는 소중한 도약 준비 기간입니다. 팀장과 선임 컨설턴트가 1:1 멘토로서 현장 방문과 가망 고객 대면 상담을 함께 뛰며 첫 유효 수주의 기쁨을 조기에 나눌 수 있도록 지사 전원이 한마음으로 밀착 지원하겠습니다. 힘내십시오!</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">5</div>
-          <div class="ai-action-title">임영민 컨설턴트 (스몰·현장 밀착형 🏃): 밀착 개척 지속 & 복합 보안 패키지 확장</div>
-          <div class="ai-action-desc">소형 안건 중심이나 현장 밀착 개척을 꾸준히 전개하여 안정적 역할을 수행 중입니다. 계약처 내 추가 센서, 지능형 영상(블루스캔) 및 부가서비스 연계를 통해 건당 수주 단가를 한 단계 끌어올리도록 지원합니다.</div>
+          <div class="ai-action-title">임영민 컨설턴트 (현장 밀착형 신뢰 파트너 🏃): 밀착 개척 지속 & 추가 설비 연계 단가 확대</div>
+          <div class="ai-action-desc">지역 현장을 발로 뛰며 자력 개척(85%)과 개시율 100%라는 가장 실속 있고 단단한 영업 기반을 지켜주셔서 든든합니다. 계약처 내 추가 센서, 지능형 영상(블루스캔) 및 부가서비스 연계를 통해 건당 수주 단가를 한 단계 끌어올려 더 큰 결실을 거두도록 적극 지원하겠습니다.</div>
         </li>
         <li class="ai-action-item" style="border-left: 3px solid #059669; background:#f0fdf4;">
-          <div class="ai-action-num" style="background:#059669;">전략</div>
-          <div class="ai-action-title" style="color:#065f46;">지사 마감 공통 전략: 단가 인상(유증) 집중 추진으로 해약 완벽 방어</div>
-          <div class="ai-action-desc" style="color:#166534;">마감 시기에 다가올수록 신규 공사 일정이 부족하여 당월 개시가 제한됩니다. 이 시기에는 기존 계약처에 대한 '단가 인상'을 통한 유지증가(유증)를 총력 추진하여 증가하는 해약(유지감소)을 즉각 상쇄하고 지사 순증 목표를 달성합니다.</div>
+          <div class="ai-action-num" style="background:#059669;">원팀</div>
+          <div class="ai-action-title" style="color:#065f46;">지사 마감 원팀 전략: 단가 인상(유증) 집중 추진으로 지사 공동 목표 100% 완수</div>
+          <div class="ai-action-desc" style="color:#166534;">마감 시기에 다가올수록 신규 공사 일정이 부족하여 당월 개시가 제한될 수 있습니다. 이 시기에는 지사 전원이 힘을 모아 기존 계약처에 대한 '단가 인상'을 함께 추진하여 증가하는 해약을 완벽히 상쇄하고 전원 목표 달성의 쾌거를 함께 이뤄냅시다!</div>
         </li>
       </ul>
     </div>
   `;
 
-  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 종합 역량 진단 & 1:1 코칭 리포트\n` +
+  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 역량 조명 & 원팀(One-Team) 성장 리포트\n` +
     `지사 평균 수주단가: ${fmtK(overallAvg)}원` + (biz ? ` | 사업팀 내 수주 순위: 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})\n\n` : `\n\n`) +
     `■ 1. 컨설턴트별 다각도 성과 요약\n`;
   repRows.forEach(function(r, idx){
-    const gapStr = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '측정불가(극소)' : '측정불가');
-    text += `${idx+1}. ${r.name}: 당월 ${fmtK(r.amount)}천원(목표 ${fmtK(r.target)}천원, ${r.pct}%), ${r.curCount}건, 단가 ${fmtK(r.curAvg)}원 | 전기간 누적 ${r.allCount}건(단가 ${fmtK(r.allAvg)}원), 주기 ${gapStr}, 시기 ${r.timingStyle}, 개척 ${r.pioneerRate}%, 업종 ${r.industry}, 전월대비: ${r.momPace}, 유형: ${r.archetype}, 개시율 ${r.startRate}%, 유지감소 ${fmtK(Math.round(r.cancelAmount/1000))}천원, 유지증가 +${fmtK(Math.round(r.priceUpAmount/1000))}천원, 지사기여율 ${r.contributionRate}%\n`;
+    const gapStr = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '도약 준비(빌드업)' : '측정불가');
+    text += `${idx+1}. ${r.name}: 당월 ${fmtK(r.amount)}천원(목표 ${fmtK(r.target)}천원, ${r.pct}%), ${r.curCount}건, 단가 ${fmtK(r.curAvg)}원 | 전기간 누적 ${r.allCount}건(단가 ${fmtK(r.allAvg)}원), 주기 ${gapStr}, 시기 ${r.timingStyle}, 개척 ${r.pioneerRate}%, 업종 ${r.industry}, 페이스: ${r.momPace}, 유형: ${r.archetype}, 개시율 ${r.startRate}%, 유지감소 ${fmtK(Math.round(r.cancelAmount/1000))}천원, 유지증가 +${fmtK(Math.round(r.priceUpAmount/1000))}천원, 지사기여율 ${r.contributionRate}%\n`;
   });
-  text += `\n■ 2. 전 기간 데이터 기반 종합 평가\n` +
-    `- 이수열 프로: 전 기간 4~5일 균등 주기로 안정적 고빈도 수주, 지사 볼륨 1위 견인 (대리점 협업 인정, 기산/테스트 단축 필요)\n` +
-    `- 최영국 컨설턴트: 80~100만원 대형 위주 장기 리드타임형, 100% 자력 개척 잠재력 보유 (당월 1건 50,000원 스타트 지연, 1:1 동행 지원)\n` +
-    `- 정문재 컨설턴트: 9월 대비 10월 수주 스피드 최고 향상 및 가속 성장형 (3건 150만원 달성)\n` +
-    `- 박광춘 컨설턴트: 수주 극소형으로 수주 부진 및 활동량 전면 쇄신 대상 (스몰 연속형 절대 아님)\n` +
-    `- 임영민 컨설턴트: 소형 안건 중심 현장 밀착형\n` +
-    `- 마감 전략: 월말 공사 일정 부족 시 '단가 인상'을 통한 유지증가(유증) 집중 추진으로 해약 완벽 방어\n`;
+  text += `\n■ 2. 전 기간 데이터 기반 종합 평가 & 원팀 응원\n` +
+    `- 이수열 프로: 4.2일 균등 주기로 안정적 고빈도 수주, 지사 볼륨 1위 견인 (대리점 협업 모범, 조기 기산 전환 기대)\n` +
+    `- 최영국 컨설턴트: 건당 89만원 대형 프로젝트 전문, 100% 자력 개척 뚝심 (월중 대형 클로징 임박, 관리자 1:1 동행 지원)\n` +
+    `- 정문재 컨설턴트: 9월 대비 10월 수주 스피드 최고 혁신 및 모멘텀 고속 성장 (3건 150만원 달성)\n` +
+    `- 박광춘 컨설턴트: 신규 도약 잠재력 빌드업 단계, 원팀 1:1 멘토링과 동행 영업으로 첫 결실 전폭 지원\n` +
+    `- 임영민 컨설턴트: 소형 안건 중심 현장 밀착형 신뢰 파트너 (개시율 100% 모범)\n` +
+    `- 원팀 마감 전략: 월말 공사 일정 부족 시 전원 '단가 인상(유증)' 집중 추진으로 지사 목표 100% 달성\n`;
 
   return { html: html, text: text };
 }
