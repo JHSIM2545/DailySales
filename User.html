@@ -4338,6 +4338,259 @@ td.prod-col, td.gross-col,
 }
 
 </style>  
+<style>
+/* ===================== AI 상황별 전략 분석 보고서 전용 프리미엄 스타일 ===================== */
+.ai-tab-btn {
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ai-tab-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+.ai-tab-btn.active {
+  background: #1e40af;
+  color: #ffffff;
+  border-color: #1e40af;
+  box-shadow: 0 2px 4px rgba(30, 64, 175, 0.2);
+}
+
+.ai-report-print-wrapper {
+  color: #1e293b;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", Dotum, sans-serif;
+  line-height: 1.6;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.ai-doc-header {
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.ai-doc-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-doc-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.ai-doc-meta {
+  font-size: 12px;
+  color: #64748b;
+  text-align: right;
+  line-height: 1.4;
+}
+
+.ai-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.ai-kpi-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  position: relative;
+  border-left: 4px solid #3b82f6;
+}
+.ai-kpi-card.green { border-left-color: #10b981; }
+.ai-kpi-card.amber { border-left-color: #f59e0b; }
+.ai-kpi-card.red { border-left-color: #ef4444; }
+.ai-kpi-card.purple { border-left-color: #8b5cf6; }
+
+.ai-kpi-lbl {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ai-kpi-val {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+}
+.ai-kpi-sub {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+}
+.ai-kpi-tag {
+  font-weight: 700;
+}
+.ai-kpi-tag.good { color: #059669; }
+.ai-kpi-tag.warn { color: #d97706; }
+.ai-kpi-tag.danger { color: #dc2626; }
+
+.ai-section {
+  margin-bottom: 20px;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.ai-sec-head {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 3px solid #2563eb;
+  padding-left: 8px;
+}
+.ai-sec-body {
+  font-size: 13px;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 12px 16px;
+  line-height: 1.7;
+}
+
+.ai-action-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.ai-action-item {
+  position: relative;
+  padding: 10px 14px 10px 36px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.ai-action-num {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  width: 20px;
+  height: 20px;
+  background: #2563eb;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-action-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+.ai-action-desc {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.ai-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+  background: #ffffff;
+}
+.ai-data-table th, .ai-data-table td {
+  border: 1px solid #cbd5e1;
+  padding: 6px 10px;
+}
+.ai-data-table th {
+  background: #f1f5f9;
+  font-weight: 700;
+  color: #334155;
+  text-align: center;
+}
+.ai-data-table td.num {
+  text-align: right;
+  font-family: inherit;
+}
+.ai-data-table td.center {
+  text-align: center;
+}
+
+/* @media print for 100% Vector clarity, zero cutoff */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #aiStrategicReportModalOverlay, #aiStrategicReportModalOverlay * {
+    visibility: visible !important;
+  }
+  #aiStrategicReportModalOverlay {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #ffffff !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    z-index: 999999 !important;
+  }
+  .ai-report-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  .ai-report-scroll-area {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm 14mm 12mm;
+  }
+  .ai-section, .ai-kpi-grid, .ai-doc-header {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .ai-data-table tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+</style>
 </head>  
 <body>  
   
@@ -4542,6 +4795,49 @@ td.prod-col, td.gross-col,
  </div>  
 </div>  
   
+<!-- ===================== AI 상황별 전략 분석 보고서 모달 ===================== -->
+<div class="modal-overlay" id="aiStrategicReportModalOverlay" style="z-index:99999;">
+  <div class="modal ai-report-modal" style="width:960px; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; padding:0; overflow:hidden; border-radius:10px; box-shadow:0 12px 36px rgba(0,0,0,0.25);">
+    
+    <!-- 모달 상단 헤더 & 액션바 (화면 표시용) -->
+    <div class="ai-report-modal-header no-print" style="padding:14px 20px; background:#1e293b; color:#fff; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:22px;">🤖</span>
+        <div>
+          <div style="font-size:16px; font-weight:700; letter-spacing:-0.3px;">에스원 북서울지사 AI 상황별 전략 분석 보고서</div>
+          <div style="font-size:12px; color:#94a3b8;" id="aiReportMetaHeader">기준년월: - | 상품군: -</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" class="btn-ai-action" onclick="copyAiReportText_()" title="클립보드로 복사" style="padding:6px 12px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📋 클립보드 복사</button>
+        <button type="button" class="btn-ai-action" onclick="printAiReport_()" title="고해상도 벡터 인쇄 및 PDF 저장" style="padding:6px 12px; background:#2563eb; color:#fff; border:1px solid #1d4ed8; border-radius:4px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">🖨️ 인쇄 / PDF 저장</button>
+        <button type="button" class="btn-ai-action" onclick="downloadAiReportPdf_()" title="PDF 파일 즉시 다운로드" style="padding:6px 12px; background:#8e2f4e; color:#fff; border:1px solid #701f3a; border-radius:4px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📄 PDF 다운로드</button>
+        <button type="button" onclick="closeAiStrategicReportModal_()" style="padding:4px 10px; background:transparent; color:#94a3b8; border:none; font-size:20px; font-weight:700; cursor:pointer; margin-left:4px;">✕</button>
+      </div>
+    </div>
+
+    <!-- 모달 상황별 탭 선택 바 (화면 표시용) -->
+    <div class="ai-report-tabs-bar no-print" style="padding:8px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; gap:8px; flex-shrink:0; align-items:center;">
+      <button class="ai-tab-btn active" id="aiTabBtn_executive" onclick="setAiReportMode_('executive')">📊 종합 경영진 전략</button>
+      <button class="ai-tab-btn" id="aiTabBtn_coaching" onclick="setAiReportMode_('coaching')">👥 컨설턴트 코칭</button>
+      <button class="ai-tab-btn" id="aiTabBtn_risk" onclick="setAiReportMode_('risk')">🛡️ 리스크 조기경보</button>
+      <button class="ai-tab-btn" id="aiTabBtn_pipeline" onclick="setAiReportMode_('pipeline')">📦 안전상품 파이프라인</button>
+      <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span style="font-size:12px; color:#64748b;">분석일시:</span>
+        <span style="font-size:12px; font-weight:600; color:#334155;" id="aiReportGeneratedTime">-</span>
+      </div>
+    </div>
+
+    <!-- 보고서 본문 스크롤 영역 -->
+    <div class="ai-report-scroll-area" style="flex:1; overflow-y:auto; padding:24px 28px; background:#ffffff;">
+      <div id="aiReportPrintWrapper" class="ai-report-print-wrapper">
+        <!-- 동적으로 AI 보고서 렌더링 -->
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalOverlay">  
  <div class="modal">
  <!-- 브라우저 자동완성 가로채기용 더미 필드 -->
@@ -4625,6 +4921,22 @@ td.prod-col, td.gross-col,
 </div>  
   
 <!-- 수정권한 없는 사용자도 수주개시/재개시/해약중지/인상인하 화면의 날짜만 팝업으로 고칠 수 있게 하는 창 -->  
+<div class="modal-overlay" id="productDailyModalOverlay">  
+ <div class="modal">
+ <!-- 브라우저 자동완성 가로채기용 더미 필드 -->
+ <div style="position:absolute; top:-9999px; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+   <input type="text" tabindex="-1" autocomplete="one-time-code">
+   <input type="password" tabindex="-1" autocomplete="one-time-code">
+ </div>  
+ <h2>상품일보 신규 등록</h2>  
+ <div class="field-grid" id="productDailyFormFields"></div>  
+ <div class="modal-actions">  
+ <button onclick="closeProductDailyModal()">취소</button>  
+ <button class="primary" onclick="submitNewProductDailyRow()">저장</button>  
+ </div>  
+ </div>  
+</div>
+
 <div class="modal-overlay" id="dateEditModalOverlay">  
  <div class="modal">
  <!-- 브라우저 자동완성 가로채기용 더미 필드 -->
@@ -6600,7 +6912,8 @@ function renderDashboard(){
  '<option value="" ' + (DASH_REP===''?'selected':'') + '>전체(지사)</option>' +  
  DASH_REP_LIST.map(function(rep){ return '<option value="' + rep + '" ' + (DASH_REP===rep?'selected':'') + '>' + rep + '</option>'; }).join('') +  
  '</select>' +  
- '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:auto; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
+ '<button id="aiStrategicReportBtn" onclick="openAiStrategicReportModal_()" style="margin-left:auto; background:linear-gradient(135deg, #1e40af, #3b82f6); color:#fff; border:1px solid #1d4ed8; font-weight:700; box-shadow:0 2px 4px rgba(30,64,175,0.25); cursor:pointer;">🤖 AI 상황별 전략 보고서</button>' +  
+ '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:6px; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
  '</div>' +  
   
  '<div class="dash-scroll">' +  
@@ -7432,7 +7745,17 @@ function selectTab(key){
  else if (key === 'cancel') { if (SCOPE_LOADED_.cancel) renderCancel(); else loadCancelData(); }  
  else if (key === 'price_change') { if (SCOPE_LOADED_.price) ensureUserNames(renderPrice); else loadPriceData(); }  
  else if (key === 'restart') { if (SCOPE_LOADED_.restart) renderRestart(); else loadRestartData(); }  
- else if (key === 'product_daily') { if (SCOPE_LOADED_.productdaily) renderProductDaily(); else loadProductDailyData(); }  
+ else if (key === 'product_daily') {  
+   const ymEl = document.getElementById('ymFilterProductDaily');  
+   if (ymEl) {  
+     if (!ymEl.value) ymEl.value = productDailyGridYm || todayStr().slice(0, 7);  
+     productDailyGridYm = ymEl.value;  
+   }  
+   document.getElementById('toolbar-product-daily').style.display = 'flex';  
+   loadProductDailySummaryTarget_(function(){  
+     if (SCOPE_LOADED_.productdaily) renderProductDaily(); else loadProductDailyData();  
+   });  
+ }  
  else if (key === 'sales_status') loadSalesStatus();
    
  else if (key === 'daily_report') loadDailyReport();  
@@ -7581,7 +7904,7 @@ function loadData(silent){
  const cacheKey = 'orderStartData_' + yearMonth;  
  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
  if (cached) {  
- ROWS = cached.rows.map(r => {  
+ ROWS = (cached && cached.rows ? cached.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -7597,7 +7920,7 @@ function loadData(silent){
  if (!silent) setLoadingCursor(false);  
  if (data && data.error) { if (!silent) showLogin(data.error); return; }  
  cacheSet_(cacheKey, data);  
- ROWS = data.rows.map(r => {  
+ ROWS = (data && data.rows ? data.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8046,7 +8369,7 @@ function loadCancelData(silent){
  const myGen = nextLoadGen_('cancel');  
  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
  if (cached) {  
- CANCEL_ROWS = cached.rows.map(r => {  
+ CANCEL_ROWS = (cached && cached.rows ? cached.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  CANCEL_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8063,7 +8386,7 @@ function loadCancelData(silent){
  if (!silent) setLoadingCursor(false);  
  if (data && data.error) { if (!silent) showLogin(data.error); return; }  
  cacheSet_(cacheKey, data);  
- CANCEL_ROWS = data.rows.map(r => {  
+ CANCEL_ROWS = (data && data.rows ? data.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  CANCEL_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8289,6 +8612,39 @@ function validateCancelRow(row){
 function openAddCancelModal(){ buildCancelForm(); document.getElementById('cancelModalOverlay').classList.add('open'); }  
 function closeCancelModal(){ document.getElementById('cancelModalOverlay').classList.remove('open'); }  
   
+function saveNewCancelRow_(fields, allowDuplicate){  
+ const saveBtn = document.querySelector('#cancelModalOverlay button.primary') || document.querySelector('#cancelModalOverlay button:last-child');
+ if (saveBtn) { saveBtn.disabled = true; saveBtn.innerText = 'DB 저장 중...'; }
+ setSyncStatus('saving');  
+ const payload = allowDuplicate ? { id: null, fields: fields, allowDuplicate: true } : { id: null, fields: fields };  
+ google.script.run  
+ .withSuccessHandler(function(res){  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   if (res && res.success) { 
+     closeCancelModal();
+     setSyncStatus('ok'); 
+     alert('✓ DB에 정상 등록되었습니다.');
+     // 해당 년월 필터 동기화 및 DB에서 즉시 재조회
+     const rowYm = (fields['확정일'] && fields['확정일'] !== '미정' && fields['확정일'] !== '해약방어') ? fields['확정일'].slice(0, 7) : (fields['접수일'] ? fields['접수일'].slice(0, 7) : '');
+     const ymInput = document.getElementById('ymFilterCancel');
+     if (rowYm && ymInput && ymInput.value && ymInput.value !== rowYm && ymInput.value !== 'ALL') {
+       ymInput.value = rowYm;
+     }
+     clearScopeCacheKeys_('cancelData_');
+     loadCancelData(false);
+     onDataChanged_('cancel'); 
+     return; 
+   }  
+   alert('등록 실패: ' + (res && res.error ? res.error : '알 수 없는 오류'));
+ })  
+ .withFailureHandler(function(err){  
+   if (saveBtn) { saveBtn.disabled = false; saveBtn.innerText = '저장'; }
+   setSyncStatus('error', err);  
+   alert('등록 실패: ' + err);  
+ })  
+ .saveCancelRow(SESSION.token, payload);  
+}
+
 function submitNewCancelRow(){  
  const fields = collectCancelFormValues();  
  if (!validateCancelRow(fields)) return;  
@@ -8403,7 +8759,7 @@ function loadPriceData(silent){
  const cacheKey = 'priceData_' + yearMonth;  
  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
  if (cached) {  
- PRICE_ROWS = cached.rows.map(r => {  
+ PRICE_ROWS = (cached && cached.rows ? cached.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  PRICE_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8419,7 +8775,7 @@ function loadPriceData(silent){
  if (!silent) setLoadingCursor(false);  
  if (data && data.error) { if (!silent) showLogin(data.error); return; }  
  cacheSet_(cacheKey, data);  
- PRICE_ROWS = data.rows.map(r => {  
+ PRICE_ROWS = (data && data.rows ? data.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  PRICE_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8754,7 +9110,7 @@ function loadRestartData(silent){
  const cacheKey = 'restartData_' + yearMonth;  
  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
  if (cached) {  
- RESTART_ROWS = cached.rows.map(r => {  
+ RESTART_ROWS = (cached && cached.rows ? cached.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  RESTART_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8770,7 +9126,7 @@ function loadRestartData(silent){
  if (!silent) setLoadingCursor(false);  
  if (data && data.error) { if (!silent) showLogin(data.error); return; }  
  cacheSet_(cacheKey, data);  
- RESTART_ROWS = data.rows.map(r => {  
+ RESTART_ROWS = (data && data.rows ? data.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  RESTART_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -8895,7 +9251,8 @@ function computeAutoProductDaily(row){
  return { 합계: String(a + b) };  
 }  
   
-let productDailySummaryYm = todayStr().slice(0,7);  
+let productDailySummaryYm = todayStr().slice(0, 7);
+let productDailyGridYm = todayStr().slice(0, 7);  
 let PRODUCT_DAILY_SUMMARY_EXTRA = null;  
 let productDailySummaryIncludeUnconfirmed = false; // 매출 집계에 "미매출" 포함 여부 (체크 시 전체 포함, 해제 시 매출 확정분만)  
   
@@ -9176,11 +9533,22 @@ function productDailySummaryTableHtml_(){
   </div>`;  
 }  
   
+function onCardSalesChange_(val){
+  const num = Number(String(val).replace(/[^0-9.-]/g, '')) || 0;
+  if (!PRODUCT_DAILY_SUMMARY_EXTRA) PRODUCT_DAILY_SUMMARY_EXTRA = {};
+  PRODUCT_DAILY_SUMMARY_EXTRA.카드매출 = num;
+  renderProductDaily();
+  google.script.run
+    .withSuccessHandler(function(){})
+    .withFailureHandler(function(err){ alert('카드매출 저장 실패: ' + (err && err.message ? err.message : err)); })
+    .saveCardSales(SESSION.token, productDailySummaryYm, num);
+}
+
 function loadProductDailyData(silent){  
  const cacheKey = 'productDailyData';  
  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
  if (cached) {  
- PRODUCT_DAILY_ROWS = cached.rows.map(r => {  
+ PRODUCT_DAILY_ROWS = (cached && cached.rows ? cached.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -9196,7 +9564,7 @@ function loadProductDailyData(silent){
  if (!silent) setLoadingCursor(false);  
  if (data && data.error) { if (!silent) showLogin(data.error); return; }  
  cacheSet_(cacheKey, data);  
- PRODUCT_DAILY_ROWS = data.rows.map(r => {  
+ PRODUCT_DAILY_ROWS = (data && data.rows ? data.rows : []).map(r => {  
  const obj = { id: r[r.length-1] };  
  PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = r[i]);  
  return obj;  
@@ -9307,6 +9675,19 @@ function formatForecastYmDisplay_(val) {
   return val;
 }
 
+function openMonthPickerForPd_(btn, id){
+  const wrap = btn.closest('.datecell-wrap') || btn.parentElement;
+  if (!wrap) return;
+  const hiddenInp = wrap.querySelector('input[type="month"]');
+  if (hiddenInp) {
+    if (typeof hiddenInp.showPicker === 'function') {
+      try { hiddenInp.showPicker(); return; } catch(e){}
+    }
+    hiddenInp.focus();
+    hiddenInp.click();
+  }
+}
+
 function onPdMonthPicked_(inp, id){
   if (!inp.value) return;
   const [y, m] = inp.value.split('-');
@@ -9344,6 +9725,55 @@ function fieldCellHtmlProductDaily(row, field, allRows){
  return `<td class="${cls}"${titleAttr}${tdStyle}>${escHtml(disp)}</td>`;  
 }  
   
+function onProductDailyFieldChange(id, field, value){  
+  const row = PRODUCT_DAILY_ROWS.find(r => r.id === id);  
+  if (!row) return;  
+  row[field] = value;  
+  if (field === '계약설치비' || field === '계약기기비') {
+    const inst = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;
+    const dev = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
+    row.합계 = inst + dev;
+  }
+  row._unsynced = true; row._syncError = false;  
+  renderProductDaily();  
+  pushSaveProductDaily(row);  
+}  
+function pushSaveProductDaily(row){  
+  setSyncStatus('saving');  
+  const fields = {};  
+  PRODUCT_DAILY_EDITABLE_FIELDS.forEach(f => fields[f] = row[f] !== undefined ? row[f] : '');  
+  if (row.합계 !== undefined) fields['합계'] = row.합계;
+  google.script.run  
+    .withSuccessHandler(function(res){  
+      if (res && res.success) { row._unsynced = false; row._syncError = false; setSyncStatus('ok'); onDataChanged_('productdaily'); }  
+      else { row._syncError = true; setSyncStatus('error', res && res.error); handleSessionExpiry(res); }  
+      renderProductDaily();  
+    })  
+    .withFailureHandler(function(err){ row._syncError = true; setSyncStatus('error', err); renderProductDaily(); })  
+    .saveProductDailyRow(SESSION.token, { id: row.id, fields: fields });  
+}  
+function deleteProductDailyRow(id){
+  if (!confirm('이 상품일보 데이터를 삭제하시겠습니까?')) return;
+  setSyncStatus('saving');
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (res && res.success) {
+        setSyncStatus('ok');
+        clearScopeCacheKeys_('productDailyData');
+        loadProductDailyData();
+        onDataChanged_('productdaily');
+      } else {
+        setSyncStatus('error', res && res.error);
+        alert('삭제 실패: ' + (res && res.error));
+      }
+    })
+    .withFailureHandler(function(err){
+      setSyncStatus('error', err);
+      alert('삭제 실패: ' + err);
+    })
+    .deleteProductDailyRow(SESSION.token, id);
+}
+
 function renderProductDaily(){  
  const rows = sortedProductDailyRows();  
  let html = productDailySummaryTableHtml_();  
@@ -9373,6 +9803,79 @@ function renderProductDaily(){
 }  
   
   
+function buildProductDailyForm(){
+  const container = document.getElementById('productDailyFormFields');
+  if (!container) return;
+  const today = todayStr();
+  const ymNow = today.slice(0, 7);
+  const ymFormatted = ymNow.slice(2, 4) + '.' + ymNow.slice(5, 7) + '월';
+
+  container.innerHTML = `
+    <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="T (미확정 시 T/M 등 1자리)" value="T" onfocus="setTimeout(()=>this.select(),0)"></div>
+    <div class="field"><label>서비스제공처</label><input type="text" id="pdf_서비스제공처" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="고객사/서비스처 명칭"></div>
+    <div class="field"><label>보고일</label><input type="date" id="pdf_보고일" autocomplete="one-time-code" value="${today}"></div>
+    <div class="field"><label>계약담당자</label><select id="pdf_계약담당자" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
+    <div class="field">
+      <label>매출예상</label>
+      <div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:32px;">
+        <input type="text" id="pdf_매출예상" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${ymFormatted}" placeholder="2026년 10월" style="width:100%; height:100%; cursor:pointer;" readonly>
+        <button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:4px; z-index:1; border:none; background:transparent; pointer-events:none; font-size:16px;">📅</button>
+        <input type="month" class="date-pick-hidden" style="position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${ymNow}" onchange="const parts=this.value.split('-'); document.getElementById('pdf_매출예상').value=parts[0].slice(2)+'.'+parts[1]+'월'">
+      </div>
+    </div>
+    <div class="field"><label>계약동기</label><select id="pdf_계약동기" autocomplete="one-time-code"><option value="">선택</option>${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
+    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>구분</label><select id="pdf_구분" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
+    <div class="field"><label>매출여부</label><select id="pdf_매출여부" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
+  `;
+}
+
+function openAddProductDailyModal(){
+  buildProductDailyForm();
+  const overlay = document.getElementById('productDailyModalOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeProductDailyModal(){
+  const overlay = document.getElementById('productDailyModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function submitNewProductDailyRow(){
+  const getVal = id => { const el = document.getElementById('pdf_' + id); return el ? el.value.trim() : ''; };
+  const instFee = Number(moneyValue(document.getElementById('pdf_계약설치비') || {value:0})) || 0;
+  const devFee = Number(moneyValue(document.getElementById('pdf_계약기기비') || {value:0})) || 0;
+
+  if (getVal('계약번호') && !/^[A-Za-z]\d{0,7}$/i.test(getVal('계약번호'))) { alert('계약번호는 영문 1자리(T, M 등) 또는 영문+숫자(최대 8자리)로 입력하세요.'); return; }
+  const fields = {
+    계약번호: getVal('계약번호') || 'T',
+    서비스제공처: getVal('서비스제공처'),
+    보고일: getVal('보고일'),
+    계약담당자: getVal('계약담당자'),
+    매출예상: getVal('매출예상'),
+    계약동기: getVal('계약동기'),
+    계약설치비: instFee,
+    계약기기비: devFee,
+    합계: instFee + devFee,
+    구분: getVal('구분') || '지사',
+    매출여부: getVal('매출여부') || '미매출'
+  };
+
+  setLoadingCursor(true);
+  google.script.run
+    .withSuccessHandler(function(res){
+      setLoadingCursor(false);
+      closeProductDailyModal();
+      loadProductDailyData();
+    })
+    .withFailureHandler(function(err){
+      setLoadingCursor(false);
+      alert('등록 실패: ' + err);
+    })
+    .saveProductDailyRow(SESSION.token, { id: null, fields: fields });
+}
+
 function onRestartFieldChange(id, field, value){  
  const row = RESTART_ROWS.find(r => r.id === id);  
  if (!row) return;  
@@ -9615,6 +10118,24 @@ function closeSalesStatusPopup_(){ const el = document.getElementById('salesStat
  document.addEventListener('mouseup', function(){ dragEl = null; });  
 })();  
   
+function fetchSalesStatusForCurrentMode_(cb){  
+ if (typeof SIM_MODE !== 'undefined' && SIM_MODE) {  
+ google.script.run  
+ .withSuccessHandler(cb)  
+ .withFailureHandler(function(err){ cb({ success: false, error: String(err) }); })  
+ .simulateSalesStatus(SESSION.token, statusYearMonth, statusProductFilter, {  
+ order: { overrides: typeof SIM_OVERRIDES_ORDER_ !== 'undefined' ? SIM_OVERRIDES_ORDER_ : {} },  
+ cancel: { overrides: typeof SIM_OVERRIDES_CANCEL_ !== 'undefined' ? SIM_OVERRIDES_CANCEL_ : {} },  
+ price: { overrides: typeof SIM_OVERRIDES_PRICE_ !== 'undefined' ? SIM_OVERRIDES_PRICE_ : {} }  
+ });  
+ } else {  
+ google.script.run  
+ .withSuccessHandler(cb)  
+ .withFailureHandler(function(err){ cb({ success: false, error: String(err) }); })  
+ .getSalesStatus(SESSION.token, statusYearMonth, statusProductFilter);  
+ }  
+}
+
 function loadSalesStatus(){  
  const cacheKey = 'salesStatus|' + statusYearMonth + '|' + statusProductFilter;  
  const cached = cacheGet_(cacheKey);  
@@ -10816,6 +11337,793 @@ function renderLoggedInUser_(name, role){
   whoEl.style.fontWeight = '700';
   whoEl.style.fontSize = '14px';
   whoEl.style.marginRight = '12px';
+}
+
+/* ===================== AI 상황별 전략 분석 보고서 모듈 (Interactive & Print/PDF Engine) ===================== */
+let AI_REPORT_CURRENT_MODE_ = 'executive';
+let AI_REPORT_LAST_TEXT_ = '';
+
+function openAiStrategicReportModal_(mode){
+  if (mode) AI_REPORT_CURRENT_MODE_ = mode;
+  const overlay = document.getElementById('aiStrategicReportModalOverlay');
+  if (overlay) overlay.classList.add('open');
+  setAiReportMode_(AI_REPORT_CURRENT_MODE_);
+}
+
+function closeAiStrategicReportModal_(){
+  const overlay = document.getElementById('aiStrategicReportModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function setAiReportMode_(mode){
+  AI_REPORT_CURRENT_MODE_ = mode || 'executive';
+  ['executive', 'coaching', 'risk', 'pipeline'].forEach(function(m){
+    const btn = document.getElementById('aiTabBtn_' + m);
+    if (btn) btn.classList.toggle('active', m === AI_REPORT_CURRENT_MODE_);
+  });
+  renderAiStrategicReportContent_();
+}
+
+function renderAiStrategicReportContent_(){
+  const area = document.getElementById('aiReportPrintWrapper');
+  if (!area) return;
+  
+  const d = (typeof DASH_DATA !== 'undefined' && DASH_DATA) ? DASH_DATA : {};
+  const ym = (typeof DASH_YM !== 'undefined' && DASH_YM) ? DASH_YM : todayStr().slice(0, 7);
+  const cat = (typeof DASH_CATEGORY !== 'undefined' && DASH_CATEGORY) ? DASH_CATEGORY : '일반알람';
+  const rep = (typeof DASH_REP !== 'undefined' && DASH_REP) ? DASH_REP : '';
+
+  const timeEl = document.getElementById('aiReportGeneratedTime');
+  const now = new Date();
+  const timeStr = now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  if (timeEl) timeEl.innerText = timeStr;
+
+  const metaEl = document.getElementById('aiReportMetaHeader');
+  if (metaEl) {
+    const repText = rep ? (rep + ' 컨설턴트') : '지사 전체';
+    metaEl.innerText = `기준: ${ym} | 상품군: ${cat} | 대상: ${repText}`;
+  }
+
+  let res = { html: '', text: '' };
+  if (AI_REPORT_CURRENT_MODE_ === 'coaching') {
+    res = buildCoachingAiReport_(d, ym, cat, rep);
+  } else if (AI_REPORT_CURRENT_MODE_ === 'risk') {
+    res = buildRiskAiReport_(d, ym, cat, rep);
+  } else if (AI_REPORT_CURRENT_MODE_ === 'pipeline') {
+    res = buildPipelineAiReport_(d, ym, cat, rep);
+  } else {
+    res = buildExecutiveAiReport_(d, ym, cat, rep);
+  }
+
+  area.innerHTML = res.html;
+  AI_REPORT_LAST_TEXT_ = res.text;
+}
+
+/* 1. 종합 경영진 전략 분석 보고서 */
+function buildExecutiveAiReport_(d, ym, cat, rep){
+  const status = d.status || {};
+  const working = (d.working && d.working.info) || { totalWorkingDays: 20, elapsedWorkingDays: 10, ratio: 50.0 };
+  const target = status.target || {};
+  const actual = status.actual || {};
+  const order = d.order || { overall: {}, byRep: {} };
+  const cancel = d.cancel || { overall: {}, byRep: {} };
+  const repMetrics = status.repMetrics || {};
+  const repTargets = status.repTargets || {};
+
+  const [y, m] = ym.split('-');
+  const repLabel = rep ? (rep + ' 컨설턴트') : '지사 전체';
+  const authorName = (typeof SESSION !== 'undefined' && SESSION && SESSION.name) ? SESSION.name : '관리자';
+
+  // 수치 계산
+  const ordTgt = Number(target.목표_수주금액) || 0;
+  const ordAct = Number(actual.수주) || 0;
+  const ordPct = ordTgt ? Math.round((ordAct / ordTgt) * 100) : 0;
+
+  const startTgt = Number(target.목표_개시금액) || 0;
+  const startAct = Number(actual.개시) || 0;
+  const startPct = startTgt ? Math.round((startAct / startTgt) * 100) : 0;
+
+  const canTgt = Number(target.목표_유지감소) || 0;
+  const canAct = Number(actual.유지감소) || 0;
+  const canPct = canTgt ? Math.round((canAct / canTgt) * 100) : 0;
+
+  const netTgt = Number(target.목표_유지증가) || 0;
+  const netAct = Number(actual.유지증가) || 0;
+  const netPct = netTgt ? Math.round((netAct / netTgt) * 100) : 0;
+
+  const workRatio = working.ratio || 0;
+  const elDays = working.elapsedWorkingDays || 1;
+  const totDays = working.totalWorkingDays || 20;
+
+  // 진척 속도(Pace) 및 월말 예상 마감치
+  const estOrd = Math.round((ordAct / elDays) * totDays);
+  const estOrdPct = ordTgt ? Math.round((estOrd / ordTgt) * 100) : 0;
+  const estNet = Math.round((netAct / elDays) * totDays);
+
+  const paceDiff = ordPct - workRatio;
+  let paceStatus = '정상 궤도 진행 중 (양호 🔵)';
+  let paceTagCls = 'good';
+  let paceDesc = `현재 영업일수 진척도(${workRatio}%)와 유사한 흐름으로 진행 중입니다.`;
+  if (paceDiff >= 5) {
+    paceStatus = '목표 초과 달성 궤도 (우수 🟢)';
+    paceTagCls = 'good';
+    paceDesc = `경과일수(${workRatio}%) 대비 달성률(${ordPct}%)이 +${Math.round(paceDiff)}%p 앞서고 있어 매우 양호합니다.`;
+  } else if (paceDiff < -5) {
+    paceStatus = '목표 대비 진척 지연 (경고 🔴)';
+    paceTagCls = 'danger';
+    paceDesc = `경과일수(${workRatio}%) 대비 달성률(${ordPct}%)이 ${Math.round(paceDiff)}%p 뒤처져 월말 수주 스퍼트가 시급합니다.`;
+  }
+
+  // 1위 수주 컨설턴트 점유율
+  const repShare = repOrderShareList_(order);
+  const topRep = repShare.length ? repShare[0] : { name: '-', amount: 0, pctAmount: 0 };
+
+  // 해약 주요 사유
+  const cancelByReason = (cancel.overall && cancel.overall.byReason) || [];
+  const topCancelReason = cancelByReason.length ? cancelByReason[0] : { name: '-', amount: 0, pctAmount: 0 };
+
+  // 안전상품 실적 연계
+  const pdSummary = (typeof PRODUCT_DAILY_SUMMARY_EXTRA !== 'undefined' && PRODUCT_DAILY_SUMMARY_EXTRA) ? PRODUCT_DAILY_SUMMARY_EXTRA : {};
+  const pdTgt = (pdSummary.목표 && pdSummary.목표.수주) ? (Number(pdSummary.목표.수주) < 1000000 ? pdSummary.목표.수주 * 1000 : pdSummary.목표.수주) : 0;
+  const pdCard = Number(pdSummary.카드매출 || 0);
+
+  let html = `
+    <div class="ai-doc-header">
+      <div>
+        <div class="ai-doc-title">
+          <span>에스원 북서울지사 경영진 전략 진단 보고서</span>
+          <span class="ai-doc-badge">상황분석 AI</span>
+        </div>
+        <div style="font-size:13px; color:#475569; margin-top:4px;">
+          ${y}년 ${m}월 종합 실적 진척도 및 월말 목표 달성 전략 제언
+        </div>
+      </div>
+      <div class="ai-doc-meta">
+        <div><strong>분석대상:</strong> ${escHtml(repLabel)} (${escHtml(cat)})</div>
+        <div><strong>근무일수:</strong> ${elDays}/${totDays}일 (${workRatio}%) 경과</div>
+        <div><strong>작성자:</strong> ${escHtml(authorName)}</div>
+      </div>
+    </div>
+
+    <!-- 핵심 KPI 카드 그리드 -->
+    <div class="ai-kpi-grid">
+      <div class="ai-kpi-card green">
+        <div class="ai-kpi-lbl">수주 실적 (달성률)</div>
+        <div class="ai-kpi-val">${fmtK(ordAct)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>목표: ${fmtK(ordTgt)}천원</span>
+          <span class="ai-kpi-tag ${ordPct >= workRatio ? 'good' : 'danger'}">${ordPct}%</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card purple">
+        <div class="ai-kpi-lbl">순유지증가 (목표비)</div>
+        <div class="ai-kpi-val">${fmtK(netAct)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>목표: ${fmtK(netTgt)}천원</span>
+          <span class="ai-kpi-tag ${netPct >= workRatio ? 'good' : 'warn'}">${netPct}%</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card ${canPct <= workRatio ? 'green' : 'red'}">
+        <div class="ai-kpi-lbl">유지감소(해약) 소진율</div>
+        <div class="ai-kpi-val">${fmtK(canAct)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>한도: ${fmtK(canTgt)}천원</span>
+          <span class="ai-kpi-tag ${canPct <= workRatio ? 'good' : 'danger'}">${canPct}%</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card amber">
+        <div class="ai-kpi-lbl">월말 수주 전망 (Pace)</div>
+        <div class="ai-kpi-val">${fmtK(estOrd)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>예상 달성률</span>
+          <span class="ai-kpi-tag ${estOrdPct >= 100 ? 'good' : 'warn'}">${estOrdPct}%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 섹션 1: AI 종합 상황 진단 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">1. 상황 종합 진단 (Executive Diagnosis)</div>
+      <div class="ai-sec-body">
+        <p><strong>[진척 상태] ${paceStatus}</strong></p>
+        <p>${paceDesc} 현재까지 수주 실적은 <strong>${fmtK(ordAct)}천원</strong>으로 목표 대비 <strong>${ordPct}%</strong>를 달성 중이며, 현 페이스 유지 시 월말 약 <strong>${fmtK(estOrd)}천원(${estOrdPct}%)</strong> 수준 마감이 전망됩니다.</p>
+        <p>순유지증가는 개시 실적(${fmtK(startAct)}천원) 대비 유지감소(${fmtK(canAct)}천원) 통제가 ${canPct <= workRatio ? '안정적으로 유지되어' : '다소 상승하여'} 현재 <strong>${fmtK(netAct)}천원(${netPct}%)</strong>을 기록하고 있습니다.</p>
+      </div>
+    </div>
+
+    <!-- 섹션 2: 심층 요인 분석 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">2. 핵심 성과 요인 및 리스크 드라이버 분석</div>
+      <div class="ai-sec-body">
+        <ul style="padding-left:18px; margin:0;">
+          <li style="margin-bottom:6px;">
+            <strong>영업 인력별 성과 분포:</strong> 최다 수주자는 <strong>${escHtml(topRep.name)}</strong> 컨설턴트로 지사 전체 수주의 <strong>${topRep.pctAmount}%</strong>(${fmtK(topRep.amount)}천원)를 견인하고 있습니다. 일부 인력에 대한 수주 편중을 완화하고 중위권 컨설턴트의 수주 전환율 제고가 필요합니다.
+          </li>
+          <li style="margin-bottom:6px;">
+            <strong>해약 리스크 관리:</strong> 해약 사유 중 <strong>'${escHtml(topCancelReason.name)}'</strong> 비중이 <strong>${topCancelReason.pctAmount}%</strong>(${fmtK(topCancelReason.amount)}천원)로 가장 높게 나타났습니다.
+          </li>
+          <li>
+            <strong>안전상품 시너지:</strong> 안전상품은 목표 대비 자력 안건 및 카드매출(${fmtK(pdCard)}원)이 연계 집계되고 있으며, 미매출 안건의 조기 기산 전환이 당월 매출 확정의 핵심 변수입니다.
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 섹션 3: 경영진 3대 전략 권고 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">3. 경영진 3대 전략 실행 과제 (Action Plan)</div>
+      <ul class="ai-action-list">
+        <li class="ai-action-item">
+          <div class="ai-action-num">1</div>
+          <div class="ai-action-title">잔여 수주 목표 갭(${fmtK(Math.max(0, ordTgt - ordAct))}천원) 조기 해소를 위한 고확률 안건 집중 클로징</div>
+          <div class="ai-action-desc">제안서 기제출 고객 및 심의 진행 안건을 선별하여 지사장/관리자 합동 동행 영업을 통해 월말 이전 조기 수주 계약을 성사시킵니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">2</div>
+          <div class="ai-action-title">당월수주 기계약건의 공사 일정 전진 배치를 통한 개시율 극대화</div>
+          <div class="ai-action-desc">기수주건 중 개시일이 미정이거나 차월로 지연된 안건에 대해 기술팀/시공팀과 즉시 협의하여 당월 내 기산(매출) 확정으로 연결합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">3</div>
+          <div class="ai-action-title">유지감소 방어선 사수 (선제적 단가인상 및 재개시 프로모션 가동)</div>
+          <div class="ai-action-desc">해약 예고 및 이전 안건에 대해 일시중지 유도 후 재개시를 연계하고, 인상 대상처를 집중 공략하여 해약 손실액을 100% 이상 상쇄합니다.</div>
+        </li>
+      </ul>
+    </div>
+  `;
+
+  let text = `[에스원 북서울지사] ${y}년 ${m}월 AI 경영진 전략 진단 보고서\n` +
+    `기준: ${ym} (${repLabel}, ${cat}) | 근무일수: ${elDays}/${totDays}일 (${workRatio}%)\n\n` +
+    `■ 1. 핵심 KPI 현황\n` +
+    `- 수주 실적: ${fmtK(ordAct)}천원 / 목표: ${fmtK(ordTgt)}천원 (달성률 ${ordPct}%, 진척: ${paceStatus})\n` +
+    `- 개시 실적: ${fmtK(startAct)}천원 / 목표: ${fmtK(startTgt)}천원 (달성률 ${startPct}%)\n` +
+    `- 유지감소: ${fmtK(canAct)}천원 / 한도: ${fmtK(canTgt)}천원 (소진율 ${canPct}%)\n` +
+    `- 순유지증가: ${fmtK(netAct)}천원 / 목표: ${fmtK(netTgt)}천원 (달성률 ${netPct}%)\n` +
+    `- 월말 수주 전망치: 약 ${fmtK(estOrd)}천원 (예상 달성률 ${estOrdPct}%)\n\n` +
+    `■ 2. 상황 종합 진단\n` +
+    `${paceDesc}\n` +
+    `- 최다 수주: ${topRep.name} (${topRep.pctAmount}%, ${fmtK(topRep.amount)}천원)\n` +
+    `- 최다 해약사유: ${topCancelReason.name} (${topCancelReason.pctAmount}%)\n\n` +
+    `■ 3. 3대 전략 실행 과제\n` +
+    `1. 잔여 수주 갭(${fmtK(Math.max(0, ordTgt - ordAct))}천원) 조기 해소를 위한 고확률 안건 집중 클로징\n` +
+    `2. 기수주 미개시 건 공사 전진 배치를 통한 당월 개시율 극대화\n` +
+    `3. 단가인상 및 재개시 가속화를 통한 유지감소 방어선 사수\n`;
+
+  return { html: html, text: text };
+}
+
+/* 2. 컨설턴트 성과 진단 & 1:1 코칭 보고서 */
+function buildCoachingAiReport_(d, ym, cat, rep){
+  const status = d.status || {};
+  const order = d.order || { overall: {}, byRep: {} };
+  const repMetrics = status.repMetrics || {};
+  const repTargets = status.repTargets || {};
+  const overallAvg = (order.overall && order.overall.avgAmount) || 0;
+
+  const repList = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : [];
+  const repRows = repList.map(function(name){
+    const dRep = (order.byRep && order.byRep[name]) || { count: 0, amount: 0, avgAmount: 0, monthlyStartRate: 0 };
+    const mRep = repMetrics[name] || {};
+    const tRep = repTargets[name] || {};
+    const tgt = Number(tRep.목표_수주금액) || 0;
+    const act = Number(mRep.수주) || Number(dRep.amount) || 0;
+    const pct = tgt ? Math.round((act / tgt) * 100) : 0;
+    return {
+      name: name,
+      count: dRep.count || 0,
+      amount: act,
+      target: tgt,
+      pct: pct,
+      avgAmount: dRep.avgAmount || 0,
+      startRate: dRep.monthlyStartRate || 0
+    };
+  });
+
+  repRows.sort(function(a, b){ return b.amount - a.amount; });
+
+  let tableHtml = repRows.map(function(r, idx){
+    const rankBadge = idx < 3 ? `<span style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#2563eb; color:#fff; font-size:10px; font-weight:700; text-align:center; line-height:18px;">${idx+1}</span>` : String(idx+1);
+    const pctCls = r.pct >= 100 ? 'color:#059669; font-weight:700;' : (r.pct < 50 ? 'color:#dc2626; font-weight:700;' : 'color:#1e293b;');
+    return `<tr>
+      <td class="center">${rankBadge}</td>
+      <td class="center" style="font-weight:600;">${escHtml(r.name)}</td>
+      <td class="num">${fmtK(r.target)}천원</td>
+      <td class="num" style="font-weight:700;">${fmtK(r.amount)}천원</td>
+      <td class="center" style="${pctCls}">${r.pct}%</td>
+      <td class="center">${r.count}건</td>
+      <td class="num">${fmtK(r.avgAmount)}원</td>
+      <td class="center">${r.startRate}%</td>
+    </tr>`;
+  }).join('');
+
+  const topPerformer = repRows[0] || { name: '-', amount: 0, pct: 0 };
+  const lowPerformer = repRows[repRows.length - 1] || { name: '-', amount: 0, pct: 0 };
+
+  let html = `
+    <div class="ai-doc-header">
+      <div>
+        <div class="ai-doc-title">
+          <span>컨설턴트별 영업 성과 진단 & 1:1 코칭 리포트</span>
+          <span class="ai-doc-badge">조직역량 AI</span>
+        </div>
+        <div style="font-size:13px; color:#475569; margin-top:4px;">
+          개인별 수주 역량, 계약 단가 구조, 당월 개시 전환율 심층 평가
+        </div>
+      </div>
+      <div class="ai-doc-meta">
+        <div><strong>기준년월:</strong> ${ym}</div>
+        <div><strong>지사 평균 수주단가:</strong> ${fmtK(overallAvg)}원</div>
+      </div>
+    </div>
+
+    <!-- 컨설턴트 랭킹 테이블 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">1. 컨설턴트별 수주 실적 및 목표 달성 현황</div>
+      <table class="ai-data-table">
+        <thead>
+          <tr>
+            <th style="width:40px;">순위</th>
+            <th style="width:75px;">컨설턴트</th>
+            <th>목표</th>
+            <th>실적</th>
+            <th>달성률</th>
+            <th>건수</th>
+            <th>건당 평균단가</th>
+            <th>당월개시율</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableHtml}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 섹션 2: AI 성과 진단 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">2. 영업 패턴 및 생산성 비교 진단</div>
+      <div class="ai-sec-body">
+        <p><strong>[선두 그룹 우수 분석]</strong> <strong>${escHtml(topPerformer.name)}</strong> 컨설턴트가 <strong>${fmtK(topPerformer.amount)}천원(${topPerformer.pct}%)</strong>으로 지사 실적을 주도하고 있습니다. 건당 평균 계약단가가 높고 안정적인 대형 안건 확보 능력을 보입니다.</p>
+        <p><strong>[단가 및 개시 전환 병목]</strong> 수주 건수 대비 단가가 지사 평균(${fmtK(overallAvg)}원)을 밑도는 인력의 경우 복합 솔루션(영상/출입 패키징) 제안 훈련이 권장되며, 당월수주 당월개시율이 50% 미만인 안건은 기술팀과의 사전 실사 공조를 통해 개시 리드타임을 단축해야 합니다.</p>
+      </div>
+    </div>
+
+    <!-- 섹션 3: 1:1 맞춤형 코칭 가이드 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">3. 컨설턴트 그룹별 1:1 맞춤 액션 코칭 가이드</div>
+      <ul class="ai-action-list">
+        <li class="ai-action-item">
+          <div class="ai-action-num">A</div>
+          <div class="ai-action-title">달성률 우수 그룹 (달성률 80% 이상)</div>
+          <div class="ai-action-desc">기존 고객 기반의 안전상품 및 고부가 부가서비스 추가 제안(Cross-sell)을 유도하고, 지사 내 성공 영업 화법을 월례 미팅에서 공유하도록 합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">B</div>
+          <div class="ai-action-title">성장 잠재 그룹 (달성률 50% ~ 79%)</div>
+          <div class="ai-action-desc">클로징 직전 단계의 협상 안건을 점검하고, 견적 단계에서 단가 저항이 있는 고객에게 프로모션 및 결합 할인을 적절히 활용하도록 코칭합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">C</div>
+          <div class="ai-action-title">집중 지원 그룹 (달성률 50% 미만)</div>
+          <div class="ai-action-desc">활동량(방문/견적 건수) 파이프라인을 긴급 점검하고, 지사 관리자 1:1 동행 영업 지원 및 유망 리드 우선 배정을 통해 조기 성공 체험을 지원합니다.</div>
+        </li>
+      </ul>
+    </div>
+  `;
+
+  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 영업 성과 & 코칭 리포트\n` +
+    `지사 평균 수주단가: ${fmtK(overallAvg)}원\n\n` +
+    `■ 1. 컨설턴트별 수주 실적 순위\n`;
+  repRows.forEach(function(r, idx){
+    text += `${idx+1}. ${r.name}: ${fmtK(r.amount)}천원 / 목표 ${fmtK(r.target)}천원 (${r.pct}%), ${r.count}건, 평균 ${fmtK(r.avgAmount)}원, 개시율 ${r.startRate}%\n`;
+  });
+  text += `\n■ 2. AI 코칭 가이드\n` +
+    `- 우수 그룹: ${topPerformer.name} 중심 고부가 솔루션 크로스셀 강화 및 우수 사례 전파\n` +
+    `- 지원 그룹: 단가 제고 패키징 교육 및 미개시건 조기 기산 전환 집중 지원\n`;
+
+  return { html: html, text: text };
+}
+
+/* 3. 리스크 조기경보 & 해약 방어 보고서 */
+function buildRiskAiReport_(d, ym, cat, rep){
+  const status = d.status || {};
+  const cancel = d.cancel || { overall: {}, byRep: {} };
+  const priceUp = d.priceUp || { overall: {} };
+  const actual = status.actual || {};
+  const target = status.target || {};
+
+  const canTgt = Number(target.목표_유지감소) || 0;
+  const canAct = Number(actual.유지감소) || 0;
+  const canPct = canTgt ? Math.round((canAct / canTgt) * 100) : 0;
+
+  const upAmt = Number(priceUp.overall && priceUp.overall.amount) || 0;
+  const upCnt = Number(priceUp.overall && priceUp.overall.count) || 0;
+  const rstAmt = Number(actual.재개시) || 0;
+
+  const defAmt = upAmt + rstAmt;
+  const defRatio = canAct ? Math.round((defAmt / canAct) * 100) : 0;
+  const netCancel = canAct - defAmt;
+
+  const reasons = (cancel.overall && cancel.overall.byReason) || [];
+  let reasonRows = reasons.map(function(r){
+    return `<tr>
+      <td style="font-weight:600;">${escHtml(r.name)}</td>
+      <td class="center">${r.count}건</td>
+      <td class="num">${fmtK(r.amount)}천원</td>
+      <td class="center" style="font-weight:700;">${r.pctAmount}%</td>
+    </tr>`;
+  }).join('');
+
+  let riskLevel = '안전 상태 🟢';
+  let riskDesc = '해약 소진율이 목표 한도 내에서 매우 안정적으로 통제되고 있습니다.';
+  if (canPct > 100) {
+    riskLevel = '한도 초과 경고 🔴';
+    riskDesc = '유지감소 실적이 월간 목표 한도를 초과하여 순유지증가 달성에 적신호가 발생했습니다.';
+  } else if (canPct > 80) {
+    riskLevel = '주의 관찰 단계 🟡';
+    riskDesc = '유지감소 소진율이 80%를 넘어 잔여 기간 고액 해약 발생 시 한도 초과 위험이 있습니다.';
+  }
+
+  let html = `
+    <div class="ai-doc-header">
+      <div>
+        <div class="ai-doc-title">
+          <span>리스크 조기경보 및 해약 방어 전략 보고서</span>
+          <span class="ai-doc-badge" style="background:#fee2e2; color:#b91c1c;">리스크 AI</span>
+        </div>
+        <div style="font-size:13px; color:#475569; margin-top:4px;">
+          해약 발생 패턴 정밀 분석, 유지감소 방어선(인상·재개시) 점검 및 고객 리텐션 대책
+        </div>
+      </div>
+      <div class="ai-doc-meta">
+        <div><strong>기준년월:</strong> ${ym}</div>
+        <div><strong>리스크 판정:</strong> <strong>${riskLevel}</strong></div>
+      </div>
+    </div>
+
+    <!-- 리스크 지표 그리드 -->
+    <div class="ai-kpi-grid">
+      <div class="ai-kpi-card ${canPct <= 80 ? 'green' : (canPct <= 100 ? 'amber' : 'red')}">
+        <div class="ai-kpi-lbl">해약(유지감소) 실적</div>
+        <div class="ai-kpi-val">${fmtK(canAct)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>한도: ${fmtK(canTgt)}천원</span>
+          <span class="ai-kpi-tag ${canPct <= 80 ? 'good' : 'danger'}">${canPct}% 소진</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card green">
+        <div class="ai-kpi-lbl">단가인상 방어실적</div>
+        <div class="ai-kpi-val">${fmtK(upAmt)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>인상 건수: ${upCnt}건</span>
+          <span class="ai-kpi-tag good">상쇄기여</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card purple">
+        <div class="ai-kpi-lbl">재개시 방어실적</div>
+        <div class="ai-kpi-val">${fmtK(rstAmt)}천원</div>
+        <div class="ai-kpi-sub">
+          <span>재개시 복원</span>
+          <span class="ai-kpi-tag good">고객환원</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card ${defRatio >= 50 ? 'green' : 'amber'}">
+        <div class="ai-kpi-lbl">총 해약 상쇄 방어율</div>
+        <div class="ai-kpi-val">${defRatio}%</div>
+        <div class="ai-kpi-sub">
+          <span>순유지감소: ${fmtK(netCancel)}천원</span>
+          <span class="ai-kpi-tag ${defRatio >= 50 ? 'good' : 'warn'}">상쇄완료</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 섹션 1: 해약 원인 테이블 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">1. 해약 사유별 분포 및 점유율 분석</div>
+      <table class="ai-data-table">
+        <thead>
+          <tr>
+            <th>해약 사유</th>
+            <th>건수</th>
+            <th>해약 금액</th>
+            <th>금액 비중(%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${reasonRows || '<tr><td colspan="4" class="center">해약 데이터 없음</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 섹션 2: AI 리스크 진단 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">2. 유지감소 방어선 진단 및 영향도 평가</div>
+      <div class="ai-sec-body">
+        <p><strong>[상태 요약]</strong> ${riskDesc}</p>
+        <p>당월 단가 인상(${fmtK(upAmt)}천원)과 재개시(${fmtK(rstAmt)}천원)를 통해 총 <strong>${fmtK(defAmt)}천원</strong>의 방어 효과를 창출하여 해약 발생액의 <strong>${defRatio}%</strong>를 효과적으로 상쇄하였습니다. 실질 순유지감소는 <strong>${fmtK(netCancel)}천원</strong>으로 축소되었습니다.</p>
+      </div>
+    </div>
+
+    <!-- 섹션 3: 3대 해약 방어 대책 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">3. 3대 긴급 해약 방어 및 리텐션 전략</div>
+      <ul class="ai-action-list">
+        <li class="ai-action-item">
+          <div class="ai-action-num">1</div>
+          <div class="ai-action-title">이전/리모델링 고객의 일시중지 유도 및 신규 사업장 재개시 사전 확약</div>
+          <div class="ai-action-desc">사업장 이전으로 인한 완전 해약을 방지하기 위해 일시중지(보류) 제도를 적극 안내하고, 신규 매장 오픈 일정에 맞춘 재개시 설치를 조기 예약합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">2</div>
+          <div class="ai-action-title">비용 부담 고객 대상 다운셀(Down-sell) 상품 재설계 및 기기 업그레이드</div>
+          <div class="ai-action-desc">경기 침체로 요금 인하를 요구하는 고객에게 회선 조정 또는 최신 센서 무상 교체를 패키징하여 계약 유지를 이끌어냅니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">3</div>
+          <div class="ai-action-title">장기 계약 만료 고객 선제적 케어 방문 및 단가인상 타깃 발굴</div>
+          <div class="ai-action-desc">경쟁사 이탈 위험이 높은 3년 이상 계약 고객을 전수 점검하여 전담 CS/영업 방문을 실시하고, 인상 여력이 있는 우량 고객을 추가 발굴하여 방어 펀드를 확충합니다.</div>
+        </li>
+      </ul>
+    </div>
+  `;
+
+  let text = `[에스원 북서울지사] ${ym} 리스크 조기경보 & 해약 방어 전략 보고서\n` +
+    `리스크 판정: ${riskLevel} (${riskDesc})\n\n` +
+    `■ 1. 해약 및 방어 지표\n` +
+    `- 해약(유지감소) 실적: ${fmtK(canAct)}천원 / 한도 ${fmtK(canTgt)}천원 (소진율 ${canPct}%)\n` +
+    `- 단가인상 방어: ${fmtK(upAmt)}천원 (${upCnt}건)\n` +
+    `- 재개시 방어: ${fmtK(rstAmt)}천원\n` +
+    `- 총 해약 상쇄 방어율: ${defRatio}% (실질 순유지감소: ${fmtK(netCancel)}천원)\n\n` +
+    `■ 2. 3대 해약 방어 전략\n` +
+    `1. 이전/리모델링 고객 일시중지 유도 및 신규 사업장 재개시 연계\n` +
+    `2. 비용 부담 호소 고객 대상 맞춤형 요금/상품 재설계 방어\n` +
+    `3. 장기 고객 선제적 케어 및 단가인상 발굴을 통한 상쇄 유지\n`;
+
+  return { html: html, text: text };
+}
+
+/* 4. 안전상품 및 매출 파이프라인 보고서 */
+function buildPipelineAiReport_(d, ym, cat, rep){
+  const rows = (typeof PRODUCT_DAILY_ROWS !== 'undefined' && Array.isArray(PRODUCT_DAILY_ROWS)) ? PRODUCT_DAILY_ROWS : [];
+  const pdSummary = (typeof PRODUCT_DAILY_SUMMARY_EXTRA !== 'undefined' && PRODUCT_DAILY_SUMMARY_EXTRA) ? PRODUCT_DAILY_SUMMARY_EXTRA : {};
+  
+  const toWon_ = function(v){
+    const n = Number(v) || 0;
+    if (n === 0) return 0;
+    return (Math.abs(n) < 1000000) ? n * 1000 : n;
+  };
+
+  const ordTgt = toWon_((pdSummary.목표 && pdSummary.목표.수주) || 0);
+  const saleTgt = toWon_((pdSummary.목표 && pdSummary.목표.매출) || 0);
+  const cardSales = Number(pdSummary.카드매출 || 0);
+
+  // 당월 수주 집계 (보고일 기준)
+  const curMonthOrders = rows.filter(r => String(r.보고일 || '').slice(0, 7) === ym);
+  const ordTotal = curMonthOrders.reduce((s, r) => s + (Number(r.합계) || 0), 0);
+  const ordPct = ordTgt ? Math.round((ordTotal / ordTgt) * 100) : 0;
+
+  // 당월 매출 집계 (매출예상 기준)
+  const curMonthSales = rows.filter(r => {
+    const fYm = parseForecastYm_(r.매출예상, r.보고일);
+    return fYm === ym;
+  });
+
+  const saleConfirmed = curMonthSales.filter(r => String(r.매출여부||'').trim() !== '미매출');
+  const saleUnconfirmed = curMonthSales.filter(r => String(r.매출여부||'').trim() === '미매출');
+
+  const confirmedAmt = saleConfirmed.reduce((s, r) => s + (Number(r.합계) || 0), 0) + cardSales;
+  const unconfirmedAmt = saleUnconfirmed.reduce((s, r) => s + (Number(r.합계) || 0), 0);
+  const totalPipelineAmt = confirmedAmt + unconfirmedAmt;
+
+  const salePct = saleTgt ? Math.round((confirmedAmt / saleTgt) * 100) : 0;
+  const potentialPct = saleTgt ? Math.round((totalPipelineAmt / saleTgt) * 100) : 0;
+
+  // 미매출 상위 안건 리스트
+  let unbilledTable = saleUnconfirmed.slice(0, 5).map(function(r){
+    return `<tr>
+      <td class="center" style="font-weight:600;">${escHtml(r.계약번호 || '-')}</td>
+      <td>${escHtml(r.서비스제공처 || '-')}</td>
+      <td class="center">${escHtml(r.계약담당자 || '-')}</td>
+      <td class="num" style="font-weight:700;">${fmtK(r.합계 || 0)}원</td>
+      <td class="center"><span style="color:#d97706; font-weight:700;">미매출</span></td>
+    </tr>`;
+  }).join('');
+
+  let html = `
+    <div class="ai-doc-header">
+      <div>
+        <div class="ai-doc-title">
+          <span>안전상품 및 매출 파이프라인 분석 보고서</span>
+          <span class="ai-doc-badge" style="background:#fef3c7; color:#92400e;">파이프라인 AI</span>
+        </div>
+        <div style="font-size:13px; color:#475569; margin-top:4px;">
+          안전상품 수주·매출 진척률 및 미매출 안건 조기 기산 전환 전략
+        </div>
+      </div>
+      <div class="ai-doc-meta">
+        <div><strong>기준년월:</strong> ${ym}</div>
+        <div><strong>카드매출 합산:</strong> ${fmtK(cardSales)}원</div>
+      </div>
+    </div>
+
+    <!-- 파이프라인 지표 그리드 -->
+    <div class="ai-kpi-grid">
+      <div class="ai-kpi-card green">
+        <div class="ai-kpi-lbl">안전상품 수주 실적</div>
+        <div class="ai-kpi-val">${fmtK(ordTotal)}원</div>
+        <div class="ai-kpi-sub">
+          <span>목표: ${fmtK(ordTgt)}원</span>
+          <span class="ai-kpi-tag good">${ordPct}% 달성</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card purple">
+        <div class="ai-kpi-lbl">확정 매출 실적</div>
+        <div class="ai-kpi-val">${fmtK(confirmedAmt)}원</div>
+        <div class="ai-kpi-sub">
+          <span>목표: ${fmtK(saleTgt)}원</span>
+          <span class="ai-kpi-tag good">${salePct}% 확정</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card amber">
+        <div class="ai-kpi-lbl">미매출 대기 파이프라인</div>
+        <div class="ai-kpi-val">${fmtK(unconfirmedAmt)}원</div>
+        <div class="ai-kpi-sub">
+          <span>대기 건수: ${saleUnconfirmed.length}건</span>
+          <span class="ai-kpi-tag warn">전환대상</span>
+        </div>
+      </div>
+      <div class="ai-kpi-card green">
+        <div class="ai-kpi-lbl">전환 완료 시 예상달성률</div>
+        <div class="ai-kpi-val">${potentialPct}%</div>
+        <div class="ai-kpi-sub">
+          <span>예상 총매출: ${fmtK(totalPipelineAmt)}원</span>
+          <span class="ai-kpi-tag good">잠재력</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 섹션 1: 미매출 안건 테이블 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">1. 당월 매출확정 대상 미매출 주요 안건 (TOP 5)</div>
+      <table class="ai-data-table">
+        <thead>
+          <tr>
+            <th style="width:85px;">계약번호</th>
+            <th>서비스제공처</th>
+            <th style="width:75px;">담당자</th>
+            <th>금액</th>
+            <th style="width:70px;">상태</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${unbilledTable || '<tr><td colspan="5" class="center">당월 미매출 안건 없음 (전건 매출 완료)</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 섹션 2: AI 파이프라인 진단 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">2. 파이프라인 전환 진단 및 매출 전망</div>
+      <div class="ai-sec-body">
+        <p>현재 안전상품 확정 매출은 카드매출(${fmtK(cardSales)}원)을 포함하여 <strong>${fmtK(confirmedAmt)}원(${salePct}%)</strong> 수준입니다.</p>
+        <p>현재 대기 중인 <strong>${saleUnconfirmed.length}건(${fmtK(unconfirmedAmt)}원)</strong>의 미매출 안건이 당월 내 설치 완료되어 세금계산서가 발행될 경우 최종 매출 달성률은 <strong>${potentialPct}%</strong>까지 수직 상승할 수 있습니다.</p>
+      </div>
+    </div>
+
+    <!-- 섹션 3: 파이프라인 가속화 실행 과제 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">3. 안전상품 매출 극대화 3대 실행 과제</div>
+      <ul class="ai-action-list">
+        <li class="ai-action-item">
+          <div class="ai-action-num">1</div>
+          <div class="ai-action-title">미매출 안건 담당자 지정 및 시공팀 납기 단축 공조</div>
+          <div class="ai-action-desc">기수주된 미매출 안건에 대해 설치 시공 일정을 앞당겨 월말 3일 전까지 검수 완료 및 계산서 발행을 마칩니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">2</div>
+          <div class="ai-action-title">카드매출 정산 데이터 실시간 누락 검증</div>
+          <div class="ai-action-desc">가맹점 카드매출 승인 내역을 일일 단위로 대조하여 안전상품 매출 집계 누락을 원천 차단합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">3</div>
+          <div class="ai-action-title">차월(M+1) 매출예상 파이프라인 조기 발굴 및 선계약 추진</div>
+          <div class="ai-action-desc">기존 알람 고객의 설비 점검 시 CCTV 노후 카메라 교체 및 소화설비 번들 프로모션을 제안하여 차월 매출 파이프라인을 두텁게 구축합니다.</div>
+        </li>
+      </ul>
+    </div>
+  `;
+
+  let text = `[에스원 북서울지사] ${ym} 안전상품 및 매출 파이프라인 분석 보고서\n` +
+    `■ 1. 안전상품 핵심 지표\n` +
+    `- 수주 실적: ${fmtK(ordTotal)}원 / 목표 ${fmtK(ordTgt)}원 (${ordPct}%)\n` +
+    `- 확정 매출: ${fmtK(confirmedAmt)}원 / 목표 ${fmtK(saleTgt)}원 (${salePct}%)\n` +
+    `- 미매출 대기 파이프라인: ${fmtK(unconfirmedAmt)}원 (${saleUnconfirmed.length}건)\n` +
+    `- 전건 전환 시 예상달성률: ${potentialPct}% (예상 총액 ${fmtK(totalPipelineAmt)}원)\n\n` +
+    `■ 2. 3대 파이프라인 실행 과제\n` +
+    `1. 미매출 안건 시공 일정 단축을 통한 당월 매출 조기 확정\n` +
+    `2. 카드매출 집계 누락 방지 및 일일 대조 정산\n` +
+    `3. 기존 보안 고객 대상 안전상품 번들 프로모션 전개\n`;
+
+  return { html: html, text: text };
+}
+
+/* 클립보드 복사 */
+function copyAiReportText_(){
+  if (!AI_REPORT_LAST_TEXT_) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(AI_REPORT_LAST_TEXT_).then(function(){
+      alert('✓ AI 보고서 내용이 클립보드에 복사되었습니다.\n카카오톡, 메신저, 보고서 등에 바로 붙여넣기 할 수 있습니다.');
+    }).catch(function(){
+      fallbackCopyText_(AI_REPORT_LAST_TEXT_);
+    });
+  } else {
+    fallbackCopyText_(AI_REPORT_LAST_TEXT_);
+  }
+}
+
+function fallbackCopyText_(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  alert('✓ AI 보고서 내용이 클립보드에 복사되었습니다.');
+}
+
+/* 고해상도 인쇄 및 브라우저 PDF 저장 */
+function printAiReport_(){
+  window.print();
+}
+
+/* 원클릭 PDF 파일 다운로드 */
+function downloadAiReportPdf_(){
+  const area = document.getElementById('aiReportPrintWrapper');
+  if (!area) return;
+
+  if (typeof window.jspdf === 'undefined' || typeof window.html2canvas === 'undefined') {
+    window.print();
+    return;
+  }
+
+  setLoadingCursor(true);
+  const jsPDF = window.jspdf.jsPDF;
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 10;
+  const usableWidth = pageWidth - margin * 2;
+
+  window.html2canvas(area, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    useCORS: true,
+    logging: false
+  }).then(function(canvas){
+    setLoadingCursor(false);
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const imgWidth = usableWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    let heightLeft = imgHeight;
+    let position = margin;
+
+    doc.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+    heightLeft -= (pageHeight - margin * 2);
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight + margin;
+      doc.addPage();
+      doc.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - margin * 2);
+    }
+
+    const ym = (typeof DASH_YM !== 'undefined' && DASH_YM) ? DASH_YM : todayStr().slice(0, 7);
+    doc.save(`에스원_AI전략분석보고서_${AI_REPORT_CURRENT_MODE_}_${ym}.pdf`);
+  }).catch(function(err){
+    setLoadingCursor(false);
+    console.warn('PDF 직접 생성 실패, 인쇄 대화상자로 전환합니다:', err);
+    window.print();
+  });
 }
 
 /* ===================== 초기화 ===================== */
