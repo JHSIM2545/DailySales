@@ -4793,6 +4793,16 @@ td.prod-col, td.gross-col,
   font-weight: normal !important;
 }
 
+
+.rpt-chapter-break {
+  page-break-before: always !important;
+  break-before: page !important;
+}
+.ai-report-all-chapters {
+  font-family: 'Malgun Gothic', '맑은 고딕', 'Noto Sans CJK KR', sans-serif !important;
+  word-break: keep-all !important;
+}
+
 </style>  
 <style>
 /* ===================== AI 상황별 전략 분석 보고서 전용 프리미엄 스타일 ===================== */
@@ -5260,24 +5270,25 @@ td.prod-col, td.gross-col,
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="font-size:22px;">🤖</span>
         <div>
-          <div style="font-size:16px; font-weight:700; letter-spacing:-0.3px;">에스원 북서울지사 AI 상황별 전략 분석 보고서</div>
-          <div style="font-size:12px; color:#94a3b8;" id="aiReportMetaHeader">기준년월: - | 상품군: -</div>
+          <div style="font-size:16px; font-weight:700; letter-spacing:-0.3px;">에스원 북서울지사 종합 전략·코칭·리스크·파이프라인 통합 보고서</div>
+          <div style="font-size:12px; color:#94a3b8;" id="aiReportMetaHeader">기준년월: - | 구분: 4대 챕터 전체 통합 | 상품군: -</div>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
         <button type="button" class="btn-ai-action" onclick="copyAiReportText_()" title="클립보드로 복사" style="padding:6px 12px; background:#334155; color:#f8fafc; border:1px solid #475569; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📋 클립보드 복사</button>
         <button type="button" class="btn-ai-action" onclick="printAiReport_()" title="고해상도 벡터 인쇄 및 PDF 저장" style="padding:6px 12px; background:#2563eb; color:#fff; border:1px solid #1d4ed8; border-radius:4px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">🖨️ 인쇄 / PDF 저장</button>
-        <button type="button" class="btn-ai-action" onclick="downloadAiReportPdf_()" title="PDF 파일 즉시 다운로드" style="padding:6px 12px; background:#8e2f4e; color:#fff; border:1px solid #701f3a; border-radius:4px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">📄 PDF 다운로드</button>
+        <button type="button" class="btn-ai-action" onclick="downloadAllChaptersPdf_()" title="4개 챕터(종합경영진전략·컨설턴트코칭·리스크조기경보·안전상품파이프라인) 전체가 포함된 단일 PDF 다운로드" style="padding:6px 14px; background:#8e2f4e; color:#fff; border:1px solid #701f3a; border-radius:4px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(142,47,78,0.3);">📄 전체 통합 PDF 다운로드</button>
         <button type="button" onclick="closeAiStrategicReportModal_()" style="padding:4px 10px; background:transparent; color:#94a3b8; border:none; font-size:20px; font-weight:700; cursor:pointer; margin-left:4px;">✕</button>
       </div>
     </div>
 
     <!-- 모달 상황별 탭 선택 바 (화면 표시용) -->
-    <div class="ai-report-tabs-bar no-print" style="padding:8px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; gap:8px; flex-shrink:0; align-items:center;">
-      <button class="ai-tab-btn active" id="aiTabBtn_executive" onclick="setAiReportMode_('executive')">📊 종합 경영진 전략</button>
-      <button class="ai-tab-btn" id="aiTabBtn_coaching" onclick="setAiReportMode_('coaching')">👥 컨설턴트 코칭</button>
-      <button class="ai-tab-btn" id="aiTabBtn_risk" onclick="setAiReportMode_('risk')">🛡️ 리스크 조기경보</button>
-      <button class="ai-tab-btn" id="aiTabBtn_pipeline" onclick="setAiReportMode_('pipeline')">📦 안전상품 파이프라인</button>
+    <div class="ai-report-tabs-bar no-print" style="padding:8px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; gap:8px; flex-shrink:0; align-items:center; flex-wrap:wrap;">
+      <button class="ai-tab-btn active" id="aiTabBtn_all" onclick="setAiReportMode_('all')">📑 전체 챕터 종합 보고서 (통합)</button>
+      <button class="ai-tab-btn" id="aiTabBtn_executive" onclick="setAiReportMode_('executive')">📊 제1장. 종합 경영진 전략</button>
+      <button class="ai-tab-btn" id="aiTabBtn_coaching" onclick="setAiReportMode_('coaching')">👥 제2장. 컨설턴트 코칭</button>
+      <button class="ai-tab-btn" id="aiTabBtn_risk" onclick="setAiReportMode_('risk')">🛡️ 제3장. 리스크 조기경보</button>
+      <button class="ai-tab-btn" id="aiTabBtn_pipeline" onclick="setAiReportMode_('pipeline')">📦 제4장. 안전상품 파이프라인</button>
       <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
         <span style="font-size:12px; color:#64748b;">분석일시:</span>
         <span style="font-size:12px; font-weight:600; color:#334155;" id="aiReportGeneratedTime">-</span>
@@ -7370,7 +7381,8 @@ function renderDashboard(){
  DASH_REP_LIST.map(function(rep){ return '<option value="' + rep + '" ' + (DASH_REP===rep?'selected':'') + '>' + rep + '</option>'; }).join('') +  
  '</select>' +  
  '<button id="aiStrategicReportBtn" onclick="openAiStrategicReportModal_()" style="margin-left:auto; background:linear-gradient(135deg, #1e40af, #3b82f6); color:#fff; border:1px solid #1d4ed8; font-weight:700; box-shadow:0 2px 4px rgba(30,64,175,0.25); cursor:pointer;">🤖 AI 상황별 전략 보고서</button>' +  
- '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:6px; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +  
+ '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:6px; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +
+'<button id="dashPdfBtn" onclick="openAiStrategicReportModal_(\'all\')" style="margin-left:6px; background:#8e2f4e; color:#fff; border-color:#701f3a;">보고서 인쇄/PDF</button>' +  
  '</div>' +  
   
  '<div class="dash-scroll">' +  
@@ -11797,11 +11809,11 @@ function renderLoggedInUser_(name, role){
 }
 
 /* ===================== AI 상황별 전략 분석 보고서 모듈 (Interactive & Print/PDF Engine) ===================== */
-let AI_REPORT_CURRENT_MODE_ = 'executive';
+let AI_REPORT_CURRENT_MODE_ = 'all';
 let AI_REPORT_LAST_TEXT_ = '';
 
 function openAiStrategicReportModal_(mode){
-  if (mode) AI_REPORT_CURRENT_MODE_ = mode;
+  AI_REPORT_CURRENT_MODE_ = mode || 'all';
   const overlay = document.getElementById('aiStrategicReportModalOverlay');
   if (overlay) overlay.classList.add('open');
   if (typeof ensureBizTeamStatusLoaded_ === 'function') {
@@ -11819,8 +11831,8 @@ function closeAiStrategicReportModal_(){
 }
 
 function setAiReportMode_(mode){
-  AI_REPORT_CURRENT_MODE_ = mode || 'executive';
-  ['executive', 'coaching', 'risk', 'pipeline'].forEach(function(m){
+  AI_REPORT_CURRENT_MODE_ = mode || 'all';
+  ['all', 'executive', 'coaching', 'risk', 'pipeline'].forEach(function(m){
     const btn = document.getElementById('aiTabBtn_' + m);
     if (btn) btn.classList.toggle('active', m === AI_REPORT_CURRENT_MODE_);
   });
@@ -11844,7 +11856,11 @@ function renderAiStrategicReportContent_(){
   const metaEl = document.getElementById('aiReportMetaHeader');
   if (metaEl) {
     const repText = rep ? (rep + ' 컨설턴트') : '지사 전체';
-    metaEl.innerText = `기준: ${ym} | 상품군: ${cat} | 대상: ${repText}`;
+    const modeLabel = (AI_REPORT_CURRENT_MODE_ === 'all' || !AI_REPORT_CURRENT_MODE_) ? '4대 챕터 전체 통합' : 
+      (AI_REPORT_CURRENT_MODE_ === 'executive' ? '제1장. 종합 경영진 전략' :
+      (AI_REPORT_CURRENT_MODE_ === 'coaching' ? '제2장. 컨설턴트 코칭' :
+      (AI_REPORT_CURRENT_MODE_ === 'risk' ? '제3장. 리스크 조기경보' : '제4장. 안전상품 파이프라인')));
+    metaEl.innerText = `기준: ${ym} | 구분: ${modeLabel} | 상품군: ${cat} | 대상: ${repText}`;
   }
 
   let res = { html: '', text: '' };
@@ -11854,8 +11870,10 @@ function renderAiStrategicReportContent_(){
     res = buildRiskAiReport_(d, ym, cat, rep);
   } else if (AI_REPORT_CURRENT_MODE_ === 'pipeline') {
     res = buildPipelineAiReport_(d, ym, cat, rep);
-  } else {
+  } else if (AI_REPORT_CURRENT_MODE_ === 'executive') {
     res = buildExecutiveAiReport_(d, ym, cat, rep);
+  } else {
+    res = buildAllChaptersAiReport_(d, ym, cat, rep);
   }
 
   area.innerHTML = res.html;
@@ -12910,6 +12928,96 @@ function buildPipelineAiReport_(d, ym, cat, rep){
   return { html: html, text: text };
 }
 
+/* 5. 전체 챕터 종합 전략 리포트 (4대 챕터 전체 통합본) */
+function buildAllChaptersAiReport_(d, ym, cat, rep){
+  d = d || {};
+  const [y, m] = (ym || todayStr().slice(0, 7)).split('-');
+  const repLabel = rep ? (rep + ' 컨설턴트') : '지사 전체';
+  const authorName = (typeof SESSION !== 'undefined' && SESSION && SESSION.name) ? SESSION.name : '관리자';
+
+  const rExecutive = buildExecutiveAiReport_(d, ym, cat, rep);
+  const rCoaching = buildCoachingAiReport_(d, ym, cat, rep);
+  const rRisk = buildRiskAiReport_(d, ym, cat, rep);
+  const rPipeline = buildPipelineAiReport_(d, ym, cat, rep);
+
+  const coverHtml = `
+    <div class="ai-all-report-cover" style="padding:26px 24px; margin-bottom:28px; background:linear-gradient(135deg, #0b1f3f 0%, #1e3a8a 100%); color:#ffffff; border-radius:12px; box-shadow:0 6px 20px rgba(11,31,63,0.3);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+        <span style="font-size:11px; font-weight:800; letter-spacing:1px; background:rgba(255,255,255,0.18); padding:4px 12px; border-radius:4px; text-transform:uppercase;">S1 CORPORATION · NORTH SEOUL BRANCH</span>
+        <span style="font-size:12px; opacity:0.85;">발행일자: ${new Date().toLocaleDateString('ko-KR')}</span>
+      </div>
+      <h1 style="font-size:24px; font-weight:900; margin:0 0 10px 0; letter-spacing:-0.5px; color:#ffffff; line-height:1.35;">에스원 북서울지사 종합 경영전략 및 영업 리포트</h1>
+      <div style="font-size:13.5px; opacity:0.92; line-height:1.65; margin-bottom:18px;">
+        사업팀 16개 지사 벤치마크 연계 분석 · 전 기간 누적 데이터 기반 컨설턴트 역량 조명 & 원팀(One-Team) 성장 코칭 · 리스크 조기경보 및 해약 방어 · 안전상품 및 부가 솔루션 파이프라인 통합 분석
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; background:rgba(255,255,255,0.12); padding:12px 16px; border-radius:8px; font-size:12px; border:1px solid rgba(255,255,255,0.18);">
+        <div><strong style="color:#93c5fd;">제1장</strong> 📊 종합 경영진 전략</div>
+        <div><strong style="color:#93c5fd;">제2장</strong> 👥 컨설턴트 코칭 (원팀)</div>
+        <div><strong style="color:#93c5fd;">제3장</strong> 🛡️ 리스크 조기경보 & 방어</div>
+        <div><strong style="color:#93c5fd;">제4장</strong> 📦 안전상품 파이프라인</div>
+      </div>
+      <div style="margin-top:14px; font-size:12px; opacity:0.85; display:flex; gap:16px; flex-wrap:wrap; border-top:1px solid rgba(255,255,255,0.15); padding-top:10px;">
+        <span>기준년월: <strong>${y}년 ${m}월</strong></span>
+        <span>상품군: <strong>${escHtml(cat)}</strong></span>
+        <span>분석대상: <strong>${escHtml(repLabel)}</strong></span>
+        <span>작성자: <strong>${escHtml(authorName)}</strong></span>
+      </div>
+    </div>
+  `;
+
+  const chapterDivider = function(num, title, sub){
+    return `
+      <div class="rpt-chapter-break" style="page-break-before:always; margin-top:36px; padding-top:24px; border-top:3px solid #2563eb;">
+        <div style="display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:#2563eb; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; background:#eff6ff; padding:3px 10px; border-radius:4px; border:1px solid #bfdbfe;">
+          <span>CHAPTER 0${num}</span>
+        </div>
+        <h2 style="font-size:20px; font-weight:800; color:#0f172a; margin:0 0 6px 0; letter-spacing:-0.4px;">${title}</h2>
+        ${sub ? `<div style="font-size:12.5px; color:#64748b; margin-bottom:18px;">${sub}</div>` : ''}
+      </div>
+    `;
+  };
+
+  const html = `
+    <div class="ai-report-all-chapters" style="font-family:'Malgun Gothic','맑은 고딕','Noto Sans CJK KR',sans-serif; word-break:keep-all;">
+      ${coverHtml}
+
+      <div class="rpt-chapter-block" id="rpt_chapter_1">
+        ${chapterDivider(1, '제1장. 종합 경영진 전략 보고서', '사업팀 16개 지사 벤치마크 연계 분석, 4대 비율 진단 및 지사 성장 로드맵')}
+        ${rExecutive.html}
+      </div>
+
+      <div class="rpt-chapter-block" id="rpt_chapter_2">
+        ${chapterDivider(2, '제2장. 컨설턴트별 역량 조명 & 원팀(One-Team) 성장 리포트', '개인별 강점 조명, 전 기간 누적 데이터 기반 다각도 역량 분석 및 상호 응원 코칭')}
+        ${rCoaching.html}
+      </div>
+
+      <div class="rpt-chapter-block" id="rpt_chapter_3">
+        ${chapterDivider(3, '제3장. 리스크 조기경보 및 해약 방어 전략', '해약 핵심 지표 진단, 사유별 점유율 분석 및 3대 긴급 고객 리텐션 실행 전술')}
+        ${rRisk.html}
+      </div>
+
+      <div class="rpt-chapter-block" id="rpt_chapter_4">
+        ${chapterDivider(4, '제4장. 안전상품 및 부가 솔루션 파이프라인 분석', '블루스캔·휴엔·디지털 핵심 실적 진척 및 당월 매출확정 대상 미매출 전환 TOP 5')}
+        ${rPipeline.html}
+      </div>
+    </div>
+  `;
+
+  const text = `========================================================================\n` +
+    `에스원 북서울지사 종합 경영전략 및 영업 리포트 (4대 챕터 전체 통합본)\n` +
+    `기준: ${y}년 ${m}월 | 상품군: ${cat} | 대상: ${repLabel}\n` +
+    `========================================================================\n\n` +
+    `[제1장. 종합 경영진 전략 보고서]\n` + rExecutive.text + `\n\n` +
+    `------------------------------------------------------------------------\n` +
+    `[제2장. 컨설턴트별 역량 조명 & 원팀 성장 리포트]\n` + rCoaching.text + `\n\n` +
+    `------------------------------------------------------------------------\n` +
+    `[제3장. 리스크 조기경보 및 해약 방어 전략]\n` + rRisk.text + `\n\n` +
+    `------------------------------------------------------------------------\n` +
+    `[제4장. 안전상품 및 부가 솔루션 파이프라인 분석]\n` + rPipeline.text;
+
+  return { html: html, text: text };
+}
+
 /* 클립보드 복사 */
 function copyAiReportText_(){
   if (!AI_REPORT_LAST_TEXT_) return;
@@ -12934,13 +13042,33 @@ function fallbackCopyText_(text){
   alert('✓ AI 보고서 내용이 클립보드에 복사되었습니다.');
 }
 
-/* 고해상도 인쇄 및 브라우저 PDF 저장 */
+/* 고해상도 인쇄 및 브라우저 PDF 저장 (4대 챕터 전체 또는 선택 챕터) */
 function printAiReport_(){
   window.print();
 }
 
-/* 원클릭 PDF 파일 다운로드 */
+/* 4개 챕터 전체가 포함된 통합 PDF 즉시 다운로드 */
+function downloadAllChaptersPdf_(){
+  if (AI_REPORT_CURRENT_MODE_ !== 'all') {
+    setAiReportMode_('all');
+    setTimeout(function(){
+      executePdfDownload_('에스원_북서울지사_종합전략보고서_전체통합본');
+    }, 120);
+  } else {
+    executePdfDownload_('에스원_북서울지사_종합전략보고서_전체통합본');
+  }
+}
+
+/* PDF 다운로드 (기본: 전체 4대 챕터 통합 다운로드) */
 function downloadAiReportPdf_(){
+  const prefix = (AI_REPORT_CURRENT_MODE_ === 'all' || !AI_REPORT_CURRENT_MODE_) 
+    ? '에스원_북서울지사_종합전략보고서_전체통합본' 
+    : `에스원_AI전략분석보고서_${AI_REPORT_CURRENT_MODE_}`;
+  executePdfDownload_(prefix);
+}
+
+/* 정밀 캔버스 슬라이싱 PDF 생성 엔진 (A4 규격 분할 및 폰트 깨짐/잘림 방지) */
+function executePdfDownload_(customPrefix){
   const area = document.getElementById('aiReportPrintWrapper');
   if (!area) return;
 
@@ -12956,33 +13084,46 @@ function downloadAiReportPdf_(){
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 10;
   const usableWidth = pageWidth - margin * 2;
+  const usableHeight = pageHeight - margin * 2;
 
   window.html2canvas(area, {
     backgroundColor: '#ffffff',
     scale: 2,
     useCORS: true,
-    logging: false
+    logging: false,
+    windowWidth: area.scrollWidth || 960
   }).then(function(canvas){
     setLoadingCursor(false);
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const imgWidth = usableWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
     
-    let heightLeft = imgHeight;
-    let position = margin;
+    // 페이지별 캔버스 높이 계산
+    const pageCanvasHeight = Math.floor((canvas.width * usableHeight) / usableWidth);
+    let yOffset = 0;
+    let pageNum = 0;
 
-    doc.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
-    heightLeft -= (pageHeight - margin * 2);
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight + margin;
-      doc.addPage();
-      doc.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - margin * 2);
+    while (yOffset < canvas.height) {
+      if (pageNum > 0) {
+        doc.addPage();
+      }
+      const sliceHeight = Math.min(pageCanvasHeight, canvas.height - yOffset);
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceHeight;
+      const ctx = pageCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+      ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+      
+      const pageData = pageCanvas.toDataURL('image/jpeg', 0.95);
+      const sliceMmHeight = (sliceHeight * usableWidth) / canvas.width;
+      doc.addImage(pageData, 'JPEG', margin, margin, usableWidth, sliceMmHeight);
+      
+      yOffset += sliceHeight;
+      pageNum++;
     }
 
     const ym = (typeof DASH_YM !== 'undefined' && DASH_YM) ? DASH_YM : todayStr().slice(0, 7);
-    doc.save(`에스원_AI전략분석보고서_${AI_REPORT_CURRENT_MODE_}_${ym}.pdf`);
+    const prefix = customPrefix || '에스원_북서울지사_종합전략보고서_전체통합본';
+    doc.save(`${prefix}_${ym}.pdf`);
   }).catch(function(err){
     setLoadingCursor(false);
     console.warn('PDF 직접 생성 실패, 인쇄 대화상자로 전환합니다:', err);
