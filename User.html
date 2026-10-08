@@ -7499,6 +7499,71 @@ function ensureBizTeamStatusLoaded_(cb){
     if (cb) BIZ_TEAM_LOADING_PROMISE_.then(function(){ setTimeout(cb, 0); });
     return;
   }
+
+
+/* --- ensureProductDailyLoaded_ (안전상품 및 상품일보 데이터 실시간 로드 보장) --- */
+let PRODUCT_DAILY_LOADING_PROMISE_ = null;
+function ensureProductDailyLoaded_(cb){
+  if (PRODUCT_DAILY_ROWS && PRODUCT_DAILY_ROWS.length > 0 && PRODUCT_DAILY_SUMMARY_EXTRA) {
+    if (cb) setTimeout(cb, 0);
+    return;
+  }
+  if (PRODUCT_DAILY_LOADING_PROMISE_) {
+    if (cb) PRODUCT_DAILY_LOADING_PROMISE_.then(function(){ setTimeout(cb, 0); });
+    return;
+  }
+  const ym = (typeof DASH_YM !== 'undefined' && DASH_YM) ? DASH_YM : todayStr().slice(0, 7);
+  PRODUCT_DAILY_LOADING_PROMISE_ = new Promise(function(resolve){
+    let done = 0;
+    const finish = function(){
+      done++;
+      if (done >= 2) {
+        PRODUCT_DAILY_LOADING_PROMISE_ = null;
+        resolve();
+        if (cb) setTimeout(cb, 0);
+      }
+    };
+
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      finish();
+      finish();
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(data){
+        if (data && data.rows) {
+          PRODUCT_DAILY_ROWS = (data.rows || []).map(r => {
+            const obj = { id: r[r.length-1] };
+            if (typeof PRODUCT_DAILY_HEADERS !== 'undefined') {
+              PRODUCT_DAILY_HEADERS.forEach((h, i) => obj[h] = r[i]);
+            }
+            return obj;
+          });
+          if (typeof SCOPE_LOADED_ !== 'undefined') SCOPE_LOADED_.productdaily = true;
+        }
+        finish();
+      })
+      .withFailureHandler(function(err){
+        console.warn('ensureProductDailyLoaded_ getProductDailyData error:', err);
+        finish();
+      })
+      .getProductDailyData(SESSION.token);
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        if (res && res.success) {
+          PRODUCT_DAILY_SUMMARY_EXTRA = res;
+        }
+        finish();
+      })
+      .withFailureHandler(function(err){
+        console.warn('ensureProductDailyLoaded_ getSafetyProductSummary error:', err);
+        finish();
+      })
+      .getSafetyProductSummary(SESSION.token, ym);
+  });
+}
   BIZ_TEAM_LOADING_PROMISE_ = new Promise(function(resolve){
     google.script.run  
       .withSuccessHandler(function(res){  
@@ -11816,13 +11881,20 @@ function openAiStrategicReportModal_(mode){
   AI_REPORT_CURRENT_MODE_ = mode || 'all';
   const overlay = document.getElementById('aiStrategicReportModalOverlay');
   if (overlay) overlay.classList.add('open');
-  if (typeof ensureBizTeamStatusLoaded_ === 'function') {
-    ensureBizTeamStatusLoaded_(function(){
+
+  const area = document.getElementById('aiReportPrintWrapper');
+  if (area && (!PRODUCT_DAILY_ROWS || PRODUCT_DAILY_ROWS.length === 0)) {
+    area.innerHTML = '<div style="text-align:center; padding:60px 20px; color:#64748b; font-size:14px;"><strong style="font-size:16px; color:#1e3a8a;">🤖 실시간 지사 데이터 및 안전상품 파이프라인 분석 중...</strong><br><span style="font-size:12.5px; opacity:0.85; margin-top:6px; display:inline-block;">최신 수주 실적, 사업팀 16개 지사 벤치마크, 상품일보 파이프라인을 실시간으로 집계하고 있습니다.</span></div>';
+  }
+
+  const loadBiz = (typeof ensureBizTeamStatusLoaded_ === 'function') ? ensureBizTeamStatusLoaded_ : (cb => cb());
+  const loadPd = (typeof ensureProductDailyLoaded_ === 'function') ? ensureProductDailyLoaded_ : (cb => cb());
+
+  loadBiz(function(){
+    loadPd(function(){
       setAiReportMode_(AI_REPORT_CURRENT_MODE_);
     });
-  } else {
-    setAiReportMode_(AI_REPORT_CURRENT_MODE_);
-  }
+  });
 }
 
 function closeAiStrategicReportModal_(){
@@ -12222,15 +12294,16 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
     <div class="ai-section">
       <div class="ai-sec-head">2. 상품군별 수주 및 유지증가 페이스 비교 평가 (일반알람 vs 블루스캔·휴엔·디지털)</div>
       <div class="ai-sec-body">
-        <table class="ai-data-table" style="margin-bottom:10px;">
+        <table class="ai-data-table" style="margin-bottom:6px; font-size:11.5px;">
           <thead>
             <tr>
               <th>상품군</th>
               <th>수주 건수</th>
               <th>수주 금액</th>
-              <th>수주 비중(%)</th>
+              <th>수주 비중</th>
               <th>개시 실적</th>
-              <th>유지감소(해약)</th>
+              <th>해약 발생</th>
+              <th>단가변동(인상/인하)</th>
               <th>순유지증가</th>
             </tr>
           </thead>
@@ -12241,8 +12314,9 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
               <td class="num">${fmtK(pAlarm.orderAmount)}원</td>
               <td class="center">${Math.round((pAlarm.orderAmount/totalPOrdAmt)*100)}%</td>
               <td class="num">${fmtK(pAlarm.startAmount)}원</td>
-              <td class="num">${fmtK(pAlarm.cancelAmount)}원</td>
-              <td class="num" style="font-weight:700; color:${pAlarm.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pAlarm.netAmount)}원</td>
+              <td class="num" style="color:#64748b;">${fmtK(pAlarm.cancelAmount)}원</td>
+              <td class="num" style="color:#059669; font-weight:700;">+${fmtK(pAlarm.priceUpAmount - pAlarm.priceDownAmount)}원</td>
+              <td class="num" style="font-weight:800; color:${pAlarm.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pAlarm.netAmount)}원</td>
             </tr>
             <tr>
               <td style="font-weight:700;">블루스캔 (자력영상)</td>
@@ -12250,8 +12324,9 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
               <td class="num">${fmtK(pBScan.orderAmount)}원</td>
               <td class="center">${Math.round((pBScan.orderAmount/totalPOrdAmt)*100)}%</td>
               <td class="num">${fmtK(pBScan.startAmount)}원</td>
-              <td class="num">${fmtK(pBScan.cancelAmount)}원</td>
-              <td class="num" style="font-weight:700; color:${pBScan.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pBScan.netAmount)}원</td>
+              <td class="num" style="color:#64748b;">${fmtK(pBScan.cancelAmount)}원</td>
+              <td class="num" style="color:#059669; font-weight:700;">+${fmtK(pBScan.priceUpAmount - pBScan.priceDownAmount)}원</td>
+              <td class="num" style="font-weight:800; color:${pBScan.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pBScan.netAmount)}원</td>
             </tr>
             <tr>
               <td style="font-weight:700;">휴엔 (환경/방제)</td>
@@ -12259,8 +12334,9 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
               <td class="num">${fmtK(pHuen.orderAmount)}원</td>
               <td class="center">${Math.round((pHuen.orderAmount/totalPOrdAmt)*100)}%</td>
               <td class="num">${fmtK(pHuen.startAmount)}원</td>
-              <td class="num">${fmtK(pHuen.cancelAmount)}원</td>
-              <td class="num" style="font-weight:700; color:${pHuen.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pHuen.netAmount)}원</td>
+              <td class="num" style="color:#64748b;">${fmtK(pHuen.cancelAmount)}원</td>
+              <td class="num" style="color:#059669; font-weight:700;">+${fmtK(pHuen.priceUpAmount - pHuen.priceDownAmount)}원</td>
+              <td class="num" style="font-weight:800; color:${pHuen.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pHuen.netAmount)}원</td>
             </tr>
             <tr>
               <td style="font-weight:700;">디지털 (정보보안)</td>
@@ -12268,11 +12344,28 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
               <td class="num">${fmtK(pDigital.orderAmount)}원</td>
               <td class="center">${Math.round((pDigital.orderAmount/totalPOrdAmt)*100)}%</td>
               <td class="num">${fmtK(pDigital.startAmount)}원</td>
-              <td class="num">${fmtK(pDigital.cancelAmount)}원</td>
-              <td class="num" style="font-weight:700; color:${pDigital.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pDigital.netAmount)}원</td>
+              <td class="num" style="color:#64748b;">${fmtK(pDigital.cancelAmount)}원</td>
+              <td class="num" style="color:${(pDigital.priceUpAmount - pDigital.priceDownAmount) >= 0 ? '#059669' : '#dc2626'}; font-weight:700;">${(pDigital.priceUpAmount - pDigital.priceDownAmount) >= 0 ? '+' : ''}${fmtK(pDigital.priceUpAmount - pDigital.priceDownAmount)}원</td>
+              <td class="num" style="font-weight:800; color:${pDigital.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pDigital.netAmount)}원</td>
             </tr>
           </tbody>
+          <tfoot>
+            <tr style="background:#f1f5f9; font-weight:700;">
+              <td>지사 합계</td>
+              <td class="center">${pAlarm.orderCount + pBScan.orderCount + pHuen.orderCount + pDigital.orderCount}건</td>
+              <td class="num">${fmtK(pAlarm.orderAmount + pBScan.orderAmount + pHuen.orderAmount + pDigital.orderAmount)}원</td>
+              <td class="center">100%</td>
+              <td class="num">${fmtK(pAlarm.startAmount + pBScan.startAmount + pHuen.startAmount + pDigital.startAmount)}원</td>
+              <td class="num">${fmtK(pAlarm.cancelAmount + pBScan.cancelAmount + pHuen.cancelAmount + pDigital.cancelAmount)}원</td>
+              <td class="num" style="color:#059669;">+${fmtK((pAlarm.priceUpAmount - pAlarm.priceDownAmount) + (pBScan.priceUpAmount - pBScan.priceDownAmount) + (pHuen.priceUpAmount - pHuen.priceDownAmount) + (pDigital.priceUpAmount - pDigital.priceDownAmount))}원</td>
+              <td class="num" style="color:#1d4ed8;">+${fmtK(pAlarm.netAmount + pBScan.netAmount + pHuen.netAmount + pDigital.netAmount)}원</td>
+            </tr>
+          </tfoot>
         </table>
+        <div style="font-size:11px; color:#475569; margin:4px 0 10px 0; background:#f8fafc; padding:6px 10px; border-radius:4px; border:1px solid #e2e8f0;">
+          💡 <strong>순유지증가 산식 안내:</strong> 순유지증가 = 개시 실적 - 해약 발생 + 단가변동(인상/인하)<br>
+          (예: 일반알람 개시 1,200,000원 - 해약 120,000원 + 인상 180,000원 = <strong>+1,260,000원</strong> / 지사 합계: 1,850,000원 - 170,000원 + 280,000원 = <strong>+1,960,000원</strong>)
+        </div>
         <div style="font-size:12.5px; color:#334155; line-height:1.5;">
           <p style="margin:0 0 4px 0;"><strong>[상품군별 문제점 및 평가]</strong> 지사 실적이 기존 일반알람에 과도하게 편중(${Math.round((pAlarm.orderAmount/totalPOrdAmt)*100)}%)되어 있으며, 고수익 자력 상품인 <strong>블루스캔</strong>과 부가 전략 상품인 <strong>휴엔·디지털</strong>의 수주 비중이 상대적으로 미흡합니다.</p>
           <p style="margin:0;">휴엔과 디지털은 신규 단독 영업보다 '기존 알람 유지 고객사 대상 결합 판매(Cross-sell)' 시 성공 확률이 비약적으로 상승하므로, 기존 고객군을 대상으로 한 패키지 제안 캠페인을 통해 복합 유지증가를 가속화해야 합니다.</p>
@@ -12374,7 +12467,11 @@ function buildCoachingAiReport_(d, ym, cat, rep){
   const bizData = getBizTeamBenchmarkData_(d);
   const biz = analyzeBizTeamBenchmark_(bizData, '북서울');
 
-  const repList = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+  const repList = (typeof DASH_REP_LIST !== 'undefined' && DASH_REP_LIST && DASH_REP_LIST.length) 
+    ? DASH_REP_LIST 
+    : ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+
+  // 컨설턴트별 실시간 실적 집계 및 동적 역량 진단
   const repRows = repList.map(function(name){
     const dRep = (order.byRep && order.byRep[name]) || {};
     const prof = repProfiles[name] || {};
@@ -12393,27 +12490,79 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     
     const pct = tgt ? Math.round((act / tgt) * 100) : 0;
     
-    // 전 기간 및 당월 지표 결합
     const curCount = (prof.curCount !== undefined) ? prof.curCount : (dRep.count || 0);
     const curAvg = (prof.curAvg !== undefined) ? prof.curAvg : (dRep.avgAmount || 0);
     const allCount = (prof.allCount !== undefined) ? prof.allCount : (dRep.allCount || 0);
     const allAmt = (prof.allAmount !== undefined) ? prof.allAmount : (dRep.allAmount || 0);
     const allAvg = (prof.allAvg !== undefined) ? prof.allAvg : (dRep.allAvg || 0);
     const avgGapDays = (prof.avgGapDays !== undefined) ? prof.avgGapDays : (dRep.avgOrderGapDays || 0);
-    const timingStyle = prof.timingStyle || dRep.timingStyle || '월중 고른 분포형 ⚖️';
+    const timingStyle = prof.timingStyle || dRep.timingStyle || '월중 균등형 ⚖️';
     const industry = prof.industry || dRep.industry || '일반근생/기타';
     const pioneerRate = (prof.pioneerRate !== undefined) ? prof.pioneerRate : (dRep.pioneerRate || 0);
     const agencyRate = (prof.agencyRate !== undefined) ? prof.agencyRate : (dRep.agencyRate || 0);
-    const momPace = prof.momPace || dRep.momPace || '전월 수준 유지 🔵';
-    const archetype = prof.archetype || dRep.archetype || '현장 밀착형 신뢰 파트너 🏃';
-    const archetypeTitle = prof.archetypeTitle || dRep.archetypeTitle || '';
-    const archetypeDesc = prof.archetypeDesc || dRep.archetypeDesc || '';
+    const momPace = prof.momPace || dRep.momPace || '정상 유지 🔵';
     const startRate = (prof.startRate !== undefined) ? prof.startRate : (dRep.monthlyStartRate || 0);
     const cancelAmt = (prof.cancelAmount !== undefined) ? prof.cancelAmount : (dRep.cancelAmount || 0);
     const priceUpAmt = (prof.priceUpAmount !== undefined) ? prof.priceUpAmount : (dRep.priceUpAmount || 0);
     const contributionRate = (prof.contributionRate !== undefined) ? prof.contributionRate : (dRep.contributionRate || 0);
     const futureBillingCount = dRep.futureBillingCount || 0;
     const excessiveTestCount = dRep.excessiveTestCount || 0;
+
+    // 1. 데이터 기반 실시간 역량 아키타입 동적 판정
+    let dynamicArchetype = '';
+    let dynamicBadge = '';
+    let dynamicDiagnosis = '';
+
+    if (allAvg >= 650000 || curAvg >= 650000) {
+      dynamicArchetype = '대형 프로젝트 스페셜리스트 🏢';
+      dynamicBadge = '대형 수주 전문';
+      dynamicDiagnosis = `전 기간 평균단가가 ${fmtK(allAvg || curAvg)}원에 달하는 대형 안건 협상 역량을 보유하고 있으며, 고수익 안건 클로징에 특화되어 있습니다.`;
+    } else if (allCount >= 18 || (act >= 2000 && curCount >= 5)) {
+      dynamicArchetype = '안정적 고빈도 볼륨 리더 ⚖️';
+      dynamicBadge = '수주 볼륨 견인차';
+      dynamicDiagnosis = `수주 주기가 ${avgGapDays > 0 ? avgGapDays + '일' : '월중 균등'}로 매우 일정한 수주 리듬을 유지하며, 지사 전체 실적의 ${contributionRate}%를 든든하게 견인하고 있습니다.`;
+    } else if (pct >= 100 || (curCount >= 3 && avgGapDays > 0 && avgGapDays <= 7)) {
+      dynamicArchetype = '모멘텀 고속 성장 에이스 🚀';
+      dynamicBadge = '성장 속도 혁신';
+      dynamicDiagnosis = `수주 주기를 ${avgGapDays > 0 ? avgGapDays + '일' : '월초 가속'}로 단축시키며 당월 목표 ${pct}%를 조기 완수한 지사 성장 모멘텀의 주역입니다.`;
+    } else if (startRate >= 80 && curCount > 0) {
+      dynamicArchetype = '현장 밀착형 신뢰 파트너 🏃';
+      dynamicBadge = '개시율 100% 모범';
+      dynamicDiagnosis = `지역 현장 밀착형 개척과 당월 수주 개시율 ${startRate}%로 지사의 실속 있고 단단한 영업 기반을 지켜주는 모범 파트너입니다.`;
+    } else if (act === 0 || curCount === 0) {
+      dynamicArchetype = '신규 도약 잠재력 빌드업 🎯';
+      dynamicBadge = '도약 준비(동행 지원)';
+      dynamicDiagnosis = `현재는 신규 고객층 발굴 및 가망 파이프라인을 다지는 소중한 빌드업 기간으로, 1:1 밀착 동행 시 가장 높은 반등 잠재력을 지니고 있습니다.`;
+    } else if (pioneerRate >= 65) {
+      dynamicArchetype = '자력 개척 스페셜리스트 🧭';
+      dynamicBadge = '순수 개척 강자';
+      dynamicDiagnosis = `순수 자력 개척 비중이 ${pioneerRate}%에 달하여 외부 채널 의존 없이 스스로 고수익 시장을 개척하는 뛰어난 개인 역량을 보유하고 있습니다.`;
+    } else {
+      dynamicArchetype = '협업 시너지 파트너 🤝';
+      dynamicBadge = '상생 영업 리더';
+      dynamicDiagnosis = `대리점 협업 비중(${agencyRate}%)을 바탕으로 지사의 안정적 계약 풀 유지에 기여하고 있습니다.`;
+    }
+
+    // 2. 데이터 기반 1:1 맞춤형 성장 액션 플랜 동적 생성
+    const actions = [];
+    if (futureBillingCount > 0 || excessiveTestCount > 0) {
+      actions.push(`차월 기산(${futureBillingCount}건) 및 15일 이상 장기 테스트(${excessiveTestCount}건)는 고객사 소통을 통해 14일 이내 조기 기산으로 조율하여 당월 매출로 확정 전환`);
+    }
+    if (curAvg > 0 && curAvg < overallAvg) {
+      actions.push(`현재 건당 단가(${fmtK(curAvg)}원)를 지사 평균(${fmtK(overallAvg)}원) 이상으로 높이기 위해 일반알람에 블루스캔·휴엔·디지털 보안 복합 패키징 제안 권장`);
+    }
+    if (pioneerRate < 35 && act > 0) {
+      actions.push(`안정적 대리점 협업에 더해 지역 내 고수익 순수 자력 개척 안건 1건을 추가 발굴하여 개인 수익 포트폴리오 다각화`);
+    }
+    if (act === 0 || curCount === 0) {
+      actions.push(`지사장 및 선임 1:1 현장 동행 상담과 유망 가망고객 DB 우선 배정을 통해 월중 첫 유효 수주 조기 클로징 전폭 지원`);
+    }
+    if (pct >= 100) {
+      actions.push(`목표 달성을 넘어 잔여 기간 기존 고객처 대상 '단가 인상(유증)'을 병행 추진하여 지사 순유지증가 최대 실적 경신 견인`);
+    }
+    if (actions.length === 0) {
+      actions.push(`현재의 양호한 수주 템포를 월말까지 유지하고 당월 계약건의 시공 일정을 전진 배치하여 조기 개시율 극대화`);
+    }
 
     return {
       name: name,
@@ -12431,9 +12580,10 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       pioneerRate: pioneerRate,
       agencyRate: agencyRate,
       momPace: momPace,
-      archetype: archetype,
-      archetypeTitle: archetypeTitle,
-      archetypeDesc: archetypeDesc,
+      archetype: dynamicArchetype,
+      archetypeBadge: dynamicBadge,
+      diagnosis: dynamicDiagnosis,
+      actionDesc: actions.join(' · '),
       futureBillingCount: futureBillingCount,
       excessiveTestCount: excessiveTestCount,
       startRate: startRate,
@@ -12454,22 +12604,22 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       testStatusHtml = `<span style="color:#2563eb; font-weight:600;">차월 ${r.futureBillingCount}건 / 조율 ${r.excessiveTestCount}건</span>`;
     }
 
-    const gapDisplay = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '도약 준비(빌드업)' : '측정불가');
+    const gapDisplay = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '월중 균등') : (r.amount === 0 ? '도약 준비' : '측정중');
 
     return `<tr>
       <td class="center">${rankBadge}</td>
       <td class="center" style="font-weight:700; font-size:12.5px;">${escHtml(r.name)}</td>
-      <td class="num">${fmtK(r.amount)}천원<br><span style="font-size:10.5px; color:#64748b;">목표 ${fmtK(r.target)} (${r.pct}%)</span></td>
+      <td class="num">${fmtK(r.amount)}천원<br><span style="font-size:10.5px; ${pctCls}">목표 ${fmtK(r.target)} (${r.pct}%)</span></td>
       <td class="center">${r.curCount}건<br><span style="font-size:10.5px; color:#64748b;">${fmtK(r.curAvg)}원</span></td>
       <td class="center">${r.allCount}건<br><span style="font-size:10.5px; color:#64748b;">${fmtK(r.allAvg)}원</span></td>
       <td class="center" style="font-weight:600;">${gapDisplay}</td>
       <td class="center" style="font-size:11px;">${escHtml(r.timingStyle)}</td>
       <td class="center" style="font-size:11px;"><span style="color:#2563eb; font-weight:700;">개척 ${r.pioneerRate}%</span><br><span style="color:#64748b;">대리점 ${r.agencyRate}%</span></td>
-      <td class="center" style="font-size:11px; font-weight:600;">${escHtml(r.industry)}</td>
+      <td class="center" style="font-size:11px;">${escHtml(r.industry)}</td>
       <td class="center" style="font-size:11px;">${escHtml(r.momPace)}</td>
       <td class="center" style="font-size:11px; line-height:1.3;">
         <strong style="color:#0f172a;">${escHtml(r.archetype)}</strong><br>
-        <span style="font-size:10px; color:#64748b;">${escHtml(r.archetypeTitle)}</span>
+        <span style="font-size:10px; color:#2563eb; font-weight:600;">${escHtml(r.archetypeBadge)}</span>
       </td>
       <td class="center" style="font-size:11px;">${testStatusHtml}</td>
       <td class="center" style="font-weight:700;">${r.startRate}%</td>
@@ -12477,6 +12627,25 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       <td class="num" style="color:#059669; font-weight:700;">+${fmtK(Math.round(r.priceUpAmount/1000))}천원</td>
       <td class="center" style="font-weight:700; color:#1d4ed8;">${r.contributionRate}%</td>
     </tr>`;
+  }).join('');
+
+  // 2. 동적 실시간 심층 진단 텍스트 생성
+  let dynamicDetailHtml = repRows.map(function(r){
+    return `• <strong>${escHtml(r.name)} (${escHtml(r.archetype)})</strong>: ${r.diagnosis} (당월 ${fmtK(r.amount)}천원 / 목표대비 ${r.pct}%, 건당 ${fmtK(r.curAvg)}원, 개척비율 ${r.pioneerRate}%)`;
+  }).join('<br><br>');
+
+  // 3. 동적 1:1 맞춤 액션 리스트 생성
+  let dynamicActionHtml = repRows.map(function(r, idx){
+    return `
+      <li class="ai-action-item">
+        <div class="ai-action-num">${idx+1}</div>
+        <div class="ai-action-title">${escHtml(r.name)} (${escHtml(r.archetype)}): ${escHtml(r.archetypeBadge)}</div>
+        <div class="ai-action-desc">
+          <strong>[실시간 진단]</strong> ${r.diagnosis}<br>
+          <strong>[실행 전술]</strong> ${r.actionDesc}
+        </div>
+      </li>
+    `;
   }).join('');
 
   let html = `
@@ -12487,7 +12656,7 @@ function buildCoachingAiReport_(d, ym, cat, rep){
           <span class="ai-doc-badge" style="background:#e0f2fe; color:#0369a1;">원팀 시너지 AI</span>
         </div>
         <div style="font-size:13px; color:#475569; margin-top:4px;">
-          개인별 강점 조명, 전 기간 누적 데이터 기반 다각도 역량 분석 및 지사 공동 목표 완수를 위한 상호 응원 코칭
+          실시간 DB 연계 개인별 강점 조명, 전 기간 다각도 역량 분석 및 지사 공동 목표 완수를 위한 상호 응원 코칭
         </div>
       </div>
       <div class="ai-doc-meta">
@@ -12497,9 +12666,9 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </div>
     </div>
 
-    <!-- 컨설턴트 종합 분석표 -->
+    <!-- 컨설턴트 종합 성과표 -->
     <div class="ai-section">
-      <div class="ai-sec-head">1. 컨설턴트별 종합 성과 & 다각도 성장 지표 (전원 현황)</div>
+      <div class="ai-sec-head">1. 컨설턴트별 종합 성과 & 다각도 성장 지표 (실시간 DB 연계)</div>
       <div style="overflow-x:auto; margin-top:10px;">
         <table class="ai-data-table" style="min-width:1150px; font-size:11.5px;">
           <thead>
@@ -12529,19 +12698,15 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </div>
     </div>
 
-    <!-- 섹션 2: 전 기간 종합 데이터 심층 진단 -->
+    <!-- 섹션 2: 실시간 데이터 기반 종합 심층 평가 -->
     <div class="ai-section">
-      <div class="ai-sec-head">2. 전 기간 종합 데이터 기반 컨설턴트별 역량 조명 & 원팀 시너지 평가</div>
+      <div class="ai-sec-head">2. 실시간 데이터 기반 컨설턴트별 역량 조명 & 원팀 시너지 평가</div>
       <div class="ai-sec-body">
-        <p><strong>[개인별 영업 강점 및 수주 주기 정밀 진단]</strong><br>
-          • <strong>이수열 프로 (안정적 고빈도 볼륨 리더 ⚖️)</strong>: 전 기간 데이터 확인 결과, 수주 간격이 <strong>평균 4.2일</strong>로 지사에서 가장 고르고 일정한 수주 리듬을 유지하고 있습니다. 대리점 채널(80%)과의 원활한 파트너십을 통해 지사 수주 볼륨의 65%를 든든하게 견인하는 핵심 기둥입니다. 기산 일정 최적화(14일 이내 조기 기산)와 본인의 뛰어난 대면 영업력을 결합해 자력 개척 시너지를 함께 창출할 지사의 든든한 맏형입니다.<br>
-          • <strong>최영국 컨설턴트 (대형 프로젝트 스페셜리스트 🏢)</strong>: 전 기간 누적 평균 단가가 <strong>890,000원에 달하는 대형 안건 전문 역량</strong>을 지니고 있으며, <strong>100% 자력 개척</strong>을 고수하는 영업 정신은 팀 전체의 귀감입니다. 대형 안건 특성상 협상 호흡이 길어 월초는 준비 기간이었으나 월중 대형 계약 클로징이 임박해 있습니다. 관리자 1:1 동행과 유망 가망고객 DB 우선 매칭으로 멋진 대형 수주 축포를 함께 쏘아 올릴 것으로 기대됩니다.<br>
-          • <strong>정문재 컨설턴트 (모멘텀 고속 성장 에이스 🚀)</strong>: 9월 대비 10월 들어 수주 주기를 5.8일로 대폭 단축하며 3건 150만원을 달성, 지사 내 가장 가파른 수주 스피드 향상과 탄력 성장을 입증하고 있습니다. 높은 자력 개척(90%) 열정을 팀 전체에 전파하고 있습니다.<br>
-          • <strong>박광춘 컨설턴트 (신규 도약 잠재력 빌드업 🎯)</strong>: 현재는 새로운 가망 고객 발굴과 파이프라인을 재정비하는 소중한 빌드업 기간입니다. 혼자 고민하지 않고 원팀 정신으로 지사장, 팀장, 선임 컨설턴트가 1:1로 함께 동행하고 가망 고객 타깃 상담을 밀착 지원하여 첫 결실을 조기 창출하도록 전원이 한마음으로 돕겠습니다.<br>
-          • <strong>임영민 컨설턴트 (현장 밀착형 신뢰 파트너 🏃)</strong>: 소형 안건 중심이나 지역 현장 밀착형 자력 개척(85%)을 꾸준히 전개하여 당월 개시율 100%라는 가장 실속 있고 단단한 영업 기반을 지켜주는 신뢰의 파트너입니다.
+        <p><strong>[개인별 영업 강점 및 실시간 실적 정밀 진단]</strong><br>
+          ${dynamicDetailHtml}
         </p>
         <p><strong>[영업동기 질적 시너지 (대리점 볼륨 인정 & 순수 개척 우대)]</strong><br>
-          대리점 연계 수주는 지사 전체 외형 볼륨을 단기간에 끌어올리는 소중한 자산(이수열 프로의 볼륨 1위 견인 기여)이며, 스스로 신규 시장을 개척하는 100% 순수 자력 개척자(최영국, 정문재 등)를 높은 개인 역량으로 우대 평가합니다. 서로의 강점을 인정하고 협력할 때 지사 전체의 경쟁력이 극대화됩니다.
+          대리점 연계 수주는 지사 전체 외형 볼륨을 단기간에 끌어올리는 소중한 자산이며, 스스로 신규 시장을 개척하는 순수 자력 개척자를 높은 개인 역량으로 우대 평가합니다. 서로의 강점을 인정하고 협력할 때 지사 전체의 경쟁력이 극대화됩니다.
         </p>
         <p><strong>[원팀 시너지: 마감 시기 단가인상 유증 합심 추진]</strong><br>
           월말 마감에 다가올수록 신규 공사 일정이 부족하여 당월 개시 전환이 제한될 수 있습니다. 이 시기에는 지사 전원이 한마음으로 기존 계약처에 대한 <strong>'단가 인상(유증)'을 함께 추진</strong>하여 지사 순유지증가 목표를 전원 100% 완수하는 원팀의 저력을 보여줄 때입니다.
@@ -12549,35 +12714,11 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </div>
     </div>
 
-    <!-- 섹션 3: 컨설턴트별 1:1 맞춤 성장 코칭 가이드 -->
+    <!-- 섹션 3: 1:1 맞춤 성장 코칭 가이드 -->
     <div class="ai-section">
-      <div class="ai-sec-head">3. 컨설턴트별 1:1 맞춤 성장 코칭 & 원팀 서포트 가이드</div>
+      <div class="ai-sec-head">3. 실시간 지표 기반 컨설턴트별 1:1 맞춤 성장 코칭 & 원팀 서포트 가이드</div>
       <ul class="ai-action-list">
-        <li class="ai-action-item">
-          <div class="ai-action-num">1</div>
-          <div class="ai-action-title">이수열 프로 (안정적 고빈도 볼륨 리더 ⚖️): 조기 기산 전환 및 자력 개척 시너지 결합</div>
-          <div class="ai-action-desc">대리점 파트너십을 통해 지사 수주 1위(65%)를 이끄는 노고에 깊이 감사드립니다. 차월 이후로 밀린 기산일정과 15일 이상의 무료 테스트 일정을 14일 이내로 단축 협상하여 지사 조기 개시 흑자에 기여하고, 본인의 뛰어난 대면 영업 역량으로 순수 자력 개척 안건까지 추가 발굴하여 지사의 완벽한 롤모델로 함께 뛰어주시길 응원합니다.</div>
-        </li>
-        <li class="ai-action-item">
-          <div class="ai-action-num">2</div>
-          <div class="ai-action-title">최영국 컨설턴트 (대형 프로젝트 스페셜리스트 🏢): 대형 파이프라인 조기 클로징 & 관리자 1:1 동행</div>
-          <div class="ai-action-desc">건당 단가가 큰 대형 안건을 성사시키는 전문 역량과 100% 자력 개척의 뚝심은 팀의 자랑입니다. 월초 준비 호흡을 거쳐 월중 대형 안건 클로징을 앞두고 있는 만큼, 관리자 1:1 현장 동행과 유망 가망고객 DB 우선 지원을 결합해 시원한 대형 수주 축포를 함께 터뜨리도록 전폭 지원하겠습니다.</div>
-        </li>
-        <li class="ai-action-item">
-          <div class="ai-action-num">3</div>
-          <div class="ai-action-title">정문재 컨설턴트 (모멘텀 고속 성장 에이스 🚀): 수주 템포 유지 & 부가 솔루션 단가 업셀링</div>
-          <div class="ai-action-desc">전월 대비 가파르게 향상된 수주 스피드(5.8일 주기)와 탄력 성장(3건 150만원)을 보여준 열정에 박수를 보냅니다. 현재의 빠른 템포를 월말까지 이어가면서, 일반알람에 블루스캔·휴엔·디지털 보안을 패키징 제안하여 건당 평균 단가를 더욱 높이는 지사의 핵심 에이스로 자리매김하도록 응원합니다.</div>
-        </li>
-        <li class="ai-action-item">
-          <div class="ai-action-num">4</div>
-          <div class="ai-action-title">박광춘 컨설턴트 (신규 도약 잠재력 빌드업 🎯): 원팀 멘토링 & 타깃 상담 밀착 동행 지원</div>
-          <div class="ai-action-desc">현재는 새로운 고객층을 확보하고 파이프라인을 다지는 소중한 도약 준비 기간입니다. 팀장과 선임 컨설턴트가 1:1 멘토로서 현장 방문과 가망 고객 대면 상담을 함께 뛰며 첫 유효 수주의 기쁨을 조기에 나눌 수 있도록 지사 전원이 한마음으로 밀착 지원하겠습니다. 힘내십시오!</div>
-        </li>
-        <li class="ai-action-item">
-          <div class="ai-action-num">5</div>
-          <div class="ai-action-title">임영민 컨설턴트 (현장 밀착형 신뢰 파트너 🏃): 밀착 개척 지속 & 추가 설비 연계 단가 확대</div>
-          <div class="ai-action-desc">지역 현장을 발로 뛰며 자력 개척(85%)과 개시율 100%라는 가장 실속 있고 단단한 영업 기반을 지켜주셔서 든든합니다. 계약처 내 추가 센서, 지능형 영상(블루스캔) 및 부가서비스 연계를 통해 건당 수주 단가를 한 단계 끌어올려 더 큰 결실을 거두도록 적극 지원하겠습니다.</div>
-        </li>
+        ${dynamicActionHtml}
         <li class="ai-action-item" style="border-left: 3px solid #059669; background:#f0fdf4;">
           <div class="ai-action-num" style="background:#059669;">원팀</div>
           <div class="ai-action-title" style="color:#065f46;">지사 마감 원팀 전략: 단가 인상(유증) 집중 추진으로 지사 공동 목표 100% 완수</div>
@@ -12587,20 +12728,29 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     </div>
   `;
 
-  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 역량 조명 & 원팀(One-Team) 성장 리포트\n` +
-    `지사 평균 수주단가: ${fmtK(overallAvg)}원` + (biz ? ` | 사업팀 내 수주 순위: 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})\n\n` : `\n\n`) +
-    `■ 1. 컨설턴트별 다각도 성과 요약\n`;
+  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 역량 조명 & 원팀(One-Team) 성장 리포트 (실시간 DB 연계)
+` +
+    `지사 평균 수주단가: ${fmtK(overallAvg)}원` + (biz ? ` | 사업팀 내 수주 순위: 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})
+
+` : `
+
+`) +
+    `■ 1. 컨설턴트별 다각도 성과 요약
+`;
   repRows.forEach(function(r, idx){
-    const gapStr = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '도약 준비(빌드업)' : '측정불가');
-    text += `${idx+1}. ${r.name}: 당월 ${fmtK(r.amount)}천원(목표 ${fmtK(r.target)}천원, ${r.pct}%), ${r.curCount}건, 단가 ${fmtK(r.curAvg)}원 | 전기간 누적 ${r.allCount}건(단가 ${fmtK(r.allAvg)}원), 주기 ${gapStr}, 시기 ${r.timingStyle}, 개척 ${r.pioneerRate}%, 업종 ${r.industry}, 페이스: ${r.momPace}, 유형: ${r.archetype}, 개시율 ${r.startRate}%, 유지감소 ${fmtK(Math.round(r.cancelAmount/1000))}천원, 유지증가 +${fmtK(Math.round(r.priceUpAmount/1000))}천원, 지사기여율 ${r.contributionRate}%\n`;
+    const gapStr = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '월중 균등') : (r.amount === 0 ? '도약 준비' : '측정중');
+    text += `${idx+1}. ${r.name}: 당월 ${fmtK(r.amount)}천원(목표 ${fmtK(r.target)}천원, ${r.pct}%), ${r.curCount}건, 단가 ${fmtK(r.curAvg)}원 | 전기간 누적 ${r.allCount}건(단가 ${fmtK(r.allAvg)}원), 주기 ${gapStr}, 시기 ${r.timingStyle}, 개척 ${r.pioneerRate}%, 업종 ${r.industry}, 페이스: ${r.momPace}, 유형: ${r.archetype}, 개시율 ${r.startRate}%, 유지감소 ${fmtK(Math.round(r.cancelAmount/1000))}천원, 유지증가 +${fmtK(Math.round(r.priceUpAmount/1000))}천원, 지사기여율 ${r.contributionRate}%
+`;
   });
-  text += `\n■ 2. 전 기간 데이터 기반 종합 평가 & 원팀 응원\n` +
-    `- 이수열 프로: 4.2일 균등 주기로 안정적 고빈도 수주, 지사 볼륨 1위 견인 (대리점 협업 모범, 조기 기산 전환 기대)\n` +
-    `- 최영국 컨설턴트: 건당 89만원 대형 프로젝트 전문, 100% 자력 개척 뚝심 (월중 대형 클로징 임박, 관리자 1:1 동행 지원)\n` +
-    `- 정문재 컨설턴트: 9월 대비 10월 수주 스피드 최고 혁신 및 모멘텀 고속 성장 (3건 150만원 달성)\n` +
-    `- 박광춘 컨설턴트: 신규 도약 잠재력 빌드업 단계, 원팀 1:1 멘토링과 동행 영업으로 첫 결실 전폭 지원\n` +
-    `- 임영민 컨설턴트: 소형 안건 중심 현장 밀착형 신뢰 파트너 (개시율 100% 모범)\n` +
-    `- 원팀 마감 전략: 월말 공사 일정 부족 시 전원 '단가 인상(유증)' 집중 추진으로 지사 목표 100% 달성\n`;
+  text += `
+■ 2. 실시간 데이터 기반 1:1 코칭 가이드
+`;
+  repRows.forEach(function(r, idx){
+    text += `${idx+1}. ${r.name} (${r.archetype}): ${r.actionDesc}
+`;
+  });
+  text += `- 원팀 마감 전략: 월말 공사 일정 부족 시 전원 '단가 인상(유증)' 집중 추진으로 지사 목표 100% 달성
+`;
 
   return { html: html, text: text };
 }
@@ -12613,27 +12763,30 @@ function buildRiskAiReport_(d, ym, cat, rep){
   const actual = status.actual || {};
   const target = status.target || {};
 
-  const canTgt = Number(target.목표_유지감소) || 0;
-  const canAct = Number(actual.유지감소) || 0;
+  const canTgt = Number(target.목표_유지감소) || 0; // 천원 단위 (e.g. 800)
+  const canAct = Number(actual.유지감소) || 0; // 천원 단위 (e.g. 170)
   const canPct = canTgt ? Math.round((canAct / canTgt) * 100) : 0;
 
-  const upAmt = Number(priceUp.overall && priceUp.overall.amount) || 0;
+  // 단가인상: priceUp.overall.amount는 '원' 단위이므로 '천원'으로 정확히 환산
+  const upAmtRaw = Number(priceUp.overall && priceUp.overall.amount) || 0; // 원 (e.g. 280,000원)
+  const upAmtK = Math.round(upAmtRaw / 1000); // 천원 환산 (e.g. 280천원)
   const upCnt = Number(priceUp.overall && priceUp.overall.count) || 0;
-  const rstAmt = Number(actual.재개시) || 0;
+  const rstAmt = Number(actual.재개시) || 0; // 천원 (e.g. 50천원)
 
-  const defAmt = upAmt + rstAmt;
-  const defRatio = canAct ? Math.round((defAmt / canAct) * 100) : 0;
-  const netCancel = canAct - defAmt;
+  // 총 방어 실적 (천원 단위로 일원화 계산)
+  const defAmtK = upAmtK + rstAmt; // 280 + 50 = 330천원
+  const defRatio = canAct ? Math.round((defAmtK / canAct) * 100) : 0; // 330 / 170 = 194%
+  const netCancelK = canAct - defAmtK; // 170 - 330 = -160천원 (순감소 흑자 방어)
 
   const reasons = (cancel.overall && cancel.overall.byReason) || [];
-  let reasonRows = reasons.map(function(r){
+  let reasonRows = (reasons.length > 0) ? reasons.map(function(r){
     return `<tr>
       <td style="font-weight:600;">${escHtml(r.name)}</td>
       <td class="center">${r.count}건</td>
       <td class="num">${fmtK(r.amount)}천원</td>
       <td class="center" style="font-weight:700;">${r.pctAmount}%</td>
     </tr>`;
-  }).join('');
+  }).join('') : '<tr><td colspan="4" class="center" style="padding:14px; color:#64748b;">당월 접수된 해약 내역이 없습니다. (안정 방어선 유지 🟢)</td></tr>';
 
   let riskLevel = '안전 상태 🟢';
   let riskDesc = '해약 소진율이 목표 한도 내에서 매우 안정적으로 통제되고 있습니다.';
@@ -12673,8 +12826,8 @@ function buildRiskAiReport_(d, ym, cat, rep){
         </div>
       </div>
       <div class="ai-kpi-card green">
-        <div class="ai-kpi-lbl">단가인상 방어실적</div>
-        <div class="ai-kpi-val">${fmtK(upAmt)}천원</div>
+        <div class="ai-kpi-lbl">단가인상 방어 실적</div>
+        <div class="ai-kpi-val">${fmtK(upAmtK)}천원</div>
         <div class="ai-kpi-sub">
           <span>인상 건수: ${upCnt}건</span>
           <span class="ai-kpi-tag good">상쇄기여</span>
@@ -12692,7 +12845,7 @@ function buildRiskAiReport_(d, ym, cat, rep){
         <div class="ai-kpi-lbl">총 해약 상쇄 방어율</div>
         <div class="ai-kpi-val">${defRatio}%</div>
         <div class="ai-kpi-sub">
-          <span>순유지감소: ${fmtK(netCancel)}천원</span>
+          <span>순유지감소: ${fmtK(netCancelK)}천원</span>
           <span class="ai-kpi-tag ${defRatio >= 50 ? 'good' : 'warn'}">상쇄완료</span>
         </div>
       </div>
@@ -12721,7 +12874,7 @@ function buildRiskAiReport_(d, ym, cat, rep){
       <div class="ai-sec-head">2. 유지감소 방어선 진단 및 영향도 평가</div>
       <div class="ai-sec-body">
         <p><strong>[상태 요약]</strong> ${riskDesc}</p>
-        <p>당월 단가 인상(${fmtK(upAmt)}천원)과 재개시(${fmtK(rstAmt)}천원)를 통해 총 <strong>${fmtK(defAmt)}천원</strong>의 방어 효과를 창출하여 해약 발생액의 <strong>${defRatio}%</strong>를 효과적으로 상쇄하였습니다. 실질 순유지감소는 <strong>${fmtK(netCancel)}천원</strong>으로 축소되었습니다.</p>
+        <p>당월 단가 인상 <strong>${fmtK(upAmtK)}천원</strong>(${fmtK(upAmtRaw)}원, ${upCnt}건)과 재개시 <strong>${fmtK(rstAmt)}천원</strong>을 통해 총 <strong>${fmtK(defAmtK)}천원</strong>의 방어 효과를 창출하여 해약 발생액(${fmtK(canAct)}천원)의 <strong>${defRatio}%</strong>를 효과적으로 상쇄하였습니다. 실질 순유지감소는 <strong>${fmtK(netCancelK)}천원</strong>으로 방어 흑자를 달성했습니다.</p>
       </div>
     </div>
 
@@ -12752,9 +12905,9 @@ function buildRiskAiReport_(d, ym, cat, rep){
     `리스크 판정: ${riskLevel} (${riskDesc})\n\n` +
     `■ 1. 해약 및 방어 지표\n` +
     `- 해약(유지감소) 실적: ${fmtK(canAct)}천원 / 한도 ${fmtK(canTgt)}천원 (소진율 ${canPct}%)\n` +
-    `- 단가인상 방어: ${fmtK(upAmt)}천원 (${upCnt}건)\n` +
+    `- 단가인상 방어: ${fmtK(upAmtK)}천원 (${upCnt}건, ${fmtK(upAmtRaw)}원)\n` +
     `- 재개시 방어: ${fmtK(rstAmt)}천원\n` +
-    `- 총 해약 상쇄 방어율: ${defRatio}% (실질 순유지감소: ${fmtK(netCancel)}천원)\n\n` +
+    `- 총 해약 상쇄 방어율: ${defRatio}% (실질 순유지감소: ${fmtK(netCancelK)}천원)\n\n` +
     `■ 2. 3대 해약 방어 전략\n` +
     `1. 이전/리모델링 고객 일시중지 유도 및 신규 사업장 재개시 연계\n` +
     `2. 비용 부담 호소 고객 대상 맞춤형 요금/상품 재설계 방어\n` +
@@ -12765,15 +12918,18 @@ function buildRiskAiReport_(d, ym, cat, rep){
 
 /* 4. 안전상품 및 매출 파이프라인 보고서 */
 function buildPipelineAiReport_(d, ym, cat, rep){
+  d = d || {};
   const rows = (typeof PRODUCT_DAILY_ROWS !== 'undefined' && Array.isArray(PRODUCT_DAILY_ROWS)) ? PRODUCT_DAILY_ROWS : [];
   const pdSummary = (typeof PRODUCT_DAILY_SUMMARY_EXTRA !== 'undefined' && PRODUCT_DAILY_SUMMARY_EXTRA) ? PRODUCT_DAILY_SUMMARY_EXTRA : {};
-  
+  const productMetrics = d.productMetrics || {};
+
   const toWon_ = function(v){
     const n = Number(v) || 0;
     if (n === 0) return 0;
     return (Math.abs(n) < 1000000) ? n * 1000 : n;
   };
 
+  // A. 상품일보 DB 연계 (설치비/기기비 매출 파이프라인)
   const ordTgt = toWon_((pdSummary.목표 && pdSummary.목표.수주) || 0);
   const saleTgt = toWon_((pdSummary.목표 && pdSummary.목표.매출) || 0);
   const cardSales = Number(pdSummary.카드매출 || 0);
@@ -12785,7 +12941,7 @@ function buildPipelineAiReport_(d, ym, cat, rep){
 
   // 당월 매출 집계 (매출예상 기준)
   const curMonthSales = rows.filter(r => {
-    const fYm = parseForecastYm_(r.매출예상, r.보고일);
+    const fYm = (typeof parseForecastYm_ === 'function') ? parseForecastYm_(r.매출예상, r.보고일) : '';
     return fYm === ym;
   });
 
@@ -12799,16 +12955,34 @@ function buildPipelineAiReport_(d, ym, cat, rep){
   const salePct = saleTgt ? Math.round((confirmedAmt / saleTgt) * 100) : 0;
   const potentialPct = saleTgt ? Math.round((totalPipelineAmt / saleTgt) * 100) : 0;
 
+  // B. 영업일보 DB 실시간 연계 전략상품군 (블루스캔·휴엔·디지털)
+  const pBScan = productMetrics['블루스캔'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const pHuen = productMetrics['휴엔'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const pDigital = productMetrics['디지털'] || { orderAmount: 0, orderCount: 0, netAmount: 0 };
+  const strategicTotalAmt = pBScan.orderAmount + pHuen.orderAmount + pDigital.orderAmount;
+  const strategicTotalCount = pBScan.orderCount + pHuen.orderCount + pDigital.orderCount;
+  const strategicTotalNet = pBScan.netAmount + pHuen.netAmount + pDigital.netAmount;
+
   // 미매출 상위 안건 리스트
-  let unbilledTable = saleUnconfirmed.slice(0, 5).map(function(r){
-    return `<tr>
-      <td class="center" style="font-weight:600;">${escHtml(r.계약번호 || '-')}</td>
-      <td>${escHtml(r.서비스제공처 || '-')}</td>
-      <td class="center">${escHtml(r.계약담당자 || '-')}</td>
-      <td class="num" style="font-weight:700;">${fmtK(r.합계 || 0)}원</td>
-      <td class="center"><span style="color:#d97706; font-weight:700;">미매출</span></td>
+  let unbilledTable = '';
+  if (saleUnconfirmed.length > 0) {
+    unbilledTable = saleUnconfirmed.slice(0, 5).map(function(r){
+      return `<tr>
+        <td class="center" style="font-weight:600;">${escHtml(r.계약번호 || '-')}</td>
+        <td>${escHtml(r.서비스제공처 || '-')}</td>
+        <td class="center">${escHtml(r.계약담당자 || '-')}</td>
+        <td class="num" style="font-weight:700;">${fmtK(r.합계 || 0)}원</td>
+        <td class="center"><span style="color:#d97706; font-weight:700;">미매출 (${escHtml(r.매출예상 || '당월')})</span></td>
+      </tr>`;
+    }).join('');
+  } else {
+    unbilledTable = `<tr>
+      <td colspan="5" class="center" style="padding:16px; color:#64748b;">
+        당월 미매출 안건이 없거나 상품일보 등록 전입니다.<br>
+        <span style="font-size:11px; color:#2563eb;">[상품일보] 탭에서 신규 수주 및 매출예상 안건을 등록하시면 실시간 파이프라인으로 집계됩니다.</span>
+      </td>
     </tr>`;
-  }).join('');
+  }
 
   let html = `
     <div class="ai-doc-header">
@@ -12818,112 +12992,169 @@ function buildPipelineAiReport_(d, ym, cat, rep){
           <span class="ai-doc-badge" style="background:#fef3c7; color:#92400e;">파이프라인 AI</span>
         </div>
         <div style="font-size:13px; color:#475569; margin-top:4px;">
-          안전상품 수주·매출 진척률 및 미매출 안건 조기 기산 전환 전략
+          안전상품 수주·매출 진척률, 3대 전략 상품군(블루스캔·휴엔·디지털) 실적 및 미매출 조기 기산 전환 전략
         </div>
       </div>
       <div class="ai-doc-meta">
         <div><strong>기준년월:</strong> ${ym}</div>
+        <div><strong>상품일보 등록건:</strong> ${rows.length}건</div>
         <div><strong>카드매출 합산:</strong> ${fmtK(cardSales)}원</div>
       </div>
     </div>
 
-    <!-- 파이프라인 지표 그리드 -->
-    <div class="ai-kpi-grid">
-      <div class="ai-kpi-card green">
-        <div class="ai-kpi-lbl">안전상품 수주 실적</div>
-        <div class="ai-kpi-val">${fmtK(ordTotal)}원</div>
-        <div class="ai-kpi-sub">
-          <span>목표: ${fmtK(ordTgt)}원</span>
-          <span class="ai-kpi-tag good">${ordPct}% 달성</span>
+    <!-- 1. 전략 안전상품군 실적 요약 카드 (영업일보 DB 연계) -->
+    <div class="ai-section">
+      <div class="ai-sec-head">1. 3대 전략 안전상품군(블루스캔·휴엔·디지털) 수주 & 순증 실적 (영업일보 DB 연계)</div>
+      <div class="ai-kpi-grid" style="margin-top:10px;">
+        <div class="ai-kpi-card green">
+          <div class="ai-kpi-lbl">블루스캔 (자력영상)</div>
+          <div class="ai-kpi-val">${fmtK(pBScan.orderAmount)}원</div>
+          <div class="ai-kpi-sub">
+            <span>수주 ${pBScan.orderCount}건</span>
+            <span class="ai-kpi-tag good">순증 +${fmtK(pBScan.netAmount)}원</span>
+          </div>
         </div>
-      </div>
-      <div class="ai-kpi-card purple">
-        <div class="ai-kpi-lbl">확정 매출 실적</div>
-        <div class="ai-kpi-val">${fmtK(confirmedAmt)}원</div>
-        <div class="ai-kpi-sub">
-          <span>목표: ${fmtK(saleTgt)}원</span>
-          <span class="ai-kpi-tag good">${salePct}% 확정</span>
+        <div class="ai-kpi-card purple">
+          <div class="ai-kpi-lbl">휴엔 (환경/방제)</div>
+          <div class="ai-kpi-val">${fmtK(pHuen.orderAmount)}원</div>
+          <div class="ai-kpi-sub">
+            <span>수주 ${pHuen.orderCount}건</span>
+            <span class="ai-kpi-tag good">순증 +${fmtK(pHuen.netAmount)}원</span>
+          </div>
         </div>
-      </div>
-      <div class="ai-kpi-card amber">
-        <div class="ai-kpi-lbl">미매출 대기 파이프라인</div>
-        <div class="ai-kpi-val">${fmtK(unconfirmedAmt)}원</div>
-        <div class="ai-kpi-sub">
-          <span>대기 건수: ${saleUnconfirmed.length}건</span>
-          <span class="ai-kpi-tag warn">전환대상</span>
+        <div class="ai-kpi-card blue">
+          <div class="ai-kpi-lbl">디지털 (정보보안)</div>
+          <div class="ai-kpi-val">${fmtK(pDigital.orderAmount)}원</div>
+          <div class="ai-kpi-sub">
+            <span>수주 ${pDigital.orderCount}건</span>
+            <span class="ai-kpi-tag good">순증 +${fmtK(pDigital.netAmount)}원</span>
+          </div>
         </div>
-      </div>
-      <div class="ai-kpi-card green">
-        <div class="ai-kpi-lbl">전환 완료 시 예상달성률</div>
-        <div class="ai-kpi-val">${potentialPct}%</div>
-        <div class="ai-kpi-sub">
-          <span>예상 총매출: ${fmtK(totalPipelineAmt)}원</span>
-          <span class="ai-kpi-tag good">잠재력</span>
+        <div class="ai-kpi-card amber">
+          <div class="ai-kpi-lbl">전략 안전상품 합계</div>
+          <div class="ai-kpi-val" style="color:#1e3a8a;">${fmtK(strategicTotalAmt)}원</div>
+          <div class="ai-kpi-sub">
+            <span>총 ${strategicTotalCount}건 수주</span>
+            <span class="ai-kpi-tag good">순증 합계 +${fmtK(strategicTotalNet)}원</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 섹션 1: 미매출 안건 테이블 -->
+    <!-- 2. 상품일보 매출 파이프라인 지표 (상품일보 DB 연계) -->
     <div class="ai-section">
-      <div class="ai-sec-head">1. 당월 매출확정 대상 미매출 주요 안건 (TOP 5)</div>
-      <table class="ai-data-table">
-        <thead>
-          <tr>
-            <th style="width:85px;">계약번호</th>
-            <th>서비스제공처</th>
-            <th style="width:75px;">담당자</th>
-            <th>금액</th>
-            <th style="width:70px;">상태</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${unbilledTable || '<tr><td colspan="5" class="center">당월 미매출 안건 없음 (전건 매출 완료)</td></tr>'}
-        </tbody>
-      </table>
-    </div>
+      <div class="ai-sec-head">2. 상품일보 안전상품 수주·매출 진척 및 미매출 전환 파이프라인 (상품일보 DB 연계)</div>
+      <div class="ai-kpi-grid" style="margin-top:10px;">
+        <div class="ai-kpi-card green">
+          <div class="ai-kpi-lbl">안전상품 수주 실적</div>
+          <div class="ai-kpi-val">${fmtK(ordTotal)}원</div>
+          <div class="ai-kpi-sub">
+            <span>목표: ${fmtK(ordTgt)}원</span>
+            <span class="ai-kpi-tag ${ordPct>=50?'good':'warn'}">${ordPct}% 달성</span>
+          </div>
+        </div>
+        <div class="ai-kpi-card purple">
+          <div class="ai-kpi-lbl">확정 매출 실적 (카드포함)</div>
+          <div class="ai-kpi-val">${fmtK(confirmedAmt)}원</div>
+          <div class="ai-kpi-sub">
+            <span>목표: ${fmtK(saleTgt)}원</span>
+            <span class="ai-kpi-tag ${salePct>=50?'good':'warn'}">${salePct}% 확정</span>
+          </div>
+        </div>
+        <div class="ai-kpi-card amber">
+          <div class="ai-kpi-lbl">미매출 대기 파이프라인</div>
+          <div class="ai-kpi-val">${fmtK(unconfirmedAmt)}원</div>
+          <div class="ai-kpi-sub">
+            <span>대기 안건: ${saleUnconfirmed.length}건</span>
+            <span class="ai-kpi-tag warn">조기 기산 대상</span>
+          </div>
+        </div>
+        <div class="ai-kpi-card blue">
+          <div class="ai-kpi-lbl">미매출 전환 시 최종 전망</div>
+          <div class="ai-kpi-val">${fmtK(totalPipelineAmt)}원</div>
+          <div class="ai-kpi-sub">
+            <span>전환율 100% 가정</span>
+            <span class="ai-kpi-tag good">${potentialPct}% 전망</span>
+          </div>
+        </div>
+      </div>
 
-    <!-- 섹션 2: AI 파이프라인 진단 -->
-    <div class="ai-section">
-      <div class="ai-sec-head">2. 파이프라인 전환 진단 및 매출 전망</div>
-      <div class="ai-sec-body">
-        <p>현재 안전상품 확정 매출은 카드매출(${fmtK(cardSales)}원)을 포함하여 <strong>${fmtK(confirmedAmt)}원(${salePct}%)</strong> 수준입니다.</p>
-        <p>현재 대기 중인 <strong>${saleUnconfirmed.length}건(${fmtK(unconfirmedAmt)}원)</strong>의 미매출 안건이 당월 내 설치 완료되어 세금계산서가 발행될 경우 최종 매출 달성률은 <strong>${potentialPct}%</strong>까지 수직 상승할 수 있습니다.</p>
+      <!-- 미매출 상위 안건 표 -->
+      <div style="margin-top:14px;">
+        <div style="font-size:13px; font-weight:700; color:#1e293b; margin-bottom:6px;">당월 매출확정 대상 미매출 주요 안건 (TOP 5)</div>
+        <table class="ai-data-table" style="font-size:12px;">
+          <thead>
+            <tr>
+              <th style="width:110px;">계약번호</th>
+              <th>서비스제공처</th>
+              <th style="width:90px;">계약담당자</th>
+              <th style="width:120px;">계약금액</th>
+              <th style="width:110px;">상태(매출예상)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${unbilledTable}
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- 섹션 3: 파이프라인 가속화 실행 과제 -->
+    <!-- 3. 안전상품 매출 극대화 3대 실행 과제 -->
     <div class="ai-section">
-      <div class="ai-sec-head">3. 안전상품 매출 극대화 3대 실행 과제</div>
+      <div class="ai-sec-head">3. 안전상품 및 부가 솔루션 매출 극대화 3대 실행 과제</div>
       <ul class="ai-action-list">
         <li class="ai-action-item">
           <div class="ai-action-num">1</div>
-          <div class="ai-action-title">미매출 안건 담당자 지정 및 시공팀 납기 단축 공조</div>
-          <div class="ai-action-desc">기수주된 미매출 안건에 대해 설치 시공 일정을 앞당겨 월말 3일 전까지 검수 완료 및 계산서 발행을 마칩니다.</div>
+          <div class="ai-action-title">일반알람 고객 대상 '블루스캔·휴엔·디지털' 결합 패키징 크로스셀</div>
+          <div class="ai-action-desc">현재 3대 전략상품 수주가 ${strategicTotalCount}건(${fmtK(strategicTotalAmt)}원)으로 집계되고 있습니다. 보안 설비 신규 상담 시 자력영상(블루스캔)과 환경위생(휴엔)을 번들 제안하여 안건당 객단가를 20% 이상 향상시킵니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">2</div>
-          <div class="ai-action-title">카드매출 정산 데이터 실시간 누락 검증</div>
-          <div class="ai-action-desc">가맹점 카드매출 승인 내역을 일일 단위로 대조하여 안전상품 매출 집계 누락을 원천 차단합니다.</div>
+          <div class="ai-action-title">미매출 대기 안건(${saleUnconfirmed.length}건, ${fmtK(unconfirmedAmt)}원) 당월 조기 시공 및 매출 확정</div>
+          <div class="ai-action-desc">공사 일정 지연으로 미매출로 잡혀있는 대기 안건들을 현장 설치 부서와 우선 조율하여 당월 중 공사를 완공하고 즉시 확정 매출로 전환합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">3</div>
-          <div class="ai-action-title">차월(M+1) 매출예상 파이프라인 조기 발굴 및 선계약 추진</div>
-          <div class="ai-action-desc">기존 알람 고객의 설비 점검 시 CCTV 노후 카메라 교체 및 소화설비 번들 프로모션을 제안하여 차월 매출 파이프라인을 두텁게 구축합니다.</div>
+          <div class="ai-action-title">카드매출(${fmtK(cardSales)}원) 관리 및 기기비 조기 회수 프로세스 정착</div>
+          <div class="ai-action-desc">기기비 분할 납부 고객에 대한 카드 결제를 정례화하여 미수금 리스크를 선제 차단하고 현금 유동성을 확보합니다.</div>
         </li>
       </ul>
     </div>
   `;
 
-  let text = `[에스원 북서울지사] ${ym} 안전상품 및 매출 파이프라인 분석 보고서\n` +
-    `■ 1. 안전상품 핵심 지표\n` +
-    `- 수주 실적: ${fmtK(ordTotal)}원 / 목표 ${fmtK(ordTgt)}원 (${ordPct}%)\n` +
-    `- 확정 매출: ${fmtK(confirmedAmt)}원 / 목표 ${fmtK(saleTgt)}원 (${salePct}%)\n` +
-    `- 미매출 대기 파이프라인: ${fmtK(unconfirmedAmt)}원 (${saleUnconfirmed.length}건)\n` +
-    `- 전건 전환 시 예상달성률: ${potentialPct}% (예상 총액 ${fmtK(totalPipelineAmt)}원)\n\n` +
-    `■ 2. 3대 파이프라인 실행 과제\n` +
-    `1. 미매출 안건 시공 일정 단축을 통한 당월 매출 조기 확정\n` +
-    `2. 카드매출 집계 누락 방지 및 일일 대조 정산\n` +
-    `3. 기존 보안 고객 대상 안전상품 번들 프로모션 전개\n`;
+  let text = `[에스원 북서울지사] ${ym} 안전상품 및 매출 파이프라인 분석 보고서 (실시간 DB 연계)
+
+` +
+    `■ 1. 3대 전략 안전상품군(블루스캔·휴엔·디지털) 실적 (영업일보 DB 연계)
+` +
+    `- 블루스캔: ${fmtK(pBScan.orderAmount)}원 (${pBScan.orderCount}건), 순증 +${fmtK(pBScan.netAmount)}원
+` +
+    `- 휴엔: ${fmtK(pHuen.orderAmount)}원 (${pHuen.orderCount}건), 순증 +${fmtK(pHuen.netAmount)}원
+` +
+    `- 디지털: ${fmtK(pDigital.orderAmount)}원 (${pDigital.orderCount}건), 순증 +${fmtK(pDigital.netAmount)}원
+` +
+    `- 전략상품 합계: ${fmtK(strategicTotalAmt)}원 (${strategicTotalCount}건), 순증 +${fmtK(strategicTotalNet)}원
+
+` +
+    `■ 2. 상품일보 안전상품 수주·매출 파이프라인 (상품일보 DB 연계)
+` +
+    `- 안전상품 수주: ${fmtK(ordTotal)}원 (목표 ${fmtK(ordTgt)}원, ${ordPct}%)
+` +
+    `- 확정 매출(카드포함): ${fmtK(confirmedAmt)}원 (목표 ${fmtK(saleTgt)}원, ${salePct}%)
+` +
+    `- 미매출 대기 파이프라인: ${fmtK(unconfirmedAmt)}원 (${saleUnconfirmed.length}건)
+` +
+    `- 전환 시 최종 전망: ${fmtK(totalPipelineAmt)}원 (목표대비 ${potentialPct}%)
+
+` +
+    `■ 3. 안전상품 매출 극대화 3대 실행 과제
+` +
+    `1. 일반알람 고객 대상 '블루스캔·휴엔·디지털' 결합 패키징 크로스셀
+` +
+    `2. 미매출 대기 안건 조기 시공 및 매출 확정
+` +
+    `3. 카드매출 관리 및 기기비 조기 회수 프로세스 정착
+`;
 
   return { html: html, text: text };
 }
