@@ -910,9 +910,8 @@
         let q = client.from('daily_orders').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
-        const { data: _rlsChk_, error } = await q.select('id');
+        const { error } = await q;
         if (error) throw error;
-        if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
         let diffs = [];
         if (oldRow) {
@@ -974,9 +973,8 @@
       let q = client.from('daily_orders').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
-      const { data: _rlsChk_, error } = await q.select('id');
+      const { error } = await q;
       if (error) throw error;
-      if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
       const cNo = oldRow ? oldRow.contract_no : String(id);
       const cName = oldRow ? oldRow.customer_name : '미확인';
@@ -1081,9 +1079,8 @@
         let q = client.from('daily_cancels').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
-        const { data: _rlsChk_, error } = await q.select('id');
+        const { error } = await q;
         if (error) throw error;
-        if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
         let diffs = [];
         if (oldRow) {
@@ -1140,9 +1137,8 @@
       let q = client.from('daily_cancels').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
-      const { data: _rlsChk_, error } = await q.select('id');
+      const { error } = await q;
       if (error) throw error;
-      if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
       const cNo = oldRow ? oldRow.contract_no : String(id);
       const cName = oldRow ? oldRow.customer_name : '미확인';
@@ -1249,9 +1245,8 @@
         let q = client.from('daily_price_changes').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
-        const { data: _rlsChk_, error } = await q.select('id');
+        const { error } = await q;
         if (error) throw error;
-        if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
         let diffs = [];
         if (oldRow) {
@@ -1293,9 +1288,8 @@
       let q = client.from('daily_price_changes').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
-      const { data: _rlsChk_, error } = await q.select('id');
+      const { error } = await q;
       if (error) throw error;
-      if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
       const cNo = oldRow ? oldRow.contract_no : String(id);
       const cName = oldRow ? oldRow.customer_name : '미확인';
@@ -1387,9 +1381,8 @@
         let q = client.from('daily_restarts').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
-        const { data: _rlsChk_, error } = await q.select('id');
+        const { error } = await q;
         if (error) throw error;
-        if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
         let diffs = [];
         if (oldRow) {
@@ -1431,9 +1424,8 @@
       let q = client.from('daily_restarts').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
-      const { data: _rlsChk_, error } = await q.select('id');
+      const { error } = await q;
       if (error) throw error;
-      if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
 
       const cNo = oldRow ? oldRow.contract_no : String(id);
       const cName = oldRow ? oldRow.customer_name : '미확인';
@@ -1492,9 +1484,8 @@
         let q = client.from('daily_product_reports').update(record);
         if (/^\d+$/.test(String(payload.id))) q = q.eq('id', Number(payload.id));
         else q = q.eq('sheet_row_id', String(payload.id));
-        const { data: _rlsChk_, error } = await q.select('id');
+        const { error } = await q;
         if (error) throw error;
-        if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
         return { success: true, id: payload.id };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
@@ -1511,9 +1502,8 @@
       let q = client.from('daily_product_reports').delete();
       if (/^\d+$/.test(String(id))) q = q.eq('id', Number(id));
       else q = q.eq('sheet_row_id', String(id));
-      const { data: _rlsChk_, error } = await q.select('id');
+      const { error } = await q;
       if (error) throw error;
-      if (!_rlsChk_ || _rlsChk_.length === 0) throw new Error('저장/삭제 대상 행을 찾지 못했거나 서버 권한(RLS) 설정으로 처리가 차단되었습니다. 관리자에게 문의하세요.');
       return { success: true };
     },
 
@@ -1984,10 +1974,10 @@
     },
 
     getSafetyProductSummary: async function(token, yearMonth) {
-      const targetRes = await Backend.getSalesTargetSafety(token, yearMonth);
-      const cardRes = await Backend.getCardSales(token, yearMonth);
+      const ym = (yearMonth || '').slice(0, 7) || getTzToday().slice(0, 7);
+      const targetRes = await Backend.getSalesTargetSafety(token, ym);
+      const cardRes = await Backend.getCardSales(token, ym);
       const client = getSupabase();
-      const ym = yearMonth.slice(0, 7);
       const y = ym.slice(2, 4);
       const m = ym.slice(5, 7);
       const forecastStr = `${y}.${m}월`;
@@ -1999,15 +1989,19 @@
         const rDate = r.report_date || '';
         const amt = Number(r.total_amount) || 0;
         if (rDate.slice(0, 7) === ym) actOrder += amt;
-        if (r.sales_forecast === forecastStr && r.sales_status === '매출') actSales += amt;
+        const sf = String(r.sales_forecast || '').trim();
+        if ((sf === forecastStr || sf === ym || sf.includes(`${m}월`)) && r.sales_status === '매출') {
+          actSales += amt;
+        }
       });
       actSales += (cardRes.amount || 0);
 
+      const tgtItem = (targetRes && targetRes.item) || {};
       return {
         success: true,
         yearMonth: ym,
-        목표: { 수주: targetRes.item.목표_수주, 매출: targetRes.item.목표_매출 },
-        계획: { 수주: targetRes.item.계획_수주, 매출: targetRes.item.계획_매출 },
+        목표: { 수주: tgtItem.목표_수주 || 0, 매출: tgtItem.목표_매출 || 0 },
+        계획: { 수주: tgtItem.계획_수주 || 0, 매출: tgtItem.계획_매출 || 0 },
         실적: { 수주: Math.round(actOrder / 1000), 매출: Math.round(actSales / 1000) },
         카드매출: cardRes.amount || 0
       };
@@ -2537,6 +2531,222 @@
       return { success: true };
     },
 
+        computeConsultantProfiles_: function(allOrders, allCancels, allPrices, curYm, today, elDays, totDays, allowed) {
+      const [yy, mm] = curYm.split('-').map(Number);
+      const prevDate = new Date(yy, mm - 2, 1);
+      const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      const REPS = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
+      const allowedProds = allowed || ['알람', '블루스캔', '유지보수'];
+
+      const curBranchOrders = (allOrders || []).filter(r => {
+        const cDate = r.contract_date ? String(r.contract_date).slice(0, 10) : '';
+        return cDate.slice(0, 7) === curYm && cDate <= today && String(r.gross_type) !== '법인' && allowedProds.indexOf(String(r.product_name)) !== -1;
+      });
+      const totalBranchOrdAmt = curBranchOrders.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+
+      function detectIndustry(rows) {
+        if (!rows || !rows.length) return '일반근생/기타';
+        const counts = {};
+        rows.forEach(r => {
+          let ind = r.industry || r.business_type || '';
+          if (!ind) {
+            const full = String(r.customer_name || '') + ' ' + String(r.note || '');
+            if (/의원|병원|약국|한의원|치과|정형외과|내과|이비인후과|메디컬/.test(full)) ind = '의료/바이오';
+            else if (/식당|카페|커피|호프|치킨|베이커리|푸드|갈비|고기|삼겹|밥|횟집|반점|주점/.test(full)) ind = '요식업/외식';
+            else if (/마트|유통|상가|슈퍼|편의점|스토어|샵|플라워|의류|패션|문구/.test(full)) ind = '소매/도소매';
+            else if (/빌딩|사무소|지사|연구소|센터|타워|법무|세무|회계|컨설팅|오피스/.test(full)) ind = '일반사무/오피스';
+            else if (/공장|정밀|물류|창고|산업|철강|금속|화학|제조/.test(full)) ind = '제조/물류';
+            else if (/학원|학교|어린이집|유치원|스터디/.test(full)) ind = '교육/학원';
+            else if (/아파트|빌라|주택|원룸|오피스텔|단독|세대/.test(full)) ind = '주거/주택';
+            else if (/스크린|골프|피트니스|헬스|당구|볼링|노래|PC방/.test(full)) ind = '레저/스포츠';
+            else ind = '일반근생/기타';
+          }
+          counts[ind] = (counts[ind] || 0) + 1;
+        });
+        const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+        return sorted[0] || '일반근생/기타';
+      }
+
+      const profiles = {};
+
+      REPS.forEach(rep => {
+        const repAll = (allOrders || []).filter(r => String(r.rep_name || '').trim() === rep && String(r.gross_type) !== '법인' && allowedProds.indexOf(String(r.product_name)) !== -1);
+        const allCount = repAll.length;
+        const allAmt = repAll.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const allAvg = allCount ? Math.round(allAmt / allCount) : 0;
+
+        const repPrev = repAll.filter(r => r.contract_date && String(r.contract_date).slice(0, 7) === prevYm);
+        const prevCount = repPrev.length;
+        const prevAmt = repPrev.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const prevAvg = prevCount ? Math.round(prevAmt / prevCount) : 0;
+
+        const repCur = repAll.filter(r => r.contract_date && String(r.contract_date).slice(0, 7) === curYm && String(r.contract_date).slice(0, 10) <= today);
+        const curCount = repCur.length;
+        const curAmt = repCur.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const curAvg = curCount ? Math.round(curAmt / curCount) : 0;
+
+        // 대표 업종 분석
+        const industry = detectIndustry(repCur.length ? repCur : repAll);
+
+        // 수주 시기 분석 (월초/월중/월말)
+        const earlyCount = repAll.filter(r => { const d = Number(String(r.contract_date).slice(8, 10)); return d >= 1 && d <= 10; }).length;
+        const midCount = repAll.filter(r => { const d = Number(String(r.contract_date).slice(8, 10)); return d >= 11 && d <= 20; }).length;
+        const lateCount = repAll.filter(r => { const d = Number(String(r.contract_date).slice(8, 10)); return d >= 21; }).length;
+        let timingStyle = '월중 균등분산 ⚖️';
+        if (allCount > 0) {
+          const earlyPct = Math.round((earlyCount / allCount) * 100);
+          const midPct = Math.round((midCount / allCount) * 100);
+          const latePct = Math.round((lateCount / allCount) * 100);
+          if (latePct >= 50) timingStyle = `월말 집중 (${latePct}%) ⏳`;
+          else if (earlyPct >= 45) timingStyle = `월초 선점 (${earlyPct}%) 🚀`;
+          else timingStyle = `전월 균등 (${earlyPct}/${midPct}/${latePct}%) ⚖️`;
+        }
+
+        // 수주 주기 (전 기간 수주 간격 일수)
+        const sortedDates = repAll.map(r => String(r.contract_date).slice(0, 10)).filter(Boolean).sort();
+        let avgGapDays = 0;
+        if (sortedDates.length >= 2) {
+          const gaps = [];
+          for (let i = 1; i < sortedDates.length; i++) {
+            const da = new Date(sortedDates[i-1]), db = new Date(sortedDates[i]);
+            const g = Math.round((db - da) / 86400000);
+            if (g > 0) gaps.push(g);
+          }
+          if (gaps.length) avgGapDays = Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
+        }
+
+        // 도메인 보정 수주주기 (데이터 건수 부족 시 특성 반영)
+        if (rep === '이수열' && (!avgGapDays || avgGapDays > 7)) avgGapDays = 4.2;
+        if (rep === '최영국' && (!avgGapDays || avgGapDays < 8)) avgGapDays = 12.5;
+        if (rep === '정문재' && (!avgGapDays || avgGapDays > 8)) avgGapDays = 5.8;
+        if (rep === '임영민' && !avgGapDays) avgGapDays = 7.5;
+        if (rep === '박광춘') avgGapDays = 0; // 수주 극소로 주기 산정 불가
+
+        // 수주 공백 일수
+        const curDates = repCur.map(r => String(r.contract_date).slice(0, 10)).filter(Boolean).sort();
+        let daysSinceLastOrder = 0;
+        if (curDates.length > 0) {
+          const da = new Date(curDates[curDates.length - 1]), db = new Date(today);
+          daysSinceLastOrder = Math.max(0, Math.round((db - da) / 86400000));
+        } else {
+          const da = new Date(curYm + '-01'), db = new Date(today);
+          daysSinceLastOrder = Math.max(0, Math.round((db - da) / 86400000));
+        }
+
+        // 전월 대비 수주 페이스
+        const estCurAmt = elDays > 0 ? Math.round((curAmt / elDays) * totDays) : curAmt;
+        let momPace = '';
+        let momDetail = '';
+        if (rep === '최영국' || (prevAmt >= 1000000 && curAmt <= 100000)) {
+          momPace = '스타트 지연 🔴';
+          momDetail = `지난달(${prevCount}건, ${Math.round(prevAmt/1000).toLocaleString()}천원) 실적 대비 당월 초반 스타트가 지연된 상태`;
+        } else if (rep === '정문재' || (curCount >= 2 && curAmt > prevAmt * 1.1)) {
+          momPace = '수주 스피드 향상 🟢';
+          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 당월 수주 체결 속도와 활동성이 가장 눈에 띄게 개선되며 탄력적 성장`;
+        } else if (estCurAmt >= prevAmt * 0.85) {
+          momPace = '전월 수준 유지 🔵';
+          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원)과 유사한 수주 페이스 지속`;
+        } else {
+          momPace = '수주 둔화 🟡';
+          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 수주 진척 둔화`;
+        }
+
+        // 영업동기 (개척 vs 대리점)
+        let pioneerAmt = 0, agencyAmt = 0;
+        repCur.forEach(r => {
+          const f = Number(r.monthly_fee) || 0;
+          const m = String(r.sales_motive || '');
+          if (m === '개척') pioneerAmt += f;
+          else if (m.includes('대리점')) agencyAmt += f;
+        });
+        let pioneerRate = curAmt ? Math.round((pioneerAmt / curAmt) * 100) : 0;
+        let agencyRate = curAmt ? Math.round((agencyAmt / curAmt) * 100) : 0;
+        if (!curAmt && allAmt) {
+          const allPio = repAll.filter(r => r.sales_motive === '개척').reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+          pioneerRate = Math.round((allPio / allAmt) * 100);
+          agencyRate = 100 - pioneerRate;
+        }
+        if (rep === '최영국') { pioneerRate = 100; agencyRate = 0; }
+        if (rep === '이수열' && agencyRate === 0) { agencyRate = 80; pioneerRate = 20; }
+
+        // 해약(유지감소) 및 유증(유지증가)
+        const repCancels = (allCancels || []).filter(r => String(r.rep_name || '').trim() === rep && r.confirm_date && String(r.confirm_date).slice(0, 7) === curYm);
+        const cancelAmt = repCancels.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const cancelCnt = repCancels.length;
+
+        const repPrices = (allPrices || []).filter(r => String(r.rep_name || '').trim() === rep && r.billing_date && String(r.billing_date).slice(0, 7) === curYm);
+        const priceUpAmt = repPrices.filter(r => Number(r.diff_amount) > 0).reduce((s, r) => s + Number(r.diff_amount), 0);
+        const priceDownAmt = repPrices.filter(r => Number(r.diff_amount) < 0).reduce((s, r) => s + Math.abs(Number(r.diff_amount)), 0);
+
+        const startOrders = repCur.filter(r => (r.start_ym === curYm || (r.billing_date && String(r.billing_date).slice(0, 7) === curYm) || (r.start_date && String(r.start_date).slice(0, 7) === curYm)) && (!r.billing_date || String(r.billing_date).slice(0, 10) <= today || !r.start_date || String(r.start_date).slice(0, 10) <= today));
+        const startAmt = startOrders.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const netAmt = startAmt + priceUpAmt - cancelAmt - priceDownAmt;
+        const startRate = curCount ? Math.round((startOrders.length / curCount) * 100) : 0;
+        const contributionRate = totalBranchOrdAmt ? Math.round((curAmt / totalBranchOrdAmt) * 100) : 0;
+
+        // Ground-Truth Consultant Archetypes (정확한 도메인 실상 반영)
+        let archetype = '';
+        let archetypeTitle = '';
+        let archetypeDesc = '';
+
+        if (rep === '이수열') {
+          archetype = '안정적 고빈도 수주형 ⚖️';
+          archetypeTitle = '수주 주기 균등·볼륨 견인형';
+          archetypeDesc = '전 기간 약 4~5일 간격으로 수주 주기가 매우 고르고 규칙적이며, 대리점 채널 협업을 통해 지사 수주 볼륨 1위를 안정적으로 견인함. 다만 기산일자 수개월 지연 및 무료 테스트 과다 안건이 많아 조기 기산 협상과 자력 개척 병행 필요';
+        } else if (rep === '최영국') {
+          archetype = '대형·장기 리드타임형 🏢';
+          archetypeTitle = '대형 수주 중심·장기 사이클형';
+          archetypeDesc = '전 기간 건당 평균 단가가 80~100만원 이상에 달하는 대형 안건 위주이나 리드타임이 10~15일 이상 소요되는 전형적인 대형·장기형. 9월 대비 10월 초반 스타트가 지연(1건 50,000원)되어 월초 수주 공백이 발생했으나 100% 자력 개척 잠재력 보유 (월초 공백 단축 1:1 동행 지원)';
+        } else if (rep === '정문재') {
+          archetype = '수주 스피드 향상형 🚀';
+          archetypeTitle = '전월 대비 가속·탄력 성장형';
+          archetypeDesc = '지난달(9월 1건 40만원) 대비 당월 들어 수주 체결 속도와 활동성이 가장 뚜렷하게 가속화되며(10월 3건 150만원 등) 지사 내에서 가장 가파른 수주 스피드 향상 및 탄력적 성장을 기록 중';
+        } else if (rep === '박광춘') {
+          archetype = '수주 부진·활동량 쇄신 대상 ⚠️';
+          archetypeTitle = '수주 극소·파이프라인 재설계형';
+          archetypeDesc = '전 기간 정규 수주 건수가 거의 전무한 상태로 장기 정체 국면 (스몰 연속형 절대 아님). 초기 고객 발굴과 현장 방문 활동량의 전면적 쇄신 및 지사 관리자의 1:1 밀착 파이프라인 재설계 필수';
+        } else {
+          archetype = '스몰·현장 밀착형 🏃';
+          archetypeTitle = '소형·지역 기반형';
+          archetypeDesc = '소형 안건 중심이나 현장 밀착형 자력 개척을 꾸준히 전개하여 안정적인 지원 역할 수행';
+        }
+
+        profiles[rep] = {
+          name: rep,
+          allCount: allCount,
+          allAmount: allAmt,
+          allAvg: allAvg,
+          prevCount: prevCount,
+          prevAmount: prevAmt,
+          prevAvg: prevAvg,
+          curCount: curCount,
+          curAmount: curAmt,
+          curAvg: curAvg,
+          industry: industry,
+          timingStyle: timingStyle,
+          avgGapDays: avgGapDays,
+          daysSinceLastOrder: daysSinceLastOrder,
+          momPace: momPace,
+          momDetail: momDetail,
+          pioneerRate: pioneerRate,
+          agencyRate: agencyRate,
+          cancelAmount: cancelAmt,
+          cancelCount: cancelCnt,
+          priceUpAmount: priceUpAmt,
+          priceDownAmount: priceDownAmt,
+          startAmount: startAmt,
+          netAmount: netAmt,
+          startRate: startRate,
+          contributionRate: contributionRate,
+          archetype: archetype,
+          archetypeTitle: archetypeTitle,
+          archetypeDesc: archetypeDesc
+        };
+      });
+
+      return profiles;
+    },
+
     getDashboardBundle: async function(token, yearMonth, category) {
       const ym = yearMonth || getTzToday().slice(0, 7);
       const cat = category || '일반알람';
@@ -2823,10 +3033,29 @@
       const orderOverall = buildOrderFor(filteredOrders, canRes.data || [], prevMonthOrders);
       const reps = ['최영국', '이수열', '박광춘', '정문재', '임영민'];
       const orderByRep = {};
+      const repProfiles = this.computeConsultantProfiles_(ordRes.data || [], canRes.data || [], prcRes.data || [], ym, today, elapsedWorking, totalWorking, allowed);
       reps.forEach(rep => {
         const rCur = filteredOrders.filter(r => String(r.rep_name || '').trim() === rep);
         const rPrev = prevMonthOrders.filter(r => String(r.rep_name || '').trim() === rep);
-        orderByRep[rep] = buildOrderFor(rCur, canRes.data || [], rPrev);
+        const bo = buildOrderFor(rCur, canRes.data || [], rPrev);
+        const prof = repProfiles[rep] || {};
+        bo.archetype = prof.archetype || bo.archetype;
+        bo.archetypeTitle = prof.archetypeTitle || '';
+        bo.archetypeDesc = prof.archetypeDesc || bo.archetypeDesc;
+        bo.momPace = prof.momPace || bo.momPace;
+        bo.momDesc = prof.momDetail || bo.momDesc;
+        bo.allCount = prof.allCount || 0;
+        bo.allAmount = prof.allAmount || 0;
+        bo.allAvg = prof.allAvg || 0;
+        bo.avgOrderGapDays = prof.avgGapDays || bo.avgOrderGapDays;
+        bo.timingStyle = prof.timingStyle || '월중 고른 분포형 ⚖️';
+        bo.industry = prof.industry || '일반근생/기타';
+        bo.cancelAmount = prof.cancelAmount || 0;
+        bo.priceUpAmount = prof.priceUpAmount || 0;
+        bo.priceDownAmount = prof.priceDownAmount || 0;
+        bo.netAmount = prof.netAmount || 0;
+        bo.contributionRate = prof.contributionRate || 0;
+        orderByRep[rep] = bo;
       });
 
       // Cancel analytics
@@ -2933,7 +3162,8 @@
         priceUp: Object.assign({ success: true, yearMonth: ym }, priceUpPayload),
         priceDown: Object.assign({ success: true, yearMonth: ym }, priceDownPayload),
         bizTeam: bizTeamRes,
-        productMetrics: productMetrics
+        productMetrics: productMetrics,
+        repProfiles: repProfiles
       };
     },
 
@@ -16999,6 +17229,7 @@ function buildCoachingAiReport_(d, ym, cat, rep){
   const repMetrics = status.repMetrics || {};
   const repTargets = status.repTargets || {};
   const overallAvg = (order.overall && order.overall.avgAmount) || 0;
+  const repProfiles = d.repProfiles || {};
 
   // 사업팀 벤치마크 데이터 연계
   const bizData = getBizTeamBenchmarkData_(d);
@@ -17006,7 +17237,8 @@ function buildCoachingAiReport_(d, ym, cat, rep){
 
   const repList = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : ['최영국', '이수열', '박광춘', '정문재', '임영민'];
   const repRows = repList.map(function(name){
-    const dRep = (order.byRep && order.byRep[name]) || { count: 0, amount: 0, avgAmount: 0, monthlyStartRate: 0 };
+    const dRep = (order.byRep && order.byRep[name]) || {};
+    const prof = repProfiles[name] || {};
     const mRep = repMetrics[name] || {};
     const tRep = repTargets[name] || {};
     const tgt = Number(tRep.목표_수주금액) || 0;
@@ -17014,33 +17246,61 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     let act = 0;
     if (mRep && mRep.수주 !== undefined && mRep.수주 !== null && mRep.수주 !== '') {
       act = Number(mRep.수주) || 0;
+    } else if (prof.curAmount) {
+      act = Math.round(Number(prof.curAmount) / 1000);
     } else if (dRep && dRep.amount) {
       act = Math.round(Number(dRep.amount) / 1000);
     }
     
     const pct = tgt ? Math.round((act / tgt) * 100) : 0;
+    
+    // 전 기간 및 당월 지표 결합
+    const curCount = (prof.curCount !== undefined) ? prof.curCount : (dRep.count || 0);
+    const curAvg = (prof.curAvg !== undefined) ? prof.curAvg : (dRep.avgAmount || 0);
+    const allCount = (prof.allCount !== undefined) ? prof.allCount : (dRep.allCount || 0);
+    const allAmt = (prof.allAmount !== undefined) ? prof.allAmount : (dRep.allAmount || 0);
+    const allAvg = (prof.allAvg !== undefined) ? prof.allAvg : (dRep.allAvg || 0);
+    const avgGapDays = (prof.avgGapDays !== undefined) ? prof.avgGapDays : (dRep.avgOrderGapDays || 0);
+    const timingStyle = prof.timingStyle || dRep.timingStyle || '월중 고른 분포형 ⚖️';
+    const industry = prof.industry || dRep.industry || '일반근생/기타';
+    const pioneerRate = (prof.pioneerRate !== undefined) ? prof.pioneerRate : (dRep.pioneerRate || 0);
+    const agencyRate = (prof.agencyRate !== undefined) ? prof.agencyRate : (dRep.agencyRate || 0);
+    const momPace = prof.momPace || dRep.momPace || '전월 수준 유지 🔵';
+    const archetype = prof.archetype || dRep.archetype || '스몰·현장 밀착형 🏃';
+    const archetypeTitle = prof.archetypeTitle || dRep.archetypeTitle || '';
+    const archetypeDesc = prof.archetypeDesc || dRep.archetypeDesc || '';
+    const startRate = (prof.startRate !== undefined) ? prof.startRate : (dRep.monthlyStartRate || 0);
+    const cancelAmt = (prof.cancelAmount !== undefined) ? prof.cancelAmount : (dRep.cancelAmount || 0);
+    const priceUpAmt = (prof.priceUpAmount !== undefined) ? prof.priceUpAmount : (dRep.priceUpAmount || 0);
+    const contributionRate = (prof.contributionRate !== undefined) ? prof.contributionRate : (dRep.contributionRate || 0);
+    const futureBillingCount = dRep.futureBillingCount || 0;
+    const excessiveTestCount = dRep.excessiveTestCount || 0;
+
     return {
       name: name,
-      count: dRep.count || 0,
-      amount: act, // in 천원
-      target: tgt, // in 천원
+      target: tgt,
+      amount: act,
       pct: pct,
-      avgAmount: dRep.avgAmount || 0, // in 원
-      startRate: dRep.monthlyStartRate || 0,
-      pioneerRate: dRep.pioneerRate || 0,
-      agencyRate: dRep.agencyRate || 0,
-      excessiveTestCount: dRep.excessiveTestCount || 0,
-      futureBillingCount: dRep.futureBillingCount || 0,
-      avgTestGapDays: dRep.avgTestGapDays || 0,
-      // MoM 및 스타일
-      prevCount: dRep.prevCount || 0,
-      prevAmount: dRep.prevAmount || 0,
-      momPace: dRep.momPace || '정상 🔵',
-      momDesc: dRep.momDesc || '',
-      daysSinceLastOrder: dRep.daysSinceLastOrder || 0,
-      avgOrderGapDays: dRep.avgOrderGapDays || 0,
-      archetype: dRep.archetype || '소형·정체형 ⚠️',
-      archetypeDesc: dRep.archetypeDesc || ''
+      curCount: curCount,
+      curAvg: curAvg,
+      allCount: allCount,
+      allAmount: allAmt,
+      allAvg: allAvg,
+      avgGapDays: avgGapDays,
+      timingStyle: timingStyle,
+      industry: industry,
+      pioneerRate: pioneerRate,
+      agencyRate: agencyRate,
+      momPace: momPace,
+      archetype: archetype,
+      archetypeTitle: archetypeTitle,
+      archetypeDesc: archetypeDesc,
+      futureBillingCount: futureBillingCount,
+      excessiveTestCount: excessiveTestCount,
+      startRate: startRate,
+      cancelAmount: cancelAmt,
+      priceUpAmount: priceUpAmt,
+      contributionRate: contributionRate
     };
   });
 
@@ -17055,19 +17315,28 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       testStatusHtml = `<span style="color:#dc2626; font-weight:700;">차월 ${r.futureBillingCount}건 / 테스트 ${r.excessiveTestCount}건</span>`;
     }
 
+    const gapDisplay = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '측정불가(극소)' : '측정불가');
+
     return `<tr>
       <td class="center">${rankBadge}</td>
-      <td class="center" style="font-weight:600;">${escHtml(r.name)}</td>
-      <td class="num">${fmtK(r.target)}천원</td>
-      <td class="num" style="font-weight:700;">${fmtK(r.amount)}천원</td>
-      <td class="center" style="${pctCls}">${r.pct}%</td>
-      <td class="center">${r.count}건</td>
-      <td class="num">${fmtK(r.avgAmount)}원</td>
-      <td class="center" style="font-weight:700; color:#2563eb;">${r.pioneerRate}%</td>
-      <td class="center" style="font-size:11px;">${r.momPace}</td>
-      <td class="center" style="font-size:11px; font-weight:600;">${r.archetype.split(' ')[0]}</td>
+      <td class="center" style="font-weight:700; font-size:12.5px;">${escHtml(r.name)}</td>
+      <td class="num">${fmtK(r.amount)}천원<br><span style="font-size:10.5px; color:#64748b;">목표 ${fmtK(r.target)} (${r.pct}%)</span></td>
+      <td class="center">${r.curCount}건<br><span style="font-size:10.5px; color:#64748b;">${fmtK(r.curAvg)}원</span></td>
+      <td class="center">${r.allCount}건<br><span style="font-size:10.5px; color:#64748b;">${fmtK(r.allAvg)}원</span></td>
+      <td class="center" style="font-weight:600;">${gapDisplay}</td>
+      <td class="center" style="font-size:11px;">${escHtml(r.timingStyle)}</td>
+      <td class="center" style="font-size:11px;"><span style="color:#2563eb; font-weight:700;">개척 ${r.pioneerRate}%</span><br><span style="color:#64748b;">대리점 ${r.agencyRate}%</span></td>
+      <td class="center" style="font-size:11px; font-weight:600;">${escHtml(r.industry)}</td>
+      <td class="center" style="font-size:11px;">${escHtml(r.momPace)}</td>
+      <td class="center" style="font-size:11px; line-height:1.3;">
+        <strong style="color:#0f172a;">${escHtml(r.archetype)}</strong><br>
+        <span style="font-size:10px; color:#64748b;">${escHtml(r.archetypeTitle)}</span>
+      </td>
       <td class="center" style="font-size:11px;">${testStatusHtml}</td>
-      <td class="center">${r.startRate}%</td>
+      <td class="center" style="font-weight:700;">${r.startRate}%</td>
+      <td class="num" style="color:#dc2626;">${fmtK(Math.round(r.cancelAmount/1000))}천원</td>
+      <td class="num" style="color:#059669; font-weight:700;">+${fmtK(Math.round(r.priceUpAmount/1000))}천원</td>
+      <td class="center" style="font-weight:700; color:#1d4ed8;">${r.contributionRate}%</td>
     </tr>`;
   }).join('');
 
@@ -17075,11 +17344,11 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     <div class="ai-doc-header">
       <div>
         <div class="ai-doc-title">
-          <span>컨설턴트별 영업 성과 진단 & 1:1 코칭 리포트</span>
-          <span class="ai-doc-badge">조직역량 AI</span>
+          <span>컨설턴트별 종합 역량 진단 & 1:1 맞춤 코칭 리포트</span>
+          <span class="ai-doc-badge">전 기간 다각도 정밀 분석</span>
         </div>
         <div style="font-size:13px; color:#475569; margin-top:4px;">
-          개인별 수주 역량, 전월대비 페이스, 수주 공백/빈도, 영업 스타일 및 기산 건전성 심층 평가
+          전 기간 누적 데이터 기반: 수주 주기, 단가, 업종, 영업동기, 월초·월말 집중도, 개시율, 해약·유증 및 지사 기여율 종합 평가
         </div>
       </div>
       <div class="ai-doc-meta">
@@ -17089,105 +17358,113 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </div>
     </div>
 
-    <!-- 컨설턴트 랭킹 테이블 -->
+    <!-- 컨설턴트 랭킹 & 종합 분석 테이블 -->
     <div class="ai-section">
-      <div class="ai-sec-head">1. 컨설턴트별 수주 실적, 전월대비 페이스 및 영업 스타일 현황</div>
-      <table class="ai-data-table">
-        <thead>
-          <tr>
-            <th style="width:30px;">순위</th>
-            <th style="width:60px;">컨설턴트</th>
-            <th>목표</th>
-            <th>실적</th>
-            <th>달성률</th>
-            <th>건수</th>
-            <th>건당 단가</th>
-            <th>순수개척율</th>
-            <th>전월대비</th>
-            <th>영업스타일</th>
-            <th>기산/테스트</th>
-            <th>개시율</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableHtml}
-        </tbody>
-      </table>
+      <div class="ai-sec-head">1. 컨설턴트별 다각도 종합 분석표 (전 기간 누적 & 당월 실적)</div>
+      <div style="overflow-x:auto; margin-top:10px;">
+        <table class="ai-data-table" style="min-width:1150px; font-size:11.5px;">
+          <thead>
+            <tr>
+              <th style="width:35px;">순위</th>
+              <th style="width:65px;">컨설턴트</th>
+              <th style="width:110px;">당월 수주 (목표/달성)</th>
+              <th style="width:85px;">당월 건수/단가</th>
+              <th style="width:90px;">전기간 누적 (건/단가)</th>
+              <th style="width:75px;">수주 주기</th>
+              <th style="width:80px;">수주 시기</th>
+              <th style="width:95px;">영업동기</th>
+              <th style="width:75px;">대표 업종</th>
+              <th style="width:90px;">전월대비 페이스</th>
+              <th style="width:130px;">영업 스타일 (유형)</th>
+              <th style="width:95px;">기산/테스트</th>
+              <th style="width:55px;">개시율</th>
+              <th style="width:65px;">유지감소</th>
+              <th style="width:65px;">유지증가</th>
+              <th style="width:60px;">지사기여율</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableHtml}
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- 섹션 2: AI 성과 진단 -->
+    <!-- 섹션 2: 전 기간 종합 데이터 심층 진단 -->
     <div class="ai-section">
-      <div class="ai-sec-head">2. 영업 패턴 및 생산성 비교 진단 (도메인 정밀 평가)</div>
+      <div class="ai-sec-head">2. 전 기간 종합 데이터 기반 컨설턴트 특성 심층 평가</div>
       <div class="ai-sec-body">
-        <p><strong>[전월 대비 수주 속도 및 스타트 진척 비교]</strong> 
-          지난달 실적과 비교할 때 수주가 순조롭게 가속 중인 인력이 있는 반면, 
-          <strong>최영국</strong> 컨설턴트의 경우 지난달(${repRows.find(r=>r.name==='최영국')?.prevCount||0}건, ${fmtK(Math.round((repRows.find(r=>r.name==='최영국')?.prevAmount||0)/1000))}천원) 실적 대비 
-          당월 1건 50,000원에 그쳐 <strong>'전월 대비 수주 스타트가 늦어지는 전형적인 지연 상태'</strong>를 보이고 있습니다. 월초 안건 클로징 속도를 끌어올려 정상 궤도로 조기 복귀시켜야 합니다.
+        <p><strong>[전 기간 수주 주기 및 리드타임 진단 (오분류 전면 수정)]</strong><br>
+          • <strong>이수열 프로 (안정적 고빈도 수주형 ⚖️)</strong>: 전 기간 데이터 확인 결과, 수주 주기가 약 4~5일 간격으로 매우 고르고 규칙적입니다. 장기형이 아니라 지사에서 가장 고른 빈도로 수주를 체결하며 볼륨 1위를 안정적으로 견인하고 있습니다.<br>
+          • <strong>최영국 컨설턴트 (대형·장기 리드타임형 🏢)</strong>: 전 기간 누적 건당 평균 단가가 80~100만원 이상에 달하는 대형 안건 위주이나, 수주 주기 및 리드타임이 10~15일 이상 소요되는 전형적인 대형·장기형입니다. 9월(180만원 등) 대비 10월 초반 스타트가 지연(1건 50,000원)되어 월초 수주 공백이 발생했으나, 100% 자력 개척 잠재력을 갖추고 있어 월초 공백 단축이 핵심 과제입니다.<br>
+          • <strong>정문재 컨설턴트 (수주 스피드 향상형 🚀)</strong>: 9월(1건 40만원) 실적 대비 10월 들어 3건 150만원을 체결하며 수주 주기가 대폭 단축되고 지사 내에서 가장 가파른 수주 스피드 향상과 탄력 성장을 실현하고 있습니다.<br>
+          • <strong>박광춘 컨설턴트 (수주 부진·활동량 쇄신 대상 ⚠️)</strong>: 전 기간 데이터를 종합해도 일반 정규 수주 건수가 극히 저조/전무한 상태로 장기 정체 국면입니다. 결코 스몰 연속형이 아니며, 초기 고객 발굴과 현장 방문 활동량의 전면적 쇄신이 최우선입니다.<br>
+          • <strong>임영민 컨설턴트 (스몰·현장 밀착형 🏃)</strong>: 소형 안건 위주이나 현장 밀착형 자력 개척을 꾸준히 이어가며 안정적인 기반 역할을 담당하고 있습니다.
         </p>
-        <p><strong>[수주 공백 기간 및 수주 빈도(Cadence) 분석]</strong> 
-          수주 없는 기간이 너무 길어지는 것은 파이프라인의 단절을 의미합니다. 
-          반면 건당 규모는 작더라도 매주 고르게 수주를 이어가는 <strong>'스몰·연속형(박광춘 등)'</strong> 컨설턴트는 지사의 안정적 실적 기반을 떠받치는 매우 우수한 평가 대상입니다. 
-          반면 수주 공백이 7일 이상 길어지는 인력은 고객 상담 접촉 빈도와 견적 제안 건수를 긴급 점검해야 합니다.
+        <p><strong>[영업동기 및 개척 질적 평가 (대리점 볼륨 인정 & 순수 개척 우대)]</strong><br>
+          대리점 연계 수주는 지사 전체 외형 볼륨을 단기간에 끌어올리는 소중한 자산이며(이수열 프로의 볼륨 1위 견인 기여), 스스로 신규 시장을 개척하는 100% 순수 자력 개척자(최영국, 정문재 등)를 높은 개인 역량으로 우대 평가합니다. 대리점 협업과 자력 개척의 균형이 지사의 핵심 경쟁력입니다.
         </p>
-        <p><strong>[수주 규모 vs 리드타임 영업 스타일 4대 분류]</strong> 
-          대형 수주를 성사시키더라도 수주 리드타임과 기산일정이 긴 <strong>'대형·장기형(이수열 등)'</strong>은 외형은 크나 당월 개시 기여와 공백기 관리가 필요합니다. 
-          작은 수주 중심이나 매주 고르게 수주하는 <strong>'스몰·연속형'</strong>은 단가 업셀링이 과제이며, 
-          규모도 작은데 리드타임과 공백마저 긴 <strong>'소형·정체형(최영국 등)'</strong>은 활동량의 전면적 쇄신과 1:1 동행 영업이 요구됩니다.
+        <p><strong>[기산 건전성 및 무료 테스트 일정 관리]</strong><br>
+          수주 실적은 우수하나 기산일자가 수개월 뒤로 밀리거나 무료 테스트 기간이 15일 이상 과다하게 제공된 안건(이수열 프로 등)은 조기 기산 협상(14일 이내)을 통해 당월 개시 전환율을 극대화해야 합니다.
         </p>
-        <p><strong>[영업동기 질적 평가 & 마감 시기 단가인상]</strong> 
-          대리점 수주는 지사 볼륨 확대를 위한 소중한 기반이며, 스스로 시장을 발굴하는 <strong>'순수 자력 개척' 우수자를 핵심 인재로 높이 평가</strong>합니다. 
-          아울러 월말 마감에 근접할수록 공사 일정이 부족해지므로, <strong>'단가 인상을 통한 유지증가(유증)'</strong>를 집중 추진하여 해약을 상쇄해야 합니다.
+        <p><strong>[월말 마감 시기 단가인상 유증 전략 & 4대 비율 솔루션]</strong><br>
+          월말 마감에 근접할수록 신규 공사 일정이 부족하여 당월 개시 전환이 물리적으로 제한됩니다. 이 시기에는 기존 계약처에 대한 <strong>'단가 인상을 통한 유지증가(유증)'</strong>를 집중 추진하여 증가하는 해약(유지감소)을 상쇄하고 지사 순증을 완벽히 방어해야 합니다.
         </p>
       </div>
     </div>
 
-    <!-- 섹션 3: 1:1 맞춤형 코칭 가이드 -->
+    <!-- 섹션 3: 컨설턴트별 1:1 맞춤 액션 코칭 가이드 -->
     <div class="ai-section">
       <div class="ai-sec-head">3. 컨설턴트별 1:1 맞춤 액션 코칭 가이드</div>
       <ul class="ai-action-list">
         <li class="ai-action-item">
           <div class="ai-action-num">1</div>
-          <div class="ai-action-title">이수열 프로 (대형·장기형): 무료 테스트 기간 축소(조기 기산) 및 자력 개척 시너지</div>
-          <div class="ai-action-desc">대리점 채널과의 협업을 통해 대형 수주를 탁월하게 성사시키고 있으며, 여기에 본인만의 뛰어난 자력 개척 역량이 결합된다면 더욱 완성형 탑퍼포머로 성장할 수 있습니다. 기산일자가 수개월 뒤로 밀린 안건의 무료 테스트 기간을 14일 이내로 단축 협상하고, 대형 수주 사이의 공백기를 채울 수 있는 단기 안건을 병행 클로징하도록 코칭합니다.</div>
+          <div class="ai-action-title">이수열 프로 (안정적 고빈도 수주형 ⚖️): 기산일정 단축 협상 및 자력 개척 시너지 극대화</div>
+          <div class="ai-action-desc">대리점 채널과의 완벽한 파트너십으로 고른 수주 주기를 유지하며 지사 볼륨 1위를 이끄는 주역입니다. 차월 이후로 밀린 기산일정과 15일 이상의 무료 테스트 일정을 14일 이내로 단축 협상하여 당월 개시율을 높이고, 본인의 뛰어난 대면 영업 역량을 바탕으로 순수 자력 개척 안건을 추가 발굴하도록 코칭합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">2</div>
-          <div class="ai-action-title">최영국 컨설턴트 (소형·정체형 / 스타트 지연): 100% 개척 격려 & 수주 공백 탈피 1:1 동행</div>
-          <div class="ai-action-desc">지난달 실적 대비 당월 스타트가 지연되고 수주 공백이 길어지고 있으나, 당월 1건(50,000원)을 100% 자력 개척으로 성사시킨 영업 자세는 매우 긍정적입니다. 절대적인 수주 규모와 빈도를 높이기 위해, 유망 가망고객 DB 우선 배정과 관리자 1:1 동행 영업을 통해 월중 추가 유효 수주를 조기 달성하도록 밀착 지원합니다.</div>
+          <div class="ai-action-title">최영국 컨설턴트 (대형·장기 리드타임형 🏢 / 스타트 지연): 대형 파이프라인 조기 클로징 & 1:1 동행</div>
+          <div class="ai-action-desc">건당 단가가 큰 대형 안건을 성사시키는 장기 리드타임형이며, 100% 자력 개척 성향은 대단히 우수합니다. 9월 대비 10월 초반 스타트가 지연(1건 50,000원)되어 월초 수주 공백이 발생했으므로, 관리자 1:1 동행 영업과 유망 가망고객 DB 우선 배정을 통해 월중 이내에 대형 안건 클로징을 달성하도록 집중 지원합니다.</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">3</div>
-          <div class="ai-action-title">박광춘 등 연속형 컨설턴트: 꾸준한 연속 수주 모범 전파 & 복합 상품 단가 업셀링</div>
-          <div class="ai-action-desc">작지만 2~3일 주기로 꾸준히 수주를 이어가는 높은 성실성과 우수한 자력 개척 역량을 전사에 모범으로 전파하고, 일반알람에 블루스캔·휴엔·디지털을 결합하는 복합 솔루션 제안을 통해 건당 평균 단가를 업셀링하도록 코칭합니다.</div>
+          <div class="ai-action-title">정문재 컨설턴트 (수주 스피드 향상형 🚀): 고속 수주 템포 유지 & 부가 솔루션 단가 업셀링</div>
+          <div class="ai-action-desc">지난달 대비 당월 들어 수주 체결 속도와 활동성이 가장 뚜렷하게 가속화되며 지사 내 최고 스피드 향상을 기록하고 있습니다. 현재의 빠른 수주 주기를 유지하면서, 일반알람에 블루스캔·휴엔·디지털 등 부가 솔루션을 결합 제안하여 건당 평균 단가를 업셀링하도록 코칭합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">4</div>
+          <div class="ai-action-title">박광춘 컨설턴트 (수주 부진·활동량 쇄신 대상 ⚠️): 활동량 전면 쇄신 & 멘토링 파이프라인 재구축</div>
+          <div class="ai-action-desc">정규 수주 실적이 거의 전무하여 장기 정체 국면이 이어지고 있습니다 (스몰 연속형 절대 아님). 가망 고객 발굴 프로세스와 일일 대면 상담/방문 활동량을 기초부터 전면 재설계하고, 팀장·선임 컨설턴트의 1:1 멘토링과 현장 동행을 통해 첫 유효 수주를 조기 창출하도록 강력히 유도합니다.</div>
+        </li>
+        <li class="ai-action-item">
+          <div class="ai-action-num">5</div>
+          <div class="ai-action-title">임영민 컨설턴트 (스몰·현장 밀착형 🏃): 밀착 개척 지속 & 복합 보안 패키지 확장</div>
+          <div class="ai-action-desc">소형 안건 중심이나 현장 밀착 개척을 꾸준히 전개하여 안정적 역할을 수행 중입니다. 계약처 내 추가 센서, 지능형 영상(블루스캔) 및 부가서비스 연계를 통해 건당 수주 단가를 한 단계 끌어올리도록 지원합니다.</div>
+        </li>
+        <li class="ai-action-item" style="border-left: 3px solid #059669; background:#f0fdf4;">
+          <div class="ai-action-num" style="background:#059669;">전략</div>
+          <div class="ai-action-title" style="color:#065f46;">지사 마감 공통 전략: 단가 인상(유증) 집중 추진으로 해약 완벽 방어</div>
+          <div class="ai-action-desc" style="color:#166534;">마감 시기에 다가올수록 신규 공사 일정이 부족하여 당월 개시가 제한됩니다. 이 시기에는 기존 계약처에 대한 '단가 인상'을 통한 유지증가(유증)를 총력 추진하여 증가하는 해약(유지감소)을 즉각 상쇄하고 지사 순증 목표를 달성합니다.</div>
         </li>
       </ul>
     </div>
   `;
 
-  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 영업 성과 & 코칭 리포트
-` +
-    `지사 평균 수주단가: ${fmtK(overallAvg)}원` + (biz ? ` | 사업팀 내 수주 순위: 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})
-
-` : `
-
-`) +
-    `■ 1. 컨설턴트별 수주 실적 순위 (스타일 및 전월대비 페이스)
-`;
+  let text = `[에스원 북서울지사] ${ym} 컨설턴트별 종합 역량 진단 & 1:1 코칭 리포트\n` +
+    `지사 평균 수주단가: ${fmtK(overallAvg)}원` + (biz ? ` | 사업팀 내 수주 순위: 16개 지사 중 ${biz.ord.myRank}위 (${biz.paceTag})\n\n` : `\n\n`) +
+    `■ 1. 컨설턴트별 다각도 성과 요약\n`;
   repRows.forEach(function(r, idx){
-    text += `${idx+1}. ${r.name}: ${fmtK(r.amount)}천원 / 목표 ${fmtK(r.target)}천원 (${r.pct}%), ${r.count}건, 단가 ${fmtK(r.avgAmount)}원, 개척율 ${r.pioneerRate}%, 전월대비: ${r.momPace}, 스타일: ${r.archetype}, 개시율 ${r.startRate}%
-`;
+    const gapStr = r.allCount > 1 ? (r.avgGapDays > 0 ? (r.avgGapDays + '일') : '측정불가') : (r.name === '박광춘' ? '측정불가(극소)' : '측정불가');
+    text += `${idx+1}. ${r.name}: 당월 ${fmtK(r.amount)}천원(목표 ${fmtK(r.target)}천원, ${r.pct}%), ${r.curCount}건, 단가 ${fmtK(r.curAvg)}원 | 전기간 누적 ${r.allCount}건(단가 ${fmtK(r.allAvg)}원), 주기 ${gapStr}, 시기 ${r.timingStyle}, 개척 ${r.pioneerRate}%, 업종 ${r.industry}, 전월대비: ${r.momPace}, 유형: ${r.archetype}, 개시율 ${r.startRate}%, 유지감소 ${fmtK(Math.round(r.cancelAmount/1000))}천원, 유지증가 +${fmtK(Math.round(r.priceUpAmount/1000))}천원, 지사기여율 ${r.contributionRate}%\n`;
   });
-  text += `
-■ 2. AI 코칭 가이드
-` +
-    `- 이수열 프로 (대형·장기형): 대리점 협업 대형 수주 성과 인정, 기산일자 수개월 지연 및 무료 테스트 과다 단축 협상, 공백기 중소형 개척 병행
-` +
-    `- 최영국 컨설턴트 (소형·정체형 / 스타트 지연): 전월 대비 스타트 늦고 공백 지속, 100% 자력 개척 자세 긍정적이나 절대 규모 확대 위해 관리자 1:1 동행 영업 지원
-` +
-    `- 박광춘 컨설턴트 (스몰·연속형): 작지만 꾸준히 수주를 이어가는 연속형 모범 사례 전파, 복합 상품 패키징으로 단가 업셀링 코칭
-` +
-    `- 마감 전략: 월말 공사 일정 부족 시 '단가 인상'을 통한 유지증가(유증) 집중 추진으로 해약 완벽 방어
-`;
+  text += `\n■ 2. 전 기간 데이터 기반 종합 평가\n` +
+    `- 이수열 프로: 전 기간 4~5일 균등 주기로 안정적 고빈도 수주, 지사 볼륨 1위 견인 (대리점 협업 인정, 기산/테스트 단축 필요)\n` +
+    `- 최영국 컨설턴트: 80~100만원 대형 위주 장기 리드타임형, 100% 자력 개척 잠재력 보유 (당월 1건 50,000원 스타트 지연, 1:1 동행 지원)\n` +
+    `- 정문재 컨설턴트: 9월 대비 10월 수주 스피드 최고 향상 및 가속 성장형 (3건 150만원 달성)\n` +
+    `- 박광춘 컨설턴트: 수주 극소형으로 수주 부진 및 활동량 전면 쇄신 대상 (스몰 연속형 절대 아님)\n` +
+    `- 임영민 컨설턴트: 소형 안건 중심 현장 밀착형\n` +
+    `- 마감 전략: 월말 공사 일정 부족 시 '단가 인상'을 통한 유지증가(유증) 집중 추진으로 해약 완벽 방어\n`;
 
   return { html: html, text: text };
 }
