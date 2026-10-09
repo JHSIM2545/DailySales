@@ -62,7 +62,16 @@
   }
 
   // --- 유틸리티 ---
-  function getTzToday() {
+  
+  // --- 안전한 숫자 파싱 유틸리티 (쉼표, 통화기호, 문자열 완벽 방어) ---
+  function safeNum_(v) {
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    const n = Number(String(v).replace(/[^0-9.-]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+
+function getTzToday() {
     const d = new Date();
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -2062,7 +2071,7 @@
 
         (ordRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
-          const fee = Number(r.monthly_fee) || 0;
+          const fee = safeNum_(r.monthly_fee);
           // 수주: 계약일 기준
           const cPart = parseDatePart_(r.contract_date);
           if (cPart && cPart.ym === ym) {
@@ -2080,7 +2089,7 @@
         // 해약중지: 확정일(confirm_date) 기준 ('해약방어' 제외)
         (canRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
-          const fee = Number(r.monthly_fee) || 0;
+          const fee = safeNum_(r.monthly_fee);
           const cPart = parseDatePart_(r.confirm_date);
           if (cPart && cPart.ym === ym) {
             if (cPart.d <= day) canCum += fee;
@@ -2091,7 +2100,7 @@
         // 재개시: 재개시일(restart_date) 기준
         (rstRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
-          const fee = Number(r.monthly_fee) || 0;
+          const fee = safeNum_(r.monthly_fee);
           const rPart = parseDatePart_(r.restart_date);
           if (rPart && rPart.ym === ym) {
             if (rPart.d <= day) rstCum += fee;
@@ -2102,7 +2111,7 @@
         // 인상인하: 기산일(billing_date) 기준
         (prcRes.data || []).forEach(r => {
           if (r.gross_type === '법인' || !allowed.includes(r.product_name)) return;
-          let amt = Number(r.diff_amount) || 0;
+          let amt = safeNum_(r.diff_amount);
           if (r.category === '인하' && amt > 0) amt = -amt;
           if (r.category === '인상' && amt < 0) amt = Math.abs(amt);
 
@@ -2328,11 +2337,11 @@
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) {
           const d = Number(String(r.contract_date).slice(8, 10));
-          if (d >= 1 && d <= daysInMonth) 수주Raw[d - 1] += Number(r.monthly_fee) || 0;
+          if (d >= 1 && d <= daysInMonth) 수주Raw[d - 1] += safeNum_(r.monthly_fee);
         }
         if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
           const d = Number(String(r.billing_date).slice(8, 10));
-          if (d >= 1 && d <= daysInMonth) 개시Raw[d - 1] += Number(r.monthly_fee) || 0;
+          if (d >= 1 && d <= daysInMonth) 개시Raw[d - 1] += safeNum_(r.monthly_fee);
         }
       });
 
@@ -2342,7 +2351,7 @@
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym) {
           const d = Number(String(r.confirm_date).slice(8, 10));
-          if (d >= 1 && d <= daysInMonth) 해약Raw[d - 1] += Number(r.monthly_fee) || 0;
+          if (d >= 1 && d <= daysInMonth) 해약Raw[d - 1] += safeNum_(r.monthly_fee);
         }
       });
 
@@ -2353,7 +2362,7 @@
         if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
           const d = Number(String(r.billing_date).slice(8, 10));
           if (d >= 1 && d <= daysInMonth) {
-            const amt = Number(r.diff_amount) || 0;
+            const amt = safeNum_(r.diff_amount);
             if (amt >= 0) pricePos[d - 1] += amt; else priceNeg[d - 1] += amt;
           }
         }
@@ -2365,7 +2374,7 @@
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         if (r.restart_date && String(r.restart_date).slice(0, 7) === ym) {
           const d = Number(String(r.restart_date).slice(8, 10));
-          if (d >= 1 && d <= daysInMonth) 재개시Raw[d - 1] += Number(r.monthly_fee) || 0;
+          if (d >= 1 && d <= daysInMonth) 재개시Raw[d - 1] += safeNum_(r.monthly_fee);
         }
       });
 
@@ -2451,8 +2460,8 @@
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) repActualsRaw[rep].수주 += Number(r.monthly_fee) || 0;
-        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) repActualsRaw[rep].개시 += Number(r.monthly_fee) || 0;
+        if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) repActualsRaw[rep].수주 += safeNum_(r.monthly_fee);
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) repActualsRaw[rep].개시 += safeNum_(r.monthly_fee);
       });
 
       cancels.forEach(r => {
@@ -2460,7 +2469,7 @@
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym) repActualsRaw[rep].해약 += Number(r.monthly_fee) || 0;
+        if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym) repActualsRaw[rep].해약 += safeNum_(r.monthly_fee);
       });
 
       prices.forEach(r => {
@@ -2469,7 +2478,7 @@
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
         if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
-          const amt = Number(r.diff_amount) || 0;
+          const amt = safeNum_(r.diff_amount);
           if (amt >= 0) repActualsRaw[rep].인상 += amt; else repActualsRaw[rep].인하 += amt;
         }
       });
@@ -2479,7 +2488,7 @@
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.restart_date && String(r.restart_date).slice(0, 7) === ym) repActualsRaw[rep].재개시 += Number(r.monthly_fee) || 0;
+        if (r.restart_date && String(r.restart_date).slice(0, 7) === ym) repActualsRaw[rep].재개시 += safeNum_(r.monthly_fee);
       });
 
       const repMetrics = {};
@@ -2562,7 +2571,7 @@
         const cDate = r.contract_date ? String(r.contract_date).slice(0, 10) : '';
         return cDate.slice(0, 7) === curYm && cDate <= today && String(r.gross_type) !== '법인' && allowedProds.indexOf(String(r.product_name)) !== -1;
       });
-      const totalBranchOrdAmt = curBranchOrders.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+      const totalBranchOrdAmt = curBranchOrders.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
 
       function detectIndustry(rows) {
         if (!rows || !rows.length) return '일반근생/기타';
@@ -2592,17 +2601,17 @@
       REPS.forEach(rep => {
         const repAll = (allOrders || []).filter(r => String(r.rep_name || '').trim() === rep && String(r.gross_type) !== '법인' && allowedProds.indexOf(String(r.product_name)) !== -1);
         const allCount = repAll.length;
-        const allAmt = repAll.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const allAmt = repAll.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const allAvg = allCount ? Math.round(allAmt / allCount) : 0;
 
         const repPrev = repAll.filter(r => r.contract_date && String(r.contract_date).slice(0, 7) === prevYm);
         const prevCount = repPrev.length;
-        const prevAmt = repPrev.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const prevAmt = repPrev.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const prevAvg = prevCount ? Math.round(prevAmt / prevCount) : 0;
 
         const repCur = repAll.filter(r => r.contract_date && String(r.contract_date).slice(0, 7) === curYm && String(r.contract_date).slice(0, 10) <= today);
         const curCount = repCur.length;
-        const curAmt = repCur.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const curAmt = repCur.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const curAvg = curCount ? Math.round(curAmt / curCount) : 0;
 
         // 대표 업종 분석
@@ -2677,7 +2686,7 @@
         // 영업동기 (개척 vs 대리점)
         let pioneerAmt = 0, agencyAmt = 0;
         repCur.forEach(r => {
-          const f = Number(r.monthly_fee) || 0;
+          const f = safeNum_(r.monthly_fee);
           const m = String(r.sales_motive || '');
           if (m === '개척') pioneerAmt += f;
           else if (m.includes('대리점')) agencyAmt += f;
@@ -2685,7 +2694,7 @@
         let pioneerRate = curAmt ? Math.round((pioneerAmt / curAmt) * 100) : 0;
         let agencyRate = curAmt ? Math.round((agencyAmt / curAmt) * 100) : 0;
         if (!curAmt && allAmt) {
-          const allPio = repAll.filter(r => r.sales_motive === '개척').reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+          const allPio = repAll.filter(r => r.sales_motive === '개척').reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
           pioneerRate = Math.round((allPio / allAmt) * 100);
           agencyRate = 100 - pioneerRate;
         }
@@ -2694,15 +2703,15 @@
 
         // 해약(유지감소) 및 유증(유지증가)
         const repCancels = (allCancels || []).filter(r => String(r.rep_name || '').trim() === rep && r.confirm_date && String(r.confirm_date).slice(0, 7) === curYm);
-        const cancelAmt = repCancels.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const cancelAmt = repCancels.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const cancelCnt = repCancels.length;
 
         const repPrices = (allPrices || []).filter(r => String(r.rep_name || '').trim() === rep && r.billing_date && String(r.billing_date).slice(0, 7) === curYm);
-        const priceUpAmt = repPrices.filter(r => Number(r.diff_amount) > 0).reduce((s, r) => s + Number(r.diff_amount), 0);
-        const priceDownAmt = repPrices.filter(r => Number(r.diff_amount) < 0).reduce((s, r) => s + Math.abs(Number(r.diff_amount)), 0);
+        const priceUpAmt = repPrices.filter(r => safeNum_(r.diff_amount) > 0).reduce((s, r) => s + Number(r.diff_amount), 0);
+        const priceDownAmt = repPrices.filter(r => safeNum_(r.diff_amount) < 0).reduce((s, r) => s + Math.abs(Number(r.diff_amount)), 0);
 
         const startOrders = repCur.filter(r => (r.start_ym === curYm || (r.billing_date && String(r.billing_date).slice(0, 7) === curYm) || (r.start_date && String(r.start_date).slice(0, 7) === curYm)) && (!r.billing_date || String(r.billing_date).slice(0, 10) <= today || !r.start_date || String(r.start_date).slice(0, 10) <= today));
-        const startAmt = startOrders.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const startAmt = startOrders.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const netAmt = startAmt + priceUpAmt - cancelAmt - priceDownAmt;
         const startRate = curCount ? Math.round((startOrders.length / curCount) * 100) : 0;
         const contributionRate = totalBranchOrdAmt ? Math.round((curAmt / totalBranchOrdAmt) * 100) : 0;
@@ -2895,9 +2904,9 @@
         .filter(r => String(r.gross_type) !== '법인');
 
       function buildOrderFor(list, allCancels, prevList) {
-        const motive = aggregateComp(list, r => r.sales_motive || '기타', r => Number(r.monthly_fee) || 0);
-        const product = aggregateComp(list, r => r.product_name || '기타', r => Number(r.monthly_fee) || 0);
-        const amounts = list.map(r => Number(r.monthly_fee) || 0);
+        const motive = aggregateComp(list, r => r.sales_motive || '기타', r => safeNum_(r.monthly_fee));
+        const product = aggregateComp(list, r => r.product_name || '기타', r => safeNum_(r.monthly_fee));
+        const amounts = list.map(r => safeNum_(r.monthly_fee));
         const total = amounts.reduce((a, b) => a + b, 0);
         const avg = amounts.length ? Math.round(total / amounts.length) : 0;
         const gapStart = list.map(r => daysBetween(r.contract_date, r.start_date)).filter(v => v !== null);
@@ -2916,7 +2925,7 @@
         const testGaps = [];
 
         list.forEach(r => {
-          const fee = Number(r.monthly_fee) || 0;
+          const fee = safeNum_(r.monthly_fee);
           const mot = String(r.sales_motive || '기타').trim();
           if (mot === '개척') {
             pioneerAmt += fee;
@@ -2960,7 +2969,7 @@
         // 전월 대비 수주 페이스 비교
         const pList = prevList || [];
         const prevCount = pList.length;
-        const prevAmount = pList.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const prevAmount = pList.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const prevAvgAmount = prevCount ? Math.round(prevAmount / prevCount) : 0;
         const estCurAmount = elapsedWorking > 0 ? Math.round((total / elapsedWorking) * totalWorking) : total;
 
@@ -3088,9 +3097,9 @@
         .filter(r => String(r.gross_type) !== '법인');
 
       function buildCancelFor(list) {
-        const reason = aggregateComp(list, r => r.cancel_type || '기타', r => Number(r.monthly_fee) || 0);
-        const product = aggregateComp(list, r => r.product_name || '기타', r => Number(r.monthly_fee) || 0);
-        const amounts = list.map(r => Number(r.monthly_fee) || 0);
+        const reason = aggregateComp(list, r => r.cancel_type || '기타', r => safeNum_(r.monthly_fee));
+        const product = aggregateComp(list, r => r.product_name || '기타', r => safeNum_(r.monthly_fee));
+        const amounts = list.map(r => safeNum_(r.monthly_fee));
         const total = amounts.reduce((a, b) => a + b, 0);
         const avg = amounts.length ? Math.round(total / amounts.length) : 0;
         return { count: list.length, amount: total, avgAmount: avg, byReason: reason.list, byProduct: product.list };
@@ -3103,15 +3112,15 @@
       function buildPriceFor(changeType) {
         const filtered = (prcRes.data || [])
           .filter(r => r.billing_date && r.billing_date.slice(0, 7) === ym && r.billing_date <= today)
-          .filter(r => changeType === '인상' ? (Number(r.diff_amount) > 0) : (Number(r.diff_amount) < 0))
+          .filter(r => changeType === '인상' ? (safeNum_(r.diff_amount) > 0) : (safeNum_(r.diff_amount) < 0))
           .filter(r => String(r.gross_type) !== '법인');
-        const amounts = filtered.map(r => Math.abs(Number(r.diff_amount) || 0));
+        const amounts = filtered.map(r => Math.abs(safeNum_(r.diff_amount)));
         const total = amounts.reduce((a, b) => a + b, 0);
         const avg = amounts.length ? Math.round(total / amounts.length) : 0;
-        const reason = aggregateComp(filtered, r => r.reason || '기타', r => Math.abs(Number(r.diff_amount) || 0));
-        const product = aggregateComp(filtered, r => r.product_name || '기타', r => Math.abs(Number(r.diff_amount) || 0));
-        const byRep = aggregateComp(filtered, r => r.rep_name || '기타', r => Math.abs(Number(r.diff_amount) || 0));
-        const byReceiver = aggregateComp(filtered, r => r.receiver_name || '기타', r => Math.abs(Number(r.diff_amount) || 0));
+        const reason = aggregateComp(filtered, r => r.reason || '기타', r => Math.abs(safeNum_(r.diff_amount)));
+        const product = aggregateComp(filtered, r => r.product_name || '기타', r => Math.abs(safeNum_(r.diff_amount)));
+        const byRep = aggregateComp(filtered, r => r.rep_name || '기타', r => Math.abs(safeNum_(r.diff_amount)));
+        const byReceiver = aggregateComp(filtered, r => r.receiver_name || '기타', r => Math.abs(safeNum_(r.diff_amount)));
         return { overall: { count: filtered.length, amount: total, avgAmount: avg }, byRep: byRep.list, byReceiver: byReceiver.list, byReason: reason.list, byProduct: product.list };
       }
 
@@ -3120,42 +3129,70 @@
 
 // 상품군별 종합 실적 집계 (일반알람, 블루스캔, 휴엔, 디지털)
       const PRODUCT_GROUPS = [
-        { key: '일반알람', name: '일반알람 (알람/유지보수)', allowed: ['알람', '유지보수'] },
-        { key: '블루스캔', name: '블루스캔 (자력영상)', allowed: ['블루스캔'] },
-        { key: '휴엔', name: '휴엔 (환경/방제)', allowed: ['휴엔'] },
-        { key: '디지털', name: '디지털 (정보보안)', allowed: ['정보보안'] }
+        { key: '일반알람', name: '일반알람 (알람/유지보수)', allowed: ['알람', '유지보수', '일반알람', '기본알람'] },
+        { key: '블루스캔', name: '블루스캔 (자력영상)', allowed: ['블루스캔', '자력영상', 'CCTV'] },
+        { key: '휴엔', name: '휴엔 (환경/방제)', allowed: ['휴엔', '휴엔케어', '환경', '방제'] },
+        { key: '디지털', name: '디지털 (정보보안)', allowed: ['정보보안', '디지털', '디지털보안', 'PC보안'] }
       ];
+
+      function matchProductGroup_(prodName, allowedList) {
+        if (!prodName) return false;
+        const p = String(prodName).trim();
+        for (let i = 0; i < allowedList.length; i++) {
+          if (p.includes(allowedList[i])) return true;
+        }
+        return false;
+      }
 
       const productMetrics = {};
       PRODUCT_GROUPS.forEach(g => {
+        // 수주: 계약일(contract_date) 당월 기준 (월말 마감/예정건 포함 전체 집계)
         const pOrders = (ordRes.data || []).filter(r => {
+          if (String(r.gross_type) === '법인') return false;
+          if (!matchProductGroup_(r.product_name, g.allowed)) return false;
           const cDate = r.contract_date ? String(r.contract_date).slice(0, 10) : '';
-          return cDate.slice(0, 7) === ym && cDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+          const ordYm = r.order_ym ? String(r.order_ym).slice(0, 7) : '';
+          return (cDate.slice(0, 7) === ym || ordYm === ym);
         });
-        const pOrdAmt = pOrders.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const pOrdAmt = pOrders.reduce((s, r) => s + safeNum_(r.monthly_fee), 0);
 
+        // 개시: 개시일(start_date), 개시월(start_ym), 또는 기산일(billing_date) 당월 기준 (무료테스트/기산지연 개시건 모두 포괄)
         const pStarts = (ordRes.data || []).filter(r => {
+          if (String(r.gross_type) === '법인') return false;
+          if (!matchProductGroup_(r.product_name, g.allowed)) return false;
+          const sDate = r.start_date ? String(r.start_date).slice(0, 10) : '';
+          const sYm = r.start_ym ? String(r.start_ym).slice(0, 7) : '';
           const bDate = r.billing_date ? String(r.billing_date).slice(0, 10) : '';
-          return bDate.slice(0, 7) === ym && bDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+          const bYm = r.billing_ym ? String(r.billing_ym).slice(0, 7) : '';
+          return (sYm === ym || sDate.slice(0, 7) === ym || bDate.slice(0, 7) === ym || bYm === ym);
         });
-        const pStartAmt = pStarts.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const pStartAmt = pStarts.reduce((s, r) => s + safeNum_(r.monthly_fee), 0);
 
+        // 해약: 확정일(confirm_date) 당월 기준 ('해약방어' 제외)
         const pCancels = (canRes.data || []).filter(r => {
+          if (String(r.gross_type) === '법인' || String(r.cancel_type) === '해약방어') return false;
+          if (!matchProductGroup_(r.product_name, g.allowed)) return false;
           const cDate = r.confirm_date ? String(r.confirm_date).slice(0, 10) : '';
-          return cDate.slice(0, 7) === ym && cDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+          const canYm = r.cancel_ym ? String(r.cancel_ym).slice(0, 7) : '';
+          return (cDate.slice(0, 7) === ym || canYm === ym);
         });
-        const pCanAmt = pCancels.reduce((s, r) => s + (Number(r.monthly_fee) || 0), 0);
+        const pCanAmt = pCancels.reduce((s, r) => s + safeNum_(r.monthly_fee), 0);
 
+        // 단가변동(인상/인하): 기산일(billing_date) 당월 기준
         const pPrices = (prcRes.data || []).filter(r => {
+          if (String(r.gross_type) === '법인') return false;
+          if (!matchProductGroup_(r.product_name, g.allowed)) return false;
           const bDate = r.billing_date ? String(r.billing_date).slice(0, 10) : '';
-          return bDate.slice(0, 7) === ym && bDate <= today && g.allowed.indexOf(String(r.product_name)) !== -1 && String(r.gross_type) !== '법인';
+          const prcYm = r.price_ym ? String(r.price_ym).slice(0, 7) : '';
+          return (bDate.slice(0, 7) === ym || prcYm === ym);
         });
         let pPricePos = 0, pPriceNeg = 0;
         pPrices.forEach(r => {
-          const diff = Number(r.diff_amount) || 0;
+          const diff = safeNum_(r.diff_amount);
           if (diff >= 0) pPricePos += diff; else pPriceNeg += Math.abs(diff);
         });
 
+        // 순유지증가 = 개시 실적 - (해약 - 인상 + 인하) = 개시 실적 - 해약 + 인상 - 인하
         const pNet = pStartAmt - (pCanAmt - pPricePos + pPriceNeg);
 
         productMetrics[g.key] = {
@@ -12364,7 +12401,7 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
         </table>
         <div style="font-size:11px; color:#475569; margin:4px 0 10px 0; background:#f8fafc; padding:6px 10px; border-radius:4px; border:1px solid #e2e8f0;">
           💡 <strong>순유지증가 산식 안내:</strong> 순유지증가 = 개시 실적 - 해약 발생 + 단가변동(인상/인하)<br>
-          (예: 일반알람 개시 1,200,000원 - 해약 120,000원 + 인상 180,000원 = <strong>+1,260,000원</strong> / 지사 합계: 1,850,000원 - 170,000원 + 280,000원 = <strong>+1,960,000원</strong>)
+          (당월 실적: 일반알람 개시 ${fmtK(pAlarm.startAmount)}원 - 해약 ${fmtK(pAlarm.cancelAmount)}원 + 단가변동 ${pAlarm.priceUpAmount - pAlarm.priceDownAmount >= 0 ? '+' : ''}${fmtK(pAlarm.priceUpAmount - pAlarm.priceDownAmount)}원 = <strong>${pAlarm.netAmount >= 0 ? '+' : ''}${fmtK(pAlarm.netAmount)}원</strong> / 지사 합계: 개시 ${fmtK(pAlarm.startAmount + pBScan.startAmount + pHuen.startAmount + pDigital.startAmount)}원 - 해약 ${fmtK(pAlarm.cancelAmount + pBScan.cancelAmount + pHuen.cancelAmount + pDigital.cancelAmount)}원 + 단가변동 ${((pAlarm.priceUpAmount - pAlarm.priceDownAmount) + (pBScan.priceUpAmount - pBScan.priceDownAmount) + (pHuen.priceUpAmount - pHuen.priceDownAmount) + (pDigital.priceUpAmount - pDigital.priceDownAmount)) >= 0 ? '+' : ''}${fmtK((pAlarm.priceUpAmount - pAlarm.priceDownAmount) + (pBScan.priceUpAmount - pBScan.priceDownAmount) + (pHuen.priceUpAmount - pHuen.priceDownAmount) + (pDigital.priceUpAmount - pDigital.priceDownAmount))}원 = <strong>${(pAlarm.netAmount + pBScan.netAmount + pHuen.netAmount + pDigital.netAmount) >= 0 ? '+' : ''}${fmtK(pAlarm.netAmount + pBScan.netAmount + pHuen.netAmount + pDigital.netAmount)}원</strong>)
         </div>
         <div style="font-size:12.5px; color:#334155; line-height:1.5;">
           <p style="margin:0 0 4px 0;"><strong>[상품군별 문제점 및 평가]</strong> 지사 실적이 기존 일반알람에 과도하게 편중(${Math.round((pAlarm.orderAmount/totalPOrdAmt)*100)}%)되어 있으며, 고수익 자력 상품인 <strong>블루스캔</strong>과 부가 전략 상품인 <strong>휴엔·디지털</strong>의 수주 비중이 상대적으로 미흡합니다.</p>
@@ -12384,8 +12421,8 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">2</div>
-          <div class="ai-action-title">월말 마감 시기 공사 일정 한계 극복: '단가 인상'을 통한 유지증가(유증) 집중 견인</div>
-          <div class="ai-action-desc">마감 시기가 다가올수록 신규 수주가 당월 개시로 연결될 물리적 공사 일정이 부족해집니다. 이 시기에는 물리적 시공 없이 고객 합의 즉시 당월 유지금액 증가로 100% 반영되는 '단가 인상' 대상처를 집중 공략하여 순유지증가 목표를 확실히 견인합니다.</div>
+          <div class="ai-action-title">${workRatio >= 85 ? '월말 마감 공사 한계 극복: 단가인상 유지증가 총력' : (workRatio >= 50 ? '월중 후반기 개시 전진배치 & 상시 단가인상 병행' : '월초 조기 수주 템포 선점 & 파이프라인 확충')}</div>
+          <div class="ai-action-desc">${workRatio >= 85 ? '월말 마감에 임박하여 신규 공사 일정이 한계에 달했을 때는 시공 없이 즉시 순증 반영되는 단가 인상에 집중합니다.' : (workRatio >= 50 ? '월중 후반기(현재 ' + elDays + '/' + totDays + '일 경과)에는 수주건의 조기 시공 개시를 앞당기면서, 해약 손실을 즉시 상쇄할 수 있는 기존 고객 대상 단가 인상을 선제적으로 병행 추진해야 합니다.' : '월초 초반부에는 가망 고객 접촉량을 극대화하여 조기 수주를 선점하고 당월 내 개시가 가능한 일정을 사전 확보합니다.')}</div>
         </li>
         <li class="ai-action-item">
           <div class="ai-action-num">3</div>
@@ -12708,8 +12745,8 @@ function buildCoachingAiReport_(d, ym, cat, rep){
         <p><strong>[영업동기 질적 시너지 (대리점 볼륨 인정 & 순수 개척 우대)]</strong><br>
           대리점 연계 수주는 지사 전체 외형 볼륨을 단기간에 끌어올리는 소중한 자산이며, 스스로 신규 시장을 개척하는 순수 자력 개척자를 높은 개인 역량으로 우대 평가합니다. 서로의 강점을 인정하고 협력할 때 지사 전체의 경쟁력이 극대화됩니다.
         </p>
-        <p><strong>[원팀 시너지: 마감 시기 단가인상 유증 합심 추진]</strong><br>
-          월말 마감에 다가올수록 신규 공사 일정이 부족하여 당월 개시 전환이 제한될 수 있습니다. 이 시기에는 지사 전원이 한마음으로 기존 계약처에 대한 <strong>'단가 인상(유증)'을 함께 추진</strong>하여 지사 순유지증가 목표를 전원 100% 완수하는 원팀의 저력을 보여줄 때입니다.
+        <p><strong>[원팀 시너지: ${workRatio >= 85 ? '마감 시기 단가인상 총력' : (workRatio >= 50 ? '월중 후반기 조기개시 & 단가인상 유기적 공조' : '월초 수주 가속 & 원팀 서포트')}]</strong><br>
+          ${workRatio >= 85 ? '월말 마감에 다가올수록 신규 공사 일정이 부족하므로 기존 계약처 단가 인상에 집중할 시기입니다.' : (workRatio >= 50 ? '현재 월중 후반기(' + elDays + '/' + totDays + '일 경과) 시점에서는 당월 계약건의 신속한 개시 시공과 함께, 해약으로 인한 마이너스 손실을 상쇄하기 위해 전원이 기존 계약처에 대한 <strong>단가 인상(유증)을 지속적으로 병행 추진</strong>해야 합니다.' : '월초에는 지사 전원이 한마음으로 가망 고객을 발굴하고 조기 수주 페이스를 선점하는 데 집중합니다.')}
         </p>
       </div>
     </div>
@@ -12721,8 +12758,8 @@ function buildCoachingAiReport_(d, ym, cat, rep){
         ${dynamicActionHtml}
         <li class="ai-action-item" style="border-left: 3px solid #059669; background:#f0fdf4;">
           <div class="ai-action-num" style="background:#059669;">원팀</div>
-          <div class="ai-action-title" style="color:#065f46;">지사 마감 원팀 전략: 단가 인상(유증) 집중 추진으로 지사 공동 목표 100% 완수</div>
-          <div class="ai-action-desc" style="color:#166534;">마감 시기에 다가올수록 신규 공사 일정이 부족하여 당월 개시가 제한될 수 있습니다. 이 시기에는 지사 전원이 힘을 모아 기존 계약처에 대한 '단가 인상'을 함께 추진하여 증가하는 해약을 완벽히 상쇄하고 전원 목표 달성의 쾌거를 함께 이뤄냅시다!</div>
+          <div class="ai-action-title" style="color:#065f46;">지사 원팀 성장 전략: ${workRatio >= 85 ? '월말 마감 단가인상(유증) 집중 추진' : (workRatio >= 50 ? '월중 후반기 조기 개시 전진배치 & 상시 단가인상 공조' : '월초 수주 가속 페이스 & 상호 코칭 서포트')}</div>
+          <div class="ai-action-desc" style="color:#166534;">${workRatio >= 85 ? '월말 마감 공사 한계를 극복하기 위해 전원이 기존 고객 단가 인상에 집중합니다.' : (workRatio >= 50 ? '월중 후반기(현재 ' + elDays + '/' + totDays + '일, ' + workRatio + '% 경과)에는 수주-개시 전환 속도를 높이고, 해약 발생분을 상쇄할 수 있도록 전 컨설턴트가 단가 인상 발굴을 유기적으로 공조합니다.' : '월초에는 전 컨설턴트가 활발한 가망 고객 발굴과 동행 지원으로 조기 수주 분위기를 선도합니다.')}</div>
         </li>
       </ul>
     </div>
@@ -12774,9 +12811,22 @@ function buildRiskAiReport_(d, ym, cat, rep){
   const rstAmt = Number(actual.재개시) || 0; // 천원 (e.g. 50천원)
 
   // 총 방어 실적 (천원 단위로 일원화 계산)
-  const defAmtK = upAmtK + rstAmt; // 280 + 50 = 330천원
-  const defRatio = canAct ? Math.round((defAmtK / canAct) * 100) : 0; // 330 / 170 = 194%
-  const netCancelK = canAct - defAmtK; // 170 - 330 = -160천원 (순감소 흑자 방어)
+  const defAmtK = upAmtK + rstAmt;
+  const defRatio = canAct ? Math.round((defAmtK / canAct) * 100) : 0;
+  // 유지감소는 음수(-) 요소이므로, 순유지감소 = 해약발생액 - (단가인상 + 재개시 방어액)
+  // 인상/재개시가 미미하여 해약이 대부분 남아있는 경우 '미흡/위험'으로 정확하게 진단
+  const netCancelK = canAct - defAmtK;
+
+  // 상쇄 평가 판정: 50% 미만이면 '상쇄 미흡/경고', 100% 이상이어야 '완전 상쇄'
+  let defTag = '상쇄 미흡 ⚠️';
+  let defTagCls = 'danger';
+  if (defRatio >= 100) {
+    defTag = '완전 상쇄 🟢';
+    defTagCls = 'good';
+  } else if (defRatio >= 50) {
+    defTag = '부분 상쇄 🟡';
+    defTagCls = 'warn';
+  }
 
   const reasons = (cancel.overall && cancel.overall.byReason) || [];
   let reasonRows = (reasons.length > 0) ? reasons.map(function(r){
@@ -12841,12 +12891,12 @@ function buildRiskAiReport_(d, ym, cat, rep){
           <span class="ai-kpi-tag good">고객환원</span>
         </div>
       </div>
-      <div class="ai-kpi-card ${defRatio >= 50 ? 'green' : 'amber'}">
+      <div class="ai-kpi-card ${defRatio >= 100 ? 'green' : (defRatio >= 50 ? 'amber' : 'red')}">
         <div class="ai-kpi-lbl">총 해약 상쇄 방어율</div>
         <div class="ai-kpi-val">${defRatio}%</div>
         <div class="ai-kpi-sub">
-          <span>순유지감소: ${fmtK(netCancelK)}천원</span>
-          <span class="ai-kpi-tag ${defRatio >= 50 ? 'good' : 'warn'}">상쇄완료</span>
+          <span>실질 순유지감소: -${fmtK(Math.abs(netCancelK))}천원</span>
+          <span class="ai-kpi-tag ${defTagCls}">${defTag}</span>
         </div>
       </div>
     </div>
@@ -12874,7 +12924,12 @@ function buildRiskAiReport_(d, ym, cat, rep){
       <div class="ai-sec-head">2. 유지감소 방어선 진단 및 영향도 평가</div>
       <div class="ai-sec-body">
         <p><strong>[상태 요약]</strong> ${riskDesc}</p>
-        <p>당월 단가 인상 <strong>${fmtK(upAmtK)}천원</strong>(${fmtK(upAmtRaw)}원, ${upCnt}건)과 재개시 <strong>${fmtK(rstAmt)}천원</strong>을 통해 총 <strong>${fmtK(defAmtK)}천원</strong>의 방어 효과를 창출하여 해약 발생액(${fmtK(canAct)}천원)의 <strong>${defRatio}%</strong>를 효과적으로 상쇄하였습니다. 실질 순유지감소는 <strong>${fmtK(netCancelK)}천원</strong>으로 방어 흑자를 달성했습니다.</p>
+        <p>
+          유지감소(해약 발생)는 순유지증가를 잠식하는 <strong>직접적인 마이너스(-) 요인</strong>입니다. 
+          당월 해약 발생(-${fmtK(canAct)}천원) 대비 단가 인상(+${fmtK(upAmtK)}천원, ${upCnt}건)과 재개시(+${fmtK(rstAmt)}천원)를 합산한 방어 실적은 총 <strong>+${fmtK(defAmtK)}천원</strong>으로, 
+          <strong>해약 상쇄 방어율은 ${defRatio}%에 불과하여 실질 유지감소 손실(-${fmtK(Math.abs(netCancelK))}천원)이 여전히 지사 유지증가를 심각하게 갉아먹고 있는 취약한 상태</strong>입니다.
+          ${defRatio < 50 ? '단가인상 및 재개시 규모가 해약 발생액에 크게 미치지 못하므로, 기존 고객군 대상 선제적 단가인상 발굴과 해약 방어 협상을 대폭 강화해야만 순유지감소를 실질적으로 틀어막을 수 있습니다.' : '단가인상 및 재개시를 통한 방어가 일부 작동하고 있으나, 해약 손실을 완전히 제압하기 위해 지속적인 단가 인상과 재개시 확대가 필수적입니다.'}
+        </p>
       </div>
     </div>
 
