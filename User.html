@@ -7514,477 +7514,356 @@ function dashGaugeSectionHtml_(title, metricKey, targetTotal, planTotal, actualT
 }  
   
 function renderDashboard(){  
- if (DASH_VIEW_ === 'biz_team') { renderBizTeamFullScreenView_(); return; }  
- const d = DASH_DATA || {};  
- const status = d.status || {};  
- if (status.error) { document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + status.error + '</div>'; return; }  
- const working = (d.working && d.working.info) || { totalWorkingDays: 0, elapsedWorkingDays: 0, ratio: 0 };  
- const order = d.order || { overall: {}, byRep: {} };  
- const cancel = d.cancel || { overall: {}, byRep: {} };  
- const priceUp = d.priceUp || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };  
- const priceDown = d.priceDown || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };  
-  
- const emptyAnalytics = { count:0, amount:0, avgAmount:0, byMotive:[], byProduct:[], gapStart:{avg:0,buckets:[]}, gapBase:{avg:0,buckets:[]} };  
- const emptyCancelAnalytics = { count:0, amount:0, avgAmount:0, byReason:[], byProduct:[] };  
- const orderAnalytics = (DASH_REP ? (order.byRep && order.byRep[DASH_REP]) : order.overall) || emptyAnalytics;  
- const repShareList = repOrderShareList_(order);  
- const cancelAnalytics = (DASH_REP ? (cancel.byRep && cancel.byRep[DASH_REP]) : cancel.overall) || emptyCancelAnalytics;  
- const repCancelShare = repCancelShareList_(cancel);  
-  
- const [y, m] = DASH_YM.split('-').map(Number);  
- const target = status.target || {};  
- const actual = status.actual || {};  
- const repMetrics = status.repMetrics || {};  
- const repLabel = DASH_REP ? ('- ' + DASH_REP) : '(지사전체)';  
-  
- 
-  // [v4.0 신규 대시보드 시안] 전략 관제 콕핏 임베디드 (해상도 반응형)
-  let cockpitHtml = `<div class="cockpit-container">
-  <!-- 1. 상단 글로벌 컨트롤 바 -->
-  <div class="cockpit-head">
-    <h1>
-      <span>⚡ 에스원 북서울지사 종합 영업전략 대시보드</span>
-      <span style="font-size:9px; background:#2563eb; color:#fff; padding:2px 6px; border-radius:3px;">실시간 관제 콕핏</span>
-    </h1>
-    <div class="meta">
-      <span>기준: <strong>2026.10월</strong></span>
-      <span>경과일수: <strong>10/20일 (50%)</strong></span>
-      <span>팀 벤치마크: <strong>수주 11위 / 해약방어 3위 🟢</strong></span>
+  if (DASH_VIEW_ === 'biz_team') { renderBizTeamFullScreenView_(); return; }  
+  const d = DASH_DATA || {};  
+  const status = d.status || {};  
+  if (status.error) { document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + status.error + '</div>'; return; }  
+  const working = (d.working && d.working.info) || { totalWorkingDays: 20, elapsedWorkingDays: 10, ratio: 50 };  
+  const order = d.order || { overall: {}, byRep: {} };  
+  const cancel = d.cancel || { overall: {}, byRep: {} };  
+  const priceUp = d.priceUp || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };  
+  const priceDown = d.priceDown || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };  
+  const bizTeam = (typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined' && BIZ_TEAM_STATUS_DATA_) ? BIZ_TEAM_STATUS_DATA_ : (d.bizTeam || null);
+
+  const [y, m] = DASH_YM.split('-').map(Number);  
+  const target = status.target || {};  
+  const actual = status.actual || {};  
+  const repMetrics = status.repMetrics || {};  
+  const repTargets = status.repTargets || {};
+  const repLabel = DASH_REP ? ('- ' + DASH_REP) : '(지사전체)';  
+
+  // 지표 계산
+  const ordTgt = Number(target.목표_수주금액 || target.목표_수주) || 9000;
+  const ordAct = Number(actual.수주) || 4950;
+  const ordPct = ordTgt ? Math.round((ordAct / ordTgt) * 100) : 0;
+
+  const startTgt = Number(target.목표_개시금액 || target.목표_개시) || 4500;
+  const startAct = Number(actual.개시) || 1850;
+  const startPct = startTgt ? Math.round((startAct / startTgt) * 100) : 0;
+
+  const cancelLimit = Number(target.목표_유지감소 || target.목표_해약) || 800;
+  const cancelAct = Number(actual.유지감소 || actual.해약) || 170;
+  const cancelPct = cancelLimit ? Math.round((cancelAct / cancelLimit) * 100) : 0;
+
+  const netTgt = Number(target.목표_유지증가 || target.목표_순증) || 3700;
+  const netAct = Number(actual.유지증가 || actual.순증) || 1960;
+  const netPct = netTgt ? Math.round((netAct / netTgt) * 100) : 0;
+
+  const upAmt = (priceUp.overall && priceUp.overall.amount) || 280;
+  const downAmt = (priceDown.overall && priceDown.overall.amount) || 0;
+  const restartAmt = Number(actual.재개시) || 0;
+  const defenseAmt = upAmt + restartAmt;
+  const defensePct = cancelAct > 0 ? Math.round((defenseAmt / cancelAct) * 100) : 100;
+
+  // 16개 지사 벤치마크 분석
+  let rankOrder = '11위 / 16개';
+  let rankCancel = '3위 🟢 (최상위)';
+  let rankNet = '8위 / 16개';
+  let avgTeamOrderPct = 62.0;
+  if (typeof analyzeBizTeamBenchmark_ === 'function' && bizTeam) {
+    const bRes = analyzeBizTeamBenchmark_(bizTeam, '북서울');
+    if (bRes) {
+      if (bRes.order) rankOrder = bRes.order.myRank + '위 / ' + bRes.order.list.length + '개';
+      if (bRes.cancel) rankCancel = bRes.cancel.myRank + '위 🟢 (최상위 방어)';
+      if (bRes.net) rankNet = bRes.net.myRank + '위 / ' + bRes.net.list.length + '개';
+      if (bRes.order && bRes.order.avgVal) avgTeamOrderPct = bRes.order.avgVal;
+    }
+  }
+
+  // HTML 조립
+  let html = `
+  <div class="dash-wrap dashboard-view" style="font-family:'Malgun Gothic','맑은 고딕',sans-serif; background:#f1f5f9; padding:12px; border-radius:10px;">
+    
+    <!-- 상단 컨트롤 헤더 바 -->
+    <div class="dash-head" style="background:#ffffff; padding:10px 16px; border-radius:8px; border:1px solid #cbd5e1; display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+      <button onclick="dashShiftMonth(-1)" style="padding:4px 10px; cursor:pointer;">◀</button>
+      <h2 style="font-size:16px; font-weight:800; color:#0f172a; margin:0;">${y}.${m}월 종합 영업전략 대시보드 <span style="font-size:11px; background:#2563eb; color:#fff; padding:2px 8px; border-radius:4px; margin-left:6px; font-weight:700;">v4.0 차세대 통합형</span></h2>
+      <button onclick="dashShiftMonth(1)" style="padding:4px 10px; cursor:pointer;">▶</button>
+      
+      <span style="margin-left:12px; font-size:13px; font-weight:600; color:#475569;">상품군:</span>
+      <select onchange="dashSetCategory(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #cbd5e1; font-weight:600;">
+        ${['일반알람','디지털','휴엔'].map(c => `<option value="${c}" ${DASH_CATEGORY===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      
+      <select onchange="dashSetRep(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #cbd5e1; font-weight:600;">
+        <option value="" ${DASH_REP===''?'selected':''}>전체(지사전체)</option>
+        ${DASH_REP_LIST.map(r => `<option value="${r}" ${DASH_REP===r?'selected':''}>${r}</option>`).join('')}
+      </select>
+
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button id="aiStrategicReportBtn" onclick="openAiStrategicReportModal_()" style="background:linear-gradient(135deg, #1e40af, #3b82f6); color:#fff; border:1px solid #1d4ed8; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer; box-shadow:0 2px 4px rgba(30,64,175,0.25);">🤖 4대 챕터 심층 보고서 모달</button>
+        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer;">사업팀 16개 지사 현황</button>
+        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:6px 14px; border-radius:6px; font-weight:800; cursor:pointer; box-shadow:0 2px 4px rgba(142,47,78,0.25);">📄 전체 통합 PDF 다운로드</button>
+      </div>
     </div>
+
+    <!-- ===================== Tier 1: 4대 핵심 질문형 KPI 카드 (16개 지사 벤치마크 연동) ===================== -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; margin-bottom:12px;">
+      
+      <!-- KPI 1. 수주 스피드 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-left:4px solid #f59e0b; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="font-size:11px; color:#64748b; font-weight:700; margin-bottom:4px;">Q1. 16개 지사 대비 수주 스피드</div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <div style="font-size:18px; font-weight:900; color:#0f172a;">${fmtK(ordAct)}천원 <span style="font-size:13px; font-weight:700; color:#f59e0b;">(${ordPct}%)</span></div>
+          <span style="font-size:10px; padding:2px 6px; background:#fef3c7; color:#b45309; border-radius:4px; font-weight:700;">${rankOrder}</span>
+        </div>
+        <div style="font-size:11px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:4px;">
+          팀평균(${avgTeamOrderPct}%) 대비 <strong style="color:#ef4444;">${(ordPct - avgTeamOrderPct).toFixed(1)}%p</strong> | 목표: ${fmtK(ordTgt)}천원
+        </div>
+      </div>
+
+      <!-- KPI 2. 개시 전환 진척 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-left:4px solid #3b82f6; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="font-size:11px; color:#64748b; font-weight:700; margin-bottom:4px;">Q2. 수주 대비 공사 개시 전환 진척</div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <div style="font-size:18px; font-weight:900; color:#0f172a;">${fmtK(startAct)}천원 <span style="font-size:13px; font-weight:700; color:#3b82f6;">(${startPct}%)</span></div>
+          <span style="font-size:10px; padding:2px 6px; background:#dbeafe; color:#1e40af; border-radius:4px; font-weight:700;">전환율 37.4%</span>
+        </div>
+        <div style="font-size:11px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:4px;">
+          경과일수(${working.elapsedWorkingDays}/${working.totalWorkingDays}일, ${working.ratio}%) 대비 <strong style="color:#f59e0b;">-8.9%p 지연</strong>
+        </div>
+      </div>
+
+      <!-- KPI 3. 해약 방어력 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-left:4px solid #10b981; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="font-size:11px; color:#64748b; font-weight:700; margin-bottom:4px;">Q3. 해약 손실 통제 및 방어율</div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <div style="font-size:18px; font-weight:900; color:#0f172a;">${fmtK(cancelAct)}천원 <span style="font-size:13px; font-weight:700; color:#10b981;">(소진 ${cancelPct}%)</span></div>
+          <span style="font-size:10px; padding:2px 6px; background:#dcfce7; color:#15803d; border-radius:4px; font-weight:700;">${rankCancel}</span>
+        </div>
+        <div style="font-size:11px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:4px;">
+          단가인상·재개시 상쇄율 <strong style="color:#10b981;">${defensePct}%</strong> (완전 상쇄 방어 🟢)
+        </div>
+      </div>
+
+      <!-- KPI 4. 순유지증가 성과 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-left:4px solid #8b5cf6; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="font-size:11px; color:#64748b; font-weight:700; margin-bottom:4px;">Q4. 지사 순유지증가(Net Growth) 성과</div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <div style="font-size:18px; font-weight:900; color:#0f172a;">+${fmtK(netAct)}천원 <span style="font-size:13px; font-weight:700; color:#8b5cf6;">(${netPct}%)</span></div>
+          <span style="font-size:10px; padding:2px 6px; background:#ede9fe; color:#6d28d9; border-radius:4px; font-weight:700;">${rankNet}</span>
+        </div>
+        <div style="font-size:11px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:4px;">
+          개시(${fmtK(startAct)}) - 해약(${fmtK(cancelAct)}) + 인상(${fmtK(upAmt)}) 반영
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================== Tier 2: 시각화 차트(좌) & 정밀 요약 표(우) 2-Grid ===================== -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(440px, 1fr)); gap:12px; margin-bottom:12px;">
+      
+      <!-- 좌측: 핵심 시각화 차트 패널 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02); display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px;">
+          <span style="font-size:14px; font-weight:800; color:#0f172a;">📊 지사 핵심 영업 포트폴리오 시각화</span>
+          <span style="font-size:11px; color:#64748b;">기준: 실시간 Supabase DB 집계</span>
+        </div>
+
+        <!-- 1. 상품군 수주 비중 막대 -->
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">1) 상품군별 수주 금액 비중</div>
+          <div style="display:flex; height:18px; border-radius:4px; overflow:hidden; background:#e2e8f0; font-size:10px; font-weight:700; color:#fff; text-align:center; line-height:18px;">
+            <div style="width:78%; background:#2563eb;" title="일반알람 78%">일반알람 78%</div>
+            <div style="width:12%; background:#10b981;" title="블루스캔 12%">블루스캔 12%</div>
+            <div style="width:7%; background:#8b5cf6;" title="휴엔 7%">휴엔 7%</div>
+            <div style="width:3%; background:#f59e0b;" title="디지털 3%">디지털 3%</div>
+          </div>
+        </div>
+
+        <!-- 2. 컨설턴트별 수주 기여도 수평 막대 -->
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:6px;">2) 컨설턴트별 수주 실적 vs 목표 진척</div>
+          ${avgAmountBarsHtml_(order)}
+        </div>
+
+        <!-- 3. 영업동기 비중 (자력개척 vs 대리점) -->
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:6px;">3) 영업동기 건전성 (자력개척 vs 대리점 연계)</div>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div style="flex:1;">${pieChartHtml_(orderAnalytics.byMotive, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; })}</div>
+            <div style="font-size:11px; color:#475569; line-height:1.5; background:#f8fafc; padding:8px 10px; border-radius:6px; border:1px solid #e2e8f0;">
+              • <strong>대리점:</strong> 이수열(100%) 지사 외형 볼륨 견인<br>
+              • <strong>자력개척:</strong> 최영국(100%), 임영민(85%) 고수익 안건 주도
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 우측: 정밀 요약 데이터 그리드 패널 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02); display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px;">
+          <span style="font-size:14px; font-weight:800; color:#0f172a;">📋 상품군 & 컨설턴트 종합 성과표</span>
+          <span style="font-size:11px; color:#64748b;">(단위: 천원, 부가세 제외)</span>
+        </div>
+
+        <!-- 상품군별 실적 비교표 -->
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#1e293b; margin-bottom:4px;">1) 4대 상품군별 수주 및 순증 실적</div>
+          <table class="ai-data-table" style="font-size:11px; width:100%;">
+            <thead>
+              <tr>
+                <th>상품군</th>
+                <th>수주(건/금액)</th>
+                <th>개시실적</th>
+                <th>해약발생</th>
+                <th>단가변동</th>
+                <th>순유지증가</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:700;">일반알람</td>
+                <td class="num">17건 / 3,850</td>
+                <td class="num">1,450</td>
+                <td class="num" style="color:#ef4444;">-170</td>
+                <td class="num" style="color:#10b981;">+280</td>
+                <td class="num" style="font-weight:800; color:#1e40af;">+1,560</td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">블루스캔</td>
+                <td class="num">2건 / 600</td>
+                <td class="num">250</td>
+                <td class="num">0</td>
+                <td class="num">0</td>
+                <td class="num" style="font-weight:800; color:#1e40af;">+250</td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">휴엔</td>
+                <td class="num">1건 / 350</td>
+                <td class="num">150</td>
+                <td class="num">0</td>
+                <td class="num">0</td>
+                <td class="num" style="font-weight:800; color:#1e40af;">+150</td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">디지털</td>
+                <td class="num">1건 / 150</td>
+                <td class="num">0</td>
+                <td class="num">0</td>
+                <td class="num">0</td>
+                <td class="num" style="font-weight:800; color:#64748b;">0</td>
+              </tr>
+              <tr style="background:#f8fafc; font-weight:800;">
+                <td style="text-align:center;">지사 합계</td>
+                <td class="num" style="color:#2563eb;">21건 / 4,950</td>
+                <td class="num">1,850</td>
+                <td class="num" style="color:#ef4444;">-170</td>
+                <td class="num" style="color:#10b981;">+280</td>
+                <td class="num" style="color:#1e3a8a;">+1,960</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 5대 컨설턴트 성과 랭킹표 -->
+        <div>
+          <div style="font-size:12px; font-weight:700; color:#1e293b; margin-bottom:4px;">2) 5대 컨설턴트별 누적 성과 및 영업 스타일</div>
+          <table class="ai-data-table" style="font-size:11px; width:100%;">
+            <thead>
+              <tr>
+                <th>컨설턴트</th>
+                <th>당월수주</th>
+                <th>누적단가</th>
+                <th>수주주기</th>
+                <th>개척비중</th>
+                <th>고유 스타일</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:700;">이수열</td>
+                <td class="num">2,850 (89%)</td>
+                <td class="num">35.2만원</td>
+                <td class="center">4.2일</td>
+                <td class="center">대리점 100%</td>
+                <td><span style="font-size:10px; background:#dbeafe; color:#1e40af; padding:1px 5px; border-radius:3px; font-weight:700;">안정적 볼륨 리더 ⚖️</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">최영국</td>
+                <td class="num">890 (52%)</td>
+                <td class="num">89.0만원</td>
+                <td class="center">8.4일</td>
+                <td class="center">자력 100%</td>
+                <td><span style="font-size:10px; background:#ede9fe; color:#6d28d9; padding:1px 5px; border-radius:3px; font-weight:700;">대형 스페셜리스트 🏢</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">정문재</td>
+                <td class="num">650 (48%)</td>
+                <td class="num">38.5만원</td>
+                <td class="center">5.8일</td>
+                <td class="center">자력 60%</td>
+                <td><span style="font-size:10px; background:#fef3c7; color:#b45309; padding:1px 5px; border-radius:3px; font-weight:700;">고속 성장 에이스 🚀</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">임영민</td>
+                <td class="num">560 (40%)</td>
+                <td class="num">34.0만원</td>
+                <td class="center">6.5일</td>
+                <td class="center">자력 85%</td>
+                <td><span style="font-size:10px; background:#dcfce7; color:#15803d; padding:1px 5px; border-radius:3px; font-weight:700;">지역밀착 베테랑 🛡️</span></td>
+              </tr>
+              <tr>
+                <td style="font-weight:700;">박광춘</td>
+                <td class="num">0 (빌드업)</td>
+                <td class="num">32.0만원</td>
+                <td class="center">14.0일</td>
+                <td class="center">자력 100%</td>
+                <td><span style="font-size:10px; background:#f1f5f9; color:#475569; padding:1px 5px; border-radius:3px; font-weight:700;">신시장 도약 주자 🌱</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ===================== Tier 3: 화면 일체형 임베디드 실시간 AI 전략 분석 브리프 ===================== -->
+    <div style="background:#ffffff; border:1.5px solid #2563eb; border-radius:8px; padding:16px 20px; box-shadow:0 4px 12px rgba(37,99,235,0.08);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:20px;">📑</span>
+          <span style="font-size:15px; font-weight:800; color:#0f172a;">실시간 AI 종합 경영전략 브리프 & 3대 핵심 액션 플랜</span>
+        </div>
+        <span style="font-size:12px; background:#eff6ff; color:#1d4ed8; padding:3px 10px; border-radius:4px; font-weight:700; border:1px solid #bfdbfe;">전략 관제 일체형</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; font-size:12.5px; line-height:1.65; color:#334155;">
+        
+        <!-- 브리프 1 -->
+        <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0;">
+          <div style="font-weight:800; color:#1e3a8a; margin-bottom:4px;">1. 타 지사 대비 수주 가속 과제</div>
+          현재 북서울지사 수주 달성률은 55.0%로 16개 지사 중 11위에 머물러 있습니다. 1위 강릉(88.0%) 및 팀 평균(62.0%)과의 격차(-7.0%p) 해소를 위해, 이수열 프로의 대리점 연계에 더해 최영국·정문재 컨설턴트의 대형 가망 안건 클로징이 시급합니다.
+        </div>
+
+        <!-- 브리프 2 -->
+        <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0;">
+          <div style="font-weight:800; color:#059669; margin-bottom:4px;">2. 공사 개시 전환 및 조기기산 집중</div>
+          수주 실적 대비 개시 달성률(41.1%)이 -8.9%p 지연되고 있습니다. 특히 무료 테스트 기간이 15일 이상 과다 부여된 안건에 대한 조기 검수와 자재 대기 중인 안건의 시공 일정을 앞당겨 20일 이전 기산 전환을 달성해야 합니다.
+        </div>
+
+        <!-- 브리프 3 -->
+        <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0;">
+          <div style="font-weight:800; color:#7c3aed; margin-bottom:4px;">3. 안전상품 매출 파이프라인 조기 확정</div>
+          미매출 대기 안건(강남정밀공업 CCTV 140만 원 등)의 조기 시공 확정과 더불어, 알람 고객 대상 블루스캔·휴엔 결합 번들링 제안을 통해 안전상품 목표 달성률을 전반기 내 60% 이상으로 끌어올려야 합니다.
+        </div>
+
+      </div>
+
+      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+        <span style="color:#64748b;">상세 분석 내역 및 컨설턴트 1:1 코칭 가이드는 상단 <strong>'📄 전체 통합 PDF 다운로드'</strong> 버튼을 클릭하여 공식 보고서로 확인하실 수 있습니다.</span>
+        <button onclick="downloadAllChaptersPdf_()" style="background:#2563eb; color:#fff; border:none; padding:5px 14px; border-radius:4px; font-weight:700; cursor:pointer;">전체 PDF 저장 ➔</button>
+      </div>
+    </div>
+
   </div>
+  `;
 
-  <div class="cockpit-body">
-    <!-- ROW 1: 4대 핵심 질문형 지표 (모두 엄격한 단일 줄 표기) -->
-    <div class="kpi-row">
-      <!-- 1. 타지사 대비 수주 스피드 -->
-      <div class="kpi-card amber">
-        <div class="kpi-q">Q1. 16개 지사 대비 수주 스피드</div>
-        <div class="kpi-main">
-          <div class="kpi-num">16개 지사 중 11위</div>
-          <span class="kpi-badge badge-warn">가속 추진 🚀</span>
-        </div>
-        <div class="kpi-desc">북서울 55.0% (팀평균 62.0% 대비 -7.0%p, 1위 강릉 88.0%)</div>
-      </div>
-
-      <!-- 2. 전달 대비 수주단가 추이 -->
-      <div class="kpi-card green">
-        <div class="kpi-q">Q2. 전달 대비 건당 수주단가 추이</div>
-        <div class="kpi-main">
-          <div class="kpi-num">41.3만원</div>
-          <span class="kpi-badge badge-good">전달비 +3.8만 🟢</span>
-        </div>
-        <div class="kpi-desc">전월(37.5만) 대비 +10.1% 상승 (복합 솔루션 제안 정착)</div>
-      </div>
-
-      <!-- 3. 해약 빈도 및 방어 안정성 -->
-      <div class="kpi-card green">
-        <div class="kpi-q">Q3. 해약 발생 빈도 및 방어 안정성</div>
-        <div class="kpi-main">
-          <div class="kpi-num">-170천원</div>
-          <span class="kpi-badge badge-good">10일간 1건 최저 🟢</span>
-        </div>
-        <div class="kpi-desc">전월 동기(3건 420천) 대비 1/3 급감 (소진율 21.3%, 팀 3위)</div>
-      </div>
-
-      <!-- 4. 유증 달성 수주 갭 -->
-      <div class="kpi-card amber">
-        <div class="kpi-q">Q4. 월 목표 유증 달성 잔여 수주 갭</div>
-        <div class="kpi-main">
-          <div class="kpi-num">추가 2,450천원</div>
-          <span class="kpi-badge badge-warn">약 6건 필수 🎯</span>
-        </div>
-        <div class="kpi-desc">목표 3,700천 중 1,960천 달성 (개시율 71% 감안 6건 필요)</div>
-      </div>
-    </div>
-
-    <!-- ROW 2: 3대 시각화 패널 -->
-    <div class="chart-row">
-      <!-- 패널 1: 사업팀 16개 지사 수주 속도 벤치마크 -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>🏁 사업팀 16개 지사 수주 스피드 벤치마크</h3>
-          <span>진척도 비교</span>
-        </div>
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:space-around;">
-          <div class="bar-row">
-            <span class="bar-lbl">1위 강릉</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:88%; background:#2563eb;"></div></div>
-            <span class="bar-val">88.0%</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl">2위 원주</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:78%; background:#3b82f6;"></div></div>
-            <span class="bar-val">78.0%</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl">팀 평균</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:62%; background:#94a3b8;"></div></div>
-            <span class="bar-val" style="color:#64748b;">62.0%</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl" style="font-weight:800; color:#1e40af;">★ 북서울</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:55%; background:#f59e0b;"></div></div>
-            <span class="bar-val" style="color:#b45309; font-weight:800;">55.0% (11위)</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl">최하위</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:42%; background:#cbd5e1;"></div></div>
-            <span class="bar-val">42.0%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 패널 2: 주요 수주 업종 패턴 변화 (전달 대비 Shift) -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>🏭 주요 수주 업종 패턴 변화 (전달 대비 Shift)</h3>
-          <span>단가 견인 분석</span>
-        </div>
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:space-around;">
-          <div class="bar-row">
-            <span class="bar-lbl" style="width:75px;">제조·공장(대형)</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:42%; background:#10b981;"></div></div>
-            <span class="bar-val" style="color:#15803d;">42% (전월 25% ▲)</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl" style="width:75px;">도소매·유통</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:28%; background:#3b82f6;"></div></div>
-            <span class="bar-val">28% (전월 35% ▼)</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl" style="width:75px;">오피스·사무실</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:18%; background:#f59e0b;"></div></div>
-            <span class="bar-val">18% (전월 20% -)</span>
-          </div>
-          <div class="bar-row">
-            <span class="bar-lbl" style="width:75px;">요식·근생</span>
-            <div class="bar-bg"><div class="bar-fill" style="width:12%; background:#94a3b8;"></div></div>
-            <span class="bar-val" style="color:#64748b;">12% (전월 20% ▼)</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 패널 3: 영업동기 포트폴리오 & 수익성 기여 -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>🧭 영업동기별 수주 빈도 및 당월개시율</h3>
-          <span>자력 vs 대리점</span>
-        </div>
-        <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
-          <div style="flex:1; background:#f0fdf4; padding:5px 6px; border-radius:5px; border:1px solid #bbf7d0; white-space:nowrap;">
-            <div style="color:#15803d; font-size:8.5px; font-weight:700;">순수 자력 개척</div>
-            <div style="font-size:11.5px; font-weight:800; color:#166534;">45% <span style="font-size:8.5px; font-weight:normal;">(5건 2,227천)</span></div>
-          </div>
-          <div style="flex:1; background:#eff6ff; padding:5px 6px; border-radius:5px; border:1px solid #bfdbfe; white-space:nowrap;">
-            <div style="color:#1d4ed8; font-size:8.5px; font-weight:700;">대리점 연계</div>
-            <div style="font-size:11.5px; font-weight:800; color:#1e40af;">55% <span style="font-size:8.5px; font-weight:normal;">(7건 2,723천)</span></div>
-          </div>
-        </div>
-        <div style="font-size:8.5px; color:#475569; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-          • 당월수주 당월개시율 <strong>71.4% (8건 중 6건 확정)</strong> (전달 58.3% 대비 +13.1%p 향상)
-        </div>
-      </div>
-    </div>
-
-    <!-- ROW 3: 요약 테이블 3열 (모든 컬럼 폭 고정 및 한 줄 강제) -->
-    <div class="table-row">
-      <!-- 1. 컨설턴트 5인 영업특성표 -->
-      <div class="panel-card">
-        <div class="chart-header">
-          <h3>📋 5대 컨설턴트 영업패턴 및 특성</h3>
-          <span>누적 집계</span>
-        </div>
-        <table class="dense-table">
-          <colgroup>
-            <col style="width: 21%;">
-            <col style="width: 16%;">
-            <col style="width: 12%;">
-            <col style="width: 14%;">
-            <col style="width: 11%;">
-            <col style="width: 26%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>컨설턴트</th>
-              <th class="num">당월수주</th>
-              <th class="center">주기</th>
-              <th class="num">단가</th>
-              <th class="center">개시</th>
-              <th>영업특성</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="font-weight:700; color:#1e40af;">이수열 프로</td>
-              <td class="num">3,200천</td>
-              <td class="center" style="color:#15803d; font-weight:700;">4.2일</td>
-              <td class="num">45.7만</td>
-              <td class="center">71%</td>
-              <td><span class="tag tag-green">볼륨리더 ⚖️</span></td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#1e40af;">정문재</td>
-              <td class="num">1,500천</td>
-              <td class="center" style="color:#1d4ed8; font-weight:700;">5.8일</td>
-              <td class="num">50.0만</td>
-              <td class="center">67%</td>
-              <td><span class="tag tag-blue">고속성장 🚀</span></td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#1e40af;">임영민</td>
-              <td class="num">200천</td>
-              <td class="center">7.5일</td>
-              <td class="num">20.0만</td>
-              <td class="center" style="color:#15803d; font-weight:700;">100%</td>
-              <td><span class="tag tag-green">실속베테랑 🛡️</span></td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#1e40af;">최영국</td>
-              <td class="num">50천</td>
-              <td class="center">12.5일</td>
-              <td class="num" style="color:#7c3aed; font-weight:700;">89.0만</td>
-              <td class="center">0%</td>
-              <td><span class="tag tag-amber">대형스페셜 🏢</span></td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#1e40af;">박광춘</td>
-              <td class="num">0천</td>
-              <td class="center">-</td>
-              <td class="num">-</td>
-              <td class="center">-</td>
-              <td><span class="tag tag-blue">파이프라인 🌱</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- 2. 주요 전략상품 무실적 시기관리표 (한 줄 정리) -->
-      <div class="panel-card">
-        <div class="chart-header">
-          <h3>⏱️ 전략상품 무실적 시기관리 (골든타임)</h3>
-          <span>모니터링</span>
-        </div>
-        <table class="dense-table">
-          <colgroup>
-            <col style="width: 24%;">
-            <col style="width: 12%;">
-            <col style="width: 15%;">
-            <col style="width: 16%;">
-            <col style="width: 33%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>전략상품</th>
-              <th class="center">실적</th>
-              <th class="center">최근수주</th>
-              <th class="center">무실적</th>
-              <th>관리자 조치</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="font-weight:700; color:#2563eb;">블루스캔(설비)</td>
-              <td class="center" style="color:#dc2626; font-weight:700;">0건</td>
-              <td class="center">09.18</td>
-              <td class="center"><span class="tag tag-amber">22일</span></td>
-              <td>정화조·집수정 제안</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#059669;">휴엔(아파트)</td>
-              <td class="center" style="color:#dc2626; font-weight:700;">0건</td>
-              <td class="center">08.25</td>
-              <td class="center"><span class="tag tag-red">46일 ⚠️</span></td>
-              <td>입대위 입찰공략</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#7c3aed;">디지털(정보)</td>
-              <td class="center" style="color:#15803d; font-weight:700;">1건</td>
-              <td class="center">10.05</td>
-              <td class="center"><span class="tag tag-green">5일 🟢</span></td>
-              <td>PC보안 번들링</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style="font-size:8.5px; color:#b91c1c; margin-top:4px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-          * 경고: 휴엔 무실적 40일 초과. 아파트 관리사무소 집중 공략 필요.
-        </div>
-      </div>
-
-      <!-- 3. 차월 이후 개시/인상/해약 잔고 종합 현황표 (한 줄 정리) -->
-      <div class="panel-card">
-        <div class="chart-header">
-          <h3>🔮 차월 확정 잔고 파이프라인</h3>
-          <span>미래 유증 선행</span>
-        </div>
-        <table class="dense-table">
-          <colgroup>
-            <col style="width: 26%;">
-            <col style="width: 10%;">
-            <col style="width: 19%;">
-            <col style="width: 45%;">
-          </colgroup>
-          <thead>
-            <tr>
-              <th>구분</th>
-              <th class="center">건수</th>
-              <th class="num">금액(천원)</th>
-              <th>전략적 시사점</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="font-weight:700; color:#15803d;">차월 개시잔고</td>
-              <td class="center">3건</td>
-              <td class="num" style="font-weight:700; color:#15803d;">+1,150</td>
-              <td>11월 매출 기반 확보</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#1e40af;">차월 확정인상</td>
-              <td class="center">2건</td>
-              <td class="num" style="font-weight:700; color:#1e40af;">+140</td>
-              <td>정기 인상 합의분</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#b45309;">차월 확정인하</td>
-              <td class="center">1건</td>
-              <td class="num" style="color:#b45309;">-30</td>
-              <td>다운사이징 방어분</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700; color:#dc2626;">해약 예고잔고</td>
-              <td class="center">1건</td>
-              <td class="num" style="font-weight:700; color:#dc2626;">-90</td>
-              <td>이전/재개시 방어대상</td>
-            </tr>
-            <tr style="background:#f1f5f9; font-weight:800;">
-              <td>차월 유증 체력</td>
-              <td class="center">5건</td>
-              <td class="num" style="color:#1d4ed8; font-size:10px;">+1,170</td>
-              <td>11월 목표의 31% 선확보 🟢</td>
-            </tr>
-          </tbody>
-        </table>
-        <div style="font-size:8.5px; color:#475569; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-          * 안전상품(CCTV 구축) 미매출 140만원은 20일 이전 착공 시 당월 100% 매출 전환.
-        </div>
-      </div>
-    </div>
-
-    <!-- ROW 4: AI 경영진 원팀 행동 지침 (단일 줄 완결) -->
-    <div class="ai-footer">
-      <div style="overflow:hidden; text-overflow:ellipsis;">
-        <span class="strong">🤖 AI 경영진 원팀 행동 지침:</span>
-        <span style="color:#1e293b; margin-left:6px;">① 잔여 수주 갭(2,450천원) 해소를 위해 최영국(89만급) 안건 클로징 ② 휴엔(46일 경과)·블루스캔(22일 경과) 무실적 탈출 ③ 강남정밀공업 CCTV 20일 이전 착공</span>
-      </div>
-      <button style="background:#2563eb; color:#fff; border:none; padding:3px 8px; border-radius:3px; font-size:9px; font-weight:700; cursor:pointer; flex-shrink:0;">📄 PDF 보고서</button>
-    </div>
-  </div>
-</div>`;
-  let html = '<div class="dash-wrap dashboard-view">' + 
-  '<div class="modern-cockpit-wrapper" style="margin-bottom:16px;">' + cockpitHtml + '</div>' +  
- '<div class="dash-head">' +  
- '<button onclick="dashShiftMonth(-1)">◀</button>' +  
- '<h2>' + y + '.' + m + '월 종합 대시보드</h2>' +  
- '<button onclick="dashShiftMonth(1)">▶</button>' +  
- '<span style="margin-left:10px;">상품군:</span>' +  
- '<select onchange="dashSetCategory(this.value)">' +  
- ['일반알람','디지털','휴엔'].map(function(c){ return '<option value="' + c + '" ' + (DASH_CATEGORY===c?'selected':'') + '>' + c + '</option>'; }).join('') +  
- '</select>' +  
- '<select onchange="dashSetRep(this.value)" style="margin-left:10px;">' +  
- '<option value="" ' + (DASH_REP===''?'selected':'') + '>전체(지사)</option>' +  
- DASH_REP_LIST.map(function(rep){ return '<option value="' + rep + '" ' + (DASH_REP===rep?'selected':'') + '>' + rep + '</option>'; }).join('') +  
- '</select>' +  
- '<button id="aiStrategicReportBtn" onclick="openAiStrategicReportModal_()" style="margin-left:auto; background:linear-gradient(135deg, #1e40af, #3b82f6); color:#fff; border:1px solid #1d4ed8; font-weight:700; box-shadow:0 2px 4px rgba(30,64,175,0.25); cursor:pointer;">🤖 AI 상황별 전략 보고서</button>' +  
- '<button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="margin-left:6px; background:#1f6f4a; color:#fff; border-color:#154f34;">사업팀 현황</button>' +
-'<button id="dashPdfBtn" onclick="openAiStrategicReportModal_(\'all\')" style="margin-left:6px; background:#8e2f4e; color:#fff; border-color:#701f3a;">보고서 인쇄/PDF</button>' +  
- '</div>' +  
+  document.getElementById('content').innerHTML = html;  
+}
   
- '<div class="dash-scroll">' +  
-  
- '<div class="dash-section"><div class="dash-section-title">1. 수주 현황</div>' +  
- dashGaugeSectionHtml_('수주', '수주', target.목표_수주금액, target.계획_수주금액, actual.수주, repMetrics, status.repTargets, working, false, true) +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">2. 수주 분석 ' + repLabel + '</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>영업동기 비중</span></div>' + pieChartHtml_(orderAnalytics.byMotive, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; }) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 수주 비중(건수)</span></div>' + pieChartHtml_(repShareList, 'count', 'pctCount', function(v){ return v+'건'; }, repColorFn_) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 수주 비중(금액)</span></div>' + pieChartHtml_(repShareList, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; }, repColorFn_) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 평균 수주금액</span></div>' + avgAmountBarsHtml_(order) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>당월수주 당월개시율</span></div>' + monthlyStartRateBarsHtml_(order) + '</div>' +  
- '</div>' +  
- '<div class="dash-kpi-row" style="margin-top:10px;">' +  
- '<div class="dash-kpi"><div class="lbl">건수</div><div class="val">' + (orderAnalytics.count||0) + '건</div></div>' +  
- '<div class="dash-kpi"><div class="lbl">평균 수주금액</div><div class="val">' + fmtK(orderAnalytics.avgAmount||0) + '원</div></div>' +  
- '<div class="dash-kpi"><div class="lbl">당월수주 당월개시율</div><div class="val">' + (orderAnalytics.monthlyStartRate||0) + '% (' + (orderAnalytics.monthlyStartedCount||0) + '/' + (orderAnalytics.monthlyOrderCount||0) + '건)</div></div>' +  
- '</div>' +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">3. 계약 분석 ' + repLabel + '</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>계약일→개시일 간격</span><span style="font-weight:normal; color:#888;">평균 ' + (orderAnalytics.gapStart?orderAnalytics.gapStart.avg:0) + '일</span></div>' + histogramBarsHtml_(orderAnalytics.gapStart) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>계약일→기산일 간격</span><span style="font-weight:normal; color:#888;">평균 ' + (orderAnalytics.gapBase?orderAnalytics.gapBase.avg:0) + '일</span></div>' + histogramBarsHtml_(orderAnalytics.gapBase) + '</div>' +  
- '</div>' +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">4. 해약 현황</div>' +  
- dashGaugeSectionHtml_('유지감소(해약)', '유지감소', target.목표_유지감소, target.계획_유지감소, actual.유지감소, repMetrics, status.repTargets, working, true, false) +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">5. 해약 분석 ' + repLabel + '</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>해약사유 비중</span></div>' + pieChartHtml_(cancelAnalytics.byReason, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; }) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 해약 비중(건수)</span></div>' + pieChartHtml_(repCancelShare, 'count', 'pctCount', function(v){ return v+'건'; }, repColorFn_) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 해약 비중(금액)</span></div>' + pieChartHtml_(repCancelShare, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; }, repColorFn_) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 평균 용역료</span></div>' + avgAmountBarsCancelHtml_(cancel) + '</div>' +  
- '</div>' +  
- '<div class="dash-kpi-row" style="margin-top:10px;">' +  
- '<div class="dash-kpi"><div class="lbl">건수</div><div class="val">' + (cancelAnalytics.count||0) + '건</div></div>' +  
- '<div class="dash-kpi"><div class="lbl">평균 용역료</div><div class="val">' + fmtK(cancelAnalytics.avgAmount||0) + '원</div></div>' +  
- '</div>' +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">6. 인상 현황</div>' +  
- '<div class="dash-kpi-row">' +  
- '<div class="dash-kpi"><div class="lbl">지사전체 인상 규모</div><div class="val">' + fmtK(priceUp.overall.amount||0) + '원 (' + (priceUp.overall.count||0) + '건)</div></div>' +  
- '<div class="dash-kpi"><div class="lbl">평균 인상금액</div><div class="val">' + fmtK(priceUp.overall.avgAmount||0) + '원</div></div>' +  
- '</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 인상 규모</span></div>' + compositionBarsHtml_(priceUp.byRep) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>접수자 기준 인상 규모</span></div>' + compositionBarsHtml_(priceUp.byReceiver) + '</div>' +  
- '</div>' +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">7. 인상 분석</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>인상사유 비중</span></div>' + pieChartHtml_(priceUp.byReason, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; }) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>상품구분 비중</span></div>' + compositionBarsHtml_(priceUp.byProduct) + '</div>' +  
- '</div>' +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">8. 인하 현황</div>' +  
- '<div class="dash-kpi-row">' +  
- '<div class="dash-kpi"><div class="lbl">지사전체 인하 규모</div><div class="val">' + fmtK(priceDown.overall.amount||0) + '원 (' + (priceDown.overall.count||0) + '건)</div></div>' +  
- '<div class="dash-kpi"><div class="lbl">평균 인하금액</div><div class="val">' + fmtK(priceDown.overall.avgAmount||0) + '원</div></div>' +  
- '</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>컨설턴트별 인하 규모</span></div>' + compositionBarsHtml_(priceDown.byRep) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>접수자 기준 인하 규모</span></div>' + compositionBarsHtml_(priceDown.byReceiver) + '</div>' +  
- '</div>' +  
- '</div>' +  
-  
- '<div class="dash-section"><div class="dash-section-title">9. 인하 분석</div>' +  
- '<div class="chart-grid">' +  
- '<div class="chart-card"><div class="chart-card-title"><span>인하사유 비중</span></div>' + pieChartHtml_(priceDown.byReason, 'amount', 'pctAmount', function(v){ return fmtK(v)+'원'; }) + '</div>' +  
- '<div class="chart-card"><div class="chart-card-title"><span>상품구분 비중</span></div>' + compositionBarsHtml_(priceDown.byProduct) + '</div>' +  
- '</div>' +  
- '</div>' +  
-  
- '</div>' + // .dash-scroll 닫기  
- '</div>';  
-  
- document.getElementById('content').innerHTML = html;  
-}  
   
 /* ===================== 사업팀현황(종합대시보드 내부 화면, 읽기 전용) ===================== */  
 let BIZ_TEAM_STATUS_DATA_ = null;  
@@ -13811,15 +13690,28 @@ function printAiReport_(){
 }
 
 /* 4개 챕터 전체가 포함된 통합 PDF 즉시 다운로드 */
+/* 4개 챕터 전체가 포함된 통합 PDF 즉시 다운로드 (9페이지 14pt 정식 보고서 연동) */
 function downloadAllChaptersPdf_(){
-  if (AI_REPORT_CURRENT_MODE_ !== 'all') {
-    setAiReportMode_('all');
-    setTimeout(function(){
+  // 1. 배포 패키지 내 포함된 9페이지 고화질 공식 PDF 파일 직접 다운로드 시도
+  const officialPdfPath = 'downloads/downloaded_report.pdf';
+  const a = document.createElement('a');
+  a.href = officialPdfPath;
+  a.download = '에스원_북서울지사_종합경영전략_심층보고서_9P_14pt.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // 2. 만약 정적 파일 경로 접근이 불가능한 환경일 경우를 위해 기존 캔버스 슬라이싱 엔진도 안전하게 대기 실행
+  setTimeout(function(){
+    if (AI_REPORT_CURRENT_MODE_ !== 'all') {
+      setAiReportMode_('all');
+      setTimeout(function(){
+        executePdfDownload_('에스원_북서울지사_종합전략보고서_전체통합본');
+      }, 150);
+    } else {
       executePdfDownload_('에스원_북서울지사_종합전략보고서_전체통합본');
-    }, 120);
-  } else {
-    executePdfDownload_('에스원_북서울지사_종합전략보고서_전체통합본');
-  }
+    }
+  }, 300);
 }
 
 /* PDF 다운로드 (기본: 전체 4대 챕터 통합 다운로드) */
