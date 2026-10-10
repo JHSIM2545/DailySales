@@ -2670,16 +2670,16 @@ function getTzToday() {
           momPace = '대형 안건 클로징 준비 ⏳';
           momDetail = `지난달(${prevCount}건, ${Math.round(prevAmt/1000).toLocaleString()}천원) 우수 실적에 이어 당월 대형 안건 협상 마무리 단계로 월중 클로징 기대`;
         } else if (rep === '정문재' || (curCount >= 2 && curAmt > prevAmt * 1.1)) {
-          momPace = '수주 스피드 혁신';
+          momPace = '수주 스피드 혁신 🟢';
           momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 당월 수주 체결 속도와 활동성이 가파르게 향상되며 지사 성장 견인`;
         } else if (rep === '박광춘') {
           momPace = '도약 준비 빌드업 💡';
           momDetail = `새로운 가망 고객 발굴과 방문 활동량 강화를 통해 첫 유효 수주를 준비하는 집중 빌드업 단계`;
         } else if (estCurAmt >= prevAmt * 0.85) {
-          momPace = '전월 수준 유지';
+          momPace = '전월 수준 유지 🔵';
           momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원)과 유사한 안정적인 수주 페이스 지속`;
         } else {
-          momPace = '페이스 조율 단계';
+          momPace = '페이스 조율 단계 🔵';
           momDetail = `안정적인 실적 페이스 회복을 위한 가망 고객 상담 확대 단계`;
         }
 
@@ -2977,19 +2977,19 @@ function getTzToday() {
         let momTag = '';
         let momDesc = '';
         if (prevAmount >= 1500000 && total <= 100000) {
-          momPace = '스타트 지연';
+          momPace = '스타트 지연 🔴';
           momTag = 'delay';
           momDesc = `지난달(${prevCount}건, ${Math.round(prevAmount/1000).toLocaleString()}천원) 호실적 대비 당월 초반 수주 체결이 지연되어 조기 정상화 필요`;
         } else if (estCurAmount > prevAmount * 1.15) {
-          momPace = '수주 가속';
+          momPace = '수주 가속 🟢';
           momTag = 'speedup';
           momDesc = `지난달(${Math.round(prevAmount/1000).toLocaleString()}천원) 대비 당월 수주 속도가 대폭 향상되며 호조세 지속`;
         } else if (estCurAmount >= prevAmount * 0.85) {
-          momPace = '전월 유지';
+          momPace = '전월 유지 🔵';
           momTag = 'maintain';
           momDesc = `지난달(${Math.round(prevAmount/1000).toLocaleString()}천원)과 유사한 안정적인 수주 페이스 유지 중`;
         } else {
-          momPace = '수주 둔화';
+          momPace = '수주 둔화 🟡';
           momTag = 'slow';
           momDesc = `지난달(${Math.round(prevAmount/1000).toLocaleString()}천원) 대비 수주 진척이 둔화됨`;
         }
@@ -5232,7 +5232,7 @@ td.prod-col, td.gross-col,
   
 <div class="topbar">  
  <div>  
- <h1 style="display:flex; align-items:center; margin:0; font-size:18px; font-weight:700;"><img src="data:image/png;base64,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" alt="북서울 영업일보" style="width:28px; height:28px; vertical-align:middle; margin-right:8px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.15);">북서울 영업일보 </h1>  
+ <h1 style="display:flex; align-items:center; margin:0; font-size:18px; font-weight:700;"><img src="data:image/png;base64,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" alt="북서울 영업일보" style="width:28px; height:28px; vertical-align:middle; margin-right:8px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.15);">북서울 영업일보 <span style="font-size:12px; background:#16a34a; color:#fff; padding:3px 10px; border-radius:4px; margin-left:8px; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,0.2);">v4.0</span></h1>  
  </div>  
  <div style="flex:1; text-align:center; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;">  
  <button id="aiReportTopBtn" class="ai-report-topbtn" style="display:none;" onclick="openAiReportModal_()">영업보고</button>  
@@ -7544,23 +7544,23 @@ function renderDashboard(){
 
   // 신호등 색상 헬퍼 함수
   function getTrafficColorBizTeam(myVal, teamAvg) {
-    if (myVal >= teamAvg) return { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '양호' };
-    if (myVal >= teamAvg - 5.0) return { bg: '#fef9c3', text: '#854d0e', dot: '#eab308', label: '주의' };
-    return { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
+    if (myVal >= teamAvg) return { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '양호 🟢' };
+    if (myVal >= teamAvg - 5.0) return { bg: '#fef9c3', text: '#854d0e', dot: '#eab308', label: '주의 🟡' };
+    return { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험 🔴' };
   }
 
   function getTrafficColorWorking(myVal, workRatio) {
-    if (myVal >= workRatio + 5.0) return { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '초과달성' };
-    if (myVal >= workRatio - 5.0) return { bg: '#fef9c3', text: '#854d0e', dot: '#eab308', label: '적정' };
-    return { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '미달' };
+    if (myVal >= workRatio + 5.0) return { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '초과달성 🟢' };
+    if (myVal >= workRatio - 5.0) return { bg: '#fef9c3', text: '#854d0e', dot: '#eab308', label: '적정 🟡' };
+    return { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '미달 🔴' };
   }
 
   // ==================== 1. 월별 핵심 지표 (10월, 11월, 12월, 9월 등 완벽 동적 분기) ====================
-  let ordAmt = 0, ordTgt = 3800, ordPct = 0, ordRank = '11위 / 16개', ordTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
-  let startAmt = 0, startTgt = 2800, startPct = 0, startRank = '16위 (최하위)', startTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
-  let netAmt = 0, netTgt = 1313, netPct = 0, netRank = '13위 / 16개', netTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
-  let safeOrdAmt = 0, safeOrdTgt = 34000, safeOrdPct = 0, safeOrdTraffic = { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '양호' };
-  let safeSaleAmt = 0, safeSaleTgt = 34000, safeSalePct = 0, safeSaleTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '미달' };
+  let ordAmt = 0, ordTgt = 3800, ordPct = 0, ordRank = '11위 / 16개', ordTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험 🔴' };
+  let startAmt = 0, startTgt = 2800, startPct = 0, startRank = '16위 (최하위)', startTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험 🔴' };
+  let netAmt = 0, netTgt = 1313, netPct = 0, netRank = '13위 / 16개', netTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험 🔴' };
+  let safeOrdAmt = 0, safeOrdTgt = 34000, safeOrdPct = 0, safeOrdTraffic = { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '양호 🟢' };
+  let safeSaleAmt = 0, safeSaleTgt = 34000, safeSalePct = 0, safeSaleTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '미달 🔴' };
   
   let viewModeTitle = `${y}년 ${m}월 기준`;
   let guidelineHeaderTitle = `${y}년 ${m}월 북서울지사 종합 전략 가이드라인`;
@@ -7618,7 +7618,7 @@ function renderDashboard(){
     startAmt = 2400; startTgt = 3000; startPct = 80.0; startRank = '6위 / 16개';
     startTraffic = getTrafficColorWorking(80.0, 75.0);
 
-    netAmt = 1600; netTgt = 1500; netPct = 106.7; netRank = '4위';
+    netAmt = 1600; netTgt = 1500; netPct = 106.7; netRank = '4위 🟢';
     netTraffic = getTrafficColorBizTeam(106.7, 80.0);
 
     safeOrdAmt = 28500; safeOrdTgt = 36000; safeOrdPct = 79.2;
@@ -7632,13 +7632,13 @@ function renderDashboard(){
     guidelineHeaderTitle = '9월 실적 평가 및 10월 연계 전략 가이드라인';
     guidelineBadge = '실적 마감 완료';
 
-    ordAmt = 3850; ordTgt = 3800; ordPct = 101.3; ordRank = '2위';
+    ordAmt = 3850; ordTgt = 3800; ordPct = 101.3; ordRank = '2위 🟢';
     ordTraffic = getTrafficColorBizTeam(101.3, 62.0);
 
-    startAmt = 2750; startTgt = 2800; startPct = 98.2; startRank = '5위';
+    startAmt = 2750; startTgt = 2800; startPct = 98.2; startRank = '5위 🟢';
     startTraffic = getTrafficColorWorking(98.2, 100.0);
 
-    netAmt = 1280; netTgt = 1313; netPct = 97.5; netRank = '4위';
+    netAmt = 1280; netTgt = 1313; netPct = 97.5; netRank = '4위 🟢';
     netTraffic = getTrafficColorBizTeam(97.5, 70.0);
 
     safeOrdAmt = 47299; safeOrdTgt = 34500; safeOrdPct = 137.1;
@@ -7723,7 +7723,7 @@ function renderDashboard(){
   let pDigiOrd = 0, pDigiStart = 0, pDigiNet = 0, pDigiCnt = 0;
 
   if (isOct2026) {
-    pAlarmCnt = 6; pAlarmOrd = 1400; pAlarmStart = 250; pAlarmCan = -1460; pAlarmPrc = -338; pAlarmNet = -1255;
+    pAlarmCnt = 5; pAlarmOrd = 1220; pAlarmStart = 250; pAlarmCan = -1460; pAlarmPrc = -338; pAlarmNet = -1210;
     pBScanCnt = 1; pBScanOrd = 180; pBScanStart = 0; pBScanNet = 0;
     pHuenCnt = 0; pHuenOrd = 0; pHuenStart = 0; pHuenNet = 0;
     pDigiCnt = 0; pDigiOrd = 0; pDigiStart = 0; pDigiNet = 0;
@@ -7749,14 +7749,12 @@ function renderDashboard(){
     pDigiCnt = 0; pDigiOrd = 0; pDigiStart = 0; pDigiNet = 0;
   }
 
-  // 일반알람에 블루스캔이 산입되어 있으므로 지사 합계는 일반알람 + 디지털 + 휴엔
-  const totProdCnt = pAlarmCnt + pHuenCnt + pDigiCnt;
-  const totProdOrd = pAlarmOrd + pHuenOrd + pDigiOrd;
-  const totProdStart = pAlarmStart + pHuenStart + pDigiStart;
+  const totProdCnt = pAlarmCnt + pBScanCnt + pHuenCnt + pDigiCnt;
+  const totProdOrd = pAlarmOrd + pBScanOrd + pHuenOrd + pDigiOrd;
+  const totProdStart = pAlarmStart + pBScanStart + pHuenStart + pDigiStart;
   const totProdCan = pAlarmCan;
   const totProdPrc = pAlarmPrc;
-  const totProdNet = pAlarmNet + pHuenNet + pDigiNet;
-
+  const totProdNet = pAlarmNet + pBScanNet + pHuenNet + pDigiNet;
 
   // ==================== 4. 개시시기 누적 비중 막대 ====================
   let startScheduleBars = '';
@@ -7817,9 +7815,9 @@ function renderDashboard(){
   // ==================== 5. AI 종합 진단 4대 과제 문구 ====================
   let aiTask1 = '', aiTask2 = '', aiTask3 = '', aiTask4 = '';
   if (isOct2026) {
-    aiTask1 = '현재 북서울지사 수주 달성률은 37%(1,400천원)로 서울사업팀 16개 지사 중 11위에 머물러 있으며, 서울사업팀 평균(62%) 대비 <strong style="color:#ef4444;">-25.0%p</strong> 뒤처져 있습니다(신호등). 최영국·정문재 컨설턴트의 대형 가망 안건 클로징 가속화가 필요합니다.';
+    aiTask1 = '현재 북서울지사 수주 달성률은 37%(1,400천원)로 서울사업팀 16개 지사 중 11위에 머물러 있으며, 서울사업팀 평균(62%) 대비 <strong style="color:#ef4444;">-25.0%p</strong> 뒤처져 있습니다(신호등 🔴). 최영국·정문재 컨설턴트의 대형 가망 안건 클로징 가속화가 필요합니다.';
     aiTask2 = '일보상 기록된 개시를 전부 달성하고 해약이 더 이상 늘지 않아도, 10월말 유증마감 전망은 -4,848천원(-369%)으로 목표를 크게 하회할 위험이 있습니다. <strong>AED 등 무공사 유증 상품</strong>에 집중하고, <strong>영업·CS·기술사원 전원이 합심한 단가인상 방어</strong>에 총력을 기울여야 합니다.';
-    aiTask3 = '안전상품은 지사 목표의 50%는 당연히 달성해야 하며 속도 면에서는 도달 가능할 것으로 보이나(수주 12,324천원, 36%), <strong>전략영업과의 협업이 현저히 부족</strong>하여 확정 매출(445천원, 1.3%) 전환이 지체되고 있습니다. 전략영업 부서와의 주간 협의체를 즉시 가동해야 합니다.';
+    aiTask3 = '안전상품은 지사 목표의 50%는 당연히 달성해야 하며 속도 면에서는 도달 가능할 것으로 보이나(수주 12,324천원, 36% 🟢), <strong>전략영업과의 협업이 현저히 부족</strong>하여 확정 매출(445천원, 1.3% 🔴) 전환이 지체되고 있습니다. 전략영업 부서와의 주간 협의체를 즉시 가동해야 합니다.';
     aiTask4 = "블루스캔·휴엔·디지털 수주 부진을 타개하기 위해 지사 내 <strong>'안건 발굴 ➔ 수주/계약 ➔ 즉시 개시'</strong>까지 원스톱으로 책임 지원하는 <strong>지사내 전략 TF 활동</strong>을 즉시 가동해야 합니다.";
   } else if (isNov2026) {
     aiTask1 = '11월은 10월 이월 안건(730천원)의 조기 기산 전환과 함께, 신규 가망 안건(목표 4,200천원)을 월초 1~2주차에 선점 클로징하여 사업팀 8위권 이내로 수주 순위를 견인해야 합니다.';
@@ -7845,12 +7843,23 @@ function renderDashboard(){
     <!-- 상단 컨트롤 헤더 바 -->
     <div class="dash-head" style="background:#ffffff; padding:10px 16px; border-radius:8px; border:1px solid #cbd5e1; display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
       <button onclick="dashShiftMonth(-1)" style="padding:4px 10px; cursor:pointer;" title="이전 월">◀</button>
-      <h2 style="font-size:16px; font-weight:800; color:#0f172a; margin:0;">${y}.${m}월 종합 영업전략 대시보드</h2>
+      <h2 style="font-size:16px; font-weight:800; color:#0f172a; margin:0;">${y}.${m}월 종합 영업전략 대시보드 <span style="font-size:11px; background:#0d9488; color:#fff; padding:2px 8px; border-radius:4px; margin-left:6px; font-weight:700;">v4.0 전략 가이드라인 연동</span></h2>
       <button onclick="dashShiftMonth(1)" style="padding:4px 10px; cursor:pointer;" title="다음 월">▶</button>
+      
+      <span style="margin-left:12px; font-size:13px; font-weight:600; color:#475569;">상품군:</span>
+      <select onchange="dashSetCategory(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #cbd5e1; font-weight:600;">
+        ${['일반알람','디지털','휴엔'].map(c => `<option value="${c}" ${DASH_CATEGORY===c?'selected':''}>${c}</option>`).join('')}
+      </select>
+      
+      <select onchange="dashSetRep(this.value)" style="padding:4px 8px; border-radius:4px; border:1px solid #cbd5e1; font-weight:600;">
+        <option value="" ${DASH_REP===''?'selected':''}>전체(지사전체)</option>
+        ${DASH_REP_LIST.map(r => `<option value="${r}" ${DASH_REP===r?'selected':''}>${r}</option>`).join('')}
+      </select>
 
       <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer;">서울사업팀 16개 지사 현황</button>
-        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:6px 16px; border-radius:6px; font-weight:800; cursor:pointer; box-shadow:0 2px 4px rgba(142,47,78,0.25);">📄 북서울지사 영업 전략 가이드라인 PDF 다운로드</button>
+        <button id="aiStrategicReportBtn" onclick="openAiStrategicReportModal_()" style="background:linear-gradient(135deg, #1e40af, #3b82f6); color:#fff; border:1px solid #1d4ed8; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer; box-shadow:0 2px 4px rgba(30,64,175,0.25);">🤖 4대 챕터 심층 보고서 모달</button>
+        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:6px 12px; border-radius:6px; font-weight:700; cursor:pointer;">서울사업팀 16개 지사 현황</button>
+        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:6px 14px; border-radius:6px; font-weight:800; cursor:pointer; box-shadow:0 2px 4px rgba(142,47,78,0.25);">📄 북서울지사 영업 전략 가이드라인 PDF 다운로드</button>
       </div>
     </div>
 
@@ -7862,40 +7871,40 @@ function renderDashboard(){
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px;">
         
         <!-- (1) 수주진척도 -->
-        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #3b82f6; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid ${ordTraffic.dot}; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(1) 수주진척도</span>
-            
+            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${ordTraffic.bg}; color:${ordTraffic.text}; font-weight:800;">● ${ordTraffic.label}</span>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
-            <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(ordAmt)}천원 <span style="font-size:13px; font-weight:700; color:#2563eb;">(${ordPct}%)</span></div>
+            <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(ordAmt)}천원 <span style="font-size:13px; font-weight:700; color:${ordTraffic.dot};">(${ordPct}%)</span></div>
             <span style="font-size:12px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:2px 6px; border-radius:4px;">${ordRank}</span>
           </div>
           <div style="font-size:11.5px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
-            ${isOct2026 ? '서울사업팀 평균(62%) 대비 <strong style="color:#ef4444;">-25.0%p</strong>' : (isNov2026 ? '10월 이월 안건 기산 전환 및 11월 신규 수주 클로징 가속' : (isDec2026 ? '연말 수주 총력전 및 연간 목표 달성 추진' : `${m}월 서울사업팀 수주 마감 달성 완료`))}
+            ${isOct2026 ? '서울사업팀 평균(62%) 대비 <strong style="color:#ef4444;">-25.0%p</strong> (평균 -5%p 이하 🔴)' : (isNov2026 ? '10월 이월 안건 기산 전환 및 11월 신규 수주 클로징 가속' : (isDec2026 ? '연말 수주 총력전 및 연간 목표 달성 추진' : `${m}월 서울사업팀 수주 마감 달성 완료`))}
           </div>
         </div>
 
         <!-- (2) 개시진척도 -->
-        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #2563eb; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid ${startTraffic.dot}; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(2) 개시진척도</span>
-            
+            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${startTraffic.bg}; color:${startTraffic.text}; font-weight:800;">● ${startTraffic.label}</span>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
-            <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(startAmt)}천원 <span style="font-size:13px; font-weight:700; color:#2563eb;">(${startPct}%)</span></div>
+            <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(startAmt)}천원 <span style="font-size:13px; font-weight:700; color:${startTraffic.dot};">(${startPct}%)</span></div>
             <span style="font-size:12px; font-weight:800; color:#1e40af; background:#eff6ff; padding:2px 6px; border-radius:4px;">${startRank}</span>
           </div>
           <div style="font-size:11.5px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
-            ${isOct2026 ? '경과일수(5/20일, 25%) 대비 <strong style="color:#ef4444;">-16.0%p 미달</strong>' : (isNov2026 ? '당월 이월된 확정 안건(730천원) + 신규 안건의 조기 기산' : (isDec2026 ? '연내 미개시 안건 100% 완공 및 매출 전환' : `${m}월 공사 완공 및 개시 완료 실적`))}
+            ${isOct2026 ? '경과일수(5/20일, 25%) 대비 <strong style="color:#ef4444;">-16.0%p 미달</strong> (공사전환 지연 🔴)' : (isNov2026 ? '당월 이월된 확정 안건(730천원) + 신규 안건의 조기 기산' : (isDec2026 ? '연내 미개시 안건 100% 완공 및 매출 전환' : `${m}월 공사 완공 및 개시 완료 실적`))}
           </div>
         </div>
 
         <!-- (3) 유지증가 수준 -->
-        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid ${netTraffic.dot}; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(3) 유지증가 수준</span>
-            
+            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${netTraffic.bg}; color:${netTraffic.text}; font-weight:800;">● ${netTraffic.label}</span>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:${netAmt<0?'#dc2626':'#0f766e'};">${netAmt>0?'+':''}${fmtK(netAmt)}천원 <span style="font-size:13px; font-weight:700;">(${netPct}%)</span></div>
@@ -7916,20 +7925,20 @@ function renderDashboard(){
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:11px; color:#64748b;">수주 실적</span>
-                
+                <span style="font-size:9.5px; padding:1px 5px; border-radius:10px; background:${safeOrdTraffic.bg}; color:${safeOrdTraffic.text}; font-weight:700;">● ${safeOrdTraffic.label}</span>
               </div>
               <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${fmtK(safeOrdAmt)}천원 <span style="font-size:11px; color:#0d9488;">(${safeOrdPct}%)</span></div>
             </div>
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:11px; color:#64748b;">확정 매출</span>
-                
+                <span style="font-size:9.5px; padding:1px 5px; border-radius:10px; background:${safeSaleTraffic.bg}; color:${safeSaleTraffic.text}; font-weight:700;">● ${safeSaleTraffic.label}</span>
               </div>
               <div style="font-size:14px; font-weight:800; color:${safeSalePct<20?'#b91c1c':'#0f766e'}; margin-top:2px;">${fmtK(safeSaleAmt)}천원 <span style="font-size:11px;">(${safeSalePct}%)</span></div>
             </div>
           </div>
           <div style="font-size:11px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:4px;">
-            ${isOct2026 ? '수주스피드: 영업일(25%) 대비 <strong style="color:#0d9488;">양호</strong> | 매출: 영업일 대비 <strong style="color:#ef4444;">미달</strong>' : `수주 ${safeOrdPct}% / 매출 ${safeSalePct}% 진척`}
+            ${isOct2026 ? '수주스피드: 영업일(25%) 대비 <strong style="color:#0d9488;">양호 🟢</strong> | 매출: 영업일 대비 <strong style="color:#ef4444;">미달 🔴</strong>' : `수주 ${safeOrdPct}% / 매출 ${safeSalePct}% 진척`}
           </div>
         </div>
 
@@ -8029,28 +8038,20 @@ function renderDashboard(){
               <td class="num" style="color:${totProdNet<0?'#b91c1c':'#0f766e'}; font-size:12px;">${totProdNet>0?'+':''}${fmtK(totProdNet)}</td>
             </tr>
             <tr>
-              <td style="font-weight:700;">일반알람 <span style="font-size:10px; color:#64748b;">(알람·유지보수·블루스캔 산입)</span></td>
+              <td style="font-weight:700;">일반알람 <span style="font-size:10px; color:#64748b;">(알람·유지보수)</span></td>
               <td class="num">${pAlarmCnt}건 / ${fmtK(pAlarmOrd)}</td>
               <td class="num">${fmtK(pAlarmStart)}</td>
               <td class="num" style="color:#ef4444;">${fmtK(pAlarmCan)}</td>
               <td class="num" style="color:${pAlarmPrc<0?'#ef4444':'#10b981'};">${pAlarmPrc>0?'+':''}${fmtK(pAlarmPrc)}</td>
               <td class="num" style="font-weight:800; color:${pAlarmNet<0?'#ef4444':'#1e40af'};">${pAlarmNet>0?'+':''}${fmtK(pAlarmNet)}</td>
             </tr>
-            <tr style="background:#f8fafc;">
-              <td style="padding-left:18px; font-weight:700; color:#2563eb;">└ 블루스캔 <span style="font-size:10px; color:#2563eb;">(자력영상·별도관리)</span></td>
-              <td class="num" style="color:#2563eb; font-weight:700;">${pBScanCnt}건 / ${fmtK(pBScanOrd)}</td>
+            <tr>
+              <td style="font-weight:700;">블루스캔 <span style="font-size:10px; color:#2563eb;">(자력영상)</span></td>
+              <td class="num">${pBScanCnt}건 / ${fmtK(pBScanOrd)}</td>
               <td class="num">${fmtK(pBScanStart)}</td>
               <td class="num">0</td>
               <td class="num">0</td>
-              <td class="num" style="font-weight:800; color:#2563eb;">${pBScanNet>0?'+':''}${fmtK(pBScanNet)}</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700;">디지털 <span style="font-size:10px; color:#6366f1;">(정보보안)</span></td>
-              <td class="num">${pDigiCnt}건 / ${fmtK(pDigiOrd)}</td>
-              <td class="num">${fmtK(pDigiStart)}</td>
-              <td class="num">0</td>
-              <td class="num">0</td>
-              <td class="num" style="font-weight:800; color:#1e40af;">+${fmtK(pDigiNet)}</td>
+              <td class="num" style="font-weight:800; color:#1e40af;">+${fmtK(pBScanNet)}</td>
             </tr>
             <tr>
               <td style="font-weight:700;">휴엔 <span style="font-size:10px; color:#0d9488;">(환경·방제)</span></td>
@@ -8059,6 +8060,14 @@ function renderDashboard(){
               <td class="num">0</td>
               <td class="num">0</td>
               <td class="num" style="font-weight:800; color:#1e40af;">+${fmtK(pHuenNet)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;">디지털 <span style="font-size:10px; color:#6366f1;">(정보보안)</span></td>
+              <td class="num">${pDigiCnt}건 / ${fmtK(pDigiOrd)}</td>
+              <td class="num">${fmtK(pDigiStart)}</td>
+              <td class="num">0</td>
+              <td class="num">0</td>
+              <td class="num" style="font-weight:800; color:#1e40af;">+${fmtK(pDigiNet)}</td>
             </tr>
           </tbody>
         </table>
@@ -12679,8 +12688,8 @@ function analyzeBizTeamBenchmark_(bizTeamData, targetBranch){
 
   // 타 지사의 가속 수주 속도 대비 북서울 수주 속도 분석
   const isPaceGoodRelative = (ord.myRank > 0 && ord.myRank <= 6) || (ord.gap >= 0);
-  let paceVerdict = isPaceGoodRelative ? '수주 페이스 양호 (사업팀 선두권 유지)' : '수주 페이스 부족 (사업팀 타 지사 속도 대비 뒤처짐)';
-  let paceTag = isPaceGoodRelative ? '양호' : '부족 (스퍼트 필요)';
+  let paceVerdict = isPaceGoodRelative ? '수주 페이스 양호 (사업팀 선두권 유지 🔵)' : '수주 페이스 부족 (사업팀 타 지사 속도 대비 뒤처짐 🔴)';
+  let paceTag = isPaceGoodRelative ? '양호 🔵' : '부족 (스퍼트 필요) 🔴';
 
   // 4대 비율 종합 진단 (수주 vs 개시 vs 해약/유지감소 불균형 감지)
   const isStartLagging = (start.myVal < ord.myVal - 4) || (start.myRank > 8);
@@ -12775,8 +12784,8 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
     finalPaceCls = biz.isPaceGoodRelative ? 'good' : 'danger';
   } else {
     const paceDiff = ordPct - workRatio;
-    finalPaceVerdict = paceDiff >= 0 ? '수주 페이스 양호 (영업일수 진척 대비 상회)' : '수주 페이스 부족 (영업일수 진척 대비 지연)';
-    finalPaceTag = paceDiff >= 0 ? '양호' : '부족';
+    finalPaceVerdict = paceDiff >= 0 ? '수주 페이스 양호 (영업일수 진척 대비 상회 🔵)' : '수주 페이스 부족 (영업일수 진척 대비 지연 🔴)';
+    finalPaceTag = paceDiff >= 0 ? '양호 🔵' : '부족 🔴';
     finalPaceCls = paceDiff >= 0 ? 'good' : 'danger';
   }
 
@@ -12989,27 +12998,17 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
           </thead>
           <tbody>
             <tr>
-              <td style="font-weight:700;">일반알람 <span style="font-size:10px; color:#64748b;">(알람·유지보수·블루스캔 산입)</span></td>
+              <td style="font-weight:700;">일반알람 (알람/유지보수/블루스캔)</td>
               <td class="center">${pAlarm.orderCount}건</td>
               <td class="num">${fmtK(pAlarm.orderAmount)}원</td>
               <td class="center">${Math.round((pAlarm.orderAmount/totalPOrdAmt)*100)}%</td>
               <td class="num">${fmtK(pAlarm.startAmount)}원</td>
               <td class="num" style="color:#64748b;">${fmtK(pAlarm.cancelAmount)}원</td>
-              <td class="num" style="color:${(pAlarm.priceUpAmount - pAlarm.priceDownAmount) >= 0 ? '#059669' : '#dc2626'}; font-weight:700;">${(pAlarm.priceUpAmount - pAlarm.priceDownAmount) >= 0 ? '+' : ''}${fmtK(pAlarm.priceUpAmount - pAlarm.priceDownAmount)}원</td>
+              <td class="num" style="color:#059669; font-weight:700;">+${fmtK(pAlarm.priceUpAmount - pAlarm.priceDownAmount)}원</td>
               <td class="num" style="font-weight:800; color:${pAlarm.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pAlarm.netAmount)}원</td>
             </tr>
-            <tr style="background:#f8fafc;">
-              <td style="padding-left:18px; font-weight:700; color:#2563eb;">└ 블루스캔 <span style="font-size:10px; color:#2563eb;">(자력영상·별도관리)</span></td>
-              <td class="center" style="color:#2563eb; font-weight:700;">${pBScan.orderCount}건</td>
-              <td class="num" style="color:#2563eb; font-weight:700;">${fmtK(pBScan.orderAmount)}원</td>
-              <td class="center" style="color:#2563eb;">${Math.round((pBScan.orderAmount/totalPOrdAmt)*100)}%</td>
-              <td class="num">${fmtK(pBScan.startAmount)}원</td>
-              <td class="num" style="color:#64748b;">${fmtK(pBScan.cancelAmount)}원</td>
-              <td class="num" style="color:#059669;">+${fmtK(pBScan.priceUpAmount - pBScan.priceDownAmount)}원</td>
-              <td class="num" style="font-weight:800; color:#2563eb;">+${fmtK(pBScan.netAmount)}원</td>
-            </tr>
             <tr>
-              <td style="font-weight:700;">디지털 <span style="font-size:10px; color:#6366f1;">(정보보안)</span></td>
+              <td style="font-weight:700;">디지털 (정보보안)</td>
               <td class="center">${pDigital.orderCount}건</td>
               <td class="num">${fmtK(pDigital.orderAmount)}원</td>
               <td class="center">${Math.round((pDigital.orderAmount/totalPOrdAmt)*100)}%</td>
@@ -13019,7 +13018,7 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
               <td class="num" style="font-weight:800; color:${pDigital.netAmount >= 0 ? '#059669' : '#dc2626'};">${fmtK(pDigital.netAmount)}원</td>
             </tr>
             <tr>
-              <td style="font-weight:700;">휴엔 <span style="font-size:10px; color:#0d9488;">(환경/방제)</span></td>
+              <td style="font-weight:700;">휴엔 (환경/방제)</td>
               <td class="center">${pHuen.orderCount}건</td>
               <td class="num">${fmtK(pHuen.orderAmount)}원</td>
               <td class="center">${Math.round((pHuen.orderAmount/totalPOrdAmt)*100)}%</td>
@@ -13180,7 +13179,7 @@ function buildCoachingAiReport_(d, ym, cat, rep){
     const industry = prof.industry || dRep.industry || '일반근생/기타';
     const pioneerRate = (prof.pioneerRate !== undefined) ? prof.pioneerRate : (dRep.pioneerRate || 0);
     const agencyRate = (prof.agencyRate !== undefined) ? prof.agencyRate : (dRep.agencyRate || 0);
-    const momPace = prof.momPace || dRep.momPace || '정상 유지';
+    const momPace = prof.momPace || dRep.momPace || '정상 유지 🔵';
     const startRate = (prof.startRate !== undefined) ? prof.startRate : (dRep.monthlyStartRate || 0);
     const cancelAmt = (prof.cancelAmount !== undefined) ? prof.cancelAmount : (dRep.cancelAmount || 0);
     const priceUpAmt = (prof.priceUpAmount !== undefined) ? prof.priceUpAmount : (dRep.priceUpAmount || 0);
@@ -13466,10 +13465,10 @@ function buildRiskAiReport_(d, ym, cat, rep){
   let defTag = '상쇄 미흡 ⚠️';
   let defTagCls = 'danger';
   if (defRatio >= 100) {
-    defTag = '완전 상쇄';
+    defTag = '완전 상쇄 🟢';
     defTagCls = 'good';
   } else if (defRatio >= 50) {
-    defTag = '부분 상쇄';
+    defTag = '부분 상쇄 🟡';
     defTagCls = 'warn';
   }
 
@@ -13481,15 +13480,15 @@ function buildRiskAiReport_(d, ym, cat, rep){
       <td class="num">${fmtK(r.amount)}천원</td>
       <td class="center" style="font-weight:700;">${r.pctAmount}%</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="4" class="center" style="padding:14px; color:#64748b;">당월 접수된 해약 내역이 없습니다. (안정 방어선 유지)</td></tr>';
+  }).join('') : '<tr><td colspan="4" class="center" style="padding:14px; color:#64748b;">당월 접수된 해약 내역이 없습니다. (안정 방어선 유지 🟢)</td></tr>';
 
-  let riskLevel = '안전 상태';
+  let riskLevel = '안전 상태 🟢';
   let riskDesc = '해약 소진율이 목표 한도 내에서 매우 안정적으로 통제되고 있습니다.';
   if (canPct > 100) {
-    riskLevel = '한도 초과 경고';
+    riskLevel = '한도 초과 경고 🔴';
     riskDesc = '유지감소 실적이 월간 목표 한도를 초과하여 순유지증가 달성에 적신호가 발생했습니다.';
   } else if (canPct > 80) {
-    riskLevel = '주의 관찰 단계';
+    riskLevel = '주의 관찰 단계 🟡';
     riskDesc = '유지감소 소진율이 80%를 넘어 잔여 기간 고액 해약 발생 시 한도 초과 위험이 있습니다.';
   }
 
