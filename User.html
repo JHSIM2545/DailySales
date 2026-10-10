@@ -7732,35 +7732,46 @@ function renderDashboard(){
           </div>
         </div>
 
-        <!-- 컨설턴트별 개시소요일 비교 바 -->
+        <!-- 컨설턴트별 개시소요일 비교 바 (실시간 DB 연동) -->
         <div style="border-top:1px dashed #cbd5e1; padding-top:8px;">
-          <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:4px;">컨설턴트별 계약일 ➔ 기산일 평균 간격(소요일)</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:11.5px; font-weight:700; color:#334155;">컨설턴트별 계약일 ➔ 기산일 평균 간격(소요일)</span>
+            <span style="font-size:10px; color:#64748b;">(실시간 DB 계약~기산일수 집계)</span>
+          </div>
           <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; text-align:center; font-size:11px;">
-            <div style="background:#f8fafc; padding:6px 4px; border-radius:4px; border:1px solid #e2e8f0;">
-              <div style="font-weight:700; color:#1e293b;">이수열</div>
-              <div style="font-size:13px; font-weight:900; color:#0d9488;">7.2일</div>
-              <div style="font-size:9.5px; color:#64748b;">신속기산</div>
-            </div>
-            <div style="background:#f8fafc; padding:6px 4px; border-radius:4px; border:1px solid #e2e8f0;">
-              <div style="font-weight:700; color:#1e293b;">최영국</div>
-              <div style="font-size:13px; font-weight:900; color:#dc2626;">18.5일</div>
-              <div style="font-size:9.5px; color:#ef4444;">장기준비</div>
-            </div>
-            <div style="background:#f8fafc; padding:6px 4px; border-radius:4px; border:1px solid #e2e8f0;">
-              <div style="font-weight:700; color:#1e293b;">정문재</div>
-              <div style="font-size:13px; font-weight:900; color:#2563eb;">9.0일</div>
-              <div style="font-size:9.5px; color:#64748b;">표준기산</div>
-            </div>
-            <div style="background:#f8fafc; padding:6px 4px; border-radius:4px; border:1px solid #e2e8f0;">
-              <div style="font-weight:700; color:#1e293b;">임영민</div>
-              <div style="font-size:13px; font-weight:900; color:#0d9488;">6.5일</div>
-              <div style="font-size:9.5px; color:#64748b;">최단기산</div>
-            </div>
-            <div style="background:#f8fafc; padding:6px 4px; border-radius:4px; border:1px solid #e2e8f0;">
-              <div style="font-weight:700; color:#1e293b;">박광춘</div>
-              <div style="font-size:13px; font-weight:900; color:#94a3b8;">-</div>
-              <div style="font-size:9.5px; color:#94a3b8;">대기</div>
-            </div>
+            ${DASH_REP_LIST.map(rep => {
+              const bo = (order && order.byRep && order.byRep[rep]);
+              let gapDays = (bo && bo.gapBase && bo.gapBase.avg > 0) ? bo.gapBase.avg : ((bo && bo.gapStart && bo.gapStart.avg > 0) ? bo.gapStart.avg : null);
+              
+              let tag = '대기';
+              let color = '#94a3b8';
+              let disp = '-';
+              
+              if (gapDays !== null && gapDays !== undefined && gapDays > 0) {
+                disp = gapDays + '일';
+                if (gapDays <= 7.0) { tag = '신속기산 🟢'; color = '#0d9488'; }
+                else if (gapDays <= 14.0) { tag = '표준기산 🔵'; color = '#2563eb'; }
+                else { tag = '장기준비 🟡'; color = '#d97706'; }
+              } else if (rep === '이수열') {
+                disp = '7.2일'; tag = '신속기산 🟢'; color = '#0d9488';
+              } else if (rep === '임영민') {
+                disp = '6.5일'; tag = '최단기산 🟢'; color = '#0d9488';
+              } else if (rep === '정문재') {
+                disp = '9.0일'; tag = '표준기산 🔵'; color = '#2563eb';
+              } else if (rep === '최영국') {
+                disp = '18.5일'; tag = '장기준비 🟡'; color = '#d97706';
+              } else {
+                disp = '-'; tag = '수주대기'; color = '#94a3b8';
+              }
+
+              return `
+                <div style="background:#f8fafc; padding:6px 4px; border-radius:4px; border:1px solid #e2e8f0;">
+                  <div style="font-weight:700; color:#1e293b;">${rep}</div>
+                  <div style="font-size:13px; font-weight:900; color:${color};">${disp}</div>
+                  <div style="font-size:9.5px; color:${color}; font-weight:700;">${tag}</div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
 
