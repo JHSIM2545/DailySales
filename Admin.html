@@ -2624,13 +2624,6 @@ function getTzToday() {
           if (gaps.length) avgGapDays = Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
         }
 
-        // 도메인 보정 수주주기 (데이터 건수 부족 시 특성 반영)
-        if (rep === '이수열' && (!avgGapDays || avgGapDays > 7)) avgGapDays = 4.2;
-        if (rep === '최영국' && (!avgGapDays || avgGapDays < 8)) avgGapDays = 12.5;
-        if (rep === '정문재' && (!avgGapDays || avgGapDays > 8)) avgGapDays = 5.8;
-        if (rep === '임영민' && !avgGapDays) avgGapDays = 7.5;
-        if (rep === '박광춘') avgGapDays = 0; // 신규 빌드업 단계
-
         // 수주 공백 일수
         const curDates = repCur.map(r => String(r.contract_date).slice(0, 10)).filter(Boolean).sort();
         let daysSinceLastOrder = 0;
@@ -2642,25 +2635,30 @@ function getTzToday() {
           daysSinceLastOrder = Math.max(0, Math.round((db - da) / 86400000));
         }
 
-        // 전월 대비 수주 페이스 (컨설턴트 공유용 독려 표현)
+        // 전월 대비 수주 페이스 (실제 수주 데이터 기반 판정)
         const estCurAmt = elDays > 0 ? Math.round((curAmt / elDays) * totDays) : curAmt;
+        const prevK_ = Math.round(prevAmt / 1000).toLocaleString();
+        const curK_ = Math.round(curAmt / 1000).toLocaleString();
         let momPace = '';
         let momDetail = '';
-        if (rep === '최영국' || (prevAmt >= 1000000 && curAmt <= 100000)) {
-          momPace = '대형 안건 클로징 준비 ⏳';
-          momDetail = `지난달(${prevCount}건, ${Math.round(prevAmt/1000).toLocaleString()}천원) 우수 실적에 이어 당월 대형 안건 협상 마무리 단계로 월중 클로징 기대`;
-        } else if (rep === '정문재' || (curCount >= 2 && curAmt > prevAmt * 1.1)) {
-          momPace = '수주 스피드 혁신';
-          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원) 대비 당월 수주 체결 속도와 활동성이 가파르게 향상되며 지사 성장 견인`;
-        } else if (rep === '박광춘') {
-          momPace = '도약 준비 빌드업 💡';
-          momDetail = `새로운 가망 고객 발굴과 방문 활동량 강화를 통해 첫 유효 수주를 준비하는 집중 빌드업 단계`;
+        if (curCount === 0 && prevCount === 0) {
+          momPace = '수주 이력 없음';
+          momDetail = '전월과 당월 모두 수주 실적이 없어 신규 가망 고객 발굴이 우선입니다';
+        } else if (curCount === 0) {
+          momPace = '당월 수주 대기';
+          momDetail = `지난달(${prevCount}건, ${prevK_}천원) 수주 이후 당월 수주는 아직 없습니다`;
+        } else if (prevAmt === 0) {
+          momPace = '당월 첫 수주';
+          momDetail = `전월 수주는 없었으나 당월 ${curCount}건, ${curK_}천원을 수주했습니다`;
+        } else if (estCurAmt >= prevAmt * 1.15) {
+          momPace = '전월 대비 가속';
+          momDetail = `지난달(${prevK_}천원) 대비 당월 수주 속도가 빨라 월말 환산 ${Math.round(estCurAmt / 1000).toLocaleString()}천원 수준입니다`;
         } else if (estCurAmt >= prevAmt * 0.85) {
           momPace = '전월 수준 유지';
-          momDetail = `지난달(${Math.round(prevAmt/1000).toLocaleString()}천원)과 유사한 안정적인 수주 페이스 지속`;
+          momDetail = `지난달(${prevK_}천원)과 유사한 수주 페이스입니다`;
         } else {
-          momPace = '페이스 조율 단계';
-          momDetail = `안정적인 실적 페이스 회복을 위한 가망 고객 상담 확대 단계`;
+          momPace = '전월 대비 둔화';
+          momDetail = `지난달(${prevK_}천원) 대비 수주 진척이 둔화되어 월말 환산 ${Math.round(estCurAmt / 1000).toLocaleString()}천원 수준입니다`;
         }
 
         // 영업동기 (개척 vs 대리점)
@@ -2678,8 +2676,6 @@ function getTzToday() {
           pioneerRate = Math.round((allPio / allAmt) * 100);
           agencyRate = 100 - pioneerRate;
         }
-        if (rep === '최영국') { pioneerRate = 100; agencyRate = 0; }
-        if (rep === '이수열' && agencyRate === 0) { agencyRate = 80; pioneerRate = 20; }
 
         // 해약(유지감소) 및 유증(유지증가)
         const repCancels = (allCancels || []).filter(r => String(r.rep_name || '').trim() === rep && r.confirm_date && String(r.confirm_date).slice(0, 7) === curYm);
@@ -2696,31 +2692,40 @@ function getTzToday() {
         const startRate = curCount ? Math.round((startOrders.length / curCount) * 100) : 0;
         const contributionRate = totalBranchOrdAmt ? Math.round((curAmt / totalBranchOrdAmt) * 100) : 0;
 
-        // 원팀 독려형 컨설턴트 영업 스타일 (긍정적·동기부여적 표현)
+        // 컨설턴트 영업 스타일: 실제 수주 데이터로 판정 (이름별 고정 문구 사용 안 함)
         let archetype = '';
         let archetypeTitle = '';
         let archetypeDesc = '';
-
-        if (rep === '이수열') {
-          archetype = '안정적 고빈도 볼륨 리더 ⚖️';
-          archetypeTitle = '수주 주기 균등·지사 수주 견인차';
-          archetypeDesc = '전 기간 약 4~5일 간격으로 고른 수주 리듬을 유지하며 대리점 협업을 통해 지사 수주 1위(65%)를 든든하게 견인하는 주역. 조기 기산 전환과 자력 개척 시너지를 결합해 지사 완성형 롤모델로 도약 기대';
-        } else if (rep === '최영국') {
+        const unitMan_ = Math.round((((curAvg || allAvg) || 0) / 10000) * 10) / 10;
+        const gapTxt_ = avgGapDays > 0 ? (avgGapDays + '일') : '산정 불가';
+        if (allAvg >= 650000 || curAvg >= 650000) {
           archetype = '대형 프로젝트 스페셜리스트 🏢';
-          archetypeTitle = '대형 안건 전문·자력 개척 강자';
-          archetypeDesc = '전 기간 건당 평균 89만원의 대형 프로젝트를 성사시키는 대형 안건 전문가이며 100% 자력 개척의 모범. 월초 준비 호흡에 이어 월중 대형 안건 클로징을 앞두고 있어 관리자 1:1 동행 시 강력한 축포 기대';
-        } else if (rep === '정문재') {
+          archetypeTitle = '대형 안건 전문';
+          archetypeDesc = `건당 평균 ${unitMan_}만원의 대형 안건 수주 이력(전 기간 ${allCount}건, 누적 단가 ${Math.round(allAvg / 10000 * 10) / 10}만원)`;
+        } else if (allCount >= 18 || (curAmt >= 2000000 && curCount >= 5)) {
+          archetype = '안정적 고빈도 볼륨 리더 ⚖️';
+          archetypeTitle = '수주 볼륨 견인';
+          archetypeDesc = `전 기간 ${allCount}건, 수주 주기 ${gapTxt_}, 당월 지사 수주 기여도 ${contributionRate}%`;
+        } else if (curCount >= 3 && avgGapDays > 0 && avgGapDays <= 7) {
           archetype = '모멘텀 고속 성장 에이스 🚀';
-          archetypeTitle = '수주 스피드 혁신·지사 성장 엔진';
-          archetypeDesc = '9월 대비 10월 수주 주기를 5.8일로 대폭 단축하고 3건 150만원을 달성하며 지사 내 가장 가파른 스피드 혁신을 입증. 높은 자력 개척(90%)과 부가 솔루션 결합을 통해 지사의 핵심 주역으로 비상';
-        } else if (rep === '박광춘') {
-          archetype = '신규 도약 잠재력 빌드업 🎯';
-          archetypeTitle = '잠재력 재점화·원팀 집중 서포트 대상';
-          archetypeDesc = '새로운 가망 고객 발굴과 파이프라인을 재정비하는 소중한 빌드업 기간. 지사 전원이 한마음으로 1:1 멘토링과 현장 동행을 지원하여 성공적인 첫 결실을 함께 만들어갈 소중한 동반자';
-        } else {
+          archetypeTitle = '수주 스피드 우수';
+          archetypeDesc = `당월 ${curCount}건 수주, 수주 주기 ${gapTxt_}로 빠른 수주 리듬`;
+        } else if (startRate >= 80 && curCount > 0) {
           archetype = '현장 밀착형 신뢰 파트너 🏃';
-          archetypeTitle = '지역 기반 개척·개시율 100% 모범';
-          archetypeDesc = '지역 현장 밀착형 자력 개척(85%)과 개시율 100%의 높은 실행력으로 지사의 든든한 기반을 지탱하는 신뢰의 파트너';
+          archetypeTitle = '개시율 우수';
+          archetypeDesc = `당월 수주 개시율 ${startRate}%, 당월 ${curCount}건 수주`;
+        } else if (curCount === 0) {
+          archetype = '신규 도약 잠재력 빌드업 🎯';
+          archetypeTitle = '당월 수주 대기';
+          archetypeDesc = `당월 수주 0건(전 기간 ${allCount}건). 가망 파이프라인 점검 및 동행 영업 대상`;
+        } else if (pioneerRate >= 65) {
+          archetype = '자력 개척 스페셜리스트 🧭';
+          archetypeTitle = '자력 개척 중심';
+          archetypeDesc = `당월 자력 개척 비중 ${pioneerRate}%`;
+        } else {
+          archetype = '협업 시너지 파트너 🤝';
+          archetypeTitle = '대리점 협업 중심';
+          archetypeDesc = `당월 대리점 협업 비중 ${agencyRate}%, 자력 개척 비중 ${pioneerRate}%`;
         }
 
         profiles[rep] = {
@@ -3021,8 +3026,25 @@ function getTzToday() {
           archetypeDesc = '단가도 작고 수주 공백 기간마저 긴 정체형 (활동량 긴급 점검 및 1:1 동행 영업 대상)';
         }
 
+        // 개시시기별 비중(기산일 기준, 금액 가중): 당월/익월/2개월/3개월+/미정
+        const stDefs = [ { key: 'cur', label: '당월' }, { key: 'next', label: '익월' }, { key: 'two', label: '2개월' }, { key: 'three', label: '3개월+' }, { key: 'none', label: '미정' } ];
+        const stMap = {};
+        stDefs.forEach(b => { stMap[b.key] = { key: b.key, label: b.label, count: 0, amount: 0, pct: 0 }; });
+        list.forEach(r => {
+          const fee = safeNum_(r.monthly_fee);
+          const bd = r.billing_date ? String(r.billing_date).slice(0, 7) : '';
+          let sk = 'none';
+          if (/^\d{4}-\d{2}$/.test(bd)) {
+            const diffM = (Number(bd.slice(0, 4)) - yy) * 12 + (Number(bd.slice(5, 7)) - mm);
+            sk = diffM <= 0 ? 'cur' : (diffM === 1 ? 'next' : (diffM === 2 ? 'two' : 'three'));
+          }
+          stMap[sk].count++; stMap[sk].amount += fee;
+        });
+        stDefs.forEach(b => { stMap[b.key].pct = total ? Math.round((stMap[b.key].amount / total) * 100) : 0; });
+        const startTiming = { total: total, buckets: stDefs.map(b => stMap[b.key]) };
+
         return {
-          count: list.length, amount: total, avgAmount: avg,
+          count: list.length, amount: total, avgAmount: avg, startTiming: startTiming,
           byMotive: motive.list, byProduct: product.list,
           gapStart: { avg: avgOf(gapStart), buckets: bucketize(gapStart) },
           gapBase: { avg: avgOf(gapBase), buckets: bucketize(gapBase) },
@@ -3187,6 +3209,10 @@ function getTzToday() {
         };
       });
 
+      // 안전상품 수주/매출 월 집계(상품일보 기반, 천원) - 종합대시보드 안전상품 카드/진단 문구용
+      let safetySummary = null;
+      try { safetySummary = await Backend.getSafetyProductSummary(token, ym); } catch(e) { safetySummary = null; }
+
       // 사업팀 16개 지사 벤치마크 데이터 연동
       let bizTeamRes = { success: true, found: false };
       try {
@@ -3203,6 +3229,7 @@ function getTzToday() {
         priceDown: Object.assign({ success: true, yearMonth: ym }, priceDownPayload),
         bizTeam: bizTeamRes,
         productMetrics: productMetrics,
+        safetySummary: safetySummary,
         repProfiles: repProfiles
       };
     },
@@ -7934,27 +7961,32 @@ function renderDashboard(){
   if (status.error) { document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + status.error + '</div>'; return; }  
   
   const [y, m] = DASH_YM.split('-').map(Number);
-  const isOct2026 = (DASH_YM === '2026-10');
-  const isSep2026 = (DASH_YM === '2026-09');
-  const isNov2026 = (DASH_YM === '2026-11');
-  const isDec2026 = (DASH_YM === '2026-12');
-  const isFutureMonth = (DASH_YM > '2026-10');
-  const isPastMonth = (DASH_YM < '2026-10');
+  // 월 구분은 하드코딩된 특정 월이 아니라 "오늘이 속한 월"과 비교해서 판단한다.
+  const todayYm_ = (typeof getTzToday === 'function' ? getTzToday() : new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const isCurMonth = (DASH_YM === todayYm_);
+  const isFutureMonth = (DASH_YM > todayYm_);
+  const isPastMonth = (DASH_YM < todayYm_);
 
-  const working = (d.working && d.working.info) || { 
-    totalWorkingDays: 20, 
-    elapsedWorkingDays: isPastMonth ? 20 : (isOct2026 ? 5 : 0), 
-    ratio: isPastMonth ? 100 : (isOct2026 ? 25 : 0) 
-  };  
+  const working = (d.working && d.working.info) || { totalWorkingDays: 0, elapsedWorkingDays: 0, ratio: 0 };
+  const workRatio = Number(working.ratio) || 0;
+  const elDays = Number(working.elapsedWorkingDays) || 0;
+  const totDays = Number(working.totalWorkingDays) || 0;
 
-  const order = d.order || { overall: {}, byRep: {} };  
-  const cancel = d.cancel || { overall: {}, byRep: {} };  
-  const priceUp = d.priceUp || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };  
-  const priceDown = d.priceDown || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };  
-  const target = status.target || {};  
+  const order = d.order || { overall: {}, byRep: {} };
+  const cancel = d.cancel || { overall: {}, byRep: {} };
+  const priceUp = d.priceUp || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };
+  const priceDown = d.priceDown || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };
+  const target = status.target || {};
   const actual = status.actual || {};
   const repMetrics = status.repMetrics || {};
-  const repTargets = status.repTargets || {};  
+  const repTargets = status.repTargets || {};
+  const productMetrics = d.productMetrics || {};
+
+  // ---- 공용 계산 헬퍼 ----
+  function pct1_(a, b) { return b ? Math.round((a / b) * 1000) / 10 : 0; }
+  function sgn_(v) { return (v > 0 ? '+' : '') + v; } // %p 등 소수 값용
+  function sgnK_(v) { return (v > 0 ? '+' : '') + fmtK(v); } // 천원 값용(천단위 콤마)
+  function k_(won) { return Math.round((Number(won) || 0) / 1000); } // 원 -> 천원
 
   // 신호등 색상 헬퍼 함수
   function getTrafficColorBizTeam(myVal, teamAvg) {
@@ -7969,301 +8001,239 @@ function renderDashboard(){
     return { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '미달' };
   }
 
-  // ==================== 1. 월별 핵심 지표 (10월, 11월, 12월, 9월 등 완벽 동적 분기) ====================
-  let ordAmt = 0, ordTgt = 3800, ordPct = 0, ordRank = '11위 / 16개', ordTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
-  let startAmt = 0, startTgt = 2800, startPct = 0, startRank = '16위 (최하위)', startTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
-  let netAmt = 0, netTgt = 1313, netPct = 0, netRank = '13위 / 16개', netTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '위험' };
-  let safeOrdAmt = 0, safeOrdTgt = 34000, safeOrdPct = 0, safeOrdTraffic = { bg: '#ccfbf1', text: '#0f766e', dot: '#0d9488', label: '양호' };
-  let safeSaleAmt = 0, safeSaleTgt = 34000, safeSalePct = 0, safeSaleTraffic = { bg: '#fee2e2', text: '#991b1b', dot: '#ef4444', label: '미달' };
-  
-  let viewModeTitle = `${y}년 ${m}월 기준`;
-  let guidelineHeaderTitle = `${y}년 ${m}월 북서울지사 종합 전략 가이드라인`;
-  let guidelineBadge = '전략 관제 일체형';
+  // ==================== 1. 월별 핵심 지표 (전부 DB 실데이터 기반) ====================
+  // 사업팀 16개 지사 벤치마크: 조회 월과 사업팀 데이터 기준월이 같을 때만 순위/평균을 사용한다.
+  let biz = null;
+  try { biz = analyzeBizTeamBenchmark_(getBizTeamBenchmarkData_(d), '북서울'); } catch (e) { biz = null; }
+  if (biz && String(biz.date || '').slice(0, 7) !== DASH_YM) biz = null;
+  const bizTotal = biz ? biz.totalBranches : 0;
+  function rankText_(mt) { return (biz && mt && mt.myRank > 0) ? (mt.myRank + '위 / ' + bizTotal + '개') : '순위 데이터 없음'; }
 
-  if (isOct2026) {
-    // 10월 당월 확정 현황
-    viewModeTitle = '10월 5영업일 경과 (25%) 기준';
-    guidelineHeaderTitle = '10월 북서울지사 AI 종합 영업전략 가이드라인';
-    guidelineBadge = '현황·원인·전망·대책 일체형';
+  const ordAmt = Number(actual.수주) || 0;
+  const ordTgt = Number(target.목표_수주금액) || 0;
+  const ordPct = pct1_(ordAmt, ordTgt);
+  const ordRank = rankText_(biz && biz.ord);
+  const ordTraffic = biz ? getTrafficColorBizTeam(ordPct, biz.ord.avgVal) : getTrafficColorWorking(ordPct, workRatio);
 
-    ordAmt = 1400; ordTgt = 3800; ordPct = 37.0; ordRank = '11위 / 16개';
-    ordTraffic = getTrafficColorBizTeam(37.0, 62.0);
+  const startAmt = Number(actual.개시) || 0;
+  const startTgt = Number(target.목표_개시금액) || 0;
+  const startPct = pct1_(startAmt, startTgt);
+  const startRank = rankText_(biz && biz.start);
+  const startTraffic = biz ? getTrafficColorBizTeam(startPct, biz.start.avgVal) : getTrafficColorWorking(startPct, workRatio);
 
-    startAmt = 250; startTgt = 2800; startPct = 9.0; startRank = '16위 (최하위)';
-    startTraffic = getTrafficColorBizTeam(9.0, 25.0);
+  const netAmt = Number(actual.유지증가) || 0;
+  const netTgt = Number(target.목표_유지증가) || 0;
+  const netPct = netTgt !== 0 ? Math.round((netAmt / netTgt) * 1000) / 10 : 0;
+  const netRank = rankText_(biz && biz.net);
+  const netTraffic = biz ? getTrafficColorBizTeam(netPct, biz.net.avgVal) : getTrafficColorWorking(netPct, workRatio);
 
-    netAmt = -1255; netTgt = 1313; netPct = -96.0; netRank = '13위 / 16개';
-    netTraffic = getTrafficColorBizTeam(-96.0, 25.0);
+  // 안전상품 수주/매출: 상품일보 기반 월 집계(getSafetyProductSummary, 단위 천원)
+  const ss = (d.safetySummary && d.safetySummary.success !== false) ? d.safetySummary : null;
+  const hasSafety = !!ss;
+  const safeOrdAmt = ss ? (Number((ss.실적 || {}).수주) || 0) : 0;
+  const safeOrdTgt = ss ? (Number((ss.목표 || {}).수주) || 0) : 0;
+  const safeSaleAmt = ss ? (Number((ss.실적 || {}).매출) || 0) : 0;
+  const safeSaleTgt = ss ? (Number((ss.목표 || {}).매출) || 0) : 0;
+  const safeOrdPct = pct1_(safeOrdAmt, safeOrdTgt);
+  const safeSalePct = pct1_(safeSaleAmt, safeSaleTgt);
+  const safeOrdTraffic = getTrafficColorWorking(safeOrdPct, workRatio);
+  const safeSaleTraffic = getTrafficColorWorking(safeSalePct, workRatio);
 
-    safeOrdAmt = 12324; safeOrdTgt = 34000; safeOrdPct = 36.0;
-    safeOrdTraffic = getTrafficColorWorking(36.0, 25.0);
+  const viewModeTitle = isCurMonth
+    ? (m + '월 ' + elDays + '영업일 경과 (' + workRatio + '%) 기준')
+    : (isPastMonth ? (m + '월 최종 실적 마감 기준') : (m + '월 (실적 집계 전)'));
+  const guidelineHeaderTitle = `${y}년 ${m}월 북서울지사 AI 종합 영업전략 가이드라인`;
+  const guidelineBadge = isCurMonth ? '현황·원인·전망·대책 일체형' : (isPastMonth ? '실적 마감 평가' : '차월 선행 점검');
 
-    safeSaleAmt = 445; safeSaleTgt = 34000; safeSalePct = 1.3;
-    safeSaleTraffic = getTrafficColorWorking(1.3, 25.0);
-  } else if (isNov2026) {
-    // 11월 사전 전망 및 파이프라인
-    viewModeTitle = '11월 사전 파이프라인 및 목표 전망';
-    guidelineHeaderTitle = '11월 조기 수주 및 개시 전환 전략 가이드라인';
-    guidelineBadge = '차월 조기기산 집중';
-
-    ordAmt = 2150; ordTgt = 4200; ordPct = 51.2; ordRank = '8위 / 16개';
-    ordTraffic = getTrafficColorBizTeam(51.2, 55.0);
-
-    startAmt = 1150; startTgt = 2800; startPct = 41.1; startRank = '12위 / 16개';
-    startTraffic = getTrafficColorWorking(41.1, 40.0);
-
-    netAmt = 350; netTgt = 1400; netPct = 25.0; netRank = '9위 / 16개';
-    netTraffic = getTrafficColorBizTeam(25.0, 30.0);
-
-    safeOrdAmt = 16800; safeOrdTgt = 35000; safeOrdPct = 48.0;
-    safeOrdTraffic = getTrafficColorWorking(48.0, 40.0);
-
-    safeSaleAmt = 9200; safeSaleTgt = 35000; safeSalePct = 26.3;
-    safeSaleTraffic = getTrafficColorWorking(26.3, 30.0);
-  } else if (isDec2026) {
-    // 12월 연말 마감 목표 및 수주 전망
-    viewModeTitle = '12월 연말 최종 마감 목표 전망';
-    guidelineHeaderTitle = '12월 연간 목표 완수 및 유증 총력전 가이드라인';
-    guidelineBadge = '연말 총력 마감';
-
-    ordAmt = 3600; ordTgt = 4500; ordPct = 80.0; ordRank = '5위 / 16개';
-    ordTraffic = getTrafficColorBizTeam(80.0, 75.0);
-
-    startAmt = 2400; startTgt = 3000; startPct = 80.0; startRank = '6위 / 16개';
-    startTraffic = getTrafficColorWorking(80.0, 75.0);
-
-    netAmt = 1600; netTgt = 1500; netPct = 106.7; netRank = '4위';
-    netTraffic = getTrafficColorBizTeam(106.7, 80.0);
-
-    safeOrdAmt = 28500; safeOrdTgt = 36000; safeOrdPct = 79.2;
-    safeOrdTraffic = getTrafficColorWorking(79.2, 75.0);
-
-    safeSaleAmt = 22100; safeSaleTgt = 36000; safeSalePct = 61.4;
-    safeSaleTraffic = getTrafficColorWorking(61.4, 60.0);
-  } else if (isSep2026) {
-    // 9월 전월 실적 마감
-    viewModeTitle = '9월 최종 실적 마감 완료';
-    guidelineHeaderTitle = '9월 실적 평가 및 10월 연계 전략 가이드라인';
-    guidelineBadge = '실적 마감 완료';
-
-    ordAmt = 3850; ordTgt = 3800; ordPct = 101.3; ordRank = '2위';
-    ordTraffic = getTrafficColorBizTeam(101.3, 62.0);
-
-    startAmt = 2750; startTgt = 2800; startPct = 98.2; startRank = '5위';
-    startTraffic = getTrafficColorWorking(98.2, 100.0);
-
-    netAmt = 1280; netTgt = 1313; netPct = 97.5; netRank = '4위';
-    netTraffic = getTrafficColorBizTeam(97.5, 70.0);
-
-    safeOrdAmt = 47299; safeOrdTgt = 34500; safeOrdPct = 137.1;
-    safeOrdTraffic = getTrafficColorWorking(137.1, 100.0);
-
-    safeSaleAmt = 36594; safeSaleTgt = 34500; safeSalePct = 106.1;
-    safeSaleTraffic = getTrafficColorWorking(106.1, 100.0);
+  // ---- 지표 카드 하단 보조 문구 (데이터 기반) ----
+  const diffOrd = Math.round((ordPct - workRatio) * 10) / 10;
+  let ordSubHtml;
+  if (biz) {
+    const g = biz.ord.gap;
+    ordSubHtml = `서울사업팀 평균(${biz.ord.avgVal}%) 대비 <strong style="color:${g >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(g)}%p</strong>`;
+  } else if (isFutureMonth) {
+    ordSubHtml = `${m}월 수주 집계 전`;
   } else {
-    // 기타 월 (실제 DB 계산 또는 기본값)
-    ordAmt = Number(actual.수주) || (isFutureMonth ? 1800 : 3200);
-    ordTgt = Number(target.목표_수주금액 || target.목표_수주) || 4000;
-    ordPct = ordTgt > 0 ? Math.round((ordAmt / ordTgt) * 1000) / 10 : 0;
-    ordRank = isFutureMonth ? '수주 대기' : '서울사업팀 마감';
-    ordTraffic = getTrafficColorBizTeam(ordPct, 60.0);
-
-    startAmt = Number(actual.개시) || (isFutureMonth ? 900 : 2200);
-    startTgt = Number(target.목표_개시금액 || target.목표_개시) || 2800;
-    startPct = startTgt > 0 ? Math.round((startAmt / startTgt) * 1000) / 10 : 0;
-    startRank = isFutureMonth ? '개시 대기' : '개시 마감';
-    startTraffic = getTrafficColorWorking(startPct, isPastMonth ? 100 : 50);
-
-    netAmt = Number(actual.유지증가 || actual.순증) || (isFutureMonth ? 100 : 800);
-    netTgt = Number(target.목표_유지증가 || target.목표_순증) || 1300;
-    netPct = netTgt !== 0 ? Math.round((netAmt / netTgt) * 1000) / 10 : 0;
-    netRank = isFutureMonth ? '유증 전망' : '유증 마감';
-    netTraffic = getTrafficColorBizTeam(netPct, 50.0);
-
-    safeOrdAmt = isFutureMonth ? 15000 : 30000; safeOrdTgt = 35000; safeOrdPct = Math.round((safeOrdAmt/safeOrdTgt)*100);
-    safeSaleAmt = isFutureMonth ? 7000 : 25000; safeSaleTgt = 35000; safeSalePct = Math.round((safeSaleAmt/safeSaleTgt)*100);
-    safeOrdTraffic = getTrafficColorWorking(safeOrdPct, isPastMonth ? 100 : 50);
-    safeSaleTraffic = getTrafficColorWorking(safeSalePct, isPastMonth ? 100 : 50);
+    ordSubHtml = `영업일 진척(${workRatio}%) 대비 <strong style="color:${diffOrd >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffOrd)}%p</strong> (사업팀 데이터 미등록)`;
   }
 
-  // ==================== 2. 컨설턴트별 수주 실적 (월별 동적 변경) ====================
-  let repRankings = [];
-  if (isOct2026) {
-    repRankings = [
-      { rank: 1, name: '이수열', orderAmt: 650, orderCount: 3, unitAmt: 21.7, cumUnitAmt: 35.2, period: 4.2, zeroDays: 0, motive: '대리점 100%', style: '안정적 볼륨 리더 ⚖️', leadTime: '7.2일', leadTag: '신속기산' },
-      { rank: 2, name: '최영국', orderAmt: 420, orderCount: 1, unitAmt: 42.0, cumUnitAmt: 89.0, period: 8.4, zeroDays: 2, motive: '자력 100%', style: '대형 스페셜리스트 🏢', leadTime: '18.5일', leadTag: '장기준비' },
-      { rank: 3, name: '정문재', orderAmt: 210, orderCount: 1, unitAmt: 21.0, cumUnitAmt: 38.5, period: 5.8, zeroDays: 1, motive: '자력 60%', style: '고속 성장 에이스 🚀', leadTime: '9.0일', leadTag: '표준기산' },
-      { rank: 4, name: '임영민', orderAmt: 120, orderCount: 1, unitAmt: 12.0, cumUnitAmt: 34.0, period: 6.5, zeroDays: 2, motive: '자력 85%', style: '지역밀착 베테랑 🛡️', leadTime: '6.5일', leadTag: '최단기산' },
-      { rank: 5, name: '박광춘', orderAmt: 0, orderCount: 0, unitAmt: 0, cumUnitAmt: 32.0, period: 14.0, zeroDays: 5, motive: '자력 100%', style: '신시장 도약 주자 🌱', leadTime: '-', leadTag: '수주대기' }
-    ];
-  } else if (isNov2026) {
-    repRankings = [
-      { rank: 1, name: '이수열', orderAmt: 950, orderCount: 4, unitAmt: 23.8, cumUnitAmt: 35.2, period: 3.8, zeroDays: 0, motive: '대리점 100%', style: '안정적 볼륨 리더 ⚖️', leadTime: '7.0일', leadTag: '신속기산' },
-      { rank: 2, name: '최영국', orderAmt: 550, orderCount: 2, unitAmt: 27.5, cumUnitAmt: 89.0, period: 7.2, zeroDays: 1, motive: '자력 100%', style: '대형 스페셜리스트 🏢', leadTime: '14.2일', leadTag: '표준기산' },
-      { rank: 3, name: '정문재', orderAmt: 380, orderCount: 2, unitAmt: 19.0, cumUnitAmt: 38.5, period: 5.0, zeroDays: 0, motive: '자력 70%', style: '고속 성장 에이스 🚀', leadTime: '8.5일', leadTag: '표준기산' },
-      { rank: 4, name: '임영민', orderAmt: 270, orderCount: 2, unitAmt: 13.5, cumUnitAmt: 34.0, period: 6.0, zeroDays: 1, motive: '자력 85%', style: '지역밀착 베테랑 🛡️', leadTime: '6.2일', leadTag: '최단기산' },
-      { rank: 5, name: '박광춘', orderAmt: 0, orderCount: 0, unitAmt: 0, cumUnitAmt: 32.0, period: 12.0, zeroDays: 3, motive: '자력 100%', style: '신시장 도약 주자 🌱', leadTime: '-', leadTag: '수주대기' }
-    ];
-  } else if (isDec2026) {
-    repRankings = [
-      { rank: 1, name: '이수열', orderAmt: 1450, orderCount: 6, unitAmt: 24.2, cumUnitAmt: 35.2, period: 3.2, zeroDays: 0, motive: '대리점 100%', style: '안정적 볼륨 리더 ⚖️', leadTime: '6.8일', leadTag: '신속기산' },
-      { rank: 2, name: '최영국', orderAmt: 980, orderCount: 3, unitAmt: 32.7, cumUnitAmt: 89.0, period: 6.5, zeroDays: 0, motive: '자력 100%', style: '대형 스페셜리스트 🏢', leadTime: '12.0일', leadTag: '표준기산' },
-      { rank: 3, name: '정문재', orderAmt: 620, orderCount: 3, unitAmt: 20.7, cumUnitAmt: 38.5, period: 4.8, zeroDays: 0, motive: '자력 65%', style: '고속 성장 에이스 🚀', leadTime: '8.0일', leadTag: '표준기산' },
-      { rank: 4, name: '임영민', orderAmt: 350, orderCount: 2, unitAmt: 17.5, cumUnitAmt: 34.0, period: 5.5, zeroDays: 1, motive: '자력 80%', style: '지역밀착 베테랑 🛡️', leadTime: '6.0일', leadTag: '최단기산' },
-      { rank: 5, name: '박광춘', orderAmt: 200, orderCount: 1, unitAmt: 20.0, cumUnitAmt: 32.0, period: 9.0, zeroDays: 2, motive: '자력 100%', style: '신시장 첫 수주 🌟', leadTime: '7.5일', leadTag: '신속기산' }
-    ];
-  } else if (isSep2026) {
-    repRankings = [
-      { rank: 1, name: '이수열', orderAmt: 1650, orderCount: 7, unitAmt: 23.6, cumUnitAmt: 35.2, period: 3.0, zeroDays: 0, motive: '대리점 100%', style: '안정적 볼륨 리더 ⚖️', leadTime: '7.1일', leadTag: '신속기산' },
-      { rank: 2, name: '최영국', orderAmt: 1100, orderCount: 3, unitAmt: 36.7, cumUnitAmt: 89.0, period: 6.0, zeroDays: 0, motive: '자력 100%', style: '대형 스페셜리스트 🏢', leadTime: '15.0일', leadTag: '장기준비' },
-      { rank: 3, name: '정문재', orderAmt: 580, orderCount: 3, unitAmt: 19.3, cumUnitAmt: 38.5, period: 5.2, zeroDays: 0, motive: '자력 60%', style: '고속 성장 에이스 🚀', leadTime: '8.8일', leadTag: '표준기산' },
-      { rank: 4, name: '임영민', orderAmt: 320, orderCount: 2, unitAmt: 16.0, cumUnitAmt: 34.0, period: 6.2, zeroDays: 0, motive: '자력 85%', style: '지역밀착 베테랑 🛡️', leadTime: '6.4일', leadTag: '최단기산' },
-      { rank: 5, name: '박광춘', orderAmt: 200, orderCount: 1, unitAmt: 20.0, cumUnitAmt: 32.0, period: 10.0, zeroDays: 1, motive: '자력 100%', style: '신시장 개척 🎯', leadTime: '8.0일', leadTag: '신속기산' }
-    ];
+  const diffStart = Math.round((startPct - workRatio) * 10) / 10;
+  const startSubHtml = isFutureMonth
+    ? `${m}월 개시 집계 전`
+    : `경과일수(${elDays}/${totDays}일, ${workRatio}%) 대비 <strong style="color:${diffStart >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffStart)}%p ${diffStart >= 0 ? '초과' : '미달'}</strong>`;
+
+  const cancelCntOv = Number((cancel.overall || {}).count) || 0;
+  const cancelAmtK = k_((cancel.overall || {}).amount);
+  const priceUpK = k_((priceUp.overall || {}).amount);
+  const priceDownK = k_((priceDown.overall || {}).amount);
+  const projNet = (isCurMonth && elDays > 0 && totDays > 0) ? Math.round((netAmt / elDays) * totDays) : null;
+  const projNetPct = (projNet !== null && netTgt !== 0) ? Math.round((projNet / netTgt) * 1000) / 10 : null;
+  const netSubHtml = isFutureMonth
+    ? `${m}월 유지증가 집계 전`
+    : `해약 ${cancelCntOv}건 ${fmtK(cancelAmtK)}천원 | 인상 ${fmtK(priceUpK)}천원 · 인하 ${fmtK(priceDownK)}천원` +
+      (projNet !== null ? ` | 현 페이스 월말 환산: <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원${projNetPct !== null ? ' (' + projNetPct + '%)' : ''}</strong>` : '');
+
+  let safeSubHtml;
+  if (!hasSafety) {
+    safeSubHtml = '상품일보 집계 데이터 없음';
   } else {
-    repRankings = [
-      { rank: 1, name: '이수열', orderAmt: Math.round(ordAmt * 0.45), orderCount: 3, unitAmt: 22.0, cumUnitAmt: 35.2, period: 4.0, zeroDays: 0, motive: '대리점 100%', style: '안정적 볼륨 리더 ⚖️', leadTime: '7.2일', leadTag: '신속기산' },
-      { rank: 2, name: '최영국', orderAmt: Math.round(ordAmt * 0.30), orderCount: 1, unitAmt: 40.0, cumUnitAmt: 89.0, period: 8.0, zeroDays: 1, motive: '자력 100%', style: '대형 스페셜리스트 🏢', leadTime: '15.0일', leadTag: '장기준비' },
-      { rank: 3, name: '정문재', orderAmt: Math.round(ordAmt * 0.15), orderCount: 1, unitAmt: 20.0, cumUnitAmt: 38.5, period: 5.5, zeroDays: 1, motive: '자력 60%', style: '고속 성장 에이스 🚀', leadTime: '9.0일', leadTag: '표준기산' },
-      { rank: 4, name: '임영민', orderAmt: Math.round(ordAmt * 0.10), orderCount: 1, unitAmt: 15.0, cumUnitAmt: 34.0, period: 6.5, zeroDays: 1, motive: '자력 85%', style: '지역밀착 베테랑 🛡️', leadTime: '6.5일', leadTag: '최단기산' },
-      { rank: 5, name: '박광춘', orderAmt: 0, orderCount: 0, unitAmt: 0, cumUnitAmt: 32.0, period: 14.0, zeroDays: 4, motive: '자력 100%', style: '신시장 도약 주자 🌱', leadTime: '-', leadTag: '수주대기' }
-    ];
+    const dO = Math.round((safeOrdPct - workRatio) * 10) / 10;
+    const dS = Math.round((safeSalePct - workRatio) * 10) / 10;
+    safeSubHtml = `수주스피드: 영업일(${workRatio}%) 대비 <strong style="color:${dO >= 0 ? '#0d9488' : '#ef4444'};">${dO >= 0 ? '양호' : '미달'}</strong> | 매출: 영업일 대비 <strong style="color:${dS >= 0 ? '#0d9488' : '#ef4444'};">${dS >= 0 ? '양호' : '미달'}</strong>`;
   }
 
-
-  // 실제 DB에 등록된 계약~기산 소요일이 있으면 실시간 반영
-  repRankings.forEach(r => {
-    const bo = (order && order.byRep && order.byRep[r.name]);
-    if (bo && bo.gapBase && typeof bo.gapBase.avg === 'number' && bo.gapBase.avg > 0) {
-      r.leadTime = bo.gapBase.avg + '일';
-      r.leadTag = bo.gapBase.avg <= 7 ? '신속기산' : (bo.gapBase.avg <= 14 ? '표준기산' : '장기준비');
-    } else if (bo && bo.gapStart && typeof bo.gapStart.avg === 'number' && bo.gapStart.avg > 0) {
-      r.leadTime = bo.gapStart.avg + '일';
-      r.leadTag = bo.gapStart.avg <= 7 ? '신속기산' : (bo.gapStart.avg <= 14 ? '표준기산' : '장기준비');
+  // ==================== 2. 컨설턴트별 수주 실적 (DB 실데이터) ====================
+  const repRankings = DASH_REP_LIST.map(function (rep) {
+    const bo = (order.byRep && order.byRep[rep]) || {};
+    const rm = repMetrics[rep] || {};
+    const cnt = Number(bo.count) || 0;
+    const pio = Number(bo.pioneerRate) || 0;
+    const agn = Number(bo.agencyRate) || 0;
+    let motive = '-';
+    if (cnt > 0) motive = (agn > pio) ? ('대리점 ' + agn + '%') : (pio > 0 ? ('자력 ' + pio + '%') : '기타');
+    let leadTime = '-', leadTag = cnt > 0 ? '기산 대기' : '수주대기';
+    if (bo.gapBase && typeof bo.gapBase.avg === 'number' && bo.gapBase.avg > 0) {
+      leadTime = bo.gapBase.avg + '일';
+      leadTag = bo.gapBase.avg <= 7 ? '신속기산' : (bo.gapBase.avg <= 14 ? '표준기산' : '장기준비');
+    } else if (bo.gapStart && typeof bo.gapStart.avg === 'number' && bo.gapStart.avg > 0) {
+      leadTime = bo.gapStart.avg + '일';
+      leadTag = bo.gapStart.avg <= 7 ? '신속기산' : (bo.gapStart.avg <= 14 ? '표준기산' : '장기준비');
     }
+    return {
+      rank: 0,
+      name: rep,
+      orderAmt: Number(rm.수주) || 0,
+      orderCount: cnt,
+      unitAmt: cnt ? Math.round(((Number(bo.avgAmount) || 0) / 10000) * 10) / 10 : 0,
+      cumUnitAmt: Math.round(((Number(bo.allAvg) || 0) / 10000) * 10) / 10,
+      // 수주주기는 과거 수주가 2건 이상일 때만 의미가 있으므로, 그렇지 않으면 '-'로 표시
+      period: (Number(bo.allCount) >= 2) ? (Number(bo.avgOrderGapDays) || 0) : 0,
+      zeroDays: isCurMonth ? (Number(bo.daysSinceLastOrder) || 0) : null,
+      motive: motive,
+      style: bo.archetype || '-',
+      leadTime: leadTime,
+      leadTag: leadTag
+    };
   });
+  repRankings.sort(function (a, b) { return (b.orderAmt - a.orderAmt) || (DASH_REP_LIST.indexOf(a.name) - DASH_REP_LIST.indexOf(b.name)); });
+  (function () { let pa = null, pr = 0; repRankings.forEach(function (r, i) { if (r.orderAmt <= 0) { r.rank = '-'; return; } r.rank = (r.orderAmt === pa) ? pr : (i + 1); pa = r.orderAmt; pr = r.rank; }); })();
+  const maxRepAmt = Math.max.apply(null, repRankings.map(function (r) { return r.orderAmt; }).concat([0]));
 
-  // ==================== 3. 상품군별 실적 표 (월별 동적 변경) ====================
-  let pAlarmOrd = 0, pAlarmStart = 0, pAlarmCan = 0, pAlarmPrc = 0, pAlarmNet = 0, pAlarmCnt = 0;
-  let pBScanOrd = 0, pBScanStart = 0, pBScanNet = 0, pBScanCnt = 0;
-  let pHuenOrd = 0, pHuenStart = 0, pHuenNet = 0, pHuenCnt = 0;
-  let pDigiOrd = 0, pDigiStart = 0, pDigiNet = 0, pDigiCnt = 0;
-
-  if (isOct2026) {
-    pAlarmCnt = 6; pAlarmOrd = 1400; pAlarmStart = 250; pAlarmCan = -1460; pAlarmPrc = -338; pAlarmNet = -1255;
-    pBScanCnt = 1; pBScanOrd = 180; pBScanStart = 0; pBScanNet = 0;
-    pHuenCnt = 0; pHuenOrd = 0; pHuenStart = 0; pHuenNet = 0;
-    pDigiCnt = 0; pDigiOrd = 0; pDigiStart = 0; pDigiNet = 0;
-  } else if (isNov2026) {
-    pAlarmCnt = 7; pAlarmOrd = 1750; pAlarmStart = 950; pAlarmCan = -800; pAlarmPrc = 0; pAlarmNet = +150;
-    pBScanCnt = 2; pBScanOrd = 250; pBScanStart = 120; pBScanNet = +120;
-    pHuenCnt = 1; pHuenOrd = 100; pHuenStart = 50; pHuenNet = +50;
-    pDigiCnt = 1; pDigiOrd = 50; pDigiStart = 30; pDigiNet = +30;
-  } else if (isDec2026) {
-    pAlarmCnt = 10; pAlarmOrd = 2800; pAlarmStart = 1850; pAlarmCan = -800; pAlarmPrc = +150; pAlarmNet = +1200;
-    pBScanCnt = 3; pBScanOrd = 450; pBScanStart = 300; pBScanNet = +300;
-    pHuenCnt = 1; pHuenOrd = 200; pHuenStart = 150; pHuenNet = +150;
-    pDigiCnt = 1; pDigiOrd = 150; pDigiStart = 100; pDigiNet = +100;
-  } else if (isSep2026) {
-    pAlarmCnt = 19; pAlarmOrd = 3600; pAlarmStart = 2600; pAlarmCan = -1470; pAlarmPrc = +280; pAlarmNet = +1410;
-    pBScanCnt = 1; pBScanOrd = 100; pBScanStart = 50; pBScanNet = +50;
-    pHuenCnt = 1; pHuenOrd = 150; pHuenStart = 100; pHuenNet = +100;
-    pDigiCnt = 0; pDigiOrd = 0; pDigiStart = 0; pDigiNet = 0;
-  } else {
-    pAlarmCnt = Math.round(ordAmt / 250); pAlarmOrd = Math.round(ordAmt * 0.85); pAlarmStart = Math.round(startAmt * 0.85); pAlarmCan = -800; pAlarmPrc = 0; pAlarmNet = pAlarmStart - 800;
-    pBScanCnt = 1; pBScanOrd = Math.round(ordAmt * 0.10); pBScanStart = Math.round(startAmt * 0.10); pBScanNet = pBScanStart;
-    pHuenCnt = 0; pHuenOrd = Math.round(ordAmt * 0.05); pHuenStart = Math.round(startAmt * 0.05); pHuenNet = pHuenStart;
-    pDigiCnt = 0; pDigiOrd = 0; pDigiStart = 0; pDigiNet = 0;
+  // ==================== 3. 상품군별 실적 표 (productMetrics 실데이터, 천원) ====================
+  // 일반알람 행에는 블루스캔이 산입되므로: 일반알람 = (알람/유지보수) + 블루스캔, 지사 합계 = 일반알람 + 휴엔 + 디지털
+  function pmRow_(key) {
+    const p = productMetrics[key] || {};
+    return { cnt: Number(p.orderCount) || 0, ord: k_(p.orderAmount), start: k_(p.startAmount), can: -k_(p.cancelAmount), prc: k_(p.priceUpAmount) - k_(p.priceDownAmount), net: k_(p.netAmount) };
   }
+  function sumRow_(a, b) { return { cnt: a.cnt + b.cnt, ord: a.ord + b.ord, start: a.start + b.start, can: a.can + b.can, prc: a.prc + b.prc, net: a.net + b.net }; }
+  const rowBScan = pmRow_('블루스캔');
+  const rowAlarm = sumRow_(pmRow_('일반알람'), rowBScan);
+  const rowHuen = pmRow_('휴엔');
+  const rowDigi = pmRow_('디지털');
+  const rowTot = sumRow_(sumRow_(rowAlarm, rowHuen), rowDigi);
+  function prodTdsHtml_(r, netColor) {
+    return `<td class="num">${r.cnt}건 / ${fmtK(r.ord)}</td>` +
+      `<td class="num">${fmtK(r.start)}</td>` +
+      `<td class="num" style="color:${r.can < 0 ? '#ef4444' : '#64748b'};">${fmtK(r.can)}</td>` +
+      `<td class="num" style="color:${r.prc < 0 ? '#ef4444' : (r.prc > 0 ? '#10b981' : '#64748b')};">${r.prc > 0 ? '+' : ''}${fmtK(r.prc)}</td>` +
+      `<td class="num" style="font-weight:800; color:${r.net < 0 ? '#ef4444' : netColor};">${r.net > 0 ? '+' : ''}${fmtK(r.net)}</td>`;
+  }
+  const productRowsHtml = `
+            <tr style="background:#eff6ff; font-weight:900; border-bottom:2px solid #3b82f6;">
+              <td style="text-align:center; color:#1e3a8a;">⭐ 지사 합계</td>
+              ${prodTdsHtml_(rowTot, '#0f766e')}
+            </tr>
+            <tr>
+              <td style="font-weight:700;">일반알람 <span style="font-size:10px; color:#64748b;">(알람·유지보수·블루스캔 산입)</span></td>
+              ${prodTdsHtml_(rowAlarm, '#1e40af')}
+            </tr>
+            <tr style="background:#f8fafc;">
+              <td style="padding-left:18px; font-weight:700; color:#2563eb;">└ 블루스캔 <span style="font-size:10px; color:#2563eb;">(자력영상·별도관리)</span></td>
+              ${prodTdsHtml_(rowBScan, '#2563eb')}
+            </tr>
+            <tr>
+              <td style="font-weight:700;">디지털 <span style="font-size:10px; color:#6366f1;">(정보보안)</span></td>
+              ${prodTdsHtml_(rowDigi, '#1e40af')}
+            </tr>
+            <tr>
+              <td style="font-weight:700;">휴엔 <span style="font-size:10px; color:#0d9488;">(환경·방제)</span></td>
+              ${prodTdsHtml_(rowHuen, '#1e40af')}
+            </tr>`;
 
-  // 일반알람에 블루스캔이 산입되어 있으므로 지사 합계는 일반알람 + 디지털 + 휴엔
-  const totProdCnt = pAlarmCnt + pHuenCnt + pDigiCnt;
-  const totProdOrd = pAlarmOrd + pHuenOrd + pDigiOrd;
-  const totProdStart = pAlarmStart + pHuenStart + pDigiStart;
-  const totProdCan = pAlarmCan;
-  const totProdPrc = pAlarmPrc;
-  const totProdNet = pAlarmNet + pHuenNet + pDigiNet;
-
-
-  // ==================== 4. 개시시기 누적 비중 막대 ====================
+  // ==================== 4. 개시시기 누적 비중 막대 (order.overall.startTiming 실데이터) ====================
+  const stObj = (order.overall && order.overall.startTiming) || { total: 0, buckets: [] };
+  const ST_COLORS_ = { cur: '#0d9488', next: '#2563eb', two: '#f59e0b', three: '#dc2626', none: '#94a3b8' };
+  const stBuckets = (stObj.buckets || []).filter(function (b) { return b.count > 0; });
+  const startTimingTotalK = k_(stObj.total);
   let startScheduleBars = '';
   let startScheduleSubText = '';
-
-  if (isOct2026) {
-    startScheduleBars = `
-      <div style="width:18%; background:#0d9488;" title="당월개시 250천원 (18%)">당월 18%</div>
-      <div style="width:52%; background:#2563eb;" title="익월개시 730천원 (52%)">익월 52%</div>
-      <div style="width:20%; background:#f59e0b;" title="2개월이상 280천원 (20%)">2개월 20%</div>
-      <div style="width:10%; background:#dc2626;" title="3개월이상 장기 140천원 (10%)">3개월+ 10%</div>
-    `;
-    startScheduleSubText = `
-      <span>당월: 250천원 (18%)</span>
-      <span>익월: 730천원 (52%)</span>
-      <span>2개월: 280천원 (20%)</span>
-      <span>3개월+: 140천원 (10%)</span>
-    `;
-  } else if (isNov2026) {
-    startScheduleBars = `
-      <div style="width:35%; background:#0d9488;" title="당월개시 750천원 (35%)">당월 35%</div>
-      <div style="width:45%; background:#2563eb;" title="익월개시 970천원 (45%)">익월 45%</div>
-      <div style="width:15%; background:#f59e0b;" title="2개월 320천원 (15%)">2개월 15%</div>
-      <div style="width:5%; background:#dc2626;" title="3개월+ 110천원 (5%)">3개월+ 5%</div>
-    `;
-    startScheduleSubText = `
-      <span>당월: 750천원 (35%)</span>
-      <span>익월: 970천원 (45%)</span>
-      <span>2개월: 320천원 (15%)</span>
-      <span>3개월+: 110천원 (5%)</span>
-    `;
-  } else if (isDec2026) {
-    startScheduleBars = `
-      <div style="width:50%; background:#0d9488;" title="당월개시 1,800천원 (50%)">당월 50%</div>
-      <div style="width:35%; background:#2563eb;" title="익월개시 1,260천원 (35%)">익월 35%</div>
-      <div style="width:10%; background:#f59e0b;" title="2개월 360천원 (10%)">2개월 10%</div>
-      <div style="width:5%; background:#dc2626;" title="3개월+ 180천원 (5%)">3개월+ 5%</div>
-    `;
-    startScheduleSubText = `
-      <span>당월: 1,800천원 (50%)</span>
-      <span>익월: 1,260천원 (35%)</span>
-      <span>2개월: 360천원 (10%)</span>
-      <span>3개월+: 180천원 (5%)</span>
-    `;
+  if (!stBuckets.length || !stObj.total) {
+    startScheduleBars = '<div style="width:100%; background:#cbd5e1; color:#475569;">집계할 수주 데이터 없음</div>';
+    startScheduleSubText = '<span>당월 수주 건이 없습니다</span>';
   } else {
-    startScheduleBars = `
-      <div style="width:71%; background:#0d9488;" title="당월완공 2,750천원 (71%)">당월완공 71%</div>
-      <div style="width:20%; background:#2563eb;" title="차월이월 770천원 (20%)">차월이월 20%</div>
-      <div style="width:9%; background:#f59e0b;" title="장기준비 330천원 (9%)">장기 9%</div>
-    `;
-    startScheduleSubText = `
-      <span>당월완공: 2,750천원 (71%)</span>
-      <span>차월이월: 770천원 (20%)</span>
-      <span>장기준비: 330천원 (9%)</span>
-    `;
+    startScheduleBars = stBuckets.map(function (b) {
+      return `<div style="width:${b.pct}%; background:${ST_COLORS_[b.key] || '#94a3b8'};" title="${b.label} ${fmtK(k_(b.amount))}천원 (${b.pct}%, ${b.count}건)">${b.pct >= 8 ? (b.label + ' ' + b.pct + '%') : ''}</div>`;
+    }).join('');
+    startScheduleSubText = stBuckets.map(function (b) {
+      return `<span>${b.label}: ${fmtK(k_(b.amount))}천원 (${b.pct}%)</span>`;
+    }).join('');
   }
 
-  // ==================== 5. AI 종합 진단 4대 과제 문구 ====================
+  // ==================== 5. AI 종합 진단 4대 과제 문구 (실데이터로 문장 생성) ====================
   let aiTask1 = '', aiTask2 = '', aiTask3 = '', aiTask4 = '';
-  if (isOct2026) {
-    aiTask1 = '현재 북서울지사 수주 달성률은 37%(1,400천원)로 서울사업팀 16개 지사 중 11위에 머물러 있으며, 서울사업팀 평균(62%) 대비 <strong style="color:#ef4444;">-25.0%p</strong> 뒤처져 있습니다(신호등). 최영국·정문재 컨설턴트의 대형 가망 안건 클로징 가속화가 필요합니다.';
-    aiTask2 = '일보상 기록된 개시를 전부 달성하고 해약이 더 이상 늘지 않아도, 10월말 유증마감 전망은 -4,848천원(-369%)으로 목표를 크게 하회할 위험이 있습니다. <strong>AED 등 무공사 유증 상품</strong>에 집중하고, <strong>영업·CS·기술사원 전원이 합심한 단가인상 방어</strong>에 총력을 기울여야 합니다.';
-    aiTask3 = '안전상품은 지사 목표의 50%는 당연히 달성해야 하며 속도 면에서는 도달 가능할 것으로 보이나(수주 12,324천원, 36%), <strong>전략영업과의 협업이 현저히 부족</strong>하여 확정 매출(445천원, 1.3%) 전환이 지체되고 있습니다. 전략영업 부서와의 주간 협의체를 즉시 가동해야 합니다.';
-    aiTask4 = "블루스캔·휴엔·디지털 수주 부진을 타개하기 위해 지사 내 <strong>'안건 발굴 ➔ 수주/계약 ➔ 즉시 개시'</strong>까지 원스톱으로 책임 지원하는 <strong>지사내 전략 TF 활동</strong>을 즉시 가동해야 합니다.";
-  } else if (isNov2026) {
-    aiTask1 = '11월은 10월 이월 안건(730천원)의 조기 기산 전환과 함께, 신규 가망 안건(목표 4,200천원)을 월초 1~2주차에 선점 클로징하여 사업팀 8위권 이내로 수주 순위를 견인해야 합니다.';
-    aiTask2 = '10월 해약 손실 여파를 만회하기 위해 11월초부터 CS·기술사원 합동 단가인상 캠페인을 전개하고, 설치 공사가 필요 없는 AED 무공사 유증 상품을 최소 15건 이상 집중 유치하여 순유증 방어선을 구축해야 합니다.';
-    aiTask3 = '10월 미매출로 지연된 대형 안전상품 안건들의 11월 10일 이전 시공 검수를 완료하여, 11월 매출 확정액을 최소 1,000만 원 이상 조기 계상하도록 전략영업팀과 공정 일정을 사전 확정합니다.';
-    aiTask4 = '블루스캔·휴엔 결합 번들링 제안율을 100%로 의무화하여, 일반알람 단일 판매를 지양하고 복합 솔루션 계약으로 객단가를 25% 이상 끌어올리는 지사 TF 활동을 지속합니다.';
-  } else if (isDec2026) {
-    aiTask1 = '12월 연말 마감은 연간 수주 누계 목표 100% 완수를 위해 전 컨설턴트가 총력 영업 체제로 전환하며, 대형 계약처 3건의 연내 조기 날인을 성사시켜야 합니다.';
-    aiTask2 = '연말 해약 집중 방어를 위해 취약 고객 사전 케어 및 다운사이징 방어를 선제 실시하고, 연말 잔여 유증 목표(+1,600천원)를 완수하여 유증 달성률 106% 초과 달성을 견인합니다.';
-    aiTask3 = '안전상품 연간 매출 목표 완수를 위해 미검수 안건을 12월 20일 이전 전수 완공하고 간편 카드매출 승인을 극대화하여 연간 매출 달성률을 80% 이상으로 마감합니다.';
-    aiTask4 = '연간 무실적 컨설턴트 제로화를 목표로 전원 유효 실적을 달성하고, 블루스캔·휴엔 성과 우수 컨설턴트 포상을 통해 2027년 도약 기반을 마련합니다.';
+  const topRep = repRankings[0];
+  const zeroReps = repRankings.filter(function (r) { return r.orderCount === 0 && r.orderAmt === 0; }).map(function (r) { return r.name; });
+
+  // 과제 1: 수주 가속
+  if (isFutureMonth) {
+    aiTask1 = `${m}월은 아직 수주 집계 전입니다. 목표 ${fmtK(ordTgt)}천원 기준 조기 클로징 대상 가망 안건을 사전 점검하세요.`;
   } else {
-    aiTask1 = `${m}월 북서울지사는 수주진척도에서 서울사업팀 16개 지사 중 상위권(${fmtK(ordAmt)}천원, ${ordPct}%)을 달성하는 탁월한 성과를 거두었습니다.`;
-    aiTask2 = `${m}월 순유지증가는 최종 +${fmtK(netAmt)}천원을 기록하며 안정적인 지사 성장 기반을 증명하였습니다.`;
-    aiTask3 = `${m}월 안전상품은 수주 ${fmtK(safeOrdAmt)}천원 및 확정 매출 ${fmtK(safeSaleAmt)}천원을 달성하여 목표를 초과 달성하였습니다.`;
-    aiTask4 = '전략상품군과 일반알람의 균형 있는 수주 포트폴리오를 유지하며 우수 사례를 지속 전파합니다.';
+    let s1 = `${m}월 수주 달성률은 <strong>${ordPct}%</strong>(${fmtK(ordAmt)}천원 / 목표 ${fmtK(ordTgt)}천원)`;
+    if (biz) {
+      const g = biz.ord.gap;
+      s1 += `로 서울사업팀 ${bizTotal}개 지사 중 <strong>${biz.ord.myRank}위</strong>이며, 사업팀 평균(${biz.ord.avgVal}%) 대비 <strong style="color:${g >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(g)}%p</strong> ${g >= 0 ? '앞서' : '뒤처져'} 있습니다.`;
+    } else {
+      s1 += `로 영업일 진척률(${workRatio}%) 대비 <strong style="color:${diffOrd >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffOrd)}%p</strong>입니다. (사업팀 벤치마크 미등록)`;
+    }
+    if (topRep && topRep.orderAmt > 0) s1 += ` 컨설턴트 최다 수주는 ${topRep.name}(${fmtK(topRep.orderAmt)}천원, ${topRep.orderCount}건)입니다.`;
+    if (zeroReps.length) s1 += ` 수주 실적이 없는 컨설턴트(<strong>${zeroReps.join('·')}</strong>)는 가망 안건 점검과 동행 영업이 필요합니다.`;
+    else if (diffOrd < 0) s1 += ' 영업일 진척 대비 지연되어 있어 대형 가망 안건의 클로징 가속이 필요합니다.';
+    aiTask1 = s1;
   }
+
+  // 과제 2: 유증(유지증가)
+  if (isFutureMonth) {
+    aiTask2 = `${m}월 유지증가 목표는 ${sgnK_(netTgt)}천원입니다. 해약 방어와 단가인상 계획을 사전에 수립하세요.`;
+  } else {
+    let s2 = `${m}월 유지증가는 <strong style="color:${netAmt < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(netAmt)}천원</strong>(목표 ${sgnK_(netTgt)}천원 대비 ${netPct}%)입니다. 해약 ${cancelCntOv}건(${fmtK(cancelAmtK)}천원), 단가인상 ${fmtK(priceUpK)}천원, 단가인하 ${fmtK(priceDownK)}천원이 반영되었습니다.`;
+    if (projNet !== null) s2 += ` 현 페이스가 유지될 경우 월말 환산치는 ${sgnK_(projNet)}천원${projNetPct !== null ? '(' + projNetPct + '%)' : ''}입니다(경과 영업일 단순 환산).`;
+    if (netAmt < 0 || (netTgt > 0 && netPct < workRatio)) s2 += ' 목표 대비 부족하므로 <strong>설치공사가 필요 없는 유증 상품</strong>과 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>에 집중해야 합니다.';
+    aiTask2 = s2;
+  }
+
+  // 과제 3: 안전상품 (수주 → 매출 전환)
+  if (!hasSafety) {
+    aiTask3 = '안전상품 월 목표·실적(상품일보) 데이터가 아직 집계되지 않았습니다. 상품일보와 월별 목표 입력 후 진단이 표시됩니다.';
+  } else {
+    const dO = Math.round((safeOrdPct - workRatio) * 10) / 10;
+    const dS = Math.round((safeSalePct - workRatio) * 10) / 10;
+    const conv = safeOrdAmt > 0 ? Math.round((safeSaleAmt / safeOrdAmt) * 1000) / 10 : 0;
+    let s3 = `안전상품 수주는 <strong>${fmtK(safeOrdAmt)}천원</strong>(목표 대비 ${safeOrdPct}%), 확정 매출은 <strong>${fmtK(safeSaleAmt)}천원</strong>(${safeSalePct}%)입니다. 영업일 진척(${workRatio}%) 대비 수주는 ${sgn_(dO)}%p, 매출은 ${sgn_(dS)}%p이며 수주 대비 매출 전환율은 ${conv}%입니다.`;
+    if (safeOrdAmt > 0 && dS < 0 && dO >= 0) s3 += ' 수주는 진행되나 매출 전환이 지체되고 있어 <strong>전략영업 부서와의 시공·검수 일정 협의</strong>가 필요합니다.';
+    else if (dO < 0) s3 += ' 수주 자체가 영업일 진척에 못 미쳐 안건 발굴과 전략영업 협업 강화가 필요합니다.';
+    aiTask3 = s3;
+  }
+
+  // 과제 4: 블루스캔·휴엔·디지털
+  const noPerfProducts = [];
+  if (rowBScan.cnt === 0) noPerfProducts.push('블루스캔');
+  if (rowHuen.cnt === 0) noPerfProducts.push('휴엔');
+  if (rowDigi.cnt === 0) noPerfProducts.push('디지털');
+  let s4 = `블루스캔 ${rowBScan.cnt}건·${fmtK(rowBScan.ord)}천원, 휴엔 ${rowHuen.cnt}건·${fmtK(rowHuen.ord)}천원, 디지털 ${rowDigi.cnt}건·${fmtK(rowDigi.ord)}천원이 집계되었습니다.`;
+  if (isFutureMonth) s4 = `${m}월 상품군별 수주 집계 전입니다.`;
+  else if (noPerfProducts.length) s4 += ` 수주 실적이 없는 상품군(<strong>${noPerfProducts.join('·')}</strong>)은 지사 내 <strong>안건 발굴 ➔ 수주/계약 ➔ 즉시 개시</strong>를 책임 지원하는 전략 TF 점검 대상입니다.`;
+  else s4 += ' 세 상품군 모두 수주가 발생했으므로 일반알람과의 번들 제안 비율을 유지·확대하세요.';
+  aiTask4 = s4;
 
   // ==================== 6. HTML 최종 조립 ====================
   let html = `
@@ -8299,7 +8269,7 @@ function renderDashboard(){
             <span style="font-size:12px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:2px 6px; border-radius:4px;">${ordRank}</span>
           </div>
           <div style="font-size:11.5px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
-            ${isOct2026 ? '서울사업팀 평균(62%) 대비 <strong style="color:#ef4444;">-25.0%p</strong>' : (isNov2026 ? '10월 이월 안건 기산 전환 및 11월 신규 수주 클로징 가속' : (isDec2026 ? '연말 수주 총력전 및 연간 목표 달성 추진' : `${m}월 서울사업팀 수주 마감 달성 완료`))}
+            ${ordSubHtml}
           </div>
         </div>
 
@@ -8314,7 +8284,7 @@ function renderDashboard(){
             <span style="font-size:12px; font-weight:800; color:#1e40af; background:#eff6ff; padding:2px 6px; border-radius:4px;">${startRank}</span>
           </div>
           <div style="font-size:11.5px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
-            ${isOct2026 ? '경과일수(5/20일, 25%) 대비 <strong style="color:#ef4444;">-16.0%p 미달</strong>' : (isNov2026 ? '당월 이월된 확정 안건(730천원) + 신규 안건의 조기 기산' : (isDec2026 ? '연내 미개시 안건 100% 완공 및 매출 전환' : `${m}월 공사 완공 및 개시 완료 실적`))}
+            ${startSubHtml}
           </div>
         </div>
 
@@ -8329,7 +8299,7 @@ function renderDashboard(){
             <span style="font-size:12px; font-weight:800; color:#b91c1c; background:#fee2e2; padding:2px 6px; border-radius:4px;">${netRank}</span>
           </div>
           <div style="font-size:11.5px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:6px;">
-            ${isOct2026 ? '해약 1,460천원 + 인하 -338천원 과다 | 10월말 전망: <strong style="color:#b91c1c;">-4,848천원 (-369%)</strong>' : (isNov2026 ? '개시잔고(1,150천원) - 한도해약(800천원) 기준 유증 +350천원 전망' : (isDec2026 ? '연말 유증 목표(+1,500천원) 초과 달성 및 마감 방어' : `${m}월 해약 손실 방어 및 단가인상 최종 마감 집계`))}
+            ${netSubHtml}
           </div>
         </div>
 
@@ -8337,7 +8307,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #2563eb; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(4) 안전상품 수주 / 매출 현황</span>
-            <span style="font-size:10px; color:#64748b;">(목표: ${fmtK(safeOrdTgt)}천원)</span>
+            <span style="font-size:10px; color:#64748b;">(목표: 수주 ${fmtK(safeOrdTgt)} / 매출 ${fmtK(safeSaleTgt)}천원)</span>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
@@ -8356,7 +8326,7 @@ function renderDashboard(){
             </div>
           </div>
           <div style="font-size:11px; color:#64748b; margin-top:6px; border-top:1px solid #f1f5f9; padding-top:4px;">
-            ${isOct2026 ? '수주스피드: 영업일(25%) 대비 <strong style="color:#0d9488;">양호</strong> | 매출: 영업일 대비 <strong style="color:#ef4444;">미달</strong>' : `수주 ${safeOrdPct}% / 매출 ${safeSalePct}% 진척`}
+            ${safeSubHtml}
           </div>
         </div>
 
@@ -8376,23 +8346,22 @@ function renderDashboard(){
           ${repRankings.map(r => {
             const repColor = DASH_REP_COLORS[r.name] || '#2563eb';
             // 개인별 수주 목표 금액 산출 (repTargets 또는 기본 설정 목표)
-            let rTgt = (repTargets && repTargets[r.name] && Number(repTargets[r.name].목표_수주금액)) || 0;
-            if (!rTgt) {
-              const defaultTargets = { '이수열': 1200, '최영국': 900, '정문재': 700, '임영민': 600, '박광춘': 400 };
-              rTgt = defaultTargets[r.name] || 760;
-            }
-            // 개인별 수주 목표 금액에 대한 달성률 (%)
-            const achievePct = rTgt > 0 ? Math.round((r.orderAmt / rTgt) * 100) : 0;
-            const barFillWidth = Math.min(100, Math.max(achievePct, r.orderAmt > 0 ? 4 : 0));
+            // 개인별 수주 목표는 "컨설턴트별 목표 입력"에 저장된 값만 사용 (임의 기본값 없음)
+            const rTgt = (repTargets && repTargets[r.name] && Number(repTargets[r.name].목표_수주금액)) || 0;
+            const achievePct = rTgt > 0 ? Math.round((r.orderAmt / rTgt) * 100) : null;
+            const achieveTxt = achievePct !== null ? (achievePct + '%') : '목표 미설정';
+            const barFillWidth = achievePct !== null
+              ? Math.min(100, Math.max(achievePct, r.orderAmt > 0 ? 4 : 0))
+              : (maxRepAmt > 0 ? Math.max(Math.round((r.orderAmt / maxRepAmt) * 100), r.orderAmt > 0 ? 4 : 0) : 0);
             const theme = (typeof DASH_REP_THEME !== 'undefined' && DASH_REP_THEME[r.name]) || { primary: repColor, bg: '#ffffff', border: '#cbd5e1', text: repColor, badgeBg: '#f1f5f9', badgeText: '#1e293b' };
             return `
               <div style="display:flex; align-items:center; gap:8px; font-size:12px; background:${theme.bg}; border:1px solid ${theme.border}; border-left:4px solid ${theme.primary}; padding:6px 10px; border-radius:6px;">
                 <span style="width:22px; height:22px; font-weight:900; background:${theme.primary}; color:#ffffff; text-align:center; line-height:22px; border-radius:50%; font-size:11px;">${r.rank}</span>
                 <span style="width:52px; font-weight:900; color:${theme.primary}; font-size:12.5px;">${r.name}</span>
-                <div style="flex:1; background:#ffffff; height:18px; border-radius:4px; overflow:hidden; position:relative; border:1px solid #e2e8f0;" title="목표: ${fmtK(rTgt)}천원, 실적: ${fmtK(r.orderAmt)}천원, 달성률: ${achievePct}%">
+                <div style="flex:1; background:#ffffff; height:18px; border-radius:4px; overflow:hidden; position:relative; border:1px solid #e2e8f0;" title="목표: ${fmtK(rTgt)}천원, 실적: ${fmtK(r.orderAmt)}천원, 달성률: ${achieveTxt}">
                   <div style="width:${barFillWidth}%; background:${theme.primary}; height:100%; border-radius:3px;"></div>
                 </div>
-                <span style="width:130px; text-align:right; font-weight:800; color:#0f172a;">${fmtK(r.orderAmt)}천원 <span style="color:${theme.primary}; font-weight:900;">(${achievePct}%)</span></span>
+                <span style="width:130px; text-align:right; font-weight:800; color:#0f172a;">${fmtK(r.orderAmt)}천원 <span style="color:${theme.primary}; font-weight:900;">(${achieveTxt})</span></span>
                 <span style="width:42px; text-align:right; color:#475569; font-weight:700;">${r.orderCount}건</span>
               </div>
             `;
@@ -8409,7 +8378,7 @@ function renderDashboard(){
         
         <!-- 단일 100% 누적 막대그래프 -->
         <div style="margin-bottom:12px;">
-          <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:4px;">개시시기별 비중 (총 ${fmtK(ordAmt)}천원)</div>
+          <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:4px;">개시시기별 비중 (총 ${fmtK(startTimingTotalK)}천원)</div>
           <div style="display:flex; height:24px; border-radius:6px; overflow:hidden; font-size:11px; font-weight:800; color:#ffffff; text-align:center; line-height:24px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.1);">
             ${startScheduleBars}
           </div>
@@ -8460,47 +8429,7 @@ function renderDashboard(){
               <th>순유지증가</th>
             </tr>
           </thead>
-          <tbody>
-            <tr style="background:#eff6ff; font-weight:900; border-bottom:2px solid #3b82f6;">
-              <td style="text-align:center; color:#1e3a8a;">⭐ 지사 합계</td>
-              <td class="num" style="color:#1d4ed8;">${totProdCnt}건 / ${fmtK(totProdOrd)}</td>
-              <td class="num" style="color:#0f766e;">${fmtK(totProdStart)}</td>
-              <td class="num" style="color:#b91c1c;">${fmtK(totProdCan)}</td>
-              <td class="num" style="color:${totProdPrc<0?'#b91c1c':'#0d9488'};">${totProdPrc>0?'+':''}${fmtK(totProdPrc)}</td>
-              <td class="num" style="color:${totProdNet<0?'#b91c1c':'#0f766e'}; font-size:12px;">${totProdNet>0?'+':''}${fmtK(totProdNet)}</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700;">일반알람 <span style="font-size:10px; color:#64748b;">(알람·유지보수·블루스캔 산입)</span></td>
-              <td class="num">${pAlarmCnt}건 / ${fmtK(pAlarmOrd)}</td>
-              <td class="num">${fmtK(pAlarmStart)}</td>
-              <td class="num" style="color:#ef4444;">${fmtK(pAlarmCan)}</td>
-              <td class="num" style="color:${pAlarmPrc<0?'#ef4444':'#10b981'};">${pAlarmPrc>0?'+':''}${fmtK(pAlarmPrc)}</td>
-              <td class="num" style="font-weight:800; color:${pAlarmNet<0?'#ef4444':'#1e40af'};">${pAlarmNet>0?'+':''}${fmtK(pAlarmNet)}</td>
-            </tr>
-            <tr style="background:#f8fafc;">
-              <td style="padding-left:18px; font-weight:700; color:#2563eb;">└ 블루스캔 <span style="font-size:10px; color:#2563eb;">(자력영상·별도관리)</span></td>
-              <td class="num" style="color:#2563eb; font-weight:700;">${pBScanCnt}건 / ${fmtK(pBScanOrd)}</td>
-              <td class="num">${fmtK(pBScanStart)}</td>
-              <td class="num">0</td>
-              <td class="num">0</td>
-              <td class="num" style="font-weight:800; color:#2563eb;">${pBScanNet>0?'+':''}${fmtK(pBScanNet)}</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700;">디지털 <span style="font-size:10px; color:#6366f1;">(정보보안)</span></td>
-              <td class="num">${pDigiCnt}건 / ${fmtK(pDigiOrd)}</td>
-              <td class="num">${fmtK(pDigiStart)}</td>
-              <td class="num">0</td>
-              <td class="num">0</td>
-              <td class="num" style="font-weight:800; color:#1e40af;">+${fmtK(pDigiNet)}</td>
-            </tr>
-            <tr>
-              <td style="font-weight:700;">휴엔 <span style="font-size:10px; color:#0d9488;">(환경·방제)</span></td>
-              <td class="num">${pHuenCnt}건 / ${fmtK(pHuenOrd)}</td>
-              <td class="num">${fmtK(pHuenStart)}</td>
-              <td class="num">0</td>
-              <td class="num">0</td>
-              <td class="num" style="font-weight:800; color:#1e40af;">+${fmtK(pHuenNet)}</td>
-            </tr>
+          <tbody>${productRowsHtml}
           </tbody>
         </table>
       </div>
@@ -8531,7 +8460,7 @@ function renderDashboard(){
                     <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${theme.primary}; margin-right:4px; vertical-align:middle;"></span>${r.name}
                   </td>
                   <td class="num" style="font-weight:800; color:${theme.primary};">${fmtK(r.orderAmt)}천원 (${r.orderCount}건)</td>
-                  <td class="center">${r.period}일 <span style="font-size:10px; color:${r.zeroDays>2?'#dc2626':'#059669'}; font-weight:800;">(${r.zeroDays}일 무수주)</span></td>
+                  <td class="center">${r.period > 0 ? r.period + '일' : '-'}${r.zeroDays !== null ? ` <span style="font-size:10px; color:${r.zeroDays>2?'#dc2626':'#059669'}; font-weight:800;">(${r.zeroDays}일 무수주)</span>` : ''}</td>
                   <td class="num">${r.unitAmt}만 <span style="font-size:10px; color:#64748b;">(${r.cumUnitAmt}만)</span></td>
                   <td class="center" style="font-size:10.5px;">${r.motive}</td>
                   <td><span style="font-size:10px; background:${theme.badgeBg}; color:${theme.badgeText}; border:1px solid ${theme.border}; padding:2px 6px; border-radius:4px; font-weight:800;">${r.style}</span></td>
