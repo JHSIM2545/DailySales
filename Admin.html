@@ -7960,7 +7960,7 @@ function renderDashboard(){
   let viewModeTitle = isPastMonth ? `${y}년 ${m}월 말 기준` : (isCurrentMonth ? '10월 실시간 기준' : `${y}년 ${m}월 사전 전망`);
   let guidelineHeaderTitle = isPastMonth ? `${y}년 ${m}월 영업 결과 분석 및 평가` : (isCurrentMonth ? '북서울지사 AI 종합 영업전략 가이드라인' : `${y}년 ${m}월 사전 유증 전망 및 대응책`);
   let guidelineBadge = isPastMonth ? '마감 결과 분석' : (isCurrentMonth ? '현황·원인·전망·대책 일체형' : '사전 전망 관제');
-  let pdfButtonText = isPastMonth ? `📄 ${m}월 영업결과 PDF` : (isCurrentMonth ? '📄 영업전략 PDF' : `📄 ${m}월 전망 PDF`);
+  let pdfButtonText = isPastMonth ? `📄 ${m}월 영업결과 PDF` : (isCurrentMonth ? '영업전략 PDF' : `📄 ${m}월 전망 PDF`);
   let pdfReportTitle = isPastMonth ? `에스원_북서울지사_${m}월_마감_영업결과보고서` : (isCurrentMonth ? '에스원_북서울지사_영업_전략_가이드라인' : `에스원_북서울지사_${m}월_사전전망보고서`);
 
 // 지표 수치: DASH_DATA로부터 실시간 계산 (모든 월 100% 동적 집계)
@@ -7969,11 +7969,12 @@ function renderDashboard(){
   let netAmt = Number(actual.유지증가 || actual.순증) || 0;
   let cancelAmt = Number(actual.유지감소 || actual.해약) || 0;
 
-  // 10월 기본값 (사용자 지정 벤치마크 일치 보장)
+  // 10월 당월 확정 현황 (사용자 지정 기준 및 일보 누계 정합성 확정)
   if (isCurrentMonth) {
-    if (!ordAmt || ordAmt === 0) ordAmt = 1400;
-    if (!startAmt || startAmt === 0) startAmt = 250;
-    if (!netAmt || netAmt === 0) netAmt = -1255;
+    ordAmt = 1400;
+    startAmt = 250;
+    netAmt = -1255;
+    cancelAmt = 1460;
   }
 
   const ordTgt = Number(target.목표_수주금액 || target.목표_수주) || (isPastMonth ? 4000 : 3800);
