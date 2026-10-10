@@ -7937,7 +7937,13 @@ function renderDashboard(){
   const actual = status.actual || {};  
   const repMetrics = status.repMetrics || {};  
   const repTargets = status.repTargets || {};
-  const repLabel = DASH_REP ? ('- ' + DASH_REP) : '(지사전체)';  
+  const repLabel = DASH_REP ? ('- ' + DASH_REP) : '(지사전체)';
+const emptyAnalytics = { count:0, amount:0, avgAmount:0, byMotive:[], byProduct:[], gapStart:{avg:0,buckets:[]}, gapBase:{avg:0,buckets:[]} };  
+  const emptyCancelAnalytics = { count:0, amount:0, avgAmount:0, byReason:[], byProduct:[] };  
+  const orderAnalytics = (DASH_REP ? (order.byRep && order.byRep[DASH_REP]) : order.overall) || emptyAnalytics;  
+  const repShareList = (typeof repOrderShareList_ === 'function') ? repOrderShareList_(order) : [];  
+  const cancelAnalytics = (DASH_REP ? (cancel.byRep && cancel.byRep[DASH_REP]) : cancel.overall) || emptyCancelAnalytics;  
+  const repCancelShare = (typeof repCancelShareList_ === 'function') ? repCancelShareList_(cancel) : [];  
 
   // 지표 계산
   const ordTgt = Number(target.목표_수주금액 || target.목표_수주) || 9000;
