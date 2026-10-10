@@ -7707,7 +7707,7 @@ function renderDashboard(){
     <!-- 상단 컨트롤 헤더 바 (사용자 요청: "당월 오늘까지 실시간 기준" 삭제) -->
     <div class="dash-head" style="background:#ffffff; padding:10px 16px; border-radius:8px; border:1px solid #cbd5e1; display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
       <button onclick="dashShiftMonth(-1)" style="padding:4px 10px; cursor:pointer;">◀</button>
-      <h2 style="font-size:16px; font-weight:800; color:#0f172a; margin:0;">${y}.${m}월 종합 영업전략 대시보드</h2>
+      <h2 style="font-size:16px; font-weight:800; color:#0f172a; margin:0;">${y}.${m}월 종합</h2>
       <button onclick="dashShiftMonth(1)" style="padding:4px 10px; cursor:pointer;">▶</button>
       
       <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
@@ -7719,7 +7719,7 @@ function renderDashboard(){
     <!-- ===================== 1. 북서울 지사 영업 현황 (4대 핵심 지표) ===================== -->
     <div style="margin-bottom:14px;">
       <div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-        <span>🎯 1. 북서울지사 영업 현황 관제 (${viewModeTitle})</span>
+        <span>🎯 1. 월간 영업 현황</span>
       </div>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px;">
         
@@ -7917,15 +7917,15 @@ function renderDashboard(){
             </tr>
             <tr>
               <td style="font-weight:700;">일반알람</td>
-              <td class="num">${isFutureMonth?'0':(isPastMonth?'17건 / 3,250':'5건 / 1,220')}</td>
+              <td class="num">${isFutureMonth?'0':(isPastMonth?'17건 / 3,250':'6건 / 1,400')}</td>
               <td class="num">${isPastMonth?'2,350':(isFutureMonth?'950':'250')}</td>
               <td class="num" style="color:#ef4444;">${isPastMonth?'-1,470':(isFutureMonth?'-800':'-1,460')}</td>
               <td class="num" style="color:${isPastMonth?'#10b981':'#ef4444'};">${isPastMonth?'+280':(isFutureMonth?'0':'-338')}</td>
-              <td class="num" style="font-weight:800; color:${isPastMonth?'#1e40af':'#ef4444'};">${isPastMonth?'+1,160':(isFutureMonth?'+150':'-1,210')}</td>
+              <td class="num" style="font-weight:800; color:${isPastMonth?'#1e40af':'#ef4444'};">${isPastMonth?'+1,160':(isFutureMonth?'+150':'-1,255')}</td>
             </tr>
             <tr>
               <td style="font-weight:700;">블루스캔</td>
-              <td class="num">${isFutureMonth?'0':(isPastMonth?'2건 / 350':'1건 / 180')}</td>
+              <td class="num">${isFutureMonth?'0':(isPastMonth?'2건 / 350':'0건 / 0')}</td>
               <td class="num">${isPastMonth?'250':(isFutureMonth?'120':'0')}</td>
               <td class="num">0</td>
               <td class="num">0</td>
