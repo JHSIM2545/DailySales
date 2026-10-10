@@ -8134,7 +8134,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid ${ordTraffic.dot}; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(1) 수주진척도</span>
-            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${ordTraffic.bg}; color:${ordTraffic.text}; font-weight:800;">● ${ordTraffic.label}</span>
+            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${ordTraffic.bg}; color:${ordTraffic.text}; font-weight:800;">${ordTraffic.label}</span>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(ordAmt)}천원 <span style="font-size:13px; font-weight:700; color:${ordTraffic.dot};">(${ordPct}%)</span></div>
@@ -8149,7 +8149,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid ${startTraffic.dot}; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(2) 개시진척도</span>
-            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${startTraffic.bg}; color:${startTraffic.text}; font-weight:800;">● ${startTraffic.label}</span>
+            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${startTraffic.bg}; color:${startTraffic.text}; font-weight:800;">${startTraffic.label}</span>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(startAmt)}천원 <span style="font-size:13px; font-weight:700; color:${startTraffic.dot};">(${startPct}%)</span></div>
@@ -8164,7 +8164,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid ${netTraffic.dot}; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(3) 유지증가 수준</span>
-            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${netTraffic.bg}; color:${netTraffic.text}; font-weight:800;">● ${netTraffic.label}</span>
+            <span style="font-size:11px; padding:2px 8px; border-radius:12px; background:${netTraffic.bg}; color:${netTraffic.text}; font-weight:800;">${netTraffic.label}</span>
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:${netAmt<0?'#dc2626':'#0f766e'};">${netAmt>0?'+':''}${fmtK(netAmt)}천원 <span style="font-size:13px; font-weight:700;">(${netPct}%)</span></div>
@@ -8185,14 +8185,14 @@ function renderDashboard(){
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:11px; color:#64748b;">수주 실적</span>
-                <span style="font-size:9.5px; padding:1px 5px; border-radius:10px; background:${safeOrdTraffic.bg}; color:${safeOrdTraffic.text}; font-weight:700;">● ${safeOrdTraffic.label}</span>
+                <span style="font-size:9.5px; padding:1px 5px; border-radius:10px; background:${safeOrdTraffic.bg}; color:${safeOrdTraffic.text}; font-weight:700;">${safeOrdTraffic.label}</span>
               </div>
               <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${fmtK(safeOrdAmt)}천원 <span style="font-size:11px; color:#0d9488;">(${safeOrdPct}%)</span></div>
             </div>
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:11px; color:#64748b;">확정 매출</span>
-                <span style="font-size:9.5px; padding:1px 5px; border-radius:10px; background:${safeSaleTraffic.bg}; color:${safeSaleTraffic.text}; font-weight:700;">● ${safeSaleTraffic.label}</span>
+                <span style="font-size:9.5px; padding:1px 5px; border-radius:10px; background:${safeSaleTraffic.bg}; color:${safeSaleTraffic.text}; font-weight:700;">${safeSaleTraffic.label}</span>
               </div>
               <div style="font-size:14px; font-weight:800; color:#b91c1c; margin-top:2px;">${fmtK(safeSaleAmt)}천원 <span style="font-size:11px;">(${safeSalePct}%)</span></div>
             </div>
