@@ -7332,10 +7332,10 @@ function dashShiftMonth(delta){
 function dashSetCategory(v){ DASH_CATEGORY = v; loadDashboard(); }  
 function dashSetRep(v){ DASH_REP = v; renderDashboard(); }  
   
-function loadDashboard(){  
+function loadDashboard(done){  
  const cacheKey = 'dash|' + DASH_YM + '|' + DASH_CATEGORY;  
  const cached = cacheGet_(cacheKey, GRID_CACHE_TTL_MS_);  
- if (cached) { DASH_DATA = cached; renderDashboard(); return; }  
+ if (cached) { DASH_DATA = cached; renderDashboard(); if (typeof done === 'function') done(); return; }  
  showLoadingProgress_('content', '대시보드를 불러오는 중입니다...', 'loadDashboard');  
  setLoadingCursor(true);  
  // 기존에는 status/working/order/cancel/priceUp/priceDown을 각각 별도 google.script.run으로 호출(6회 왕복 + 시트 중복읽기)했으나,  
@@ -7344,13 +7344,14 @@ function loadDashboard(){
  .withSuccessHandler(function(bundle){  
  setLoadingCursor(false);  
  if (bundle && bundle.error === '세션 만료') { showLogin(bundle.error); return; } // 로그인 직후 첫 화면이 대시보드라, 세션 만료 시 여기서도 로그인 화면으로 보내야 함  
- if (!bundle || !bundle.success) { DASH_DATA = { status: { error: (bundle && bundle.error) || '알 수 없는 오류' } }; renderDashboard(); return; }  
+ if (!bundle || !bundle.success) { DASH_DATA = { status: { error: (bundle && bundle.error) || '알 수 없는 오류' } }; renderDashboard(); if (typeof done === 'function') done(); return; }  
  const results = { status: bundle.status, working: bundle.working, order: bundle.order, cancel: bundle.cancel, priceUp: bundle.priceUp, priceDown: bundle.priceDown, bizTeam: bundle.bizTeam, productMetrics: bundle.productMetrics, safetyMetrics: bundle.safetyMetrics, safetySummary: bundle.safetySummary }; if (bundle && bundle.safetySummary) { PRODUCT_DAILY_SUMMARY_EXTRA = bundle.safetySummary; } if (bundle && bundle.bizTeam && bundle.bizTeam.found && typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined' && !BIZ_TEAM_STATUS_DATA_) { BIZ_TEAM_STATUS_DATA_ = bundle.bizTeam; }  
  DASH_DATA = results;  
  cacheSet_(cacheKey, results);  
  renderDashboard();  
+ if (typeof done === 'function') done();  
  })  
- .withFailureHandler(function(e){ setLoadingCursor(false); DASH_DATA = { status: { error: String(e) } }; renderDashboard(); })  
+ .withFailureHandler(function(e){ setLoadingCursor(false); DASH_DATA = { status: { error: String(e) } }; renderDashboard(); if (typeof done === 'function') done(); })  
  .getDashboardBundle(SESSION.token, DASH_YM, DASH_CATEGORY);  
 }  
   
@@ -14158,7 +14159,7 @@ function buildStrategyDoc_(c){
     else sumLines.push('부족한 부문을 보완하며 목표 달성에 집중할 시기입니다.');
   }
   const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
-  const wd = String(c.todayDs || '').replace(/-/g, '.');
+  const wd = String(getTzToday()).replace(/-/g, '.');  // 작성일자는 PDF를 만드는 오늘 날짜
   const cover = '<div class="pg cover">'
     + '<div class="cv-eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
     + '<div class="cv-rule" style="top:15%"></div>'
@@ -14336,6 +14337,13 @@ const STRATEGY_PDF_CSS_ = '<style>'
  + '</style>';
 
 async function downloadAllChaptersPdf_(){
+  // PDF 생성 직전에 대시보드 데이터를 서버에서 다시 받아 최신화(캐시 무시). 대시보드 화면일 때만 재조회한다.
+  try {
+    if (typeof currentTab !== 'undefined' && currentTab === 'dashboard' && typeof loadDashboard === 'function' && typeof clearAllAggregateCaches_ === 'function') {
+      clearAllAggregateCaches_();
+      await new Promise(function (resolve) { try { loadDashboard(resolve); } catch (e) { resolve(); } setTimeout(resolve, 20000); });
+    }
+  } catch (e) { console.warn('PDF 전 데이터 최신화 실패(기존 데이터 사용)', e); }
   const c = window.DASH_REPORT_CTX_;
   if (!c) { alert('대시보드 데이터를 먼저 불러온 뒤 다시 시도하세요.'); return; }
   const fname = '북서울지사_' + c.ym + '_영업전략_가이드라인';
