@@ -8625,6 +8625,15 @@ function renderDashboard(){
       ordCount: Number((order.overall || {}).count) || 0,
       leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
       motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -18904,19 +18913,34 @@ function buildStrategyDoc_(c){
   const add = function(html, keep){ blocks.push({ html: html, ch: html.indexOf('<div class="blk band"') === 0 && html.indexOf('7. 현장 인력') < 0 }); };
   const band = function(no, title, sub){ return '<div class="blk band"><div class="eb">' + no + '</div><h2>' + title + '</h2>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>'; };
 
-  /* ───── 표지 ───── */
-  const rkTxt = function (o) { return o.rank > 0 ? ', 사업팀 ' + o.rank + '위' : ''; };
-  let sum1 = m + '월 수주 ' + K(c.ord.amt) + '천원(달성률 ' + c.ord.pct + '%' + rkTxt(c.ord) + '), 개시 ' + K(c.start.amt) + '천원(' + c.start.pct + '%' + rkTxt(c.start) + '), 유지증가 ' + S(c.net.amt) + '천원(목표 대비 ' + c.net.pct + '%)입니다.';
-  let sum2 = '';
-  if (c.isCurMonth && c.net.endPct !== null && c.net.endPct !== undefined) sum2 = '영업현황 월말 기준 유지증가 전망은 ' + S(c.net.end) + '천원(목표 대비 ' + c.net.endPct + '%)입니다.';
-  if (c.safety) sum2 += (sum2 ? ' ' : '') + '안전상품은 수주 ' + c.safety.ordPct + '%, 확정 매출 ' + c.safety.salePct + '% 수준입니다.';
-  if (c.isFutureMonth) { sum1 = m + '월은 아직 실적 집계 전입니다.'; sum2 = ''; }
+  /* ───── 표지 (첨부 시안 기준 배치) ───── */
+  const rk = function (o) { return o.rank > 0 ? '사업팀 ' + o.rank + '위' : '달성률 ' + o.pct + '%'; };
+  const gOrd = (c.ord.rank > 0 && c.ord.gap !== null && c.ord.gap !== undefined) ? c.ord.gap : r1(c.ord.pct - c.workRatio);
+  const gSt = (c.start.rank > 0 && c.start.gap !== null && c.start.gap !== undefined) ? c.start.gap : r1(c.start.pct - c.workRatio);
+  const weak = gOrd < 0 || gSt < 0;
+  const vNet = (c.isCurMonth && c.rowEnd) ? (Number(c.rowEnd.누계유지증가) || 0) : c.net.amt;
+  const pNet = c.net.tgt ? r1(vNet / c.net.tgt * 100) : 0;
+  const lossAll = A(c.cancel.amt) + A(c.priceDownK);
+  const sumLines = [];
+  if (c.isFutureMonth) sumLines.push(m + '월은 아직 실적 집계 전입니다.');
+  else {
+    sumLines.push(m + '월 ' + (c.isCurMonth ? '현재 ' : '') + ((c.ord.rank > 0 && c.start.rank > 0) ? ('수주는 사업팀 ' + c.ord.rank + '위, 개시는 ' + c.start.rank + '위로 ') : ('수주 ' + c.ord.pct + '%, 개시 ' + c.start.pct + '%로 ')) + '목표달성이 ' + (weak ? '미흡합니다.' : '양호합니다.'));
+    sumLines.push((lossAll > c.start.amt ? '해약·인하 증가로 ' : '') + '유지증가 ' + (c.isCurMonth ? '전망은 ' : '는 ') + S(vNet) + '천원(목표 대비 ' + pNet + '%)로 ' + (vNet < 0 ? '매우 부정적입니다.' : (pNet < 100 ? '목표에 미달합니다.' : '목표를 달성했습니다.')));
+    if (c.safety) sumLines.push('안전상품은 수주 ' + c.safety.ordPct + '%, 매출 ' + c.safety.salePct + '%로 ' + (c.safety.salePct < c.safety.ordPct ? '매출 전환이 미흡합니다.' : '수주·매출이 균형입니다.'));
+    sumLines.push((weak || pNet < 100) ? '특단의 영업 전략 수립이 필요한 시기입니다.' : '현재 흐름을 유지하며 해약 방어에 집중할 시기입니다.');
+  }
+  const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
   const wd = String(c.todayDs || '').replace(/-/g, '.');
-  const cover = '<div class="pg cover"><div class="eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
-    + '<div class="cv-mid"><div class="cv-ban"><div class="tl1">' + y + '.' + m + '월 <span class="dot">·</span> <span class="yl">북서울지사</span></div><div class="tl2">영업 현황 및 가이드 라인</div></div><div class="cv-d">작성일 ' + esc(wd) + '</div>'
-    + '<div class="cv-sum">' + esc(sum1 + (sum2 ? ' ' + sum2 : '')) + '</div></div>'
-    + '<div class="cv-box"><div class="eb">STRATEGIC ANALYSIS FRAMEWORK</div><div class="cv-grid">'
-    + '<div><b>01 · 02</b><br>현황 및 현황분석</div><div><b>03 · 04</b><br>문제점 및 원인점검</div><div><b>05 · 06</b><br>수주 · 성과 · 월말 전망</div><div><b>07</b><br>실행 대책 및 행동수칙</div></div></div></div>';
+  const cover = '<div class="pg cover">'
+    + '<div class="cv-eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
+    + '<div class="cv-rule" style="top:15%"></div>'
+    + '<div class="cv-t1">' + y + '.' + m + '월 <span class="dot">·</span><span class="yl">북서울지사</span></div>'
+    + '<div class="cv-t2">영업 현황 및 가이드 라인</div>'
+    + '<div class="cv-rule" style="top:31.5%"></div>'
+    + '<div class="cv-d">' + esc(wd) + '</div>'
+    + '<div class="cv-sum">' + sumLines.map(function (t) { return '<div>' + esc(t) + '</div>'; }).join('') + '</div>'
+    + '<div class="cv-toc">' + toc.map(function (t, i) { return '<div>' + (i + 1) + '. ' + t + '</div>'; }).join('') + '</div>'
+    + '<div class="cv-org">에스원 서울사업팀 북서울지사</div></div>';
 
   /* ───── Chapter 01·02 현황 ───── */
   add(band('CHAPTER 01 · 02', '1. 월간 영업 현황 및 현황분석', '기준: ' + esc(modeTxt)), true);
@@ -19071,14 +19095,16 @@ const STRATEGY_PDF_CSS_ = '<style>'
  + '.pg .red{background:#fef2f2;border-color:#fecaca;border-left:.3em solid #dc2626;} .pg .grn{background:#f0fdf4;border-color:#bbf7d0;border-left:.3em solid #16a34a;}'
  + '.pg .brow{display:flex;align-items:center;gap:.6em;margin:calc(.35em*var(--sp,1)) 0;} .pg .bl{width:4.2em;font-weight:700;} .pg .bt{flex:1;height:1.1em;background:#e2e8f0;border-radius:.3em;position:relative;overflow:hidden;} .pg .bf1,.pg .bf2{position:absolute;left:0;top:0;bottom:0;border-radius:.3em;} .pg .bf2{background:#93c5fd;} .pg .bf1{background:#1d4ed8;} .pg .bv{white-space:nowrap;text-align:right;} .pg .bl{white-space:nowrap;} .pg .lg{display:inline-block;width:.9em;height:.9em;border-radius:.2em;vertical-align:middle;margin:0 .3em 0 .6em;} .pg .l1{background:#1d4ed8;} .pg .l2{background:#93c5fd;}'
  + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.6em .8em;text-align:center;}'
- + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:44px 50px 44px;justify-content:flex-start;line-height:1.5;}'
- + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;font-size:.95em;}'
- + '.cover .cv-ban{background:transparent;padding:0;}'
- + '.cover .cv-ban .tl1{font-size:2.5em;line-height:1.25;color:#fff;font-weight:400;} .cover .cv-ban .dot{color:#fff;} .cover .cv-ban .yl{color:#ffff00;}'
- + '.cover .cv-ban .tl2{font-size:3.3em;line-height:1.25;color:#a9c9f0;font-weight:800;}'
- + '.cover .cv-mid{margin-top:1.2em;} .cover .cv-box{margin-top:auto;border:1px solid rgba(255,255,255,.3);border-radius:.5em;padding:.7em;background:rgba(255,255,255,.07);} .cover .cv-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5em;margin-top:.5em;} .cover .cv-grid>div{border:1px solid rgba(255,255,255,.3);border-radius:.4em;padding:.4em .6em;text-align:center;line-height:1.45;}'
- + '.cover .cv-d{margin-top:.8em;font-size:.95em;color:#93a9d4;}'
- + '.cover .cv-sum{margin-top:1.2em;border:1px solid rgba(255,255,255,.35);border-radius:.5em;background:rgba(255,255,255,.08);padding:.8em 1em;font-size:18.667px;line-height:1.7;color:#f1f5f9;}'
+ + '.pg.cover{position:relative;background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:0;display:block;line-height:1.4;}'
+ + '.cover>div{position:absolute;white-space:nowrap;}'
+ + '.cover .cv-eb{left:7.7%;top:5.9%;font-size:17px;letter-spacing:.02em;color:#a9c9f0;}'
+ + '.cover .cv-rule{left:8%;width:83.5%;height:4px;background:#a9c9f0;}'
+ + '.cover .cv-t1{left:11.3%;top:18.6%;font-size:28px;line-height:1.3;color:#fff;} .cover .cv-t1 .dot{color:#fff;} .cover .cv-t1 .yl{color:#ffff00;}'
+ + '.cover .cv-t2{left:11.6%;top:22.8%;font-size:54px;line-height:1.3;color:#a9c9f0;font-weight:700;letter-spacing:.1em;}'
+ + '.cover .cv-d{left:0;right:0;text-align:center;top:34.5%;font-size:17px;color:#a9c9f0;}'
+ + '.cover .cv-sum{left:9.4%;width:78.7%;top:41.2%;white-space:normal;border:2.5px solid #fff;background:rgba(255,255,255,.17);padding:.6em 1.2em;font-size:18px;line-height:1.7;color:#ffe8d0;word-break:keep-all;}'
+ + '.cover .cv-toc{left:24.3%;top:63.8%;font-size:19px;line-height:1.5;color:#eef2ff;}'
+ + '.cover .cv-org{left:0;right:0;text-align:center;top:89.4%;font-size:31px;color:#fff;}'
  + '</style>';
 
 async function downloadAllChaptersPdf_(){
