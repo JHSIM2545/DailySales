@@ -14064,8 +14064,8 @@ function fieldCellHtmlProductDaily(row, field, allRows){
     const fVal = parseForecastYm_(val, row.보고일);
     inner = `<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%;">` +
       `<input type="text" class="cell-align-center" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="text-align:center !important; width:100%; height:100%; padding-right:30px; box-sizing:border-box;" value="${escAttr(formatForecastYmDisplay_(val) || val)}" onchange="onPdForecastTyped_(this, '${row.id}')">` +
-      `<button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:2px; z-index:1; border:none; background:transparent; pointer-events:none;">📅</button>` +
-      `<input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
+      `<button type="button" class="pd-cal-btn" title="월 선택 (달력)" onclick="openMonthPickerForPd_(this)" style="position:absolute; right:3px; top:50%; transform:translateY(-50%); z-index:3; border:none; background:transparent; cursor:pointer; font-size:15px; line-height:1; padding:2px 4px;">📅</button>` +
+      `<input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; pointer-events:none; z-index:0; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
       `</div>`;
   } else {
     inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','${field}',this.value)">`;
@@ -14201,8 +14201,8 @@ function buildProductDailyForm(){
       <label>매출예상</label>
       <div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:32px;">
         <input type="text" id="pdf_매출예상" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${ymFormatted}" placeholder="예: 26.10월 / 2026-10 (직접 입력 또는 📅 선택)" style="width:100%; height:100%; padding-right:34px; box-sizing:border-box;" onblur="(function(el){ var v=(el.value||'').trim(); if(!v) return; var rd=document.getElementById('pdf_보고일'); var ym=(typeof parseForecastYm_==='function')?parseForecastYm_(v, rd?rd.value:''):''; if(ym){ el.value=ym.slice(2,4)+'.'+ym.slice(5,7)+'월'; } })(this)">
-        <button type="button" class="date-pick-btn" title="월 선택" style="position:absolute; right:4px; z-index:1; border:none; background:transparent; pointer-events:none; font-size:16px;">📅</button>
-        <input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; cursor:pointer; z-index:2; border:none; padding:0; margin:0;" value="${ymNow}" onchange="const parts=this.value.split('-'); document.getElementById('pdf_매출예상').value=parts[0].slice(2)+'.'+parts[1]+'월'">
+        <button type="button" class="pd-cal-btn" title="월 선택 (달력)" onclick="openMonthPickerForPd_(this)" style="position:absolute; right:3px; top:50%; transform:translateY(-50%); z-index:3; border:none; background:transparent; cursor:pointer; font-size:15px; line-height:1; padding:2px 4px;">📅</button>
+        <input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; pointer-events:none; z-index:0; border:none; padding:0; margin:0;" value="${ymNow}" onchange="const parts=this.value.split('-'); document.getElementById('pdf_매출예상').value=parts[0].slice(2)+'.'+parts[1]+'월'">
       </div>
     </div>
     <div class="field"><label>계약동기</label><select id="pdf_계약동기" autocomplete="one-time-code"><option value="">선택</option>${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
