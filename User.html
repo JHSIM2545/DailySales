@@ -8212,6 +8212,12 @@ function renderDashboard(){
       ordCount: Number((order.overall || {}).count) || 0,
       leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
       motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -14093,10 +14099,12 @@ function buildStrategyDoc_(c){
   const wd = String(c.todayDs || '').replace(/-/g, '.');
   const cover = '<div class="pg cover"><div class="eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
     + '<div class="cv-mid"><div class="cv-ban"><div class="tl1">' + y + '.' + m + '월 <span class="dot">·</span> <span class="yl">북서울지사</span></div><div class="tl2">영업 현황 및 가이드 라인</div></div><div class="cv-d">작성일 ' + esc(wd) + '</div>'
-    + '<div class="cv-sum">' + esc(sum1 + (sum2 ? ' ' + sum2 : '')) + '</div></div><div></div></div>';
+    + '<div class="cv-sum">' + esc(sum1 + (sum2 ? ' ' + sum2 : '')) + '</div></div>'
+    + '<div class="cv-box"><div class="eb">STRATEGIC ANALYSIS FRAMEWORK</div><div class="cv-grid">'
+    + '<div><b>01 · 02</b><br>현황 및 현황분석</div><div><b>03 · 04</b><br>문제점 및 원인점검</div><div><b>05 · 06</b><br>수주 · 성과 · 월말 전망</div><div><b>07</b><br>실행 대책 및 행동수칙</div></div></div></div>';
 
   /* ───── Chapter 01·02 현황 ───── */
-  add(band('CHAPTER 01', '1. 월간 영업 현황 및 현황분석', '기준: ' + esc(modeTxt)), true);
+  add(band('CHAPTER 01 · 02', '1. 월간 영업 현황 및 현황분석', '기준: ' + esc(modeTxt)), true);
   const tO = traf(c.ord.pct, c.ord), tS = traf(c.start.pct, c.start), tN = traf(c.net.pct, c.net);
   const badge = function(t){ return '<span class="bdg" style="color:' + t.col + ';background:' + t.bg + '">' + t.t + '</span>'; };
   let intro = y + '년 ' + m + '월 ' + (c.isCurMonth ? ('현재(' + c.elDays + '영업일 경과, 영업일 진척률 ' + c.workRatio + '%)') : (c.isPastMonth ? '최종 마감 기준' : '집계 전')) + ', 북서울지사의 수주 달성률은 ' + c.ord.pct + '%, 개시 ' + c.start.pct + '%, 유지증가 ' + S(c.net.amt) + '천원(목표 대비 ' + c.net.pct + '%)입니다.';
@@ -14123,7 +14131,7 @@ function buildStrategyDoc_(c){
   add('<div class="blk"><h3 class="s">1.2 현황 분석</h3><p>' + a1 + '</p><p>' + a2 + '</p><p>' + a3 + '</p></div>');
 
   /* ───── Chapter 03·04 문제점 ───── */
-  add(band('CHAPTER 02', '2. 핵심 문제점 및 원인 점검', '현황 수치에서 확인되는 문제 영역'), true);
+  add(band('CHAPTER 03 · 04', '2. 핵심 문제점 및 원인 점검', '현황 수치에서 확인되는 문제 영역'), true);
   const P = [];
   const gapO = hasBiz ? c.ord.gap : r1(c.ord.pct - c.workRatio), gapSt = hasBiz ? c.start.gap : r1(c.start.pct - c.workRatio);
   P.push({ bad: gapO < 0, t: '수주 스피드 ' + (hasBiz ? '서울사업팀 평균 대비 ' : '영업일 진척 대비 ') + gapS(gapO),
@@ -14147,7 +14155,7 @@ function buildStrategyDoc_(c){
     + '</tbody></table><p class="note">원인은 DB로 확인할 수 없어 점검 항목으로만 제시했습니다. 현장 확인 후 판단하세요.</p></div>');
 
   /* ───── 3. 수주 현황 ───── */
-  add(band('CHAPTER 03', '3. 수주 현황 및 개시일정·소요일 분석', '컨설턴트별 순위 및 리드타임 비교'), true);
+  add(band('DETAILED ANALYSIS', '3. 수주 현황 및 개시일정·소요일 분석', '컨설턴트별 순위 및 리드타임 비교'), true);
   const totOrd = c.reps.reduce(function(s, r){ return s + r.orderAmt; }, 0);
   add('<div class="blk"><h3 class="s">3.1 컨설턴트별 수주 실적 및 지사 기여도</h3><p>당월 지사 전체 수주는 총 ' + (c.ordCount || 0) + '건, ' + K(totOrd) + '천원입니다.</p><table><thead><tr><th>컨설턴트</th><th>수주금액</th><th>건당 단가</th><th>점유율</th><th>영업동기</th></tr></thead><tbody>'
     + c.reps.map(function(r){ return '<tr><td><b>' + (r.rank === '-' ? '' : r.rank + '위 ') + esc(r.name) + '</b></td><td class="n">' + K(r.orderAmt) + '천원 (' + r.orderCount + '건)</td><td class="n">' + (r.orderCount ? r.unitAmt + '만' : '-') + '</td><td class="n">' + (totOrd ? r1(r.orderAmt / totOrd * 100) : 0) + '%</td><td>' + esc(r.motive) + '</td></tr>'; }).join('')
@@ -14162,7 +14170,7 @@ function buildStrategyDoc_(c){
     + '</tbody></table></div>');
 
   /* ───── 4. 성과표 ───── */
-  add(band('CHAPTER 04', '4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표', '당월 실적 기준'), true);
+  add(band('PERFORMANCE MATRIX', '4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표', '당월 실적 기준'), true);
   const pr = function(label, r, cls, ind){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + (ind ? '└ ' : '') + '<b>' + label + '</b></td><td class="n">' + r.cnt + '건 / ' + K(r.ord) + '</td><td class="n">' + K(r.start) + '</td><td class="n">' + K(r.can) + '</td><td class="n">' + S(r.prc) + '</td><td class="n" style="color:' + (r.net < 0 ? '#b91c1c' : '#0f766e') + '"><b>' + S(r.net) + '</b></td></tr>'; };
   add('<div class="blk"><h3 class="s">4.1 상품군별 수주 및 유지증가 실적 (천원)</h3><table><thead><tr><th>상품군</th><th>수주 (건수/금액)</th><th>개시</th><th>해약</th><th>단가변동</th><th>유지증가</th></tr></thead><tbody>'
     + pr('⭐ 지사 합계', c.prod.tot, 'sum') + pr('일반알람', c.prod.alarm) + pr('블루스캔', c.prod.bscan, '', true) + pr('디지털', c.prod.digi) + pr('휴엔', c.prod.huen) + '</tbody></table></div>');
@@ -14171,7 +14179,7 @@ function buildStrategyDoc_(c){
     + '</tbody></table><p class="note">무수주는 마지막 수주 이후 경과한 영업일(주말·공휴일 제외, 당월만)이며, 영업동기는 수주금액 기준 비중입니다.</p></div>');
 
   /* ───── 5. 월말 전망 ───── */
-  add(band('CHAPTER 05', '5. ' + m + '월말 실적 전망 및 분석', '영업현황 월말 기준'), true);
+  add(band('CHAPTER 05 · 06', '5. ' + m + '월말 실적 전망 및 분석', '영업현황 월말 기준'), true);
   const rt = c.rowToday, re = c.rowEnd;
   if (c.isFutureMonth) add('<div class="blk"><p>' + m + '월은 집계 전입니다.</p></div>');
   else if (!re) add('<div class="blk"><p>영업현황 일별 데이터가 없습니다.</p></div>');
@@ -14205,13 +14213,13 @@ function buildStrategyDoc_(c){
   }
 
   /* ───── 6. 4대 과제 ───── */
-  add(band('CHAPTER 06 · ACTION PLAN', '6. 북서울지사 4대 전략 실행 과제', ''), true);
+  add(band('CHAPTER 07 · ACTION PLAN', '6. 북서울지사 4대 전략 실행 과제', ''), true);
   const tn = ['과제 1. 타 지사 대비 수주 가속', '과제 2. 당월 유지증가 확보', '과제 3. 안전상품 수주 → 매출 전환', '과제 4. 블루스캔·휴엔·디지털 확대'];
   const tc = ['#d97706', '#dc2626', '#2563eb', '#7c3aed'];
   c.tasks.forEach(function(t, i){ add('<div class="blk card" style="border-left:.3em solid ' + tc[i] + '"><b style="color:' + tc[i] + '">' + tn[i] + '</b><br>' + t + '</div>'); });
 
   /* ───── 7. 행동수칙 ───── */
-  add(band('CHAPTER 07 · ACTION PROTOCOL', '7. 현장 인력 실천 수칙', ''), true);
+  add(band('CONCLUSION & ACTION PROTOCOL', '7. 현장 인력 실천 수칙', ''), true);
   const zeroNames = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; });
   const ordGap = Math.max(0, c.ord.tgt - c.ord.amt);
   const leadTxt = c.leadAvg > 0 ? ('현재 평균 ' + c.leadAvg + '일 → 단축') : '단축';
@@ -14248,11 +14256,12 @@ const STRATEGY_PDF_CSS_ = '<style>'
  + '.pg .red{background:#fef2f2;border-color:#fecaca;border-left:.3em solid #dc2626;} .pg .grn{background:#f0fdf4;border-color:#bbf7d0;border-left:.3em solid #16a34a;}'
  + '.pg .brow{display:flex;align-items:center;gap:.6em;margin:calc(.35em*var(--sp,1)) 0;} .pg .bl{width:4.2em;font-weight:700;} .pg .bt{flex:1;height:1.1em;background:#e2e8f0;border-radius:.3em;position:relative;overflow:hidden;} .pg .bf1,.pg .bf2{position:absolute;left:0;top:0;bottom:0;border-radius:.3em;} .pg .bf2{background:#93c5fd;} .pg .bf1{background:#1d4ed8;} .pg .bv{white-space:nowrap;text-align:right;} .pg .bl{white-space:nowrap;} .pg .lg{display:inline-block;width:.9em;height:.9em;border-radius:.2em;vertical-align:middle;margin:0 .3em 0 .6em;} .pg .l1{background:#1d4ed8;} .pg .l2{background:#93c5fd;}'
  + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.6em .8em;text-align:center;}'
- + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:60px 50px 40px;justify-content:space-between;line-height:1.5;}'
+ + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:44px 50px 44px;justify-content:flex-start;line-height:1.5;}'
  + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;font-size:.95em;}'
- + '.cover .cv-ban{background:#000099;padding:.35em .6em .45em;}'
+ + '.cover .cv-ban{background:transparent;padding:0;}'
  + '.cover .cv-ban .tl1{font-size:2.5em;line-height:1.25;color:#fff;font-weight:400;} .cover .cv-ban .dot{color:#fff;} .cover .cv-ban .yl{color:#ffff00;}'
  + '.cover .cv-ban .tl2{font-size:3.3em;line-height:1.25;color:#a9c9f0;font-weight:800;}'
+ + '.cover .cv-mid{margin-top:1.2em;} .cover .cv-box{margin-top:auto;border:1px solid rgba(255,255,255,.3);border-radius:.5em;padding:.7em;background:rgba(255,255,255,.07);} .cover .cv-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5em;margin-top:.5em;} .cover .cv-grid>div{border:1px solid rgba(255,255,255,.3);border-radius:.4em;padding:.4em .6em;text-align:center;line-height:1.45;}'
  + '.cover .cv-d{margin-top:.8em;font-size:.95em;color:#93a9d4;}'
  + '.cover .cv-sum{margin-top:1.2em;border:1px solid rgba(255,255,255,.35);border-radius:.5em;background:rgba(255,255,255,.08);padding:.8em 1em;font-size:18.667px;line-height:1.7;color:#f1f5f9;}'
  + '</style>';
