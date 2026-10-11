@@ -3216,7 +3216,11 @@ function getTzToday() {
       // 사업팀 16개 지사 벤치마크 데이터 연동
       let bizTeamRes = { success: true, found: false };
       try {
-        bizTeamRes = await Backend.getBizTeamDataNearestOnOrBefore(token, today, '일반알람');
+        // 마감된 과거 월은 그 달의 마지막 날(월말) 사업팀 자료를, 진행 중인 월은 오늘 기준 최신 자료를 사용한다.
+        const bizRefDate = (ym < todayYm) ? `${ym}-${String(daysInMonth).padStart(2, '0')}` : today;
+        bizTeamRes = await Backend.getBizTeamDataNearestOnOrBefore(token, bizRefDate, '일반알람');
+        // 조회 월과 다른 달의 자료(예: 월말 자료가 없어 전월 자료가 잡힌 경우)는 벤치마크로 쓰지 않는다.
+        if (bizTeamRes && bizTeamRes.found && String(bizTeamRes.date || '').slice(0, 7) !== ym) bizTeamRes = { success: true, found: false };
       } catch(e) {}
 
       return {
@@ -17489,6 +17493,8 @@ function getBizTeamBenchmarkData_(d){
   if (d && d.bizTeam && d.bizTeam.found && d.bizTeam.branches && d.bizTeam.branches.length) {
     return d.bizTeam;
   }
+  // 대시보드 번들이 해당 월 기준 자료 없음(found:false)으로 응답했다면, 다른 달의 최신 자료로 대체하지 않는다.
+  if (d && d.bizTeam && d.bizTeam.found === false) return null;
   if (typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined' && BIZ_TEAM_STATUS_DATA_ && BIZ_TEAM_STATUS_DATA_.found && BIZ_TEAM_STATUS_DATA_.branches) {
     return BIZ_TEAM_STATUS_DATA_;
   }
