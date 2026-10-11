@@ -17270,6 +17270,24 @@ function bizTeamDivergingChartHtml_(title, branches, row){
 }
 
 /* --- bizTeamGroupedTableHtml_ --- */
+/* 그룹 배경색의 색상(hue)은 유지하고 채도만 높여 약간 진하게 */
+function bizTeamSatColor_(hex){
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(hex || ''));
+  if (!m) return '#dbe4f0';
+  const r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  let h = 0, sat = 0;
+  if (d > 0) {
+    sat = d / (1 - Math.abs(2 * l - 1));
+    if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  const s2 = Math.min(1, sat + 0.22), l2 = Math.max(0.84, l - 0.04);
+  const c = (1 - Math.abs(2 * l2 - 1)) * s2, x = c * (1 - Math.abs((h / 60) % 2 - 1)), mm = l2 - c / 2;
+  const p = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return '#' + p.map(function(v){ return ('0' + Math.round((v + mm) * 255).toString(16)).slice(-2); }).join('');
+}
+
 /* 사업팀 합계 열 계산: 금액·건수=단순합, 달성률=합계실적/합계계획, 기타 %=계획 가중평균, 단가=합계금액/(Σ금액÷단가) */
 function bizTeamTotalCell_(g, sub, rows, branches){
   const rowOf = function(lbl){ const s2 = g.subs.find(function(x){ return x.label === lbl; }); return s2 ? bizTeamFindRow_(rows, s2.key) : null; };
@@ -17329,7 +17347,7 @@ function bizTeamGroupedTableHtml_(branches, rows, orderedIdx, productType){
  html += '<td rowspan="' + g.subs.length + '" style="padding:5px 7px; width:1%; white-space:nowrap; border:1px solid #e2e6ea; font-weight:700; text-align:center; vertical-align:middle; background:' + g.color + ';">' + escHtml(g.group) + '</td>';  
  }  
  html += '<td style="padding:5px 7px; width:1%; border:1px solid #e2e6ea; font-weight:700; white-space:nowrap; background:' + g.color + ';">' + escHtml(sub.label) + '</td>';  
- html += '<td style="padding:5px 7px; width:84px; min-width:84px; max-width:84px; box-sizing:border-box; border:1px solid #e2e6ea; border-right:2px solid #94a3b8; text-align:right !important; text-align-last:right !important; font-weight:800; color:' + (isDaily ? '#1a56db' : '#0f172a') + '; background:#cfd8e6;">' + escHtml(bizTeamTotalCell_(g, sub, rows, branches)) + '</td>';  
+ html += '<td style="padding:5px 7px; width:84px; min-width:84px; max-width:84px; box-sizing:border-box; border:1px solid #e2e6ea; border-right:2px solid #94a3b8; text-align:right !important; text-align-last:right !important; font-weight:800; color:' + (isDaily ? '#1a56db' : '#0f172a') + '; background:' + bizTeamSatColor_(g.color) + ';">' + escHtml(bizTeamTotalCell_(g, sub, rows, branches)) + '</td>';  
  html += orderedIdx.map(function(origI){  
  const v = row && row.values ? row.values[origI] : '';  
  const isMine = branches[origI] === '북서울';  
