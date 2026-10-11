@@ -7660,7 +7660,7 @@ function renderDashboard(){
   const viewModeTitle = isCurMonth
     ? (m + '월 ' + elDays + '영업일 경과 (' + workRatio + '%) 기준')
     : (isPastMonth ? (m + '월 최종 실적 마감 기준') : (m + '월 (실적 집계 전)'));
-  const guidelineHeaderTitle = `${y}년 ${m}월 북서울지사 AI 종합 영업전략 가이드라인`;
+  const guidelineHeaderTitle = `${y}년 ${m}월 가이드 라인`;
   const guidelineBadge = isCurMonth ? '현황·원인·전망·대책 일체형' : (isPastMonth ? '실적 마감 평가' : '차월 선행 점검');
 
   // ---- 지표 카드 하단 보조 문구 (데이터 기반) ----
@@ -8104,9 +8104,9 @@ function renderDashboard(){
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:20px;">🤖</span>
-          <span style="font-size:15px; font-weight:800; color:#0f172a;">${guidelineHeaderTitle}</span>
+          <span style="font-size:15px; font-weight:800; color:#0f172a; white-space:nowrap;">${guidelineHeaderTitle}</span>
         </div>
-        <span style="font-size:12px; background:#eff6ff; color:#1d4ed8; padding:3px 10px; border-radius:4px; font-weight:700; border:1px solid #bfdbfe;">${guidelineBadge}</span>
+        <span style="font-size:12px; background:#eff6ff; color:#1d4ed8; padding:3px 10px; border-radius:4px; font-weight:700; white-space:nowrap; border:1px solid #bfdbfe;">${guidelineBadge}</span>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; font-size:12.5px; line-height:1.65; color:#334155;">
