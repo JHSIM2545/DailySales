@@ -7585,7 +7585,7 @@ function renderDashboard(){
   
   const [y, m] = DASH_YM.split('-').map(Number);
   // 월 구분은 하드코딩된 특정 월이 아니라 "오늘이 속한 월"과 비교해서 판단한다.
-  const todayDs_ = (typeof getTzToday === 'function' ? getTzToday() : new Date().toISOString().slice(0, 10));
+  const todayDs_ = (typeof getTzToday === 'function' ? getTzToday() : todayStr());  // UTC 날짜가 아닌 한국(로컬) 날짜
   const todayYm_ = todayDs_.slice(0, 7);
   const isCurMonth = (DASH_YM === todayYm_);
   const isFutureMonth = (DASH_YM > todayYm_);
@@ -14159,7 +14159,7 @@ function buildStrategyDoc_(c){
     else sumLines.push('부족한 부문을 보완하며 목표 달성에 집중할 시기입니다.');
   }
   const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
-  const wd = String(getTzToday()).replace(/-/g, '.');  // 작성일자는 PDF를 만드는 오늘 날짜
+  const wd = (function () { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); } })().replace(/-/g, '.');  // 작성일자는 PDF를 만드는 오늘 날짜
   const cover = '<div class="pg cover">'
     + '<div class="cv-eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
     + '<div class="cv-rule" style="top:15%"></div>'
