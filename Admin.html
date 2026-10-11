@@ -7966,7 +7966,8 @@ function renderDashboard(){
   
   const [y, m] = DASH_YM.split('-').map(Number);
   // 월 구분은 하드코딩된 특정 월이 아니라 "오늘이 속한 월"과 비교해서 판단한다.
-  const todayYm_ = (typeof getTzToday === 'function' ? getTzToday() : new Date().toISOString().slice(0, 10)).slice(0, 7);
+  const todayDs_ = (typeof getTzToday === 'function' ? getTzToday() : new Date().toISOString().slice(0, 10));
+  const todayYm_ = todayDs_.slice(0, 7);
   const isCurMonth = (DASH_YM === todayYm_);
   const isFutureMonth = (DASH_YM > todayYm_);
   const isPastMonth = (DASH_YM < todayYm_);
@@ -8025,7 +8026,12 @@ function renderDashboard(){
   const startRank = rankText_(biz && biz.start);
   const startTraffic = biz ? getTrafficColorBizTeam(startPct, biz.start.avgVal) : getTrafficColorWorking(startPct, workRatio);
 
-  const netAmt = Number(actual.유지증가) || 0;
+  // 유지증가: 영업현황 일별 누계(rows) 기준.
+  //  - 당월: 오늘까지의 누계(현재 수준)  - 마감월: 월말 최종 누계  - 월말 전망: 영업현황 월말(마지막 날) 누계
+  const statusRows_ = Array.isArray(status.rows) ? status.rows : [];
+  const netEnd = Number(actual.유지증가) || 0; // 영업현황 월말 누계 (일보에 기록된 개시·해약·단가변동 전부 반영)
+  const netTodayRow_ = isCurMonth ? statusRows_.find(function (r) { return r.날짜 === todayDs_; }) : null;
+  const netAmt = netTodayRow_ ? (Number(netTodayRow_.누계유지증가) || 0) : netEnd;
   const netTgt = Number(target.목표_유지증가) || 0;
   const netPct = netTgt !== 0 ? Math.round((netAmt / netTgt) * 1000) / 10 : 0;
   const netRank = rankText_(biz && biz.net);
@@ -8070,12 +8076,12 @@ function renderDashboard(){
   const cancelAmtK = k_((cancel.overall || {}).amount);
   const priceUpK = k_((priceUp.overall || {}).amount);
   const priceDownK = k_((priceDown.overall || {}).amount);
-  const projNet = (isCurMonth && elDays > 0 && totDays > 0) ? Math.round((netAmt / elDays) * totDays) : null;
+  const projNet = isCurMonth ? netEnd : null; // 영업현황 월말 기준 전망
   const projNetPct = (projNet !== null && netTgt !== 0) ? Math.round((projNet / netTgt) * 1000) / 10 : null;
   const netSubHtml = isFutureMonth
     ? `${m}월 유지증가 집계 전`
     : `해약 ${cancelCntOv}건 ${fmtK(cancelAmtK)}천원 | 인상 ${fmtK(priceUpK)}천원 · 인하 ${fmtK(priceDownK)}천원` +
-      (projNet !== null ? ` | 현 페이스 월말 환산: <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원${projNetPct !== null ? ' (' + projNetPct + '%)' : ''}</strong>` : '');
+      (projNet !== null ? ` | ${m}월말 전망(영업현황 월말 기준): <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원${projNetPct !== null ? ' (' + projNetPct + '%)' : ''}</strong>` : '');
 
   let safeSubHtml;
   if (!hasSafety) {
@@ -8209,9 +8215,9 @@ function renderDashboard(){
   if (isFutureMonth) {
     aiTask2 = `${m}월 유지증가 목표는 ${sgnK_(netTgt)}천원입니다. 해약 방어와 단가인상 계획을 사전에 수립하세요.`;
   } else {
-    let s2 = `${m}월 유지증가는 <strong style="color:${netAmt < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(netAmt)}천원</strong>(목표 ${sgnK_(netTgt)}천원 대비 ${netPct}%)입니다. 해약 ${cancelCntOv}건(${fmtK(cancelAmtK)}천원), 단가인상 ${fmtK(priceUpK)}천원, 단가인하 ${fmtK(priceDownK)}천원이 반영되었습니다.`;
-    if (projNet !== null) s2 += ` 현 페이스가 유지될 경우 월말 환산치는 ${sgnK_(projNet)}천원${projNetPct !== null ? '(' + projNetPct + '%)' : ''}입니다(경과 영업일 단순 환산).`;
-    if (netAmt < 0 || (netTgt > 0 && netPct < workRatio)) s2 += ' 목표 대비 부족하므로 <strong>설치공사가 필요 없는 유증 상품</strong>과 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>에 집중해야 합니다.';
+    let s2 = `${m}월 ${isCurMonth ? '현재까지 ' : ''}유지증가는 <strong style="color:${netAmt < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(netAmt)}천원</strong>(목표 ${sgnK_(netTgt)}천원 대비 ${netPct}%)입니다. 해약 ${cancelCntOv}건(${fmtK(cancelAmtK)}천원), 단가인상 ${fmtK(priceUpK)}천원, 단가인하 ${fmtK(priceDownK)}천원이 반영되었습니다.`;
+    if (projNet !== null) s2 += ` 영업현황 ${m}월말 기준(일보에 기록된 개시·해약·단가변동을 모두 반영) 유지증가 전망은 <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원</strong>${projNetPct !== null ? '(목표 대비 ' + projNetPct + '%)' : ''}입니다.`;
+    if (netAmt < 0 || (projNet !== null && netTgt > 0 && projNet < netTgt) || (projNet === null && netTgt > 0 && netPct < workRatio)) s2 += ' 목표 대비 부족하므로 <strong>설치공사가 필요 없는 유증 상품</strong>과 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>에 집중해야 합니다.';
     aiTask2 = s2;
   }
 
@@ -8295,7 +8301,7 @@ function renderDashboard(){
         <!-- (3) 유지증가 수준 -->
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:12px; font-weight:700; color:#475569;">(3) 유지증가 수준</span>
+            <span style="font-size:12px; font-weight:700; color:#475569;">(3) 유지증가 수준${isCurMonth ? ' (현재까지)' : ''}</span>
             
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
