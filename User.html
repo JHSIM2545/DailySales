@@ -9850,7 +9850,7 @@ function deleteCancelGridRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('cancel'); }  
  else { CANCEL_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderCancel(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ CANCEL_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderCancel(); alert('삭제 실패: ' + err); })  
@@ -10276,7 +10276,7 @@ function deletePriceGridRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('price'); }  
  else { PRICE_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderPrice(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ PRICE_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderPrice(); alert('삭제 실패: ' + err); })  
@@ -11185,7 +11185,9 @@ function submitNewProductDailyRow(){
     .withSuccessHandler(function(res){
       setLoadingCursor(false);
       closeProductDailyModal();
+      if (typeof clearScopeCacheKeys_ === 'function') clearScopeCacheKeys_('productDailyData');
       loadProductDailyData();
+      onDataChanged_('productdaily');
     })
     .withFailureHandler(function(err){
       setLoadingCursor(false);
@@ -11227,7 +11229,7 @@ function deleteRestartGridRow(id){
  setSyncStatus('saving');  
  google.script.run  
  .withSuccessHandler(function(res){  
- if (res && res.success) setSyncStatus('ok');  
+ if (res && res.success) { setSyncStatus('ok'); onDataChanged_('restart'); }  
  else { RESTART_ROWS.splice(idx, 0, removed); setSyncStatus('error', res && res.error); renderRestart(); alert('삭제 실패: ' + (res && res.error ? res.error : '알 수 없는 오류')); }  
  })  
  .withFailureHandler(function(err){ RESTART_ROWS.splice(idx, 0, removed); setSyncStatus('error', err); renderRestart(); alert('삭제 실패: ' + err); })  
