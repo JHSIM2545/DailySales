@@ -8568,78 +8568,6 @@ function renderDashboard(){
       ordCount: Number((order.overall || {}).count) || 0,
       leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
       motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
-      ordCount: Number((order.overall || {}).count) || 0,
-      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
-      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -18923,17 +18851,46 @@ function buildStrategyDoc_(c){
   const rk = function (o) { return o.rank > 0 ? '사업팀 ' + o.rank + '위' : '달성률 ' + o.pct + '%'; };
   const gOrd = (c.ord.rank > 0 && c.ord.gap !== null && c.ord.gap !== undefined) ? c.ord.gap : r1(c.ord.pct - c.workRatio);
   const gSt = (c.start.rank > 0 && c.start.gap !== null && c.start.gap !== undefined) ? c.start.gap : r1(c.start.pct - c.workRatio);
-  const weak = gOrd < 0 || gSt < 0;
   const vNet = (c.isCurMonth && c.rowEnd) ? (Number(c.rowEnd.누계유지증가) || 0) : c.net.amt;
   const pNet = c.net.tgt ? r1(vNet / c.net.tgt * 100) : 0;
   const lossAll = A(c.cancel.amt) + A(c.priceDownK);
   const sumLines = [];
+  const refP = c.isCurMonth ? c.workRatio : 100;
+  /* 지표별 개별 판정: 2=양호(목표 달성/상위권) 1=보통 0=미흡 */
+  const lvl = function (o) {
+    const hr = o.rank > 0;
+    if (o.pct >= refP || (hr && o.rank <= Math.ceil(nb / 3))) return 2;
+    if ((hr && o.rank >= Math.ceil(nb * 0.6)) || o.pct < refP - 5) return 0;
+    return 1;
+  };
+  const lo = lvl(c.ord), ls = lvl(c.start);
+  const wdL = ['미흡', '다소 부족', '양호'];
+  const prT = function (o) { return o.rank > 0 ? ('사업팀 ' + o.rank + '위') : ('달성률 ' + o.pct + '%'); };
+  const weakList = [];
   if (c.isFutureMonth) sumLines.push(m + '월은 아직 실적 집계 전입니다.');
   else {
-    sumLines.push(m + '월 ' + (c.isCurMonth ? '현재 ' : '') + ((c.ord.rank > 0 && c.start.rank > 0) ? ('수주는 사업팀 ' + c.ord.rank + '위, 개시는 ' + c.start.rank + '위로 ') : ('수주 ' + c.ord.pct + '%, 개시 ' + c.start.pct + '%로 ')) + '목표달성이 ' + (weak ? '미흡합니다.' : '양호합니다.'));
-    sumLines.push((lossAll > c.start.amt ? '해약·인하 증가로 ' : '') + '유지증가 ' + (c.isCurMonth ? '전망은 ' : '는 ') + S(vNet) + '천원(목표 대비 ' + pNet + '%)로 ' + (vNet < 0 ? '매우 부정적입니다.' : (pNet < 100 ? '목표에 미달합니다.' : '목표를 달성했습니다.')));
-    if (c.safety) sumLines.push('안전상품은 수주 ' + c.safety.ordPct + '%, 매출 ' + c.safety.salePct + '%로 ' + (c.safety.salePct < c.safety.ordPct ? '매출 전환이 미흡합니다.' : '수주·매출이 균형입니다.'));
-    sumLines.push((weak || pNet < 100) ? '특단의 영업 전략 수립이 필요한 시기입니다.' : '현재 흐름을 유지하며 해약 방어에 집중할 시기입니다.');
+    const cur = m + '월 ' + (c.isCurMonth ? '현재 ' : '');
+    if (lo === ls) sumLines.push(cur + '수주 ' + prT(c.ord) + ', 개시 ' + prT(c.start) + '로 목표달성이 ' + wdL[lo] + (lo === 2 ? '합니다.' : '합니다.'));
+    else sumLines.push(cur + '수주는 ' + prT(c.ord) + '로 ' + wdL[lo] + ', 개시는 ' + prT(c.start) + '로 ' + wdL[ls] + '합니다.');
+    if (lo === 0) weakList.push('수주'); if (ls === 0) weakList.push('개시');
+    const lossTxt = (lossAll > c.start.amt ? '해약·인하 증가로 ' : '');
+    const nl = vNet < 0 ? 0 : (pNet >= (c.isCurMonth ? Math.min(100, c.workRatio) : 100) ? 2 : (pNet >= 80 ? 1 : 0));
+    if (nl === 0) weakList.push('유지증가');
+    sumLines.push(lossTxt + '유지증가' + (c.isCurMonth ? ' 전망은 ' : '는 ') + S(vNet) + '천원(목표 대비 ' + pNet + '%)으로 ' + (vNet < 0 ? '매우 부정적입니다.' : (nl === 2 ? (c.isCurMonth ? '영업일 진도를 상회합니다.' : '목표를 달성했습니다.') : (nl === 1 ? '목표에 다소 못 미칩니다.' : '목표에 미달합니다.'))));
+    if (c.safety) {
+      const so = c.safety.ordPct, ss = c.safety.salePct;
+      const sref = refP;
+      let tail;
+      if (so >= sref && ss >= sref) tail = '수주·매출 모두 목표를 초과했습니다.';
+      else if (so >= sref) { tail = '수주는 양호하나 매출 전환은 다소 부족합니다.'; }
+      else if (ss >= sref) tail = '매출은 양호하나 수주 확대가 필요합니다.';
+      else { tail = '수주·매출 모두 목표에 미달합니다.'; weakList.push('안전상품'); }
+      sumLines.push('안전상품은 수주 ' + so + '%, 매출 ' + ss + '%로 ' + tail);
+    }
+    if (weakList.length >= 3) sumLines.push('특단의 영업 전략 수립이 필요한 시기입니다.');
+    else if (weakList.length) sumLines.push(weakList.join('·') + ' 보완에 집중해야 할 시기입니다.');
+    else if (lo === 2 && ls === 2) sumLines.push('현재 흐름을 유지하며 해약 방어에 집중할 시기입니다.');
+    else sumLines.push('부족한 부문을 보완하며 목표 달성에 집중할 시기입니다.');
   }
   const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
   const wd = String(c.todayDs || '').replace(/-/g, '.');
