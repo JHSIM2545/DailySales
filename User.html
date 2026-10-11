@@ -8158,6 +8158,21 @@ function renderDashboard(){
       safety: hasSafety ? { ordAmt: safeOrdAmt, ordTgt: safeOrdTgt, ordPct: safeOrdPct, saleAmt: safeSaleAmt, saleTgt: safeSaleTgt, salePct: safeSalePct } : null,
       cancel: { cnt: cancelCntOv, amt: cancelAmtK }, priceUpK: priceUpK, priceDownK: priceDownK,
       reps: repRankings,
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -14005,169 +14020,259 @@ function printAiReport_(){
   window.print();
 }
 
-/* ===== 영업전략 PDF: 대시보드 실데이터(window.DASH_REPORT_CTX_)로 생성 / 맑은 고딕 14pt 이상 ===== */
-function buildStrategyReportHtml_(c){
+/* ===== 영업전략 PDF v2: 대시보드 실데이터(window.DASH_REPORT_CTX_)로 생성 / 맑은 고딕 14pt 이상 / A4 세로 / 빈 공간 없이 페이지 채움 ===== */
+function buildStrategyDoc_(c){
   const K = function(v){ return (typeof fmtK === 'function') ? fmtK(v) : String(Math.round(Number(v)||0)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
   const S = function(v){ v = Number(v)||0; return (v > 0 ? '+' : '') + K(v); };
   const esc = function(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
-  const m = c.m, y = c.y;
-  const modeTxt = c.isCurMonth ? (c.todayDs + ' 기준 · ' + c.elDays + '/' + c.totDays + '영업일 경과 (' + c.workRatio + '%)') : (c.isPastMonth ? (m + '월 최종 마감 기준') : (m + '월 집계 전'));
-  const rankTxt = function(o){ return (o && o.rank > 0) ? (o.rank + '위 / ' + c.bizTotal + '개') : '-'; };
-  const gapTxt = function(o){ return (o && o.gap !== null && o.gap !== undefined) ? ((o.gap > 0 ? '+' : '') + o.gap + '%p') : '-'; };
-  const css = '<style>'
-   + '.pp{width:1123px;box-sizing:border-box;padding:34px 44px;background:#fff;color:#0f172a;font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR",sans-serif;font-size:14pt;line-height:1.55;}'
-   + '.pp h1{font-size:34px;margin:0 0 10px;color:#1e3a8a;}'
-   + '.pp h2{font-size:25px;margin:0 0 12px;padding-bottom:6px;border-bottom:3px solid #1e3a8a;color:#1e3a8a;}'
-   + '.pp h3{font-size:20.5px;margin:16px 0 8px;color:#0f172a;}'
-   + '.pp p{margin:6px 0;} .pp ul{margin:6px 0;padding-left:26px;} .pp li{margin:4px 0;}'
-   + '.pp table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:14pt;}'
-   + '.pp th{background:#e2e8f0;border:1px solid #94a3b8;padding:6px 8px;text-align:center;white-space:nowrap;}'
-   + '.pp td{border:1px solid #cbd5e1;padding:6px 8px;vertical-align:middle;}'
-   + '.pp td.n{text-align:right;white-space:nowrap;} .pp td.c{text-align:center;white-space:nowrap;} .pp td.t{white-space:nowrap;}'
-   + '.pp tr.sum td{background:#eff6ff;font-weight:700;}'
-   + '.pp .neg{color:#b91c1c;font-weight:700;} .pp .pos{color:#0f766e;font-weight:700;}'
-   + '.pp .note{font-size:14pt;color:#475569;}'
-   + '.pp .task{border:1px solid #cbd5e1;border-left:6px solid #1e3a8a;border-radius:6px;padding:10px 14px;margin:10px 0;}'
-   + '</style>';
-  const sec = function(inner){ return '<div class="pp">' + inner + '</div>'; };
-  const pc = function(v){ return '<span class="' + (v < 0 ? 'neg' : 'pos') + '">' + S(v) + '</span>'; };
+  const A = function(v){ return Math.abs(Number(v)||0); };
+  const r1 = function(v){ return Math.round(v * 10) / 10; };
+  const m = c.m, y = c.y, nb = c.bizTotal || 16;
+  const hasBiz = c.ord.rank > 0;
+  const modeTxt = c.isCurMonth ? (c.todayDs.replace(/-/g, '.') + ' 기준 · ' + c.elDays + '/' + c.totDays + '영업일 경과 (' + c.workRatio + '%)') : (c.isPastMonth ? (m + '월 최종 마감 기준') : (m + '월 집계 전'));
+  const gapS = function(g){ return (g > 0 ? '+' : '') + g + '%p'; };
+  const traf = function(pct, o){
+    const ref = (o.avg !== null && o.avg !== undefined && o.rank > 0) ? o.avg : c.workRatio;
+    const d = pct - ref;
+    return d >= 0 ? { t: '양호', col: '#0f766e', bg: '#ccfbf1' } : (d >= -5 ? { t: '주의', col: '#854d0e', bg: '#fef9c3' } : { t: '위험', col: '#991b1b', bg: '#fee2e2' });
+  };
+  const rankLine = function(o, label){
+    if (o.rank > 0) return '서울사업팀 ' + nb + '개 지사 중 <b>' + o.rank + '위</b>' + (o.rank === nb ? ' (최하위)' : '') + '<br>사업팀 평균(' + o.avg + '%) 대비 <b>' + gapS(o.gap) + '</b>';
+    return '영업일 진척률(' + c.workRatio + '%) 대비 <b>' + gapS(r1(o.pct - c.workRatio)) + '</b><br><span style="color:#64748b">사업팀 순위 자료 없음</span>';
+  };
+  const blocks = [];
+  const add = function(html, keep){ blocks.push({ html: html, keep: !!keep }); };
+  const band = function(no, title, sub){ return '<div class="blk band"><div><div class="eb">' + no + '</div><h2>' + title + '</h2></div><div class="sub">' + sub + '</div></div>'; };
 
-  /* 표지 */
-  let p0 = '<h1>' + y + '년 ' + m + '월 북서울지사<br>AI 종합 영업전략 가이드라인</h1>'
-    + '<p class="note">' + esc(modeTxt) + '</p>'
-    + '<p class="note">모든 수치는 영업일보 DB 실데이터로 생성되며, 금액은 천원 단위입니다.</p>'
-    + '<h3>목차</h3><ul><li>1. 북서울지사 영업 현황</li><li>2. 현황 점검</li><li>3. 수주 현황</li><li>4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표</li><li>5. 월말 전망</li><li>6. 핵심 4대 과제</li><li>7. 집계 기준</li></ul>';
+  /* ───── 표지 ───── */
+  const cover = '<div class="pg cover"><div class="cv-top"><div class="eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
+    + '<h1>에스원 북서울지사<br>영업 전략 가이드라인</h1>'
+    + '<p class="cv-sub">' + m + '월 실시간 영업 데이터 기반 [현황 ➔ 분석 ➔ 문제점 ➔ 원인점검 ➔ 전망 ➔ 대책] 완결 체계</p>'
+    + '<p class="cv-sub2">서울사업팀 ' + nb + '개 지사 벤치마크 대조 및 현장 즉각 실행 행동 지침서</p></div>'
+    + '<div class="cv-box"><div class="eb">STRATEGIC ANALYSIS FRAMEWORK</div><div class="cv-grid">'
+    + '<div><b>01 · 02</b><br>현황 및 현황분석</div><div><b>03 · 04</b><br>문제점 및 원인점검</div><div><b>05 · 06</b><br>수주 · 성과 · 월말 전망</div><div><b>07</b><br>실행 대책 및 행동수칙</div></div></div>'
+    + '<div class="cv-ft"><div>발행처: 에스원 북서울지사 영업전략실</div><div>기준: ' + esc(modeTxt) + '</div><div>보안등급: 대외비 (내부 공유용)</div></div></div>';
 
-  /* 1. 현황 */
-  const sf = c.safety;
-  let p1 = '<h2>1. 북서울지사 영업 현황</h2>'
-    + '<table><thead><tr><th>지표</th><th>실적</th><th>목표</th><th>달성률</th><th>사업팀 순위</th><th>사업팀 평균 대비</th></tr></thead><tbody>'
-    + '<tr><td class="t">수주</td><td class="n">' + K(c.ord.amt) + '</td><td class="n">' + K(c.ord.tgt) + '</td><td class="c">' + c.ord.pct + '%</td><td class="c">' + rankTxt(c.ord) + '</td><td class="c">' + gapTxt(c.ord) + '</td></tr>'
-    + '<tr><td class="t">개시</td><td class="n">' + K(c.start.amt) + '</td><td class="n">' + K(c.start.tgt) + '</td><td class="c">' + c.start.pct + '%</td><td class="c">' + rankTxt(c.start) + '</td><td class="c">' + gapTxt(c.start) + '</td></tr>'
-    + '<tr><td class="t">유지증가' + (c.isCurMonth ? ' (현재까지)' : '') + '</td><td class="n">' + S(c.net.amt) + '</td><td class="n">' + S(c.net.tgt) + '</td><td class="c">' + c.net.pct + '%</td><td class="c">' + rankTxt(c.net) + '</td><td class="c">' + gapTxt(c.net) + '</td></tr>'
-    + (sf ? ('<tr><td class="t">안전상품 수주</td><td class="n">' + K(sf.ordAmt) + '</td><td class="n">' + K(sf.ordTgt) + '</td><td class="c">' + sf.ordPct + '%</td><td class="c">-</td><td class="c">-</td></tr>'
-      + '<tr><td class="t">안전상품 매출</td><td class="n">' + K(sf.saleAmt) + '</td><td class="n">' + K(sf.saleTgt) + '</td><td class="c">' + sf.salePct + '%</td><td class="c">-</td><td class="c">-</td></tr>') : '')
-    + '</tbody></table>'
-    + '<p class="note">' + (c.bizDate ? ('사업팀 순위는 ' + esc(c.bizDate) + ' 사업팀 자료 기준입니다. ') : '사업팀 자료가 없어 순위는 표시하지 않습니다. ') + '영업일 진척률은 ' + c.workRatio + '%입니다.</p>';
+  /* ───── Chapter 01·02 현황 ───── */
+  add(band('CHAPTER 01 · 02', '1. 월간 영업 현황 및 현황분석', '기준: ' + esc(modeTxt)), true);
+  const tO = traf(c.ord.pct, c.ord), tS = traf(c.start.pct, c.start), tN = traf(c.net.pct, c.net);
+  const badge = function(t){ return '<span class="bdg" style="color:' + t.col + ';background:' + t.bg + '">' + t.t + '</span>'; };
+  let intro = y + '년 ' + m + '월 ' + (c.isCurMonth ? ('현재(' + c.elDays + '영업일 경과, 영업일 진척률 ' + c.workRatio + '%)') : (c.isPastMonth ? '최종 마감 기준' : '집계 전')) + ', 북서울지사의 수주 달성률은 ' + c.ord.pct + '%, 개시 ' + c.start.pct + '%, 유지증가 ' + S(c.net.amt) + '천원(목표 대비 ' + c.net.pct + '%)입니다.';
+  if (c.safety) intro += ' 안전상품은 수주 ' + c.safety.ordPct + '%, 확정 매출 ' + c.safety.salePct + '% 수준입니다.';
+  add('<div class="blk"><h3 class="s">1.1 4대 핵심 지표 영업 현황' + (hasBiz ? ' 및 서울사업팀 ' + nb + '개 지사 벤치마크' : '') + '</h3><p>' + esc(intro) + '</p>'
+    + '<div class="kpi">'
+    + '<div class="card"><div class="ch"><b>(1) 수주진척도</b>' + badge(tO) + '</div><div class="kv">' + K(c.ord.amt) + '천원 <small>(' + c.ord.pct + '%)</small></div><div class="kt">목표 ' + K(c.ord.tgt) + '천원<br>' + rankLine(c.ord) + '</div></div>'
+    + '<div class="card"><div class="ch"><b>(2) 개시진척도</b>' + badge(tS) + '</div><div class="kv">' + K(c.start.amt) + '천원 <small>(' + c.start.pct + '%)</small></div><div class="kt">목표 ' + K(c.start.tgt) + '천원<br>' + rankLine(c.start) + '</div></div>'
+    + '<div class="card"><div class="ch"><b>(3) 유지증가' + (c.isCurMonth ? ' (현재까지)' : '') + '</b>' + badge(tN) + '</div><div class="kv" style="color:' + (c.net.amt < 0 ? '#b91c1c' : '#0f766e') + '">' + S(c.net.amt) + '천원 <small>(' + c.net.pct + '%)</small></div><div class="kt">목표 ' + S(c.net.tgt) + '천원<br>' + rankLine(c.net) + '</div></div>'
+    + '<div class="card"><div class="ch"><b>(4) 안전상품 수주 / 매출</b></div>' + (c.safety
+      ? ('<div class="kv">수주 ' + K(c.safety.ordAmt) + '천원 <small>(' + c.safety.ordPct + '%)</small></div><div class="kt">목표 ' + K(c.safety.ordTgt) + '천원<br>확정 매출 <b>' + K(c.safety.saleAmt) + '천원 (' + c.safety.salePct + '%)</b></div>')
+      : '<div class="kt">상품일보 집계 데이터 없음</div>') + '</div>'
+    + '</div></div>');
 
-  /* 2. 현황 점검 (사실 기반 체크리스트) */
-  const f = [];
-  const dOrd = Math.round((c.ord.pct - c.workRatio) * 10) / 10, dStart = Math.round((c.start.pct - c.workRatio) * 10) / 10;
-  if (c.isFutureMonth) f.push(m + '월은 아직 집계 전입니다.');
-  else {
-    f.push('수주 달성률 ' + c.ord.pct + '%' + (c.ord.gap !== null && c.ord.gap !== undefined ? (' — 사업팀 평균 대비 ' + gapTxt(c.ord) + ', ' + rankTxt(c.ord)) : (' — 영업일 진척(' + c.workRatio + '%) 대비 ' + (dOrd > 0 ? '+' : '') + dOrd + '%p')));
-    f.push('개시 달성률 ' + c.start.pct + '%' + (c.start.gap !== null && c.start.gap !== undefined ? (' — 사업팀 평균 대비 ' + gapTxt(c.start) + ', ' + rankTxt(c.start)) : (' — 영업일 진척 대비 ' + (dStart > 0 ? '+' : '') + dStart + '%p')));
-    f.push('유지증가 ' + S(c.net.amt) + '천원 (목표 대비 ' + c.net.pct + '%) — 해약 ' + c.cancel.cnt + '건 ' + K(c.cancel.amt) + '천원, 단가인상 ' + K(c.priceUpK) + '천원, 단가인하 ' + K(c.priceDownK) + '천원');
-    const zero = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; });
-    if (zero.length) f.push('수주 실적이 없는 컨설턴트: ' + zero.join(', '));
-    const idle = c.reps.filter(function(r){ return r.zeroDays !== null && r.zeroDays >= 3 && r.orderCount > 0; }).map(function(r){ return r.name + ' ' + r.zeroDays + '영업일'; });
-    if (idle.length) f.push('3영업일 이상 연속 무수주: ' + idle.join(', '));
-    if (c.timingTotalK > 0) {
-      const cur = c.timing.filter(function(b){ return b.key === 'cur'; })[0];
-      f.push('수주 건 중 당월 개시 비중 ' + (cur ? cur.pct : 0) + '% — 나머지는 차월 이후 또는 미정입니다.');
-    }
-    if (sf) f.push('안전상품 수주 ' + sf.ordPct + '% / 매출 ' + sf.salePct + '% (영업일 진척 ' + c.workRatio + '%)');
-  }
-  let p2 = '<h2>2. 현황 점검</h2><p class="note">아래는 DB 수치에서 읽히는 사실이며, 원인 판단은 담당 팀장이 현장 확인 후 내립니다.</p><ul>' + f.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+  const cur = c.timing.filter(function(b){ return b.key === 'cur'; })[0];
+  const curK = cur ? cur.amountK : 0, curShare = c.timingTotalK > 0 ? r1(curK / c.timingTotalK * 100) : 0;
+  const lossK = A(c.cancel.amt) + A(c.priceDownK);
+  let a1 = '', a2 = '', a3 = '';
+  if (c.timingTotalK > 0) a1 = '<b>① 수주와 개시 간의 시차:</b> 당월 수주 ' + K(c.timingTotalK) + '천원 중 당월 개시로 연결된 금액은 ' + K(curK) + '천원(' + curShare + '%)이며, 나머지 ' + r1(100 - curShare) + '%는 차월 이후 또는 미정입니다.' + (curShare < 50 ? ' 수주가 발생해도 당월 개시·유지증가로 환산되는 비중이 낮습니다.' : '');
+  else a1 = '<b>① 수주와 개시 간의 시차:</b> 집계할 당월 수주 건이 없습니다.';
+  a2 = '<b>② 해약·단가변동과 유지증가:</b> 개시 ' + K(c.start.amt) + '천원에 대해 해약 ' + c.cancel.cnt + '건(-' + K(A(c.cancel.amt)) + '천원), 단가인하 -' + K(A(c.priceDownK)) + '천원, 단가인상 +' + K(A(c.priceUpK)) + '천원이 반영되어 유지증가는 ' + S(c.net.amt) + '천원입니다.' + (lossK > c.start.amt ? ' 해약·인하 합계(' + K(lossK) + '천원)가 개시 실적을 웃돌고 있습니다.' : '');
+  if (c.safety) { const dd = r1(c.safety.ordPct - c.safety.salePct); a3 = '<b>③ 안전상품 수주와 매출:</b> 수주 ' + K(c.safety.ordAmt) + '천원(' + c.safety.ordPct + '%) 대비 확정 매출 ' + K(c.safety.saleAmt) + '천원(' + c.safety.salePct + '%)으로, ' + (dd > 0 ? ('매출 전환이 수주보다 ' + dd + '%p 뒤처져 있습니다. 시공·검수 일정 관리가 필요합니다.') : '매출 전환이 수주 속도를 따라가고 있습니다.'); }
+  else a3 = '<b>③ 안전상품:</b> 상품일보 집계 데이터가 아직 없습니다.';
+  add('<div class="blk"><h3 class="s">1.2 현황 분석</h3><p>' + a1 + '</p><p>' + a2 + '</p><p>' + a3 + '</p></div>');
 
-  /* 3. 수주 현황 */
+  /* ───── Chapter 03·04 문제점 ───── */
+  add(band('CHAPTER 03 · 04', '2. 핵심 문제점 및 원인 점검', '현황 수치에서 확인되는 문제 영역'), true);
+  const P = [];
+  const gapO = hasBiz ? c.ord.gap : r1(c.ord.pct - c.workRatio), gapSt = hasBiz ? c.start.gap : r1(c.start.pct - c.workRatio);
+  P.push({ bad: gapO < 0, t: '수주 스피드 ' + (hasBiz ? '서울사업팀 평균 대비 ' : '영업일 진척 대비 ') + gapS(gapO),
+    d: '수주 달성률 ' + c.ord.pct + '%' + (hasBiz ? ' (사업팀 ' + nb + '개 지사 중 ' + c.ord.rank + '위, 평균 ' + c.ord.avg + '%)' : ' (영업일 진척률 ' + c.workRatio + '%)') + '.' + (function(){ const z = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; }); const idle = c.reps.filter(function(r){ return r.zeroDays !== null && r.zeroDays >= 3 && r.orderCount > 0; }).map(function(r){ return r.name + '(' + r.zeroDays + '영업일)'; }); return (z.length ? ' 당월 수주가 없는 컨설턴트: ' + z.join('·') + '.' : '') + (idle.length ? ' 3영업일 이상 무수주: ' + idle.join('·') + '.' : ''); })() });
+  P.push({ bad: gapSt < 0, t: '개시 전환 ' + (c.start.rank > 0 ? ('사업팀 ' + c.start.rank + '위') : ('진척 ' + c.start.pct + '%')),
+    d: '개시 ' + K(c.start.amt) + '천원(달성률 ' + c.start.pct + '%, ' + (hasBiz ? '사업팀 평균 대비 ' + gapS(gapSt) : '영업일 진척 대비 ' + gapS(gapSt)) + '). 당월 수주 중 당월 개시 비중은 ' + curShare + '%입니다.' });
+  P.push({ bad: c.net.amt < 0 || lossK > c.start.amt, t: '해약·인하 방어 (유지증가 ' + S(c.net.amt) + '천원)',
+    d: '해약 ' + c.cancel.cnt + '건 -' + K(A(c.cancel.amt)) + '천원, 단가인하 -' + K(A(c.priceDownK)) + '천원, 단가인상 +' + K(A(c.priceUpK)) + '천원. 유지증가 목표 ' + S(c.net.tgt) + '천원 대비 ' + c.net.pct + '%.' });
+  const zp = []; if (c.prod.bscan.cnt === 0) zp.push('블루스캔'); if (c.prod.huen.cnt === 0) zp.push('휴엔'); if (c.prod.digi.cnt === 0) zp.push('디지털');
+  const convBad = c.safety && c.safety.salePct < c.safety.ordPct;
+  P.push({ bad: zp.length > 0 || convBad, t: '전략상품·안전상품' + (zp.length ? ' — ' + zp.join('·') + ' 무실적' : ''),
+    d: '블루스캔 ' + c.prod.bscan.cnt + '건·' + K(c.prod.bscan.ord) + '천원, 휴엔 ' + c.prod.huen.cnt + '건·' + K(c.prod.huen.ord) + '천원, 디지털 ' + c.prod.digi.cnt + '건·' + K(c.prod.digi.ord) + '천원.' + (c.safety ? ' 안전상품 수주 ' + c.safety.ordPct + '% / 매출 ' + c.safety.salePct + '%.' : '') });
+  add('<div class="blk"><h3 class="s">2.1 지사 경영상 점검이 필요한 4대 문제 영역</h3></div>', true);
+  P.forEach(function(p, i){ add('<div class="blk card ' + (p.bad ? 'red' : 'grn') + '"><b>' + (p.bad ? '문제점 ' : '양호 ') + (i + 1) + '. ' + esc(p.t) + '</b><br>' + esc(p.d) + '</div>'); });
+  const upRate = A(c.priceDownK) > 0 ? Math.round(A(c.priceUpK) / A(c.priceDownK) * 100) : null;
+  add('<div class="blk"><h3 class="s">2.2 원인 점검표 (현장 확인 필요 사항)</h3><table><thead><tr><th>문제 영역</th><th>표면적 현상 (DB 수치)</th><th>원인 점검 포인트</th></tr></thead><tbody>'
+    + '<tr><td><b>개시일정</b></td><td>당월 개시 비중 ' + curShare + '%</td><td>기산일 설정 관행, 무료 테스트 기간, 공사·검수 일정</td></tr>'
+    + '<tr><td><b>해약 통제</b></td><td>해약 ' + c.cancel.cnt + '건 -' + K(A(c.cancel.amt)) + '천원, 인하 -' + K(A(c.priceDownK)) + '천원</td><td>해약 사유, 일시중지 전환 여부, 인하 요청 대응 내용</td></tr>'
+    + '<tr><td><b>단가인상</b></td><td>인상 +' + K(A(c.priceUpK)) + '천원' + (upRate !== null ? ' (인하 대비 ' + upRate + '%)' : '') + '</td><td>장기 고객 인상 제안 이력, CS·기술 순회 점검 연계</td></tr>'
+    + '<tr><td><b>전략상품</b></td><td>블루스캔 ' + c.prod.bscan.cnt + '건 · 휴엔 ' + c.prod.huen.cnt + '건 · 디지털 ' + c.prod.digi.cnt + '건</td><td>번들 제안 여부, 안건 발굴 지원 체계</td></tr>'
+    + '</tbody></table><p class="note">원인은 DB로 확인할 수 없어 점검 항목으로만 제시했습니다. 현장 확인 후 판단하세요.</p></div>');
+
+  /* ───── 3. 수주 현황 ───── */
+  add(band('DETAILED ANALYSIS', '3. 수주 현황 및 개시일정·소요일 분석', '컨설턴트별 순위 및 리드타임 비교'), true);
   const totOrd = c.reps.reduce(function(s, r){ return s + r.orderAmt; }, 0);
-  let p3 = '<h2>3. 수주 현황</h2><h3>3.1 컨설턴트별 수주</h3>'
-    + '<table><thead><tr><th>순위</th><th>컨설턴트</th><th>수주금액</th><th>건수</th><th>비중</th></tr></thead><tbody>'
-    + c.reps.map(function(r){ return '<tr><td class="c">' + r.rank + '</td><td class="t">' + esc(r.name) + '</td><td class="n">' + K(r.orderAmt) + '</td><td class="c">' + r.orderCount + '건</td><td class="c">' + (totOrd ? Math.round(r.orderAmt / totOrd * 1000) / 10 : 0) + '%</td></tr>'; }).join('')
-    + '</tbody></table>'
-    + '<h3>3.2 개시시기별 수주 비중</h3>'
-    + (c.timing.length ? ('<table><thead><tr><th>개시시기</th><th>금액</th><th>건수</th><th>비중</th></tr></thead><tbody>'
-      + c.timing.map(function(b){ return '<tr><td class="t">' + esc(b.label) + '</td><td class="n">' + K(b.amountK) + '</td><td class="c">' + b.count + '건</td><td class="c">' + b.pct + '%</td></tr>'; }).join('') + '</tbody></table>') : '<p>집계할 수주 건이 없습니다.</p>')
-    + '<h3>3.3 컨설턴트별 계약 → 기산 리드타임</h3>'
-    + '<table><thead><tr><th>컨설턴트</th><th>평균</th><th>최소~최대</th><th>구분</th></tr></thead><tbody>'
-    + c.reps.map(function(r){ return '<tr><td class="t">' + esc(r.name) + '</td><td class="c">' + esc(r.leadTime) + '</td><td class="c">' + (r.leadMax > 0 ? (r.leadMin + '~' + r.leadMax + '일') : '-') + '</td><td class="c">' + esc(r.leadTag) + '</td></tr>'; }).join('')
-    + '</tbody></table>';
+  add('<div class="blk"><h3 class="s">3.1 컨설턴트별 수주 실적 및 지사 기여도</h3><p>당월 지사 전체 수주는 총 ' + (c.ordCount || 0) + '건, ' + K(totOrd) + '천원입니다.</p><table><thead><tr><th>컨설턴트</th><th>수주금액</th><th>건당 단가</th><th>점유율</th><th>영업동기</th></tr></thead><tbody>'
+    + c.reps.map(function(r){ return '<tr><td><b>' + (r.rank === '-' ? '' : r.rank + '위 ') + esc(r.name) + '</b></td><td class="n">' + K(r.orderAmt) + '천원 (' + r.orderCount + '건)</td><td class="n">' + (r.orderCount ? r.unitAmt + '만' : '-') + '</td><td class="n">' + (totOrd ? r1(r.orderAmt / totOrd * 100) : 0) + '%</td><td>' + esc(r.motive) + '</td></tr>'; }).join('')
+    + '<tr class="sum"><td>지사 합계</td><td class="n">' + K(totOrd) + '천원 (' + (c.ordCount || 0) + '건)</td><td class="n">' + (c.ordCount ? r1(totOrd / c.ordCount / 10) + '만' : '-') + '</td><td class="n">100%</td><td>' + esc(c.motiveAll || '-') + '</td></tr>'
+    + '</tbody></table></div>');
+  add('<div class="blk"><h3 class="s">3.2 개시시기별 비중 분석</h3>' + (c.timing.length
+    ? ('<p>수주 ' + K(c.timingTotalK) + '천원 중 당월 개시 비중은 ' + curShare + '%입니다.</p><table><thead><tr><th>개시 예정 시기</th><th>건수</th><th>금액</th><th>구성비</th></tr></thead><tbody>'
+      + c.timing.map(function(b){ return '<tr><td>' + esc(b.label) + '</td><td class="n">' + b.count + '건</td><td class="n">' + K(b.amountK) + '천원</td><td class="n">' + b.pct + '%</td></tr>'; }).join('') + '</tbody></table>')
+    : '<p>집계할 당월 수주 건이 없습니다.</p>') + '</div>');
+  add('<div class="blk"><h3 class="s">3.3 컨설턴트별 계약일 ➔ 기산일 소요일 비교</h3><table><thead><tr><th>컨설턴트</th><th>평균</th><th>최단</th><th>최장</th><th>평가</th></tr></thead><tbody>'
+    + c.reps.map(function(r){ const ok = r.leadMax > 0; return '<tr><td><b>' + esc(r.name) + '</b></td><td class="n">' + (ok ? esc(r.leadTime) : '-') + '</td><td class="n">' + (ok ? r.leadMin + '일' : '-') + '</td><td class="n">' + (ok ? r.leadMax + '일' : '-') + '</td><td>' + (ok ? esc(r.leadTag) : '당월 수주 없음') + '</td></tr>'; }).join('')
+    + '</tbody></table></div>');
 
-  /* 4. 성과표 */
-  const pr = function(label, r, cls, indent){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td class="t">' + (indent ? '└ ' : '') + label + '</td><td class="n">' + r.cnt + '건 / ' + K(r.ord) + '</td><td class="n">' + K(r.start) + '</td><td class="n">' + K(r.can) + '</td><td class="n">' + S(r.prc) + '</td><td class="n">' + pc(r.net) + '</td></tr>'; };
-  let p4 = '<h2>4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표</h2><h3>4.1 상품군별 수주 / 개시 / 유지증가</h3>'
-    + '<table><thead><tr><th>상품군</th><th>수주</th><th>개시</th><th>해약</th><th>단가변동</th><th>유지증가</th></tr></thead><tbody>'
-    + pr('지사 합계', c.prod.tot, 'sum') + pr('일반알람', c.prod.alarm) + pr('블루스캔', c.prod.bscan, '', true) + pr('디지털', c.prod.digi) + pr('휴엔', c.prod.huen)
-    + '</tbody></table>'
-    + '<h3>4.2 컨설턴트별 성과</h3>'
-    + '<table><thead><tr><th>컨설턴트</th><th>수주 실적</th><th>수주주기 (무수주)</th><th>수주단가 (누적)</th><th>영업동기</th></tr></thead><tbody>'
-    + c.reps.map(function(r){
-        return '<tr><td class="t"><b>' + esc(r.name) + '</b><br><span class="note">' + esc(r.style) + '</span></td>'
-          + '<td class="n">' + K(r.orderAmt) + ' (' + r.orderCount + '건)</td>'
-          + '<td class="c">' + (r.period > 0 ? r.period + '일' : '-') + (r.zeroDays !== null ? ' (' + r.zeroDays + '일)' : '') + '</td>'
-          + '<td class="n">' + r.unitAmt + '만 (' + r.cumUnitAmt + '만)</td>'
-          + '<td>' + esc(r.motive) + '</td></tr>';
-      }).join('')
-    + '</tbody></table><p class="note">수주주기는 과거 수주 2건 이상일 때 평균 간격, 무수주는 마지막 수주 이후 경과한 영업일(당월만)입니다. 영업동기는 수주금액 기준 비중입니다.</p>';
+  /* ───── 4. 성과표 ───── */
+  add(band('PERFORMANCE MATRIX', '4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표', '당월 실적 기준'), true);
+  const pr = function(label, r, cls, ind){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + (ind ? '└ ' : '') + '<b>' + label + '</b></td><td class="n">' + r.cnt + '건 / ' + K(r.ord) + '</td><td class="n">' + K(r.start) + '</td><td class="n">' + K(r.can) + '</td><td class="n">' + S(r.prc) + '</td><td class="n" style="color:' + (r.net < 0 ? '#b91c1c' : '#0f766e') + '"><b>' + S(r.net) + '</b></td></tr>'; };
+  add('<div class="blk"><h3 class="s">4.1 상품군별 수주 및 유지증가 실적 (천원)</h3><table><thead><tr><th>상품군</th><th>수주 (건수/금액)</th><th>개시</th><th>해약</th><th>단가변동</th><th>유지증가</th></tr></thead><tbody>'
+    + pr('⭐ 지사 합계', c.prod.tot, 'sum') + pr('일반알람', c.prod.alarm) + pr('블루스캔', c.prod.bscan, '', true) + pr('디지털', c.prod.digi) + pr('휴엔', c.prod.huen) + '</tbody></table></div>');
+  add('<div class="blk"><h3 class="s">4.2 컨설턴트별 성과분석</h3><table><thead><tr><th>컨설턴트</th><th>수주 실적</th><th>수주주기 (무수주)</th><th>수주단가 (누적)</th><th>영업동기</th></tr></thead><tbody>'
+    + c.reps.map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b><br><span class="sm">' + esc(r.style) + '</span></td><td class="n">' + K(r.orderAmt) + '천원<br>(' + r.orderCount + '건)</td><td class="n">' + (r.period > 0 ? r.period + '일' : '-') + (r.zeroDays !== null ? '<br><span style="color:' + (r.zeroDays > 2 ? '#dc2626' : '#059669') + '">(' + r.zeroDays + '일)</span>' : '') + '</td><td class="n">' + r.unitAmt + '만<br>(' + r.cumUnitAmt + '만)</td><td>' + esc(r.motive) + '</td></tr>'; }).join('')
+    + '</tbody></table><p class="note">무수주는 마지막 수주 이후 경과한 영업일(주말·공휴일 제외, 당월만)이며, 영업동기는 수주금액 기준 비중입니다.</p></div>');
 
-  /* 5. 월말 전망 */
-  let p5 = '<h2>5. 월말 전망</h2>';
-  if (c.isFutureMonth) p5 += '<p>' + m + '월은 집계 전입니다.</p>';
+  /* ───── 5. 월말 전망 ───── */
+  add(band('CHAPTER 05 · 06', '5. ' + m + '월말 실적 전망 및 분석', '영업현황 월말 기준'), true);
+  const rt = c.rowToday, re = c.rowEnd;
+  if (c.isFutureMonth) add('<div class="blk"><p>' + m + '월은 집계 전입니다.</p></div>');
+  else if (!re) add('<div class="blk"><p>영업현황 일별 데이터가 없습니다.</p></div>');
   else {
-    const rt = c.rowToday, re = c.rowEnd;
-    const fld = [['수주', '누계수주'], ['개시', '누계개시'], ['해약·중지', '누계해약중지'], ['단가인상', '누계인상'], ['단가인하', '누계인하'], ['재개시', '누계재개시'], ['유지증가', '누계유지증가']];
-    if (c.isCurMonth && rt && re) {
-      p5 += '<table><thead><tr><th>구분 (누계)</th><th>현재까지 (' + esc(rt.날짜.slice(5)) + ')</th><th>' + m + '월말 (영업현황)</th><th>차이</th></tr></thead><tbody>'
-        + fld.map(function(x){ const a = Number(rt[x[1]])||0, b = Number(re[x[1]])||0; return '<tr><td class="t">' + x[0] + '</td><td class="n">' + S(a) + '</td><td class="n">' + S(b) + '</td><td class="n">' + S(b - a) + '</td></tr>'; }).join('')
-        + '</tbody></table><p>유지증가 월말 전망은 <b>' + S(c.net.end) + '천원</b>' + (c.net.endPct !== null ? ' (목표 대비 ' + c.net.endPct + '%)' : '') + '입니다. 월말 수치는 영업현황의 마지막 날 누계이며, 오늘 이후 기산일로 이미 입력된 일보 건이 반영됩니다.</p>';
-    } else if (re) {
-      p5 += '<p>' + m + '월 최종 마감: 수주 ' + K(re.누계수주) + ', 개시 ' + K(re.누계개시) + ', 유지증가 ' + S(re.누계유지증가) + '천원 (목표 대비 ' + c.net.pct + '%)</p>';
-    } else p5 += '<p>영업현황 일별 데이터가 없습니다.</p>';
+    const now = c.isCurMonth && rt ? rt : re;
+    const pctOf = function(v, t){ return t ? r1(v / t * 100) + '%' : '-'; };
+    const rowsT = [
+      ['수주', c.ord.tgt, now.누계수주, re.누계수주, true],
+      ['개시', c.start.tgt, now.누계개시, re.누계개시, true],
+      ['해약·중지', null, now.누계해약중지, re.누계해약중지, false],
+      ['단가변동', null, (Number(now.누계인상) || 0) + (Number(now.누계인하) || 0), (Number(re.누계인상) || 0) + (Number(re.누계인하) || 0), false],
+      ['유지증가', c.net.tgt, now.누계유지증가, re.누계유지증가, true]
+    ];
+    add('<div class="blk"><h3 class="s">5.1 ' + m + '월말 실적 전망 (천원)</h3><p>' + (c.isCurMonth ? '현재까지 실적과 영업현황의 ' + m + '월말 누계(오늘 이후 기산일로 이미 입력된 일보 건 반영)를 비교합니다.' : m + '월 최종 마감 수치입니다.') + '</p><table><thead><tr><th>구분</th><th>월간 목표</th><th>' + (c.isCurMonth ? '현재까지' : '마감') + '</th><th>월말 전망</th><th>목표 대비</th></tr></thead><tbody>'
+      + rowsT.map(function(x){ const bad = x[4] && x[1] && x[3] < x[1]; return '<tr' + (x[0] === '유지증가' ? ' class="sum"' : '') + '><td><b>' + x[0] + '</b></td><td class="n">' + (x[1] !== null ? (x[0] === '유지증가' ? S(x[1]) : K(x[1])) : '-') + '</td><td class="n">' + S(x[2]) + '</td><td class="n"><b>' + S(x[3]) + '</b></td><td class="n" style="color:' + (bad ? '#b91c1c' : '#0f766e') + '">' + (x[4] ? pctOf(x[3], x[1]) : '-') + '</td></tr>'; }).join('')
+      + '</tbody></table></div>');
+    const endNet = Number(re.누계유지증가) || 0, nowNet = Number(now.누계유지증가) || 0;
+    const shortK = c.net.tgt - endNet;
+    const pend = Math.max(0, (Number(re.누계개시) || 0) - (Number(now.누계개시) || 0));
+    const fixedLoss = A(now.누계해약중지) + A(now.누계인하);
+    const b1 = '월말 유지증가 전망은 <b>' + S(endNet) + '천원</b>으로 목표 ' + S(c.net.tgt) + '천원 대비 ' + pctOf(endNet, c.net.tgt) + '이며, ' + (shortK > 0 ? ('목표까지 <b>' + K(shortK) + '천원</b>이 부족합니다.') : '목표를 초과 달성하는 수준입니다.');
+    const b2 = c.isCurMonth ? ('현재 누계 유지증가 ' + S(nowNet) + '천원에서 월말까지 ' + S(endNet - nowNet) + '천원 변동이 이미 일보에 반영되어 있고, 이 중 개시 예정 잔여액은 ' + K(pend) + '천원입니다. 기발생 해약·인하 합계는 ' + K(fixedLoss) + '천원입니다.') : ('최종 개시 ' + K(Number(re.누계개시) || 0) + '천원, 해약·인하 합계 ' + K(A(re.누계해약중지) + A(re.누계인하)) + '천원이 반영된 결과입니다.');
+    const b3 = shortK > 0 ? ('부족분 ' + K(shortK) + '천원은 일보에 이미 입력된 건만으로는 메워지지 않으므로, 당월 즉시 유지증가로 계상되는 상품과 단가인상으로 보완하는 대책이 필요합니다.') : '현재 일보 기준으로 유지증가 목표는 달성 가능한 수준입니다. 해약 방어와 개시 일정 준수로 유지하세요.';
+    add('<div class="blk card ' + (shortK > 0 ? 'red' : 'grn') + '"><b>5.2 전망 분석</b><br>1. ' + b1 + '<br>2. ' + b2 + '<br>3. ' + b3 + '<br><span class="sm">※ 전망은 영업현황 월말 누계를 그대로 사용하며, 이후 신규 수주·해약은 반영되지 않습니다.</span></div>');
   }
 
-  /* 6. 4대 과제 */
-  const names = ['수주 가속', '유지증가 확보', '안전상품 수주→매출 전환', '블루스캔·휴엔·디지털 확대'];
-  let p6 = '<h2>6. 핵심 4대 과제</h2>' + c.tasks.map(function(t, i){ return '<div class="task"><b>과제 ' + (i + 1) + '. ' + names[i] + '</b><br>' + t + '</div>'; }).join('');
+  /* ───── 6. 4대 과제 ───── */
+  add(band('CHAPTER 07 · ACTION PLAN', '6. 북서울지사 4대 전략 실행 과제', '영업·CS·기술 전원 행동 지침'), true);
+  const tn = ['과제 1. 타 지사 대비 수주 가속', '과제 2. 당월 유지증가 확보', '과제 3. 안전상품 수주 → 매출 전환', '과제 4. 블루스캔·휴엔·디지털 확대'];
+  const tc = ['#d97706', '#dc2626', '#2563eb', '#7c3aed'];
+  c.tasks.forEach(function(t, i){ add('<div class="blk card" style="border-left:.3em solid ' + tc[i] + '"><b style="color:' + tc[i] + '">' + tn[i] + '</b><br>' + t + '</div>'); });
 
-  /* 7. 집계 기준 */
-  let p7 = '<h2>7. 집계 기준</h2><ul>'
-    + '<li>수주: 계약일 기준, 법인 구분 제외</li><li>개시: 기산일 기준</li><li>해약: 확정일 기준</li><li>수주단가(누적): 당월 건당 평균(전체 누적 평균), 단위 만원</li>'
-    + '<li>유지증가 = 개시 − 해약 + 단가인상 − 단가인하 (+ 재개시)</li><li>일반알람 행에는 블루스캔이 포함되며, 지사 합계 = 일반알람 + 디지털 + 휴엔</li>'
-    + '<li>무수주: 마지막 수주 다음 영업일부터 오늘까지의 영업일 수 (주말·공휴일 제외)</li></ul>';
-
-  return css + [p0, p1 + p2, p3, p4, p5 + p6, p7].map(sec).join('');
+  /* ───── 7. 행동수칙 ───── */
+  add(band('CONCLUSION & ACTION PROTOCOL', '7. 현장 인력 실천 수칙', '북서울지사 행동 강령'), true);
+  const zeroNames = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; });
+  const ordGap = Math.max(0, c.ord.tgt - c.ord.amt);
+  const leadTxt = c.leadAvg > 0 ? ('현재 평균 ' + c.leadAvg + '일 → 단축') : '소요일 단축';
+  add('<div class="blk"><h3 class="s">7.1 직무별 실천 행동 수칙</h3><table><thead><tr><th>직무</th><th>당일 즉각 조치</th><th>잔여기간 목표</th></tr></thead><tbody>'
+    + '<tr><td><b>영업 컨설턴트</b></td><td>가망 안건 중 당월 즉시 기산 가능처 우선 접촉' + (zeroNames.length ? ' (무수주: ' + esc(zeroNames.join('·')) + ')' : '') + '</td><td>수주 갭 ' + K(ordGap) + '천원 해소, 연속 무수주 최소화</td></tr>'
+    + '<tr><td><b>CS 관리자</b></td><td>해약 통보 고객 즉시 상담 및 일시중지 전환 유도</td><td>해약 누계 ' + K(A(c.cancel.amt)) + '천원 이상 확대 차단</td></tr>'
+    + '<tr><td><b>현장 기술사원</b></td><td>당월 개시 예정처 시공 일정 우선 배정, 순회 점검 시 단가인상 제안</td><td>계약→기산 소요일 ' + leadTxt + '</td></tr>'
+    + '<tr><td><b>지사 관리자</b></td><td>전략영업 부서와 안전상품 시공 일정 협의, 전략상품 지원 체계 점검</td><td>유지증가 목표 부족분 ' + K(Math.max(0, c.net.tgt - (c.rowEnd ? Number(c.rowEnd.누계유지증가) || 0 : c.net.amt))) + '천원 보완</td></tr>'
+    + '</tbody></table></div>');
+  add('<div class="blk quote"><b>"위기는 현장 속에 답이 있고, 극복은 원팀(One-Team)의 합심에서 시작됩니다."</b><br>지사의 모든 동료가 하나의 목표를 향해 수주를 가속하고, 해약을 철통 방어하며, 단가인상과 즉시 유증 상품으로 ' + m + '월 유지증가 목표를 달성합시다.<br><span class="sm">' + y + '년 ' + m + '월 · 에스원 북서울지사 임직원 일동</span></div>');
+  return { cover: cover, items: blocks };
 }
+
+const STRATEGY_PDF_CSS_ = '<style>'
+ + '.pg{width:794px;height:1123px;box-sizing:border-box;background:#fff;color:#0f172a;font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR",sans-serif;font-size:18.667px;line-height:1.45;display:flex;flex-direction:column;padding:30px 30px 18px;overflow:hidden;}'
+ + '.pg *{box-sizing:border-box;}'
+ + '.pg .bd{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;}'
+ + '.pg .bd>.blk{flex:0 0 auto;}'
+ + '.pg .ft{flex:0 0 auto;font-size:18.667px;display:flex;justify-content:space-between;border-top:1px solid #cbd5e1;padding-top:.25em;margin-top:.3em;color:#64748b;}'
+ + '.pg p{margin:.25em 0;} .pg small{font-size:.8em;font-weight:700;color:#2563eb;} .pg .sm{font-size:1em;color:#64748b;} .pg .note{color:#64748b;}'
+ + '.pg .band{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:.14em solid #1e3a8a;padding-bottom:.25em;}'
+ + '.pg .band .eb{color:#2563eb;font-weight:700;} .pg .band h2{font-size:1.4em;margin:0;line-height:1.25;} .pg .band .sub{color:#64748b;text-align:right;max-width:27%;line-height:1.25;}'
+ + '.pg h3.s{font-size:1.1em;margin:0 0 .25em;color:#1e3a8a;}'
+ + '.pg table{width:100%;border-collapse:collapse;margin:.25em 0;font-size:inherit;}'
+ + '.pg th{background:#eaf0f8;border:1px solid #b6c3d6;padding:.2em .3em;text-align:center;line-height:1.3;}'
+ + '.pg td{border:1px solid #d5dde8;padding:.2em .3em;vertical-align:middle;line-height:1.3;} .pg td.n{text-align:right;white-space:nowrap;} .pg td:first-child{white-space:nowrap;} .pg tr.sum td{background:#eff6ff;font-weight:700;}'
+ + '.pg .kpi{display:grid;grid-template-columns:1fr 1fr;gap:.4em;margin-top:.3em;}'
+ + '.pg .card{border:1px solid #cbd5e1;border-radius:.35em;padding:.4em .6em;line-height:1.4;}'
+ + '.pg .card .ch{display:flex;justify-content:space-between;align-items:center;} .pg .kv{font-size:1.35em;font-weight:800;line-height:1.25;} .pg .kt{line-height:1.35;}'
+ + '.pg .bdg{font-weight:700;padding:0 .4em;border-radius:.3em;}'
+ + '.pg .red{background:#fef2f2;border-color:#fecaca;border-left:.3em solid #dc2626;} .pg .grn{background:#f0fdf4;border-color:#bbf7d0;border-left:.3em solid #16a34a;}'
+ + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.5em .7em;text-align:center;}'
+ + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a);color:#fff;padding:60px 50px 40px;justify-content:space-between;}'
+ + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;} .cover h1{font-size:2.3em;line-height:1.3;margin:.6em 0 .4em;}'
+ + '.cover .cv-sub{font-size:1.15em;color:#e2e8f0;margin:.4em 0;} .cover .cv-sub2{color:#cbd5e1;}'
+ + '.cover .cv-box{border:1px solid rgba(255,255,255,.3);border-radius:.5em;padding:.7em;background:rgba(255,255,255,.07);} .cover .cv-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5em;margin-top:.5em;}'
+ + '.cover .cv-grid>div{border:1px solid rgba(255,255,255,.3);border-radius:.4em;padding:.4em .6em;text-align:center;}'
+ + '.cover .cv-ft{color:#cbd5e1;line-height:1.7;}'
+ + '</style>';
 
 async function downloadAllChaptersPdf_(){
   const c = window.DASH_REPORT_CTX_;
   if (!c) { alert('대시보드 데이터를 먼저 불러온 뒤 다시 시도하세요.'); return; }
   if (typeof html2canvas === 'undefined' || !(window.jspdf && window.jspdf.jsPDF)) { alert('PDF 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도하세요.'); return; }
   const host = document.createElement('div');
-  host.style.cssText = 'position:fixed;left:-20000px;top:0;width:1123px;background:#fff;z-index:-1;';
-  host.innerHTML = buildStrategyReportHtml_(c);
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;width:794px;background:#fff;z-index:-1;';
+  host.innerHTML = STRATEGY_PDF_CSS_;
   document.body.appendChild(host);
   try {
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
-    const pdf = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    const PW = pdf.internal.pageSize.getWidth(), PH = pdf.internal.pageSize.getHeight();
-    const s = PW / 1123, MARGIN = 24, HC = PH / s - MARGIN * 2;
-    const pages = host.querySelectorAll('.pp');
-    let first = true;
-    for (let i = 0; i < pages.length; i++) {
-      const pp = pages[i];
-      const top = pp.getBoundingClientRect().top;
-      const bottoms = Array.prototype.map.call(pp.querySelectorAll('tr,p,li,h2,h3,.task'), function (el) { return el.getBoundingClientRect().bottom - top; });
-      const canvas = await html2canvas(pp, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      const total = pp.scrollHeight, sc = canvas.width / 1123;
-      let start = 0;
-      while (start < total - 2) {
-        let end = Math.min(total, start + HC);
-        if (end < total) {
-          const lim = end;
-          const cands = bottoms.filter(function (b) { return b > start + HC * 0.35 && b <= lim; });
-          if (cands.length) end = Math.max.apply(null, cands);
-        }
-        const sl = document.createElement('canvas');
-        sl.width = canvas.width; sl.height = Math.max(1, Math.round((end - start) * sc));
-        const cx = sl.getContext('2d');
-        cx.fillStyle = '#fff'; cx.fillRect(0, 0, sl.width, sl.height);
-        cx.drawImage(canvas, 0, Math.round(start * sc), canvas.width, sl.height, 0, 0, sl.width, sl.height);
-        if (!first) pdf.addPage();
-        first = false;
-        pdf.addImage(sl.toDataURL('image/jpeg', 0.95), 'JPEG', 0, MARGIN * s, PW, (end - start) * s);
-        start = end;
+    const BASE = 18.667;
+    const doc = buildStrategyDoc_(c);
+    const mk = function (inner, s) {
+      const pg = document.createElement('div');
+      pg.className = 'pg'; pg.style.fontSize = (BASE * s) + 'px';
+      pg.innerHTML = '<div class="bd">' + inner + '</div><div class="ft"><span>에스원 북서울지사 영업 전략 가이드라인</span><span>00</span></div>';
+      host.appendChild(pg); return pg;
+    };
+    const fits = function (pg) { const bd = pg.querySelector('.bd'); return bd.scrollHeight <= bd.clientHeight + 1; };
+    // 1) 키프(제목+다음 블록) 묶음
+    const units = []; let pend = '';
+    doc.items.forEach(function (it) { if (it.keep) { pend += it.html; } else { units.push(pend + it.html); pend = ''; } });
+    if (pend) units.push(pend);
+    // 2) 단위별 자연 높이를 재고, 페이지별 여백(남는 높이)이 균등해지도록 분할(DP) → 페이지마다 글자 크기가 비슷해짐
+    const hs = units.map(function (u) { const pg = mk(u, 1); const bd = pg.querySelector('.bd'); bd.style.justifyContent = 'flex-start'; let h = 0; Array.prototype.forEach.call(bd.children, function (ch) { h += ch.offsetHeight; }); const cap = bd.clientHeight; host.removeChild(pg); return { h: h, cap: cap }; });
+    const CAP = hs[0].cap, n = units.length, pre = [0];
+    hs.forEach(function (x) { pre.push(pre[pre.length - 1] + x.h); });
+    let Pmin = 1; { let acc = 0; hs.forEach(function (x) { if (acc + x.h > CAP && acc > 0) { Pmin++; acc = x.h; } else acc += x.h; }); }
+    let cuts = null;
+    for (let P = Pmin; P <= Pmin + 2 && !cuts; P++) {
+      const INF = 1e18, dp = [], bk = [];
+      for (let k = 0; k <= P; k++) { dp.push(new Array(n + 1).fill(INF)); bk.push(new Array(n + 1).fill(-1)); }
+      dp[0][0] = 0;
+      for (let k = 1; k <= P; k++) for (let i = 1; i <= n; i++) for (let j = k - 1; j < i; j++) {
+        if (dp[k - 1][j] >= INF) continue;
+        const H = pre[i] - pre[j]; if (H > CAP && i - j > 1) continue;
+        const cost = dp[k - 1][j] + (H > CAP ? 1e9 : Math.pow(CAP - H, 2));
+        if (cost < dp[k][i]) { dp[k][i] = cost; bk[k][i] = j; }
       }
+      if (dp[P][n] < INF) { cuts = []; let i = n; for (let k = P; k >= 1; k--) { const j = bk[k][i]; cuts.unshift([j, i]); i = j; } }
+    }
+    if (!cuts) cuts = [[0, n]];
+    let pages = cuts.map(function (r) { return units.slice(r[0], r[1]); });
+    // 실제 렌더링으로 14pt에서 넘치는 페이지는 마지막 단위를 다음 페이지로 넘김
+    for (let i = 0; i < pages.length; i++) {
+      for (;;) {
+        const t = mk(pages[i].join(''), 1); const ok = fits(t); host.removeChild(t);
+        if (ok || pages[i].length <= 1) break;
+        const mv = pages[i].pop();
+        if (i + 1 < pages.length) pages[i + 1].unshift(mv); else pages.push([mv]);
+      }
+    }
+    // 3) 페이지별 글자·여백 확대(최대 1.5배)로 빈 공간 제거, 넘치면 최소한만 축소
+    const finals = pages.map(function (us, i) {
+      const html = us.join('');
+      let s = 1, pg = mk(html, 1);
+      if (!fits(pg)) { host.removeChild(pg); for (s = 0.98; s >= 0.85; s -= 0.02) { pg = mk(html, s); if (fits(pg)) break; host.removeChild(pg); pg = null; } if (!pg) { s = 0.85; pg = mk(html, s); } }
+      else { host.removeChild(pg); let lo = 1, hi = 1.5; for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; const t = mk(html, mid); const ok = fits(t); host.removeChild(t); if (ok) lo = mid; else hi = mid; } s = lo; pg = mk(html, s); }
+      pg.querySelector('.ft span:last-child').textContent = String(i + 2);
+      return pg;
+    });
+    const cv = document.createElement('div'); cv.innerHTML = doc.cover; host.insertBefore(cv.firstChild, host.firstChild.nextSibling);
+    const all = Array.prototype.slice.call(host.querySelectorAll('.pg'));
+    const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const PW = pdf.internal.pageSize.getWidth(), PH = pdf.internal.pageSize.getHeight();
+    for (let i = 0; i < all.length; i++) {
+      const canvas = await html2canvas(all[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      if (i > 0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, PW, PH);
     }
     pdf.save('북서울지사_' + c.ym + '_영업전략_가이드라인.pdf');
   } catch (e) {
