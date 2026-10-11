@@ -4540,6 +4540,15 @@ td.amount-neg input {
   
 /* 컨설턴트별 차트 스타일 */  
  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }  
+ /* 영업현황 컨설턴트별 달성률: 4개 그래프를 한 줄에 표시(그래프 좌우 폭 약 40% 축소) */
+ .chart-grid.status-rep-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 8px !important; }
+ .status-rep-grid .chart-card { padding: 6px 6px !important; min-width: 0; }
+ .status-rep-grid .chart-card-title { font-size: 12px !important; flex-wrap: wrap; gap: 0 4px; }
+ .status-rep-grid .chart-card-title span[style] { font-size: 10px; }
+ .status-rep-grid .bar-row { gap: 3px !important; }
+ .status-rep-grid .bar-name { width: 38px !important; font-size: 11px !important; overflow: hidden; }
+ .status-rep-grid .bar-pct { width: 32px !important; font-size: 10.5px !important; }
+ @media screen and (max-width: 700px) { .chart-grid.status-rep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
  .chart-card { background: #fff; border: 1px solid #c7cfd8; border-radius: 6px; padding: 10px; }  
  .chart-card-title { font-size: 13px; font-weight: bold; color: #1c2f4a; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; display: flex; justify-content: space-between;}  
  .bar-row { display: flex; align-items: center; margin-bottom: 6px; gap: 6px; }  
@@ -11521,7 +11530,7 @@ function renderSalesStatus(){
  { key: '유지감소' }  
  ];  
   
- let chartHtml = '<div class="chart-grid">';  
+ let chartHtml = '<div class="chart-grid status-rep-grid">';  
   
  // 1) 수주/개시/유지감소: 컨설턴트별 색상 게이지 + 100% 초과 시 축 자동 확장 (담당자별로 부여된 개인 목표 사용)  
  gaugeMetrics.forEach(m => {  
@@ -11602,7 +11611,7 @@ function renderSalesStatus(){
  <div class="status-target-title">영업현황 집계 (단위: 천원)</div>  
  ${statusSummaryTableHtml(STATUS_TARGET, STATUS_ACTUAL)}  
  </div>  
- <div class="status-target" style="margin-bottom:0; flex:1 1 500px; background:#f4f6f8;">  
+ <div class="status-target" style="margin-bottom:0; flex:1 1 420px; min-width:0; background:#f4f6f8;">  
  <div class="status-target-title">컨설턴트별 달성률</div>  
  ${chartHtml}  
  </div>  
