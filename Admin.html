@@ -8604,6 +8604,9 @@ function renderDashboard(){
       ordCount: Number((order.overall || {}).count) || 0,
       leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
       motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -19043,7 +19046,7 @@ const STRATEGY_PDF_CSS_ = '<style>'
  + '.pg .card .ch{display:flex;justify-content:space-between;align-items:center;} .pg .kv{font-size:1.35em;font-weight:800;line-height:1.35;} .pg .kt{line-height:1.55;}'
  + '.pg .bdg{font-weight:700;padding:0 .45em;border-radius:.3em;font-size:.9em;}'
  + '.pg .red{background:#fef2f2;border-color:#fecaca;border-left:.3em solid #dc2626;} .pg .grn{background:#f0fdf4;border-color:#bbf7d0;border-left:.3em solid #16a34a;}'
- + '.pg .brow{display:flex;align-items:center;gap:.6em;margin:calc(.35em*var(--sp,1)) 0;} .pg .bl{width:4.2em;font-weight:700;} .pg .bt{flex:1;height:1.1em;background:#e2e8f0;border-radius:.3em;position:relative;overflow:hidden;} .pg .bf1,.pg .bf2{position:absolute;left:0;top:0;bottom:0;border-radius:.3em;} .pg .bf2{background:#93c5fd;} .pg .bf1{background:#1d4ed8;} .pg .bv{width:13.5em;text-align:right;} .pg .lg{display:inline-block;width:.9em;height:.9em;border-radius:.2em;vertical-align:middle;margin:0 .3em 0 .6em;} .pg .l1{background:#1d4ed8;} .pg .l2{background:#93c5fd;}'
+ + '.pg .brow{display:flex;align-items:center;gap:.6em;margin:calc(.35em*var(--sp,1)) 0;} .pg .bl{width:4.2em;font-weight:700;} .pg .bt{flex:1;height:1.1em;background:#e2e8f0;border-radius:.3em;position:relative;overflow:hidden;} .pg .bf1,.pg .bf2{position:absolute;left:0;top:0;bottom:0;border-radius:.3em;} .pg .bf2{background:#93c5fd;} .pg .bf1{background:#1d4ed8;} .pg .bv{white-space:nowrap;text-align:right;} .pg .bl{white-space:nowrap;} .pg .lg{display:inline-block;width:.9em;height:.9em;border-radius:.2em;vertical-align:middle;margin:0 .3em 0 .6em;} .pg .l1{background:#1d4ed8;} .pg .l2{background:#93c5fd;}'
  + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.6em .8em;text-align:center;}'
  + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:60px 50px 40px;justify-content:space-between;line-height:1.5;}'
  + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;font-size:.95em;} .cover h1{font-size:2.3em;line-height:1.3;margin:.6em 0 .4em;color:#fff;}'
@@ -19060,7 +19063,7 @@ async function downloadAllChaptersPdf_(){
   const old = document.getElementById('spPrintFrame'); if (old && old.parentNode) old.parentNode.removeChild(old);
   const ifr = document.createElement('iframe');
   ifr.id = 'spPrintFrame';
-  ifr.style.cssText = 'position:fixed;left:-20000px;top:0;width:794px;height:1123px;border:0;visibility:hidden;';
+  ifr.style.cssText = 'position:fixed;left:-20000px;top:0;width:794px;height:1123px;border:0;background:#fff;';
   document.body.appendChild(ifr);
   try {
     const idoc = ifr.contentDocument;
@@ -19079,6 +19082,7 @@ async function downloadAllChaptersPdf_(){
       host.appendChild(pg); return pg;
     };
     const fits = function (pg) { const bd = pg.querySelector('.bd'); return bd.scrollHeight <= bd.clientHeight + 1; };
+    doc.items.forEach(function (it) { it.html = it.html.replace(/<t([dh])([^>]*)>([\s\S]*?)<\/t\1>/g, function (m0, tg, at, inner) { return '<t' + tg + at + '>' + inner.replace(/<br\s*\/?>/g, ' ') + '</t' + tg + '>'; }); });
     { // 표 글자 배율 결정: 가장 넓은 표가 페이지 폭 안에서 한 줄로 들어가는 최대 크기
       const probe = mk(doc.items.map(function (it) { return it.html; }).join(''), FS, 1);
       for (TF = 0.92; TF >= 0.6; TF -= 0.02) {
@@ -19139,12 +19143,25 @@ async function downloadAllChaptersPdf_(){
     const cv = idoc.createElement('div'); cv.innerHTML = doc.cover;
     host.insertBefore(cv.firstChild, host.firstChild);
     if (typeof window.__PDF_TEST_HOOK__ === 'function') { window.__PDF_TEST_HOOK__(idoc); return; }
-    const win = ifr.contentWindow;
-    const done = function () { setTimeout(function () { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); }, 500); };
-    win.onafterprint = done;
-    win.focus();
-    win.print();     // 인쇄 창에서 '대상: PDF로 저장'을 선택하면 글자 잘림 없는 PDF가 저장됩니다.
-    setTimeout(function () { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); }, 10 * 60 * 1000);
+    const hasLib = (typeof html2canvas !== 'undefined') && window.jspdf && window.jspdf.jsPDF;
+    if (hasLib) {
+      const pdf = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const PW = pdf.internal.pageSize.getWidth(), PH = pdf.internal.pageSize.getHeight();
+      const all = Array.prototype.slice.call(idoc.querySelectorAll('.pg'));
+      for (let i = 0; i < all.length; i++) {
+        const canvas = await html2canvas(all[i], { scale: 2.5, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: 794, windowHeight: 1120 });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, PW, PH);
+      }
+      pdf.save(fname + '.pdf');     // 인쇄 창 없이 바로 파일 저장
+      if (ifr.parentNode) ifr.parentNode.removeChild(ifr);
+    } else {
+      // PDF 라이브러리를 불러오지 못한 경우에만 인쇄(PDF로 저장) 방식으로 대체
+      const win = ifr.contentWindow;
+      win.onafterprint = function () { setTimeout(function () { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); }, 500); };
+      win.focus(); win.print();
+      setTimeout(function () { if (ifr.parentNode) ifr.parentNode.removeChild(ifr); }, 10 * 60 * 1000);
+    }
   } catch (e) {
     console.error('PDF 생성 실패', e);
     alert('PDF 생성 중 오류가 발생했습니다: ' + (e && e.message ? e.message : e));
