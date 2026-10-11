@@ -8173,6 +8173,15 @@ function renderDashboard(){
       ordCount: Number((order.overall || {}).count) || 0,
       leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
       motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -14041,8 +14050,8 @@ function buildStrategyDoc_(c){
     return '영업일 진척률(' + c.workRatio + '%) 대비 <b>' + gapS(r1(o.pct - c.workRatio)) + '</b><br><span style="color:#64748b">사업팀 순위 자료 없음</span>';
   };
   const blocks = [];
-  const add = function(html, keep){ blocks.push({ html: html, keep: !!keep }); };
-  const band = function(no, title, sub){ return '<div class="blk band"><div><div class="eb">' + no + '</div><h2>' + title + '</h2></div><div class="sub">' + sub + '</div></div>'; };
+  const add = function(html, keep){ blocks.push({ html: html, ch: html.indexOf('<div class="blk band"') === 0 && html.indexOf('7. 현장 인력') < 0 }); };
+  const band = function(no, title, sub){ return '<div class="blk band"><div class="eb">' + no + '</div><h2>' + title + '</h2><div class="sub">' + sub + '</div></div>'; };
 
   /* ───── 표지 ───── */
   const cover = '<div class="pg cover"><div class="cv-top"><div class="eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
@@ -14146,6 +14155,12 @@ function buildStrategyDoc_(c){
     add('<div class="blk"><h3 class="s">5.1 ' + m + '월말 실적 전망 (천원)</h3><p>' + (c.isCurMonth ? '현재까지 실적과 영업현황의 ' + m + '월말 누계(오늘 이후 기산일로 이미 입력된 일보 건 반영)를 비교합니다.' : m + '월 최종 마감 수치입니다.') + '</p><table><thead><tr><th>구분</th><th>월간 목표</th><th>' + (c.isCurMonth ? '현재까지' : '마감') + '</th><th>월말 전망</th><th>목표 대비</th></tr></thead><tbody>'
       + rowsT.map(function(x){ const bad = x[4] && x[1] && x[3] < x[1]; return '<tr' + (x[0] === '유지증가' ? ' class="sum"' : '') + '><td><b>' + x[0] + '</b></td><td class="n">' + (x[1] !== null ? (x[0] === '유지증가' ? S(x[1]) : K(x[1])) : '-') + '</td><td class="n">' + S(x[2]) + '</td><td class="n"><b>' + S(x[3]) + '</b></td><td class="n" style="color:' + (bad ? '#b91c1c' : '#0f766e') + '">' + (x[4] ? pctOf(x[3], x[1]) : '-') + '</td></tr>'; }).join('')
       + '</tbody></table></div>');
+    const barRow = function(label, tgt, nowV, endV){
+      const w = function(v){ return tgt > 0 ? Math.max(0, Math.min(100, v / tgt * 100)) : 0; };
+      return '<div class="brow"><div class="bl">' + label + '</div><div class="bt"><div class="bf2" style="width:' + w(endV) + '%"></div>' + (c.isCurMonth ? '<div class="bf1" style="width:' + w(nowV) + '%"></div>' : '') + '</div><div class="bv">' + (c.isCurMonth ? '현재 ' + pctOf(nowV, tgt) + ' → ' : '') + '월말 <b>' + pctOf(endV, tgt) + '</b></div></div>';
+    };
+    add('<div class="blk"><h3 class="s">5.2 목표 대비 달성 현황</h3>' + barRow('수주', c.ord.tgt, now.누계수주, re.누계수주) + barRow('개시', c.start.tgt, now.누계개시, re.누계개시) + barRow('유지증가', c.net.tgt, now.누계유지증가, re.누계유지증가)
+      + '<div class="sm" style="margin-top:.3em"><span class="lg l1"></span>' + (c.isCurMonth ? '현재까지 ' : '') + '<span class="lg l2"></span>월말 전망 (막대 끝 = 월간 목표 100%)</div></div>');
     const endNet = Number(re.누계유지증가) || 0, nowNet = Number(now.누계유지증가) || 0;
     const shortK = c.net.tgt - endNet;
     const pend = Math.max(0, (Number(re.누계개시) || 0) - (Number(now.누계개시) || 0));
@@ -14153,7 +14168,7 @@ function buildStrategyDoc_(c){
     const b1 = '월말 유지증가 전망은 <b>' + S(endNet) + '천원</b>으로 목표 ' + S(c.net.tgt) + '천원 대비 ' + pctOf(endNet, c.net.tgt) + '이며, ' + (shortK > 0 ? ('목표까지 <b>' + K(shortK) + '천원</b>이 부족합니다.') : '목표를 초과 달성하는 수준입니다.');
     const b2 = c.isCurMonth ? ('현재 누계 유지증가 ' + S(nowNet) + '천원에서 월말까지 ' + S(endNet - nowNet) + '천원 변동이 이미 일보에 반영되어 있고, 이 중 개시 예정 잔여액은 ' + K(pend) + '천원입니다. 기발생 해약·인하 합계는 ' + K(fixedLoss) + '천원입니다.') : ('최종 개시 ' + K(Number(re.누계개시) || 0) + '천원, 해약·인하 합계 ' + K(A(re.누계해약중지) + A(re.누계인하)) + '천원이 반영된 결과입니다.');
     const b3 = shortK > 0 ? ('부족분 ' + K(shortK) + '천원은 일보에 이미 입력된 건만으로는 메워지지 않으므로, 당월 즉시 유지증가로 계상되는 상품과 단가인상으로 보완하는 대책이 필요합니다.') : '현재 일보 기준으로 유지증가 목표는 달성 가능한 수준입니다. 해약 방어와 개시 일정 준수로 유지하세요.';
-    add('<div class="blk card ' + (shortK > 0 ? 'red' : 'grn') + '"><b>5.2 전망 분석</b><br>1. ' + b1 + '<br>2. ' + b2 + '<br>3. ' + b3 + '<br><span class="sm">※ 전망은 영업현황 월말 누계를 그대로 사용하며, 이후 신규 수주·해약은 반영되지 않습니다.</span></div>');
+    add('<div class="blk card ' + (shortK > 0 ? 'red' : 'grn') + '"><b>5.3 전망 분석</b><br>1. ' + b1 + '<br>2. ' + b2 + '<br>3. ' + b3 + '<br><span class="sm">※ 전망은 영업현황 월말 누계를 그대로 사용하며, 이후 신규 수주·해약은 반영되지 않습니다.</span></div>');
   }
 
   /* ───── 6. 4대 과제 ───── */
@@ -14166,7 +14181,7 @@ function buildStrategyDoc_(c){
   add(band('CONCLUSION & ACTION PROTOCOL', '7. 현장 인력 실천 수칙', '북서울지사 행동 강령'), true);
   const zeroNames = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; });
   const ordGap = Math.max(0, c.ord.tgt - c.ord.amt);
-  const leadTxt = c.leadAvg > 0 ? ('현재 평균 ' + c.leadAvg + '일 → 단축') : '소요일 단축';
+  const leadTxt = c.leadAvg > 0 ? ('현재 평균 ' + c.leadAvg + '일 → 단축') : '단축';
   add('<div class="blk"><h3 class="s">7.1 직무별 실천 행동 수칙</h3><table><thead><tr><th>직무</th><th>당일 즉각 조치</th><th>잔여기간 목표</th></tr></thead><tbody>'
     + '<tr><td><b>영업 컨설턴트</b></td><td>가망 안건 중 당월 즉시 기산 가능처 우선 접촉' + (zeroNames.length ? ' (무수주: ' + esc(zeroNames.join('·')) + ')' : '') + '</td><td>수주 갭 ' + K(ordGap) + '천원 해소, 연속 무수주 최소화</td></tr>'
     + '<tr><td><b>CS 관리자</b></td><td>해약 통보 고객 즉시 상담 및 일시중지 전환 유도</td><td>해약 누계 ' + K(A(c.cancel.amt)) + '천원 이상 확대 차단</td></tr>'
@@ -14178,27 +14193,29 @@ function buildStrategyDoc_(c){
 }
 
 const STRATEGY_PDF_CSS_ = '<style>'
- + '.pg{width:794px;height:1123px;box-sizing:border-box;background:#fff;color:#0f172a;font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR",sans-serif;font-size:18.667px;line-height:1.45;display:flex;flex-direction:column;padding:30px 30px 18px;overflow:hidden;}'
- + '.pg *{box-sizing:border-box;}'
- + '.pg .bd{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;}'
+ + '.pg{width:794px;height:1123px;box-sizing:border-box;background:#fff !important;color:#0f172a !important;font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR",sans-serif !important;font-size:16px;line-height:calc(1.35 + .2*var(--sp,1));display:flex;flex-direction:column;padding:34px 38px 20px;overflow:hidden;letter-spacing:0;text-align:left;}'
+ + '.pg *{box-sizing:border-box;font-family:inherit !important;}'
+ + '.pg .bd{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:calc(.45em*var(--sp,1));}'
  + '.pg .bd>.blk{flex:0 0 auto;}'
- + '.pg .ft{flex:0 0 auto;font-size:18.667px;display:flex;justify-content:space-between;border-top:1px solid #cbd5e1;padding-top:.25em;margin-top:.3em;color:#64748b;}'
- + '.pg p{margin:.25em 0;} .pg small{font-size:.8em;font-weight:700;color:#2563eb;} .pg .sm{font-size:1em;color:#64748b;} .pg .note{color:#64748b;}'
- + '.pg .band{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:.14em solid #1e3a8a;padding-bottom:.25em;}'
- + '.pg .band .eb{color:#2563eb;font-weight:700;} .pg .band h2{font-size:1.4em;margin:0;line-height:1.25;} .pg .band .sub{color:#64748b;text-align:right;max-width:27%;line-height:1.25;}'
- + '.pg h3.s{font-size:1.1em;margin:0 0 .25em;color:#1e3a8a;}'
- + '.pg table{width:100%;border-collapse:collapse;margin:.25em 0;font-size:inherit;}'
- + '.pg th{background:#eaf0f8;border:1px solid #b6c3d6;padding:.2em .3em;text-align:center;line-height:1.3;}'
- + '.pg td{border:1px solid #d5dde8;padding:.2em .3em;vertical-align:middle;line-height:1.3;} .pg td.n{text-align:right;white-space:nowrap;} .pg td:first-child{white-space:nowrap;} .pg tr.sum td{background:#eff6ff;font-weight:700;}'
- + '.pg .kpi{display:grid;grid-template-columns:1fr 1fr;gap:.4em;margin-top:.3em;}'
- + '.pg .card{border:1px solid #cbd5e1;border-radius:.35em;padding:.4em .6em;line-height:1.4;}'
- + '.pg .card .ch{display:flex;justify-content:space-between;align-items:center;} .pg .kv{font-size:1.35em;font-weight:800;line-height:1.25;} .pg .kt{line-height:1.35;}'
- + '.pg .bdg{font-weight:700;padding:0 .4em;border-radius:.3em;}'
+ + '.pg .ft{flex:0 0 auto;font-size:14px;display:flex;justify-content:space-between;border-top:1px solid #cbd5e1;padding-top:6px;margin-top:8px;color:#64748b;}'
+ + '.pg p{margin:calc(.25em*var(--sp,1)) 0 !important;color:#0f172a;} .pg small{font-size:.85em;font-weight:700;color:#2563eb;} .pg .sm{font-size:.92em;color:#64748b;} .pg .note{color:#64748b;}'
+ + '.pg .bd>.band:not(:first-child){margin-top:.9em;} .pg .band{border-bottom:.14em solid #1e3a8a;padding-bottom:.35em;}'
+ + '.pg .band .eb{color:#2563eb;font-weight:700;font-size:.9em;} .pg .band h2{font-size:1.45em;margin:.05em 0 0 !important;line-height:1.3;color:#0f172a;font-weight:800;} .pg .band .sub{color:#64748b;font-size:.95em;}'
+ + '.pg h3.s{font-size:1.1em;margin:0 0 calc(.3em*var(--sp,1)) !important;color:#1e3a8a;font-weight:800;}'
+ + '.pg table{width:100% !important;border-collapse:collapse;margin:calc(.25em*var(--sp,1)) 0 !important;font-size:1em !important;table-layout:auto;}'
+ + '.pg th{background:#e8eef7 !important;color:#0f172a !important;border:1px solid #b6c3d6;padding:calc(.3em*var(--sp,1)) .4em !important;text-align:center;font-weight:700;font-size:1em !important;white-space:normal !important;line-height:1.3;}'
+ + '.pg td{background:#fff;color:#0f172a !important;border:1px solid #d5dde8;padding:calc(.3em*var(--sp,1)) .4em !important;vertical-align:middle;font-size:1em !important;white-space:normal !important;word-break:keep-all;overflow-wrap:anywhere;line-height:1.35;text-align:left;}'
+ + '.pg td.n{text-align:right;white-space:nowrap !important;} .pg tr.sum td{background:#eff6ff;font-weight:700;}'
+ + '.pg .kpi{display:grid;grid-template-columns:1fr 1fr;gap:calc(.45em*var(--sp,1));margin-top:calc(.3em*var(--sp,1));}'
+ + '.pg .card{border:1px solid #cbd5e1;border-radius:.35em;padding:calc(.45em*var(--sp,1)) .7em;line-height:calc(1.3 + .15*var(--sp,1));}'
+ + '.pg .card .ch{display:flex;justify-content:space-between;align-items:center;} .pg .kv{font-size:1.35em;font-weight:800;line-height:1.3;} .pg .kt{line-height:1.4;}'
+ + '.pg .bdg{font-weight:700;padding:0 .45em;border-radius:.3em;font-size:.9em;}'
  + '.pg .red{background:#fef2f2;border-color:#fecaca;border-left:.3em solid #dc2626;} .pg .grn{background:#f0fdf4;border-color:#bbf7d0;border-left:.3em solid #16a34a;}'
- + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.5em .7em;text-align:center;}'
- + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a);color:#fff;padding:60px 50px 40px;justify-content:space-between;}'
- + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;} .cover h1{font-size:2.3em;line-height:1.3;margin:.6em 0 .4em;}'
- + '.cover .cv-sub{font-size:1.15em;color:#e2e8f0;margin:.4em 0;} .cover .cv-sub2{color:#cbd5e1;}'
+ + '.pg .brow{display:flex;align-items:center;gap:.6em;margin:calc(.35em*var(--sp,1)) 0;} .pg .bl{width:4.2em;font-weight:700;} .pg .bt{flex:1;height:1.1em;background:#e2e8f0;border-radius:.3em;position:relative;overflow:hidden;} .pg .bf1,.pg .bf2{position:absolute;left:0;top:0;bottom:0;border-radius:.3em;} .pg .bf2{background:#93c5fd;} .pg .bf1{background:#1d4ed8;} .pg .bv{width:13.5em;text-align:right;} .pg .lg{display:inline-block;width:.9em;height:.9em;border-radius:.2em;vertical-align:middle;margin:0 .3em 0 .6em;} .pg .l1{background:#1d4ed8;} .pg .l2{background:#93c5fd;}'
+ + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.6em .8em;text-align:center;}'
+ + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:60px 50px 40px;justify-content:space-between;line-height:1.5;}'
+ + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;font-size:.95em;} .cover h1{font-size:2.3em;line-height:1.3;margin:.6em 0 .4em;color:#fff;}'
+ + '.cover .cv-sub{font-size:1.1em;color:#e2e8f0 !important;margin:.4em 0 !important;} .cover .cv-sub2{color:#cbd5e1 !important;}'
  + '.cover .cv-box{border:1px solid rgba(255,255,255,.3);border-radius:.5em;padding:.7em;background:rgba(255,255,255,.07);} .cover .cv-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5em;margin-top:.5em;}'
  + '.cover .cv-grid>div{border:1px solid rgba(255,255,255,.3);border-radius:.4em;padding:.4em .6em;text-align:center;}'
  + '.cover .cv-ft{color:#cbd5e1;line-height:1.7;}'
@@ -14214,26 +14231,25 @@ async function downloadAllChaptersPdf_(){
   document.body.appendChild(host);
   try {
     if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
-    const BASE = 18.667;
+    const FS = 16;   // 본문 기본 글자 크기(px) — 12pt. 페이지마다 동일하게 유지
     const doc = buildStrategyDoc_(c);
-    const mk = function (inner, s) {
+    const mk = function (inner, fs, sp) {
       const pg = document.createElement('div');
-      pg.className = 'pg'; pg.style.fontSize = (BASE * s) + 'px';
+      pg.className = 'pg'; pg.style.fontSize = fs + 'px'; pg.style.setProperty('--sp', String(sp));
       pg.innerHTML = '<div class="bd">' + inner + '</div><div class="ft"><span>에스원 북서울지사 영업 전략 가이드라인</span><span>00</span></div>';
       host.appendChild(pg); return pg;
     };
     const fits = function (pg) { const bd = pg.querySelector('.bd'); return bd.scrollHeight <= bd.clientHeight + 1; };
-    // 1) 키프(제목+다음 블록) 묶음
-    const units = []; let pend = '';
-    doc.items.forEach(function (it) { if (it.keep) { pend += it.html; } else { units.push(pend + it.html); pend = ''; } });
-    if (pend) units.push(pend);
-    // 2) 단위별 자연 높이를 재고, 페이지별 여백(남는 높이)이 균등해지도록 분할(DP) → 페이지마다 글자 크기가 비슷해짐
-    const hs = units.map(function (u) { const pg = mk(u, 1); const bd = pg.querySelector('.bd'); bd.style.justifyContent = 'flex-start'; let h = 0; Array.prototype.forEach.call(bd.children, function (ch) { h += ch.offsetHeight; }); const cap = bd.clientHeight; host.removeChild(pg); return { h: h, cap: cap }; });
-    const CAP = hs[0].cap, n = units.length, pre = [0];
+    // 1) 장(章) 단위로 묶기 — 장은 페이지를 넘나들지 않음
+    const chapters = [];
+    doc.items.forEach(function (it) { if (it.ch || !chapters.length) chapters.push(''); chapters[chapters.length - 1] += it.html; });
+    // 2) 장별 자연 높이 측정 후, 페이지별 남는 높이가 고르게 되도록 장을 묶음(DP)
+    const hs = chapters.map(function (u) { const pg = mk(u, FS, 1); const bd = pg.querySelector('.bd'); bd.style.justifyContent = 'flex-start'; bd.style.gap = '0'; let h = 0, k = 0; Array.prototype.forEach.call(bd.children, function (ch) { h += ch.offsetHeight; k++; }); const cap = bd.clientHeight; host.removeChild(pg); return { h: h + k * 8, cap: cap }; });
+    const CAP = hs[0].cap * 1.1, n = chapters.length, pre = [0];
     hs.forEach(function (x) { pre.push(pre[pre.length - 1] + x.h); });
     let Pmin = 1; { let acc = 0; hs.forEach(function (x) { if (acc + x.h > CAP && acc > 0) { Pmin++; acc = x.h; } else acc += x.h; }); }
     let cuts = null;
-    for (let P = Pmin; P <= Pmin + 2 && !cuts; P++) {
+    for (let P = Pmin; P <= Math.min(n, Pmin + 2) && !cuts; P++) {
       const INF = 1e18, dp = [], bk = [];
       for (let k = 0; k <= P; k++) { dp.push(new Array(n + 1).fill(INF)); bk.push(new Array(n + 1).fill(-1)); }
       dp[0][0] = 0;
@@ -14245,23 +14261,23 @@ async function downloadAllChaptersPdf_(){
       }
       if (dp[P][n] < INF) { cuts = []; let i = n; for (let k = P; k >= 1; k--) { const j = bk[k][i]; cuts.unshift([j, i]); i = j; } }
     }
-    if (!cuts) cuts = [[0, n]];
-    let pages = cuts.map(function (r) { return units.slice(r[0], r[1]); });
-    // 실제 렌더링으로 14pt에서 넘치는 페이지는 마지막 단위를 다음 페이지로 넘김
-    for (let i = 0; i < pages.length; i++) {
-      for (;;) {
-        const t = mk(pages[i].join(''), 1); const ok = fits(t); host.removeChild(t);
-        if (ok || pages[i].length <= 1) break;
-        const mv = pages[i].pop();
-        if (i + 1 < pages.length) pages[i + 1].unshift(mv); else pages.push([mv]);
-      }
-    }
-    // 3) 페이지별 글자·여백 확대(최대 1.5배)로 빈 공간 제거, 넘치면 최소한만 축소
+    if (!cuts) cuts = chapters.map(function (_, i) { return [i, i + 1]; });
+    const pages = cuts.map(function (r) { return chapters.slice(r[0], r[1]); });
+    // 3) 페이지별: 가능한 가장 큰 글자(최대 17px, 최소 14px)를 고르고, 남는 높이는 행간·셀 여백으로 넓혀 채움
     const finals = pages.map(function (us, i) {
       const html = us.join('');
-      let s = 1, pg = mk(html, 1);
-      if (!fits(pg)) { host.removeChild(pg); for (s = 0.98; s >= 0.85; s -= 0.02) { pg = mk(html, s); if (fits(pg)) break; host.removeChild(pg); pg = null; } if (!pg) { s = 0.85; pg = mk(html, s); } }
-      else { host.removeChild(pg); let lo = 1, hi = 1.5; for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; const t = mk(html, mid); const ok = fits(t); host.removeChild(t); if (ok) lo = mid; else hi = mid; } s = lo; pg = mk(html, s); }
+      let fs = 17, pg = null;
+      for (; fs >= 14; fs -= 0.25) { pg = mk(html, fs, 1); if (fits(pg)) break; host.removeChild(pg); pg = null; }
+      let sp = 1;
+      if (pg) {
+        host.removeChild(pg);
+        let lo = 1, hi = 2.4;
+        for (let k = 0; k < 9; k++) { const mid = (lo + hi) / 2; const t = mk(html, fs, mid); const ok = fits(t); host.removeChild(t); if (ok) lo = mid; else hi = mid; }
+        sp = lo; pg = mk(html, fs, sp);
+      } else {
+        outer: for (fs = 14; fs >= 12; fs -= 0.5) { for (sp = 0.9; sp >= 0.4; sp -= 0.1) { pg = mk(html, fs, sp); if (fits(pg)) break outer; host.removeChild(pg); pg = null; } }
+        if (!pg) { fs = 12; sp = 0.4; pg = mk(html, fs, sp); }
+      }
       pg.querySelector('.ft span:last-child').textContent = String(i + 2);
       return pg;
     });
