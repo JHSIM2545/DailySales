@@ -10891,19 +10891,13 @@ function sortedProductDailyRows(){
   if (filterText) list = list.filter(r => String(r.서비스제공처||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
   if (repFilter) list = list.filter(r => r.계약담당자 === repFilter);  
   if (gubunFilter) list = list.filter(r => r.구분 === gubunFilter);  
-  
-  // 2. 기본적으로 디폴트로 미매출은 체크하지 않은 상태로 하위 테이블에서도 미매출은 빼고 매출 완료된 것 만 표기
-  if (!includeUnconfirmed) {
-    list = list.filter(r => String(r.매출여부||'').trim() !== '미매출');
-  }  
-  
-  // 1 & 5. 테이블 표시 기준은 메뉴바의 년월 기준으로 매출예상 월이 메뉴바의 지정된 월을 포함한 그 이후인 경우의 자료만 표시
-  if (ymFilter) {  
-    list = list.filter(r => {
-      const fYm = parseForecastYm_(r.매출예상, r.보고일);
-      return Boolean(fYm && fYm >= ymFilter);
-    });  
-  }  
+ // 상품일보 목록: 선택한 년월(기본 당월) 이후(당월 포함)가 매출예상월인 건만 표시. 매출예상월이 지난 건, 매출확정(매출) 건은 제외. 매출예상이 비어 있는 건은 보정 가능하도록 표시.
+ const pdYmSel_ = ((document.getElementById('ymFilterProductDaily')||{}).value) || ((typeof productDailyGridYm !== 'undefined' && productDailyGridYm) ? productDailyGridYm : '') || todayStr().slice(0, 7);
+ list = list.filter(r => {
+ if (String(r.매출여부||'').trim() === '매출') return false;
+ const fYm_ = parseForecastYm_(r.매출예상, r.보고일);
+ return !fYm_ || fYm_ >= pdYmSel_;
+ });
 
   const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
   list.sort((a,b) => {  

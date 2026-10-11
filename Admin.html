@@ -3380,7 +3380,7 @@ function getTzToday() {
     listPendingAiReportMessages: async function(token) {
       const client = getSupabase();
       const { data, error } = await client.from('inbox_ai_reports').select('*').eq('status', '대기').order('submitted_at', { ascending: false });
-      if (error) return { success: true, items: [] };
+      if (error) { console.error('inbox_ai_reports 조회 오류', error); return { success: false, error: '접수함 조회 실패: ' + (error.message || error.code || error) + ' (Supabase 권한/RLS 설정 확인)', items: [] }; }
       const items = (data || []).map(r => ({
         id: r.id,
         submittedAt: r.submitted_at ? r.submitted_at.slice(0, 16).replace('T', ' ') : '',
@@ -11292,6 +11292,7 @@ function loadPendingAiReports_(){
 
   google.script.run
     .withSuccessHandler(function(res){
+      if (res && res.success === false) { listEl.innerHTML = '<div class="denied">' + escHtml(res.error || '접수함 조회 실패') + '</div>'; return; }
       const items = (res && res.items) || [];
       updatePendingAiBadge_();
       if (!items.length) {
@@ -16598,6 +16599,13 @@ function sortedProductDailyRows(){
  if (filterText) list = list.filter(r => String(r.서비스제공처||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.계약담당자 === repFilter);  
  if (gubunFilter) list = list.filter(r => r.구분 === gubunFilter);  
+ // 상품일보 목록: 선택한 년월(기본 당월) 이후(당월 포함)가 매출예상월인 건만 표시. 매출예상월이 지난 건, 매출확정(매출) 건은 제외. 매출예상이 비어 있는 건은 보정 가능하도록 표시.
+ const pdYmSel_ = ((document.getElementById('ymFilterProductDaily')||{}).value) || ((typeof productDailyGridYm !== 'undefined' && productDailyGridYm) ? productDailyGridYm : '') || todayStr().slice(0, 7);
+ list = list.filter(r => {
+ if (String(r.매출여부||'').trim() === '매출') return false;
+ const fYm_ = parseForecastYm_(r.매출예상, r.보고일);
+ return !fYm_ || fYm_ >= pdYmSel_;
+ });
  const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
