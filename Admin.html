@@ -8610,6 +8610,15 @@ function renderDashboard(){
       ordCount: Number((order.overall || {}).count) || 0,
       leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
       motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
+      ordCount: Number((order.overall || {}).count) || 0,
+      leadAvg: Number(((order.overall || {}).gapBase || {}).avg) || 0,
+      motiveAll: (function () { const ml = ((order.overall || {}).byMotive || []).filter(function (x) { return x && x.amount > 0; }); if (!ml.length) return '-'; const t3 = ml.slice(0, 3); const rest = Math.max(0, 100 - t3.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0)); return t3.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (ml.length > 3 && rest > 0 ? ' / 외 ' + rest + '%' : ''); })(),
       prod: { tot: rowTot, alarm: rowAlarm, bscan: rowBScan, digi: rowDigi, huen: rowHuen },
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
@@ -18898,7 +18907,7 @@ function buildStrategyDoc_(c){
   if (c.isFutureMonth) { sum1 = m + '월은 아직 실적 집계 전입니다.'; sum2 = ''; }
   const wd = String(c.todayDs || '').replace(/-/g, '.');
   const cover = '<div class="pg cover"><div class="eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
-    + '<div class="cv-mid"><h1>' + y + '.' + m + '월</h1><div class="cv-t">북서울지사 영업 현황 및 가이드 라인</div><div class="cv-d">작성일 ' + esc(wd) + '</div>'
+    + '<div class="cv-mid"><div class="cv-ban"><div class="tl1">' + y + '.' + m + '월 <span class="dot">·</span> <span class="yl">북서울지사</span></div><div class="tl2">영업 현황 및 가이드 라인</div></div><div class="cv-d">작성일 ' + esc(wd) + '</div>'
     + '<div class="cv-sum">' + esc(sum1 + (sum2 ? ' ' + sum2 : '')) + '</div></div><div></div></div>';
 
   /* ───── Chapter 01·02 현황 ───── */
@@ -19055,9 +19064,12 @@ const STRATEGY_PDF_CSS_ = '<style>'
  + '.pg .brow{display:flex;align-items:center;gap:.6em;margin:calc(.35em*var(--sp,1)) 0;} .pg .bl{width:4.2em;font-weight:700;} .pg .bt{flex:1;height:1.1em;background:#e2e8f0;border-radius:.3em;position:relative;overflow:hidden;} .pg .bf1,.pg .bf2{position:absolute;left:0;top:0;bottom:0;border-radius:.3em;} .pg .bf2{background:#93c5fd;} .pg .bf1{background:#1d4ed8;} .pg .bv{white-space:nowrap;text-align:right;} .pg .bl{white-space:nowrap;} .pg .lg{display:inline-block;width:.9em;height:.9em;border-radius:.2em;vertical-align:middle;margin:0 .3em 0 .6em;} .pg .l1{background:#1d4ed8;} .pg .l2{background:#93c5fd;}'
  + '.pg .quote{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:.4em;padding:.6em .8em;text-align:center;}'
  + '.pg.cover{background:linear-gradient(160deg,#0b1d4a,#12337a) !important;color:#fff !important;padding:60px 50px 40px;justify-content:space-between;line-height:1.5;}'
- + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;font-size:.95em;} .cover h1{font-size:3.4em;line-height:1.15;margin:0 0 .25em;color:#fff;font-weight:800;}'
- + '.cover .cv-t{font-size:1.7em;font-weight:700;color:#e2e8f0;line-height:1.35;} .cover .cv-d{margin-top:.7em;font-size:.95em;color:#93a9d4;}'
- + '.cover .cv-sum{margin-top:1.6em;border:1px solid rgba(255,255,255,.35);border-radius:.5em;background:rgba(255,255,255,.08);padding:.8em 1em;font-size:18.667px;line-height:1.7;color:#f1f5f9;}'
+ + '.cover .eb{color:#93c5fd;font-weight:700;letter-spacing:.04em;font-size:.95em;}'
+ + '.cover .cv-ban{background:#000099;padding:.35em .6em .45em;}'
+ + '.cover .cv-ban .tl1{font-size:2.5em;line-height:1.25;color:#fff;font-weight:400;} .cover .cv-ban .dot{color:#fff;} .cover .cv-ban .yl{color:#ffff00;}'
+ + '.cover .cv-ban .tl2{font-size:3.3em;line-height:1.25;color:#a9c9f0;font-weight:800;}'
+ + '.cover .cv-d{margin-top:.8em;font-size:.95em;color:#93a9d4;}'
+ + '.cover .cv-sum{margin-top:1.2em;border:1px solid rgba(255,255,255,.35);border-radius:.5em;background:rgba(255,255,255,.08);padding:.8em 1em;font-size:18.667px;line-height:1.7;color:#f1f5f9;}'
  + '</style>';
 
 async function downloadAllChaptersPdf_(){
