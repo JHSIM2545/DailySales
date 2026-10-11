@@ -8064,6 +8064,22 @@ function renderDashboard(){
   const safeOrdTraffic = getTrafficColorWorking(safeOrdPct, workRatio);
   const safeSaleTraffic = getTrafficColorWorking(safeSalePct, workRatio);
 
+  // ---- 카드 신호등 (R=빨강 Y=노랑 G=청록) ----
+  const tlRef_ = isCurMonth ? workRatio : 100;
+  function tlHtml_(lv, tip) {
+    if (!lv || isFutureMonth) return '';
+    const on = { R: '#dc2626', Y: '#eab308', G: '#0d9488' };
+    const lamp = function (k) { return '<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:' + (lv === k ? on[k] : '#e2e8f0') + ';' + (lv === k ? 'box-shadow:0 0 5px ' + on[k] + ';' : '') + '"></span>'; };
+    return '<span title="' + String(tip || '').replace(/"/g, '&quot;') + '" style="display:inline-flex;gap:3px;align-items:center;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:3px 6px;flex-shrink:0;">' + lamp('R') + lamp('Y') + lamp('G') + '</span>';
+  }
+  const tlOrdAvg_ = (biz && biz.ord && biz.ord.avgVal !== undefined && biz.ord.avgVal !== null) ? Number(biz.ord.avgVal) : tlRef_;
+  const tlOrd_ = ordPct >= 100 || ordPct >= tlOrdAvg_ + 3 ? 'G' : (ordPct > tlOrdAvg_ ? 'Y' : 'R');
+  const tlStart_ = startPct > tlRef_ + 3 ? 'G' : (startPct >= tlRef_ - 3 ? 'Y' : 'R');
+  const tlNet_ = (netAmt < 0 || netPct < tlRef_) ? 'R' : (netPct < tlRef_ + 5 ? 'Y' : 'G');
+  const tlSafe_ = function (p) { return p > tlRef_ + 3 ? 'G' : (p >= tlRef_ - 3 ? 'Y' : 'R'); };
+  const tlSafeOrd_ = hasSafety ? tlSafe_(safeOrdPct) : '';
+  const tlSafeSale_ = hasSafety ? tlSafe_(safeSalePct) : '';
+
   const viewModeTitle = isCurMonth
     ? (m + '월 ' + elDays + '영업일 경과 (' + workRatio + '%) 기준')
     : (isPastMonth ? (m + '월 최종 실적 마감 기준') : (m + '월 (실적 집계 전)'));
@@ -8295,7 +8311,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #3b82f6; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(1) 수주진척도</span>
-            
+            ${tlHtml_(tlOrd_, '수주: 사업팀 평균 이하 빨강 / 평균+3%p 미만 노랑 / 평균+3%p 이상 또는 100% 이상 청록')}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(ordAmt)}천원 <span style="font-size:13px; font-weight:700; color:#2563eb;">(${ordPct}%)</span></div>
@@ -8310,7 +8326,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #2563eb; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(2) 개시진척도</span>
-            
+            ${tlHtml_(tlStart_, '개시: 진도율 ±3%p 이내 노랑 / 미만 빨강 / 초과 청록')}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(startAmt)}천원 <span style="font-size:13px; font-weight:700; color:#2563eb;">(${startPct}%)</span></div>
@@ -8325,7 +8341,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(3) 유지증가 수준${isCurMonth ? ' (현재까지)' : ''}</span>
-            
+            ${tlHtml_(tlNet_, '유지증가: 마이너스 또는 진도율 미만 빨강 / 진도율+5%p 미만 노랑 / 이상 청록')}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:${netAmt<0?'#dc2626':'#0f766e'};">${netAmt>0?'+':''}${fmtK(netAmt)}천원 <span style="font-size:13px; font-weight:700;">(${netPct}%)</span></div>
@@ -8346,14 +8362,14 @@ function renderDashboard(){
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:11px; color:#64748b;">수주 실적</span>
-                
+                ${tlHtml_(tlSafeOrd_, '안전상품: 영업일 진도율 ±3%p 이내 노랑 / 미만 빨강 / 초과 청록')}
               </div>
               <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:2px;">${fmtK(safeOrdAmt)}천원 <span style="font-size:11px; color:#0d9488;">(${safeOrdPct}%)</span></div>
             </div>
             <div style="background:#f8fafc; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0;">
               <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:11px; color:#64748b;">확정 매출</span>
-                
+                ${tlHtml_(tlSafeSale_, '안전상품: 영업일 진도율 ±3%p 이내 노랑 / 미만 빨강 / 초과 청록')}
               </div>
               <div style="font-size:14px; font-weight:800; color:${safeSalePct<20?'#b91c1c':'#0f766e'}; margin-top:2px;">${fmtK(safeSaleAmt)}천원 <span style="font-size:11px;">(${safeSalePct}%)</span></div>
             </div>
