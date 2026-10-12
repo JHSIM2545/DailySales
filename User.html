@@ -8139,19 +8139,14 @@ function renderDashboard(){
       const rest = Math.max(0, 100 - top.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0));
       motive = top.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (mlist.length > 3 && rest > 0 ? (' / 외 ' + rest + '%') : '');
     } else if (cnt > 0) { motive = (mlist.length ? '' : '금액 미입력'); }
-    let leadTime = '-', leadTag = cnt > 0 ? '개시 대기' : '수주대기';
+    let leadTime = '-', leadTag = '';
     if (bo.gapBase && typeof bo.gapBase.avg === 'number' && bo.gapBase.avg > 0) {
       leadTime = bo.gapBase.avg + '일';
-      leadTag = bo.gapBase.avg <= 7 ? '신속개시' : (bo.gapBase.avg <= 30 ? '표준개시' : '익월 이후 개시');
+      leadTag = '';
     } else if (bo.gapStart && typeof bo.gapStart.avg === 'number' && bo.gapStart.avg > 0) {
       leadTime = bo.gapStart.avg + '일';
-      leadTag = bo.gapStart.avg <= 7 ? '신속개시' : (bo.gapStart.avg <= 30 ? '표준개시' : '익월 이후 개시');
+      leadTag = '';
     }
-    // 당월 개시 비중(금액 기준)이 50% 이상이면 리드타임과 무관하게 '당월개시 多'
-    try {
-      const curB = bo.startTiming && Array.isArray(bo.startTiming.buckets) ? bo.startTiming.buckets.filter(function (b) { return b.key === 'cur'; })[0] : null;
-      if (cnt > 0 && curB && Number(curB.pct) >= 50) leadTag = '당월개시 多';
-    } catch (e_) {}
     return {
       rank: 0,
       name: rep,
@@ -8442,36 +8437,22 @@ function renderDashboard(){
           </div>
         </div>
 
-        <!-- 컨설턴트별 개시소요일 비교 바 -->
+        <!-- 컨설턴트별 개시 리드타임 + TEST 제공 (통합 카드) -->
         <div style="border-top:1px dashed #cbd5e1; padding-top:8px;">
-          <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:4px;">컨설턴트별 계약일 ➔ 개시일 평균 간격(소요일)</div>
-          <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; text-align:center; font-size:11px;">
-            ${repRankings.map(r => {
-              const theme = (typeof DASH_REP_THEME !== 'undefined' && DASH_REP_THEME[r.name]) || { primary: '#2563eb', bg: '#f8fafc', border: '#e2e8f0', text: '#1e293b', badgeBg: '#f1f5f9', badgeText: '#475569' };
-              const leadColor = r.leadTime === '-' ? '#94a3b8' : theme.primary;
-              return `
-                <div style="background:${theme.bg}; padding:8px 4px; border-radius:6px; border:1px solid ${theme.border}; border-top:3.5px solid ${theme.primary}; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
-                  <div style="font-weight:900; color:${theme.primary}; font-size:12px; margin-bottom:2px;">${r.name}</div>
-                  <div style="font-size:14px; font-weight:900; color:${leadColor};">${r.leadTime}</div>
-                  <div style="font-size:10px; color:${theme.primary}; font-weight:800; background:${theme.badgeBg}; display:inline-block; padding:1px 6px; border-radius:4px; margin-top:2px;">${r.leadTag || '대기'}</div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-
-        <!-- TEST 제공 현황: 개시일 → 기산일이 영업일 2일 이상(1일 이내는 개시 후 즉시 기산) -->
-        <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:10px;">
           ${(function(){
-            const ov = ((order.overall || {}).testInfo) || { cnt: 0, avgBiz: 0, avgCal: 0, total: 0, pct: 0, instant: 0 };
+            const ov = ((order.overall || {}).testInfo) || { cnt: 0, avgBiz: 0, avgCal: 0, total: 0, pct: 0 };
             const head = '<div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:4px; margin-bottom:4px;">' +
-              '<span style="font-size:11.5px; font-weight:700; color:#334155;">TEST 제공 현황 <span style="font-weight:500; color:#64748b;">(개시일 → 기산일 영업일 2일 이상)</span></span>' +
-              '<span style="font-size:11.5px; font-weight:800; color:#0f172a;">지사 합계: TEST <b style="color:#7c3aed;">' + ov.cnt + '건</b> · 평균 <b style="color:#7c3aed;">' + (ov.cnt ? ov.avgBiz + '영업일' : '-') + '</b>' + (ov.cnt ? ' <span style="font-weight:600; color:#64748b;">(' + ov.avgCal + '일)</span>' : '') + ' · 비중 <b style="color:#7c3aed;">' + ov.pct + '%</b> <span style="font-weight:600; color:#64748b;">(' + ov.cnt + '/' + ov.total + '건)</span></span></div>';
+              '<span style="font-size:11.5px; font-weight:700; color:#334155;">컨설턴트별 개시 리드타임</span>' +
+              '<span style="font-size:11.5px; font-weight:800; color:#0f172a;">TEST 제공 지사 합계: <b style="color:#7c3aed;">' + ov.cnt + '건</b> · 평균 <b style="color:#7c3aed;">' + (ov.cnt ? ov.avgBiz + '영업일' : '-') + '</b>' + (ov.cnt ? ' <span style="font-weight:600; color:#64748b;">(' + ov.avgCal + '일)</span>' : '') + ' · 비중 <b style="color:#7c3aed;">' + ov.pct + '%</b> <span style="font-weight:600; color:#64748b;">(' + ov.cnt + '/' + ov.total + '건)</span></span></div>';
             const tiles = repRankings.map(function(r){
               const t = r.testInfo || { cnt: 0, avgBiz: 0, avgCal: 0, total: 0, pct: 0 };
               const theme = (typeof DASH_REP_THEME !== 'undefined' && DASH_REP_THEME[r.name]) || { primary: '#2563eb', bg: '#f8fafc', border: '#e2e8f0' };
               return '<div style="background:' + theme.bg + '; padding:7px 4px; border-radius:6px; border:1px solid ' + theme.border + '; border-top:3.5px solid ' + theme.primary + ';">' +
                 '<div style="font-weight:900; color:' + theme.primary + '; font-size:12px; margin-bottom:2px;">' + r.name + '</div>' +
+                '<div style="font-size:10px; color:#64748b; font-weight:700;">개시 리드타임</div>' +
+                '<div style="font-size:14px; font-weight:900; color:' + (r.leadTime === '-' ? '#94a3b8' : theme.primary) + ';">' + r.leadTime + '</div>' +
+                '<div style="border-top:1px dashed ' + theme.border + '; margin:5px 6px 4px;"></div>' +
+                '<div style="font-size:10px; color:#64748b; font-weight:700;">TEST 제공</div>' +
                 '<div style="font-size:14px; font-weight:900; color:' + (t.cnt ? '#7c3aed' : '#94a3b8') + ';">' + t.cnt + '건</div>' +
                 '<div style="font-size:10.5px; color:#475569; font-weight:700;">평균 ' + (t.cnt ? t.avgBiz + '영업일' : '-') + '</div>' +
                 '<div style="font-size:10.5px; color:' + theme.primary + '; font-weight:800;">비중 ' + t.pct + '% <span style="color:#64748b; font-weight:600;">(' + t.cnt + '/' + t.total + ')</span></div></div>';
@@ -14664,8 +14645,8 @@ function buildStrategyDoc_(c){
     ? ('<p>수주 ' + K(c.timingTotalK) + '천원 중 당월 개시 비중은 ' + curShare + '%입니다.</p><table><thead><tr><th>개시 예정 시기</th><th>건수</th><th>금액</th><th>구성비</th></tr></thead><tbody>'
       + c.timing.map(function(b){ return '<tr><td>' + esc(b.label) + '</td><td class="n">' + b.count + '건</td><td class="n">' + K(b.amountK) + '천원</td><td class="n">' + b.pct + '%</td></tr>'; }).join('') + '</tbody></table>')
     : '<p>집계할 당월 수주 건이 없습니다.</p>') + '</div>');
-  add('<div class="blk"><h3 class="s">3.3 컨설턴트별 계약일 ➔ 기산일 소요일 비교</h3><table><thead><tr><th>컨설턴트</th><th>평균</th><th>최단</th><th>최장</th><th>평가</th></tr></thead><tbody>'
-    + c.reps.map(function(r){ const ok = r.leadMax > 0; return '<tr><td><b>' + esc(r.name) + '</b></td><td class="n">' + (ok ? esc(r.leadTime) : '-') + '</td><td class="n">' + (ok ? r.leadMin + '일' : '-') + '</td><td class="n">' + (ok ? r.leadMax + '일' : '-') + '</td><td>' + (ok ? esc(r.leadTag) : '당월 수주 없음') + '</td></tr>'; }).join('')
+  add('<div class="blk"><h3 class="s">3.3 컨설턴트별 개시 리드타임</h3><table><thead><tr><th>컨설턴트</th><th>평균</th><th>최단</th><th>최장</th></tr></thead><tbody>'
+    + c.reps.map(function(r){ const ok = r.leadMax > 0; return '<tr><td><b>' + esc(r.name) + '</b></td><td class="n">' + (ok ? esc(r.leadTime) : '-') + '</td><td class="n">' + (ok ? r.leadMin + '일' : '-') + '</td><td class="n">' + (ok ? r.leadMax + '일' : '-') + '</td></tr>'; }).join('')
     + '</tbody></table></div>');
 
   /* ───── 4. 성과표 ───── */
