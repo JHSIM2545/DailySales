@@ -7790,24 +7790,6 @@ function dashPriceCancelSectionsHtml_(d){
   const repRows = reps.map(function(r){ const x = byRep[r] || {}; const p = prevByRep[r] || {}; return { name: r, count: x.count || 0, amount: x.amount || 0, avg: x.avgAmount || 0, pCount: p.count || 0, pAmount: p.amount || 0, reasons: x.byReason || [] }; })
     .sort(function(a, b){ return b.amount - a.amount || b.count - a.count; });
   const maxAmt = Math.max.apply(null, repRows.map(function(r){ return r.amount; }).concat([1]));
-  const repTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액(천원)</th><th>비중</th><th>전월 동기</th></tr></thead><tbody>' +
-    repRows.map(function(r){
-      const color = (typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[r.name]) || '#475569';
-      const share = totAmt ? Math.round(r.amount / totAmt * 100) : 0;
-      const top = r.reasons[0] ? (esc(r.reasons[0].name) + ' ' + (r.reasons[0].pctAmount || 0) + '%') : '-';
-      return '<tr><td style="font-weight:900; color:' + color + '; border-left:3.5px solid ' + color + ';">' + esc(r.name) + '</td>' +
-        '<td class="num">' + r.count + '건</td>' +
-        '<td class="num"><div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;"><span style="display:inline-block; height:8px; width:' + Math.round(r.amount / maxAmt * 60) + 'px; background:' + color + '; border-radius:2px;"></span><b>' + kk(r.amount) + '</b></div></td>' +
-        '<td class="num">' + share + '%</td>' +
-        '<td class="num" style="color:#64748b;">' + r.pCount + '건 / ' + kk(r.pAmount) + '</td></tr>';
-    }).join('') + '</tbody></table>';
-  const worst = repRows[0] && repRows[0].amount > 0 ? repRows[0] : null;
-  const reasonText = cov.byReasonText || [];
-  const typeList = cov.byReason || [];
-  const cancelInsight = '<div style="margin-top:10px; font-size:12px; color:#334155; line-height:1.7; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px;">' +
-    (worst ? '<span style="display:inline-block; margin-right:10px;">해약 최다 <b>' + esc(worst.name) + '</b> (' + worst.count + '건, ' + kk(worst.amount) + '천원, 비중 ' + (totAmt ? Math.round(worst.amount / totAmt * 100) : 0) + '%)</span>' : '') +
-    topLine_(typeList, '주요 유형', '') + '</div>';
-
   // ---------- 컨설턴트별 유지감소 대비 유지증가 (= 현재 유증 실적) ----------
   const stt = d.status || {};
   const rmx = stt.repMetrics || {}, rtg = stt.repTargets || {}, act = stt.actual || {}, tgt = stt.target || {};
@@ -7821,25 +7803,37 @@ function dashPriceCancelSectionsHtml_(d){
   const sumInc = keepRows.reduce(function(a, x){ return a + x.inc; }, 0), sumDec = keepRows.reduce(function(a, x){ return a + x.dec; }, 0);
   const totNet = (act.유지증가 !== undefined) ? Number(act.유지증가) || 0 : (sumInc - sumDec);
   const totTgt = Number(tgt.목표_유지증가) || 0;
-  const keepTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th>컨설턴트</th><th>유지증가<br>(개시)</th><th>유지감소</th><th>유증 실적<br>(증가−감소)</th><th>증가/감소</th><th>목표 달성</th></tr></thead><tbody>' +
-    keepRows.map(function(x){
-      const color = (typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[x.name]) || '#475569';
-      const nc = x.net >= 0 ? '#059669' : '#dc2626';
+  const keepBy = {}; keepRows.forEach(function(x){ keepBy[x.name] = x; });
+  const th_ = 'padding:4px 6px;';
+  const repTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th rowspan="2">컨설턴트</th><th colspan="4">해약</th><th colspan="4" style="border-left:2px solid #94a3b8;">유지감소 대비 유지증가 (현재 유증 실적)</th></tr>' +
+    '<tr><th>건수</th><th>금액(천원)</th><th>비중</th><th>전월 동기</th><th style="border-left:2px solid #94a3b8;">유지증가<br>(개시)</th><th>유지감소</th><th>유증 실적</th><th>증가/감소</th></tr></thead><tbody>' +
+    repRows.map(function(r){
+      const color = (typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[r.name]) || '#475569';
+      const share = totAmt ? Math.round(r.amount / totAmt * 100) : 0;
+      const x = keepBy[r.name] || { inc: 0, dec: 0, net: 0, cover: null };
       const cv = x.cover === null ? (x.inc > 0 ? '감소 없음' : '-') : x.cover + '%';
       const cvc = x.cover === null ? '#059669' : (x.cover >= 100 ? '#059669' : '#dc2626');
-      return '<tr><td style="font-weight:900; color:' + color + '; border-left:3.5px solid ' + color + ';">' + esc(x.name) + '</td>' +
-        '<td class="num" style="color:#059669; font-weight:800;">+' + x.inc.toLocaleString('ko-KR') + '</td>' +
+      return '<tr><td style="font-weight:900; color:' + color + '; border-left:3.5px solid ' + color + ';">' + esc(r.name) + '</td>' +
+        '<td class="num">' + r.count + '건</td>' +
+        '<td class="num"><div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;"><span style="display:inline-block; height:8px; width:' + Math.round(r.amount / maxAmt * 40) + 'px; background:' + color + '; border-radius:2px;"></span><b>' + kk(r.amount) + '</b></div></td>' +
+        '<td class="num">' + share + '%</td>' +
+        '<td class="num" style="color:#64748b;">' + r.pCount + '건 / ' + kk(r.pAmount) + '</td>' +
+        '<td class="num" style="color:#059669; font-weight:800; border-left:2px solid #94a3b8;">+' + x.inc.toLocaleString('ko-KR') + '</td>' +
         '<td class="num" style="color:#dc2626; font-weight:800;">−' + Math.abs(x.dec).toLocaleString('ko-KR') + '</td>' +
-        '<td class="num" style="color:' + nc + '; font-weight:900;">' + sgn(x.net) + '</td>' +
-        '<td class="num" style="color:' + cvc + '; font-weight:800;">' + cv + '</td>' +
-        '<td class="num">' + (x.pct === null ? '<span style="color:#94a3b8;">목표 미설정</span>' : '<b style="color:' + (x.pct >= 100 ? '#059669' : (x.pct >= 0 ? '#2563eb' : '#dc2626')) + ';">' + x.pct + '%</b>') + '</td></tr>';
+        '<td class="num" style="color:' + (x.net >= 0 ? '#059669' : '#dc2626') + '; font-weight:900;">' + sgn(x.net) + '</td>' +
+        '<td class="num" style="color:' + cvc + '; font-weight:800;">' + cv + '</td></tr>';
     }).join('') +
-    '<tr style="background:#f1f5f9; font-weight:900;"><td>지사 합계</td><td class="num" style="color:#059669;">+' + sumInc.toLocaleString('ko-KR') + '</td><td class="num" style="color:#dc2626;">−' + Math.abs(sumDec).toLocaleString('ko-KR') + '</td>' +
-      '<td class="num" style="color:' + (totNet >= 0 ? '#059669' : '#dc2626') + ';">' + sgn(totNet) + '</td><td class="num">' + (sumDec > 0 ? Math.round(sumInc / sumDec * 100) + '%' : '-') + '</td>' +
-      '<td class="num">' + (totTgt > 0 ? Math.round(totNet / totTgt * 100) + '%' : '-') + '</td></tr></tbody></table>';
-  const keepBox = '<div style="margin-top:12px;"><div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:4px;">컨설턴트별 유지감소 대비 유지증가 <span style="font-weight:600; color:#64748b;">(단위: 천원 · 현재 유증 실적)</span></div>' +
-    '<div style="overflow-x:auto;">' + keepTable + '</div>' +
-    '<div style="margin-top:6px; font-size:12px; font-weight:800; color:' + (totNet >= 0 ? '#047857' : '#b91c1c') + ';">현재 지사 유증 실적 ' + sgn(totNet) + '천원' + (totTgt > 0 ? ' (목표 ' + sgn(totTgt) + '천원 대비 ' + Math.round(totNet / totTgt * 100) + '%)' : '') + '</div></div>';
+    '<tr style="background:#f1f5f9; font-weight:900;"><td>지사 합계</td><td class="num">' + totCnt + '건</td><td class="num">' + kk(totAmt) + '</td><td class="num">100%</td><td class="num" style="color:#64748b;">' + ((cov.prev || {}).count || 0) + '건 / ' + kk((cov.prev || {}).amount) + '</td>' +
+      '<td class="num" style="color:#059669; border-left:2px solid #94a3b8;">+' + sumInc.toLocaleString('ko-KR') + '</td><td class="num" style="color:#dc2626;">−' + Math.abs(sumDec).toLocaleString('ko-KR') + '</td>' +
+      '<td class="num" style="color:' + (totNet >= 0 ? '#059669' : '#dc2626') + ';">' + sgn(totNet) + '</td><td class="num">' + (sumDec > 0 ? Math.round(sumInc / sumDec * 100) + '%' : '-') + '</td></tr></tbody></table>';
+  const keepBox = '<div style="margin-top:6px; font-size:12px; font-weight:800; color:' + (totNet >= 0 ? '#047857' : '#b91c1c') + ';">현재 지사 유증 실적 ' + sgn(totNet) + '천원' + (totTgt > 0 ? ' (목표 ' + sgn(totTgt) + '천원 대비 ' + Math.round(totNet / totTgt * 100) + '%)' : '') + ' <span style="font-weight:600; color:#64748b;">· 유증 실적 = 유지증가(개시) − 유지감소</span></div>';
+  const worst = repRows[0] && repRows[0].amount > 0 ? repRows[0] : null;
+  const reasonText = cov.byReasonText || [];
+  const typeList = cov.byReason || [];
+  const cancelInsight = '<div style="margin-top:10px; font-size:12px; color:#334155; line-height:1.7; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px;">' +
+    (worst ? '<span style="display:inline-block; margin-right:10px;">해약 최다 <b>' + esc(worst.name) + '</b> (' + worst.count + '건, ' + kk(worst.amount) + '천원, 비중 ' + (totAmt ? Math.round(worst.amount / totAmt * 100) : 0) + '%)</span>' : '') +
+    topLine_(typeList, '주요 유형', '') + '</div>';
+
   const sec4 = '<div>' +
     '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('4. 해약 분석', '(해약 확정일 기준 · 단위: 천원)') +
     '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
@@ -7847,8 +7841,8 @@ function dashPriceCancelSectionsHtml_(d){
       kpi_('해약 건수', totCnt + '건', deltaBadge_(totCnt, (cov.prev || {}).count, false, true)) +
       kpi_('평균 해약금액', kk(cov.avgAmount) + '천원', '') +
     '</div>' +
-    '<div style="margin-top:10px; overflow-x:auto;">' + repTable + '</div>' +
-    barBlock_('해약 유형', typeList, 6) + cancelInsight + keepBox + '</div></div>';
+    '<div style="margin-top:10px; overflow-x:auto;">' + repTable + '</div>' + keepBox +
+    barBlock_('해약 유형', typeList, 6) + cancelInsight + '</div></div>';
   return '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:12px; margin-bottom:14px;">' + sec3 + sec4 + '</div>';
 }
 
@@ -14556,17 +14550,17 @@ function buildStrategyDoc_(c){
       + (Dn.byReason[0] ? ('인하 주요 사유: <b>' + esc(Dn.byReason[0].name) + '</b> (' + Dn.byReason[0].cnt + '건, ' + K(Dn.byReason[0].amtK) + '천원, ' + Dn.byReason[0].pct + '%).') : '')
       + '</p></div>');
     const cTot = Cn.amtK || 0;
-    add('<div class="blk"><h3 class="s">5.3 해약 분석 (천원)</h3><p>당월 해약은 총 <b>' + Cn.cnt + '건, ' + K(Cn.amtK) + '천원</b>으로 전월 동기(' + Cn.prevCnt + '건, ' + K(Cn.prevAmtK) + '천원) 대비 ' + dl(Cn.amtK, Cn.prevAmtK, false) + '입니다.</p>'
-      + '<table><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액</th><th>비중</th><th>전월 동기</th></tr></thead><tbody>'
-      + Cn.byRep.slice().sort(function(a, b){ return b.amtK - a.amtK || b.cnt - a.cnt; }).map(function(x){ return '<tr><td><b>' + esc(x.name) + '</b></td><td class="n">' + x.cnt + '건</td><td class="n">' + K(x.amtK) + '</td><td class="n">' + (cTot ? r1(x.amtK / cTot * 100) : 0) + '%</td><td class="n">' + x.prevCnt + '건 / ' + K(x.prevAmtK) + '</td></tr>'; }).join('')
-      + '</tbody></table>'
-      + (Cn.byType.length ? ('<p class="note">해약 유형: ' + Cn.byType.map(function(x){ return esc(x.name) + ' ' + x.pct + '% (' + x.cnt + '건)'; }).join(' · ') + '</p>') : '') + '</div>');
     const kNet = Kp.totNet, kTgt = Kp.totTgt;
-    add('<div class="blk"><h3 class="s">5.4 컨설턴트별 유지감소 대비 유지증가 (천원)</h3><table><thead><tr><th>컨설턴트</th><th>유지증가(개시)</th><th>유지감소</th><th>유증 실적</th><th>증가/감소</th><th>목표 달성</th></tr></thead><tbody>'
-      + Kp.rows.map(function(x){ return '<tr><td><b>' + esc(x.name) + '</b></td><td class="n" style="color:#0f766e">+' + K(x.inc) + '</td><td class="n" style="color:#b91c1c">−' + K(A(x.dec)) + '</td><td class="n"><b style="color:' + (x.net >= 0 ? '#0f766e' : '#b91c1c') + '">' + S(x.net) + '</b></td><td class="n">' + (x.dec > 0 ? Math.round(x.inc / x.dec * 100) + '%' : (x.inc > 0 ? '감소 없음' : '-')) + '</td><td class="n">' + (x.tgt > 0 ? Math.round(x.net / x.tgt * 100) + '%' : '목표 미설정') + '</td></tr>'; }).join('')
-      + '<tr class="sum"><td>지사 합계</td><td class="n">+' + K(Kp.totInc) + '</td><td class="n">−' + K(A(Kp.totDec)) + '</td><td class="n">' + S(kNet) + '</td><td class="n">' + (Kp.totDec > 0 ? Math.round(Kp.totInc / Kp.totDec * 100) + '%' : '-') + '</td><td class="n">' + (kTgt > 0 ? Math.round(kNet / kTgt * 100) + '%' : '-') + '</td></tr></tbody></table>'
-      + '<p class="note">유증 실적 = 유지증가(개시) − 유지감소(해약·인하 − 인상·재개시 반영). 증가/감소 100% 이상이면 해약을 개시로 방어하고 있는 상태입니다.</p></div>');
-    // 5.5 종합 분석
+    const kBy = {}; Kp.rows.forEach(function(x){ kBy[x.name] = x; });
+    const cvTxt = function(x){ return x.dec > 0 ? Math.round(x.inc / x.dec * 100) + '%' : (x.inc > 0 ? '감소 없음' : '-'); };
+    add('<div class="blk"><h3 class="s">5.3 해약 분석 및 유지감소 대비 유지증가 (천원)</h3><p>당월 해약은 총 <b>' + Cn.cnt + '건, ' + K(Cn.amtK) + '천원</b>으로 전월 동기(' + Cn.prevCnt + '건, ' + K(Cn.prevAmtK) + '천원) 대비 ' + dl(Cn.amtK, Cn.prevAmtK, false) + '입니다.</p>'
+      + '<table><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액</th><th>비중</th><th>전월 동기</th><th>유지증가(개시)</th><th>유지감소</th><th>유증 실적</th><th>증가/감소</th></tr></thead><tbody>'
+      + Cn.byRep.slice().sort(function(a, b){ return b.amtK - a.amtK || b.cnt - a.cnt; }).map(function(x){ const k2 = kBy[x.name] || { inc: 0, dec: 0, net: 0 }; return '<tr><td><b>' + esc(x.name) + '</b></td><td class="n">' + x.cnt + '건</td><td class="n">' + K(x.amtK) + '</td><td class="n">' + (cTot ? r1(x.amtK / cTot * 100) : 0) + '%</td><td class="n">' + x.prevCnt + '건 / ' + K(x.prevAmtK) + '</td><td class="n" style="color:#0f766e">+' + K(k2.inc) + '</td><td class="n" style="color:#b91c1c">−' + K(A(k2.dec)) + '</td><td class="n"><b style="color:' + (k2.net >= 0 ? '#0f766e' : '#b91c1c') + '">' + S(k2.net) + '</b></td><td class="n">' + cvTxt(k2) + '</td></tr>'; }).join('')
+      + '<tr class="sum"><td>지사 합계</td><td class="n">' + Cn.cnt + '건</td><td class="n">' + K(Cn.amtK) + '</td><td class="n">100%</td><td class="n">' + Cn.prevCnt + '건 / ' + K(Cn.prevAmtK) + '</td><td class="n">+' + K(Kp.totInc) + '</td><td class="n">−' + K(A(Kp.totDec)) + '</td><td class="n">' + S(kNet) + '</td><td class="n">' + cvTxt({ inc: Kp.totInc, dec: Kp.totDec }) + '</td></tr>'
+      + '</tbody></table>'
+      + (Cn.byType.length ? ('<p class="note">해약 유형: ' + Cn.byType.map(function(x){ return esc(x.name) + ' ' + x.pct + '% (' + x.cnt + '건)'; }).join(' · ') + '</p>') : '')
+      + '<p class="note">유증 실적 = 유지증가(개시) − 유지감소(해약·인하 − 인상·재개시 반영). 증가/감소 100% 이상이면 해약을 개시로 방어하고 있는 상태입니다.' + (kTgt > 0 ? ' 현재 지사 유증 실적 ' + S(kNet) + '천원은 월 목표 ' + S(kTgt) + '천원의 ' + Math.round(kNet / kTgt * 100) + '%입니다.' : '') + '</p></div>');
+    // 5.4 종합 분석
     const lines = [];
     const minRep = Kp.rows.length ? Kp.rows.slice().sort(function(a, b){ return a.net - b.net; })[0] : null;
     const maxRep = Kp.rows.length ? Kp.rows.slice().sort(function(a, b){ return b.net - a.net; })[0] : null;
@@ -14575,7 +14569,7 @@ function buildStrategyDoc_(c){
     const topCan = Cn.byRep.slice().sort(function(a, b){ return b.amtK - a.amtK; })[0];
     if (topCan && topCan.amtK > 0) lines.push('해약은 <b>' + esc(topCan.name) + '</b>이 ' + topCan.cnt + '건·' + K(topCan.amtK) + '천원(' + (cTot ? Math.round(topCan.amtK / cTot * 100) : 0) + '%)으로 가장 많아 우선 케어가 필요합니다.');
     lines.push('단가변동은 인상 +' + K(U.amtK) + '천원, 인하 −' + K(Dn.amtK) + '천원으로 순 ' + S(netUp) + '천원이며, 전월 동기 대비 ' + dl(netUp, netUpPrev, true) + '입니다.');
-    add('<div class="blk card ' + (kNet >= 0 ? 'grn' : 'red') + '"><b>5.5 종합 분석</b><br>' + lines.map(function(t, i){ return (i + 1) + '. ' + t; }).join('<br>') + '</div>');
+    add('<div class="blk card ' + (kNet >= 0 ? 'grn' : 'red') + '"><b>5.4 종합 분석</b><br>' + lines.map(function(t, i){ return (i + 1) + '. ' + t; }).join('<br>') + '</div>');
   }
 
   /* ───── 6. 월말 전망 ───── */
