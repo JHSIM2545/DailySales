@@ -5179,6 +5179,14 @@ input[type="checkbox"] {
     max-width: 100% !important;
     width: 100% !important;
   }
+  /* 검색창 + 담당자 선택은 한 줄에 반반씩 */
+  .toolbar input[type="text"][id$="earchBox"], .toolbar select[id^="repFilter"] {
+    width: calc(50% - 3px) !important;
+    max-width: calc(50% - 3px) !important;
+    flex: 1 1 calc(50% - 3px) !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
 
   /* 3. 대시보드 뷰포트 적응 */
   .dash-head {
