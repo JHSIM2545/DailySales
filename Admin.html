@@ -19633,7 +19633,10 @@ async function downloadAllChaptersPdf_(){
   } catch (e) { console.warn('PDF 전 데이터 최신화 실패(기존 데이터 사용)', e); }
   const c = window.DASH_REPORT_CTX_;
   if (!c) { alert('대시보드 데이터를 먼저 불러온 뒤 다시 시도하세요.'); return; }
-  const fname = '북서울지사_' + c.ym + '_영업전략_가이드라인';
+  const fname = '북서울지사_영업현황 보고서_' + (function () {   // 예: 북서울지사_영업현황 보고서_261013 (PDF 생성일 기준, 한국시간)
+    try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, ''); }
+    catch (e) { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
+  })();
   const old = document.getElementById('spPrintFrame'); if (old && old.parentNode) old.parentNode.removeChild(old);
   const ifr = document.createElement('iframe');
   ifr.id = 'spPrintFrame';
