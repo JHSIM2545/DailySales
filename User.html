@@ -5232,6 +5232,10 @@ td.prod-col, td.gross-col,
 .ai-data-table td.center {
   text-align: center;
 }
+/* 2-(4) 컨설턴트별 성과 분석: 화면이 좁아지면 셀 내용을 여러 줄로 줄바꿈해 가로 스크롤 없이 한 화면에 표시 */
+.rep-perf-table { table-layout: auto; width: 100%; }
+.rep-perf-table th, .rep-perf-table td { white-space: normal !important; word-break: keep-all; overflow-wrap: anywhere; padding: 5px 6px !important; }
+.rep-perf-table td.motive-cell { min-width: 90px; line-height: 1.5; }
 
 /* @media print for 100% Vector clarity, zero cutoff */
 @media print {
@@ -7993,8 +7997,8 @@ function renderDashboard(){
       <!-- (1) 컨설턴트별 수주 실적 (순위 표기 차트) -->
       <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px;">
-          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(1) 컨설턴트별 수주 실적 (지사 합계: ${fmtK(ordAmt)}천원)</span>
-          <span style="font-size:11px; color:#64748b;">${viewModeTitle}</span>
+          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(1) 컨설턴트별 수주 실적</span>
+          <span style="font-size:12px; font-weight:700; color:#475569;">(지사 합계: ${fmtK(ordAmt)}천원)</span>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
           ${repRankings.map(r => {
@@ -8026,8 +8030,7 @@ function renderDashboard(){
       <!-- (2) 개시일정 분석 및 컨설턴트 리드타임 -->
       <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px;">
-          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(2) 개시일정 분석 및 컨설턴트별 리드타임</span>
-          <span style="font-size:11px; color:#64748b;">${viewModeTitle}</span>
+          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(2) 개시일정 분석</span>
         </div>
         
         <!-- 단일 100% 누적 막대그래프 -->
@@ -8069,7 +8072,7 @@ function renderDashboard(){
       <!-- 1) 상품군별 실적 (지사 합계 최상단 첫 행 배치) -->
       <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px;">
-          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(3)-1) 상품군별 실적 (${viewModeTitle})</span>
+          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(3) 상품군별 실적</span>
           <span style="font-size:11px; color:#64748b;">(단위: 천원)</span>
         </div>
         <table class="ai-data-table" style="font-size:11px; width:100%;">
@@ -8091,10 +8094,9 @@ function renderDashboard(){
       <!-- 2) 컨설턴트별 성과분석 -->
       <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px;">
-          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(3)-2) 컨설턴트별 성과 & 무수주 관리</span>
-          <span style="font-size:11px; color:#64748b;">${viewModeTitle}</span>
+          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(4) 컨설턴트별 성과 분석</span>
         </div>
-        <table class="ai-data-table" style="font-size:11px; width:100%;">
+        <table class="ai-data-table rep-perf-table" style="font-size:11px; width:100%;">
           <thead>
             <tr>
               <th>컨설턴트</th>
@@ -8116,7 +8118,7 @@ function renderDashboard(){
                   <td class="num" style="font-weight:800; color:${theme.primary};">${fmtK(r.orderAmt)}천원 (${r.orderCount}건)</td>
                   <td class="center">${r.period > 0 ? r.period + '일' : '-'}${r.zeroDays !== null ? ` <span style="font-size:10px; color:${r.zeroDays>2?'#dc2626':'#059669'}; font-weight:800;">(${r.zeroDays}일)</span>` : ''}</td>
                   <td class="num">${r.unitAmt}만 <span style="font-size:10px; color:#64748b;">(${r.cumUnitAmt}만)</span></td>
-                  <td class="center" style="font-size:10.5px;">${r.motive}</td>
+                  <td class="center motive-cell" style="font-size:10.5px;">${String(r.motive == null ? '' : r.motive).split(' / ').map(function(t){ return '<span style="display:inline-block; white-space:nowrap;">' + t + '</span>'; }).join(' / ')}</td>
                   <td><span style="font-size:10px; background:${theme.badgeBg}; color:${theme.badgeText}; border:1px solid ${theme.border}; padding:2px 6px; border-radius:4px; font-weight:800;">${r.style}</span></td>
                 </tr>
               `;
@@ -8163,10 +8165,6 @@ function renderDashboard(){
           ${aiTask4}
         </div>
 
-      </div>
-
-      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-        <span style="color:#64748b;">위 4대 진단에 따른 종합 분석 보고서는 상단 버튼을 클릭하여 공식 PDF로 출력/공유할 수 있습니다.</span>
       </div>
     </div>
 
