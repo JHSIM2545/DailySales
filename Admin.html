@@ -5197,6 +5197,7 @@ input[type="checkbox"] {
     padding: 4px 6px !important;
   }
   .toolbar input[type="text"][id$="earchBox"] { flex: 1.4 1 0 !important; }
+  .toolbar select#gubunFilterProductDaily { flex: 0 0 auto !important; width: auto !important; max-width: none !important; }
 
   /* 3. 대시보드 뷰포트 적응 */
   .dash-head {
@@ -5647,15 +5648,15 @@ input[type="checkbox"] {
  <input type="text" id="productDailySearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
  <select id="repFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">전체</option><option value="박정훈">박정훈</option><option value="박광모">박광모</option><option value="김상훈">김상훈</option><option value="최영국">최영국</option><option value="이수열">이수열</option><option value="박광춘">박광춘</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select><span class="tb-break"></span>  
+ </select>  
  <select id="gubunFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">구분 전체</option><option value="지사">지사</option><option value="법인">법인</option><option value="전략">전략</option>  
- </select>  
+ </select><span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
- </span><span class="tb-break"></span>  
+ </span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily">선택</label>  
  <button title="인쇄" onclick="printGridData('productdaily')">🖨️</button>  
