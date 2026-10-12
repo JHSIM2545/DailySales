@@ -4199,7 +4199,7 @@ function getTzToday() {
  .sync-status.error{ background:#ffebee; color:#c00000; cursor:pointer; font-weight:bold; border:1px solid #c00000; }  
  .sync-status.error:hover{ background:#f8d7da; }  
  .sync-status.ok{ background:#0a4b40; color:#00ff00; font-weight:bold; border:1px solid #00ff00; box-shadow:0 0 10px #00ff00, inset 0 0 5px #00ff00; text-shadow:0 0 5px #00ff00; }  
- .tabs{ display:flex; background:#e5dde0; border-bottom:2px solid #8e2f4e; flex-wrap:nowrap; overflow-x:auto; align-items:stretch; -webkit-overflow-scrolling:touch; }  
+ .tabs{ display:flex; background:#e5dde0; border-bottom:2px solid #8e2f4e; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; align-items:stretch; -webkit-overflow-scrolling:touch; }  
  .tab{ padding:9px 16px; cursor:pointer; font-size:13px; font-weight:600; color:#5a6472; border-right:1px solid #c7cfd8; white-space:nowrap; display:flex; align-items:center; justify-content:center; flex-shrink:0; }  
  .tab.active{ background:#fff; color:#5c1c2f; border-bottom:2px solid #fff; margin-bottom:-2px; }  
  .tab.disabled{ color:#a9b2bd; cursor:default; }  
@@ -7462,7 +7462,7 @@ function renderTabs(){
    return `<div class="tab ${t.key===currentTab?'active':''} ${t.ready?'':'disabled'}"${styleAttr}${titleAttr}  
  onclick="${t.ready ? onclickExpr : ''}">${label}${t.ready?'':' (준비중)'}</div>`;  
  }).join('');  
- const fileBtnHtml_ = (typeof openFileStoreModal_ === 'function') ? '<div class="tab" id="fileStoreTopBtn" title="파일 저장소" onclick="openFileStoreModal_()" style="font-size:13px; padding:8px 10px;">📁</div>' : '';
+ const fileBtnHtml_ = (typeof openFileStoreModal_ === 'function') ? '<div class="tab" id="fileStoreTopBtn" title="파일 저장소" onclick="openFileStoreModal_()" style="font-size:13px; padding:8px 10px; line-height:1.2;">📁</div>' : '';
  el.innerHTML = tabsHtml + fileBtnHtml_;  
 }  
 // 직무 저장값(서버에 저장된 값) -> 화면 표시용 이름. 저장값은 기존 사용자 데이터와의 호환을 위해 그대로 두고,  
