@@ -1830,8 +1830,16 @@ function getTzToday() {
       let q = client.from('login_logs').select('*').order('created_at', { ascending: false });
       if (from) q = q.gte('created_at', from + 'T00:00:00');
       if (to) q = q.lte('created_at', to + 'T23:59:59');
-      const { data, error } = await q;
-      if (error) return { success: true, rows: [] };
+      let { data, error } = await q.limit(5000);
+      if (error) {
+        // select('*') 또는 정렬/필터 실패 시, 확인된 컬럼만으로 재시도
+        const r2 = await client.from('login_logs').select('phone, name, browser, device_type, created_at').order('created_at', { ascending: false }).limit(5000);
+        data = r2.data; error = r2.error;
+      }
+      if (error) {
+        console.warn('[adminListLoginHistory] 조회 실패:', error);
+        return { success: false, error: (error.message || String(error)) + (error.code ? ' (' + error.code + ')' : ''), rows: [] };
+      }
       // [이름, 전화번호, 시각, 액션(로그인/로그아웃 · 시스템), 브라우저, 기기유형, 시스템(전용 컬럼이 있을 때)]
       const rows = (data || []).map(r => [
         r.name,
@@ -1869,8 +1877,16 @@ function getTzToday() {
       let q = client.from('activity_logs').select('*').order('created_at', { ascending: false });
       if (from) q = q.gte('created_at', from + 'T00:00:00');
       if (to) q = q.lte('created_at', to + 'T23:59:59');
-      const { data, error } = await q;
-      if (error) return { success: true, rows: [] };
+      let { data, error } = await q.limit(5000);
+      if (error) {
+        // select('*') 또는 정렬/필터 실패 시, 확인된 컬럼만으로 재시도
+        const r2 = await client.from('login_logs').select('phone, name, browser, device_type, created_at').order('created_at', { ascending: false }).limit(5000);
+        data = r2.data; error = r2.error;
+      }
+      if (error) {
+        console.warn('[adminListLoginHistory] 조회 실패:', error);
+        return { success: false, error: (error.message || String(error)) + (error.code ? ' (' + error.code + ')' : ''), rows: [] };
+      }
 
       // 데이터의 추가, 변경, 삭제 등에 관련한 데이터 변경 이력 중심으로만 필터링하여 조회
       const filtered = (data || []).filter(r => {
@@ -8211,14 +8227,19 @@ function renderDashboard(){
       const rest = Math.max(0, 100 - top.reduce(function (s0, x) { return s0 + (Number(x.pctAmount) || 0); }, 0));
       motive = top.map(function (x) { return x.name + ' ' + x.pctAmount + '%'; }).join(' / ') + (mlist.length > 3 && rest > 0 ? (' / 외 ' + rest + '%') : '');
     } else if (cnt > 0) { motive = (mlist.length ? '' : '금액 미입력'); }
-    let leadTime = '-', leadTag = cnt > 0 ? '기산 대기' : '수주대기';
+    let leadTime = '-', leadTag = cnt > 0 ? '개시 대기' : '수주대기';
     if (bo.gapBase && typeof bo.gapBase.avg === 'number' && bo.gapBase.avg > 0) {
       leadTime = bo.gapBase.avg + '일';
-      leadTag = bo.gapBase.avg <= 7 ? '신속기산' : (bo.gapBase.avg <= 14 ? '표준기산' : '장기준비');
+      leadTag = bo.gapBase.avg <= 7 ? '신속개시' : (bo.gapBase.avg <= 30 ? '표준개시' : '익월 이후 개시');
     } else if (bo.gapStart && typeof bo.gapStart.avg === 'number' && bo.gapStart.avg > 0) {
       leadTime = bo.gapStart.avg + '일';
-      leadTag = bo.gapStart.avg <= 7 ? '신속기산' : (bo.gapStart.avg <= 14 ? '표준기산' : '장기준비');
+      leadTag = bo.gapStart.avg <= 7 ? '신속개시' : (bo.gapStart.avg <= 30 ? '표준개시' : '익월 이후 개시');
     }
+    // 당월 개시 비중(금액 기준)이 50% 이상이면 리드타임과 무관하게 '당월개시 多'
+    try {
+      const curB = bo.startTiming && Array.isArray(bo.startTiming.buckets) ? bo.startTiming.buckets.filter(function (b) { return b.key === 'cur'; })[0] : null;
+      if (cnt > 0 && curB && Number(curB.pct) >= 50) leadTag = '당월개시 多';
+    } catch (e_) {}
     return {
       rank: 0,
       name: rep,
@@ -8510,7 +8531,7 @@ function renderDashboard(){
 
         <!-- 컨설턴트별 개시소요일 비교 바 -->
         <div style="border-top:1px dashed #cbd5e1; padding-top:8px;">
-          <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:4px;">컨설턴트별 계약일 ➔ 기산일 평균 간격(소요일)</div>
+          <div style="font-size:11.5px; font-weight:700; color:#334155; margin-bottom:4px;">컨설턴트별 계약일 ➔ 개시일 평균 간격(소요일)</div>
           <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; text-align:center; font-size:11px;">
             ${repRankings.map(r => {
               const theme = (typeof DASH_REP_THEME !== 'undefined' && DASH_REP_THEME[r.name]) || { primary: '#2563eb', bg: '#f8fafc', border: '#e2e8f0', text: '#1e293b', badgeBg: '#f1f5f9', badgeText: '#475569' };
@@ -8909,9 +8930,9 @@ function buildDashReportContainer_(){
  '<div class="rpt-page">' +  
  '<div class="rpt-section">' +  
  '<div class="rpt-h2">3. 계약 분석<span class="sub">' + escHtml(repLabel) + '</span></div>' +  
- '<div class="rpt-comment">계약일에서 개시일까지 평균 ' + (orderAnalytics.gapStart ? orderAnalytics.gapStart.avg : 0) + '일, 계약일에서 기산일까지 평균 ' + (orderAnalytics.gapBase ? orderAnalytics.gapBase.avg : 0) + '일이 소요되었습니다.</div>' +  
- '<div class="rpt-chart-card"><div class="rpt-chart-title"><span>계약일 → 개시일 간격</span><span class="sub">평균 ' + (orderAnalytics.gapStart ? orderAnalytics.gapStart.avg : 0) + '일</span></div>' + reportGapColumnsHtml_(orderAnalytics.gapStart) + '</div>' +  
- '<div class="rpt-chart-card"><div class="rpt-chart-title"><span>계약일 → 기산일 간격</span><span class="sub">평균 ' + (orderAnalytics.gapBase ? orderAnalytics.gapBase.avg : 0) + '일</span></div>' + reportGapColumnsHtml_(orderAnalytics.gapBase) + '</div>' +  
+ '<div class="rpt-comment">계약일에서 공사완료일까지 평균 ' + (orderAnalytics.gapStart ? orderAnalytics.gapStart.avg : 0) + '일, 계약일에서 개시일까지 평균 ' + (orderAnalytics.gapBase ? orderAnalytics.gapBase.avg : 0) + '일이 소요되었습니다.</div>' +  
+ '<div class="rpt-chart-card"><div class="rpt-chart-title"><span>계약일 → 공사완료일 간격</span><span class="sub">평균 ' + (orderAnalytics.gapStart ? orderAnalytics.gapStart.avg : 0) + '일</span></div>' + reportGapColumnsHtml_(orderAnalytics.gapStart) + '</div>' +  
+ '<div class="rpt-chart-card"><div class="rpt-chart-title"><span>계약일 → 개시일 간격</span><span class="sub">평균 ' + (orderAnalytics.gapBase ? orderAnalytics.gapBase.avg : 0) + '일</span></div>' + reportGapColumnsHtml_(orderAnalytics.gapBase) + '</div>' +  
  '</div>' +  
  '<div class="rpt-section">' +  
  '<div class="rpt-h2">4. 해약 현황</div>' +  
@@ -14637,7 +14658,7 @@ function loadLoginHistory(){
     .withFailureHandler(function(err){ usersErr = err; USER_ROWS = USER_ROWS || []; usersDone = true; finish_(); })
     .adminListUsers(SESSION.token);
   google.script.run
-    .withSuccessHandler(function(res){ LOGIN_HISTORY_ROWS = (res && res.rows) || []; histDone = true; finish_(); })
+    .withSuccessHandler(function(res){ LOGIN_HISTORY_ROWS = (res && res.rows) || []; if (res && res.success === false) histErr = res.error || '조회 실패'; LOGIN_HISTORY_RAW_COUNT = LOGIN_HISTORY_ROWS.length; histDone = true; finish_(); })
     .withFailureHandler(function(err){ histErr = err; histDone = true; finish_(); })
     .adminListLoginHistory(SESSION.token, fromVal, toVal);
 }
@@ -16051,6 +16072,7 @@ function onDailyReportDateChange(){
 
 /* ===================== 사용자 이력 툴바 이벤트 ===================== */
 let LOGIN_HISTORY_ROWS = [];
+let LOGIN_HISTORY_RAW_COUNT = 0;
 
 function onLoginHistoryModeChange(){
   if (currentTab !== 'users') return;
@@ -16109,7 +16131,7 @@ function renderLoginHistory(){
   const statusHtml_ = loginStatusTableHtml_();
   const head = '<div style="padding:8px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">📜 로그인 이력 <span style="font-weight:500; color:#64748b;">(시간순, 최신 먼저)</span></div>';
   if (!sessions.length) {
-    container.innerHTML = statusHtml_ + head + '<div class="placeholder">로그인 이력이 없습니다.</div>';
+    container.innerHTML = statusHtml_ + head + '<div class="placeholder">로그인 이력이 없습니다.' + (LOGIN_HISTORY_RAW_COUNT ? '' : '<br><span style="font-size:12px;color:#94a3b8;">(조회된 로그 0건 — 날짜 조건을 비우거나, login_logs 테이블에 데이터/조회 권한(RLS)이 있는지 확인이 필요합니다)</span>') + '</div>';
     return;
   }
   let html = statusHtml_ + head + '<div class="grid-wrap"><table><thead><tr><th>사용자명</th><th>전화번호</th><th>접속 시스템</th><th>접속기기</th><th>로그인 시각</th><th>로그아웃 시각</th><th>사용시간</th></tr></thead><tbody>';
