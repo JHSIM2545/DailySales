@@ -2318,6 +2318,10 @@ function getTzToday() {
       const parts = String(ym).split('-');
       const yy = Number(parts[0]), mm = Number(parts[1]);
       const daysInMonth = new Date(yy, mm, 0).getDate();
+      // 실적은 '오늘까지 발생분'만 집계 (일일실적보고와 동일 기준). 과거 월=월말까지, 미래 월=0
+      const todayDs_ = getTzToday();
+      const cutoffIdx_ = ym < todayDs_.slice(0, 7) ? daysInMonth : (ym === todayDs_.slice(0, 7) ? Number(todayDs_.slice(8, 10)) : 0);
+      const cutoffDs_ = ym < todayDs_.slice(0, 7) ? '9999-12-31' : (ym === todayDs_.slice(0, 7) ? todayDs_ : '0000-00-00');
 
       const orders = ordRes.data || [];
       const cancels = canRes.data || [];
@@ -2443,7 +2447,9 @@ function getTzToday() {
         });
       }
 
-      const last = rows[rows.length - 1] || {};
+      const last = (cutoffIdx_ > 0 ? rows[Math.min(cutoffIdx_, rows.length) - 1] : null) || {};
+      const lastFull_ = rows[rows.length - 1] || {};
+      const actualMonthEnd = { 수주: lastFull_.누계수주 || 0, 개시: lastFull_.누계개시 || 0, 유지감소: lastFull_.누계유지감소 || 0, 유지증가: lastFull_.누계유지증가 || 0 }; // 월말(예정 포함) 전망용
       const actual = {
         수주: last.누계수주 || 0,
         개시: last.누계개시 || 0,
@@ -2460,8 +2466,8 @@ function getTzToday() {
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) repActualsRaw[rep].수주 += safeNum_(r.monthly_fee);
-        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) repActualsRaw[rep].개시 += safeNum_(r.monthly_fee);
+        if (r.contract_date && String(r.contract_date).slice(0, 7) === ym && String(r.contract_date).slice(0, 10) <= cutoffDs_) repActualsRaw[rep].수주 += safeNum_(r.monthly_fee);
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym && String(r.billing_date).slice(0, 10) <= cutoffDs_) repActualsRaw[rep].개시 += safeNum_(r.monthly_fee);
       });
 
       cancels.forEach(r => {
@@ -2469,7 +2475,7 @@ function getTzToday() {
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym) repActualsRaw[rep].해약 += safeNum_(r.monthly_fee);
+        if (r.confirm_date && String(r.confirm_date).slice(0, 7) === ym && String(r.confirm_date).slice(0, 10) <= cutoffDs_) repActualsRaw[rep].해약 += safeNum_(r.monthly_fee);
       });
 
       prices.forEach(r => {
@@ -2477,7 +2483,7 @@ function getTzToday() {
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym) {
+        if (r.billing_date && String(r.billing_date).slice(0, 7) === ym && String(r.billing_date).slice(0, 10) <= cutoffDs_) {
           const amt = safeNum_(r.diff_amount);
           if (amt >= 0) repActualsRaw[rep].인상 += amt; else repActualsRaw[rep].인하 += amt;
         }
@@ -2488,7 +2494,7 @@ function getTzToday() {
         if (allowed.indexOf(String(r.product_name)) === -1) return;
         const rep = String(r.rep_name || '').trim();
         if (!repActualsRaw[rep]) repActualsRaw[rep] = { 수주: 0, 개시: 0, 해약: 0, 인상: 0, 인하: 0, 재개시: 0 };
-        if (r.restart_date && String(r.restart_date).slice(0, 7) === ym) repActualsRaw[rep].재개시 += safeNum_(r.monthly_fee);
+        if (r.restart_date && String(r.restart_date).slice(0, 7) === ym && String(r.restart_date).slice(0, 10) <= cutoffDs_) repActualsRaw[rep].재개시 += safeNum_(r.monthly_fee);
       });
 
       const repMetrics = {};
@@ -2533,6 +2539,7 @@ function getTzToday() {
         yearMonth: ym,
         target: target,
         actual: actual,
+        actualMonthEnd: actualMonthEnd,
         rows: rows,
         repMetrics: repMetrics,
         repTargets: repTargets
@@ -7653,9 +7660,9 @@ function renderDashboard(){
   // 유지증가: 영업현황 일별 누계(rows) 기준.
   //  - 당월: 오늘까지의 누계(현재 수준)  - 마감월: 월말 최종 누계  - 월말 전망: 영업현황 월말(마지막 날) 누계
   const statusRows_ = Array.isArray(status.rows) ? status.rows : [];
-  const netEnd = Number(actual.유지증가) || 0; // 영업현황 월말 누계 (일보에 기록된 개시·해약·단가변동 전부 반영)
+  const netEnd = Number((status.actualMonthEnd || actual).유지증가) || 0; // 영업현황 월말 누계 (일보에 기록된 개시·해약·단가변동 전부 반영)
   const netTodayRow_ = isCurMonth ? statusRows_.find(function (r) { return r.날짜 === todayDs_; }) : null;
-  const netAmt = netTodayRow_ ? (Number(netTodayRow_.누계유지증가) || 0) : netEnd;
+  const netAmt = netTodayRow_ ? (Number(netTodayRow_.누계유지증가) || 0) : (Number(actual.유지증가) || 0);
   const netTgt = Number(target.목표_유지증가) || 0;
   const netPct = netTgt !== 0 ? Math.round((netAmt / netTgt) * 1000) / 10 : 0;
   const netRank = rankText_(biz && biz.net);
