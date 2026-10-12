@@ -8085,6 +8085,31 @@ function dashGaugeSectionHtml_(title, metricKey, targetTotal, planTotal, actualT
  return html;  
 }  
   
+/** 보고서·대시보드 공용: 인상/인하/해약/유지증감 수치 모델 (금액 단위: 천원) */
+function dashPCModel_(d){
+  d = d || {};
+  const k = function(w){ return Math.round((Number(w) || 0) / 1000); };
+  const up = d.priceUp || {}, dn = d.priceDown || {}, can = d.cancel || {}, st = d.status || {};
+  const reps = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : [];
+  const lst = function(l, n){ return (l || []).slice(0, n).map(function(x){ return { name: x.name, cnt: x.count || 0, amtK: k(x.amount), pct: x.pctAmount || 0 }; }); };
+  const byName = function(l){ const m = {}; (l || []).forEach(function(x){ m[x.name] = x; }); return m; };
+  function pr(p){
+    const o = p.overall || {}, pv = p.prev || {}, m = byName(p.byRep);
+    return { cnt: o.count || 0, amtK: k(o.amount), avgK: k(o.avgAmount), prevCnt: pv.count || 0, prevAmtK: k(pv.amount),
+      byRep: reps.map(function(r){ const x = m[r] || {}; return { name: r, cnt: x.count || 0, amtK: k(x.amount) }; }),
+      byReceiver: lst(p.byReceiver, 3), byReason: lst(p.byReason, 3) };
+  }
+  const co = can.overall || {}, cp = co.prev || {}, cb = can.byRep || {}, cpb = can.prevByRep || {};
+  const cancel = { cnt: co.count || 0, amtK: k(co.amount), avgK: k(co.avgAmount), prevCnt: cp.count || 0, prevAmtK: k(cp.amount),
+    byRep: reps.map(function(r){ const x = cb[r] || {}, p = cpb[r] || {}; return { name: r, cnt: x.count || 0, amtK: k(x.amount), prevCnt: p.count || 0, prevAmtK: k(p.amount) }; }),
+    byType: lst(co.byReason, 4) };
+  const rm = st.repMetrics || {}, rt = st.repTargets || {}, act = st.actual || {}, tg = st.target || {};
+  const rows = reps.map(function(r){ const m = rm[r] || {}; return { name: r, inc: Number(m.개시) || 0, dec: Number(m.유지감소) || 0, net: Number(m.유지증가) || 0, tgt: Number((rt[r] || {}).목표_유지증가) || 0 }; });
+  const totInc = rows.reduce(function(a, x){ return a + x.inc; }, 0), totDec = rows.reduce(function(a, x){ return a + x.dec; }, 0);
+  return { up: pr(up), down: pr(dn), cancel: cancel,
+    keep: { rows: rows, totInc: totInc, totDec: totDec, totNet: (act.유지증가 !== undefined) ? (Number(act.유지증가) || 0) : (totInc - totDec), totTgt: Number(tg.목표_유지증가) || 0 } };
+}
+
 /** 대시보드 3. 인상·인하 분석 / 4. 해약 분석 */
 function dashPriceCancelSectionsHtml_(d){
   d = d || {};
@@ -8190,9 +8215,40 @@ function dashPriceCancelSectionsHtml_(d){
   const typeList = cov.byReason || [];
   const cancelInsight = '<div style="margin-top:10px; font-size:12px; color:#334155; line-height:1.7; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px;">' +
     (worst ? '<span style="display:inline-block; margin-right:10px;">해약 최다 <b>' + esc(worst.name) + '</b> (' + worst.count + '건, ' + kk(worst.amount) + '천원, 비중 ' + (totAmt ? Math.round(worst.amount / totAmt * 100) : 0) + '%)</span>' : '') +
-    topLine_(reasonText.filter(function(x){ return x.name !== '미기재'; }), '주요 사유', '') + topLine_(typeList, '주요 유형', '') +
-    (reasonText[0] && reasonText[0].name === '미기재' ? '<br><span style="color:#b45309;">※ 해약 사유 미기재 건이 가장 많습니다 (' + reasonText[0].count + '건) — 사유 입력 보완이 필요합니다.</span>' : '') +
-    '</div>';
+    topLine_(typeList, '주요 유형', '') + '</div>';
+
+  // ---------- 컨설턴트별 유지감소 대비 유지증가 (= 현재 유증 실적) ----------
+  const stt = d.status || {};
+  const rmx = stt.repMetrics || {}, rtg = stt.repTargets || {}, act = stt.actual || {}, tgt = stt.target || {};
+  const sgn = function(v){ v = Number(v) || 0; return (v > 0 ? '+' : (v < 0 ? '−' : '')) + Math.abs(v).toLocaleString('ko-KR'); };
+  const keepRows = reps.map(function(r){
+    const m = rmx[r] || {};
+    const inc = Number(m.개시) || 0, dec = Number(m.유지감소) || 0, net = Number(m.유지증가) || 0;
+    const t = Number((rtg[r] || {}).목표_유지증가) || 0;
+    return { name: r, inc: inc, dec: dec, net: net, cover: dec > 0 ? Math.round(inc / dec * 100) : null, tgt: t, pct: t > 0 ? Math.round(net / t * 100) : null };
+  });
+  const sumInc = keepRows.reduce(function(a, x){ return a + x.inc; }, 0), sumDec = keepRows.reduce(function(a, x){ return a + x.dec; }, 0);
+  const totNet = (act.유지증가 !== undefined) ? Number(act.유지증가) || 0 : (sumInc - sumDec);
+  const totTgt = Number(tgt.목표_유지증가) || 0;
+  const keepTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th>컨설턴트</th><th>유지증가<br>(개시)</th><th>유지감소</th><th>유증 실적<br>(증가−감소)</th><th>증가/감소</th><th>목표 달성</th></tr></thead><tbody>' +
+    keepRows.map(function(x){
+      const color = (typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[x.name]) || '#475569';
+      const nc = x.net >= 0 ? '#059669' : '#dc2626';
+      const cv = x.cover === null ? (x.inc > 0 ? '감소 없음' : '-') : x.cover + '%';
+      const cvc = x.cover === null ? '#059669' : (x.cover >= 100 ? '#059669' : '#dc2626');
+      return '<tr><td style="font-weight:900; color:' + color + '; border-left:3.5px solid ' + color + ';">' + esc(x.name) + '</td>' +
+        '<td class="num" style="color:#059669; font-weight:800;">+' + x.inc.toLocaleString('ko-KR') + '</td>' +
+        '<td class="num" style="color:#dc2626; font-weight:800;">−' + Math.abs(x.dec).toLocaleString('ko-KR') + '</td>' +
+        '<td class="num" style="color:' + nc + '; font-weight:900;">' + sgn(x.net) + '</td>' +
+        '<td class="num" style="color:' + cvc + '; font-weight:800;">' + cv + '</td>' +
+        '<td class="num">' + (x.pct === null ? '<span style="color:#94a3b8;">목표 미설정</span>' : '<b style="color:' + (x.pct >= 100 ? '#059669' : (x.pct >= 0 ? '#2563eb' : '#dc2626')) + ';">' + x.pct + '%</b>') + '</td></tr>';
+    }).join('') +
+    '<tr style="background:#f1f5f9; font-weight:900;"><td>지사 합계</td><td class="num" style="color:#059669;">+' + sumInc.toLocaleString('ko-KR') + '</td><td class="num" style="color:#dc2626;">−' + Math.abs(sumDec).toLocaleString('ko-KR') + '</td>' +
+      '<td class="num" style="color:' + (totNet >= 0 ? '#059669' : '#dc2626') + ';">' + sgn(totNet) + '</td><td class="num">' + (sumDec > 0 ? Math.round(sumInc / sumDec * 100) + '%' : '-') + '</td>' +
+      '<td class="num">' + (totTgt > 0 ? Math.round(totNet / totTgt * 100) + '%' : '-') + '</td></tr></tbody></table>';
+  const keepBox = '<div style="margin-top:12px;"><div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:4px;">컨설턴트별 유지감소 대비 유지증가 <span style="font-weight:600; color:#64748b;">(단위: 천원 · 현재 유증 실적)</span></div>' +
+    '<div style="overflow-x:auto;">' + keepTable + '</div>' +
+    '<div style="margin-top:6px; font-size:12px; font-weight:800; color:' + (totNet >= 0 ? '#047857' : '#b91c1c') + ';">현재 지사 유증 실적 ' + sgn(totNet) + '천원' + (totTgt > 0 ? ' (목표 ' + sgn(totTgt) + '천원 대비 ' + Math.round(totNet / totTgt * 100) + '%)' : '') + '</div></div>';
   const sec4 = '<div>' +
     '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('4. 해약 분석', '(해약 확정일 기준 · 단위: 천원)') +
     '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
@@ -8201,11 +8257,7 @@ function dashPriceCancelSectionsHtml_(d){
       kpi_('평균 해약금액', kk(cov.avgAmount) + '천원', '') +
     '</div>' +
     '<div style="margin-top:10px; overflow-x:auto;">' + repTable + '</div>' +
-    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">' +
-      '<div>' + barBlock_('해약 사유 (금액 비중)', reasonText, 6) + '</div>' +
-      '<div>' + barBlock_('해약 유형', typeList, 6) + '</div>' +
-      '<div>' + barBlock_('상품별 해약', cov.byProduct, 5) + '</div>' +
-    '</div>' + cancelInsight + '</div></div>';
+    barBlock_('해약 유형', typeList, 6) + cancelInsight + keepBox + '</div></div>';
   return '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:12px; margin-bottom:14px;">' + sec3 + sec4 + '</div>';
 }
 
@@ -8825,6 +8877,7 @@ function renderDashboard(){
       timing: stBuckets.map(function (b) { return { key: b.key, label: b.label, count: b.count, pct: b.pct, amountK: k_(b.amount) }; }),
       timingTotalK: startTimingTotalK,
       tasks: [aiTask1, aiTask2, aiTask3, aiTask4],
+      pc: dashPCModel_(d),
       rowToday: netTodayRow_ || null, rowEnd: lastRow_
     };
   } catch (e) { window.DASH_REPORT_CTX_ = null; console.warn('보고서 컨텍스트 생성 실패', e); }
@@ -19265,7 +19318,7 @@ function buildStrategyDoc_(c){
     return '영업일 진척률(' + c.workRatio + '%) 대비 <b>' + gapS(r1(o.pct - c.workRatio)) + '</b><br><span style="color:#64748b">사업팀 순위 자료 없음</span>';
   };
   const blocks = [];
-  const add = function(html, keep){ blocks.push({ html: html, ch: html.indexOf('<div class="blk band"') === 0 && html.indexOf('7. 현장 인력') < 0 }); };
+  const add = function(html, keep){ blocks.push({ html: html, ch: html.indexOf('<div class="blk band"') === 0 && html.indexOf('8. 현장 인력') < 0 }); };
   const band = function(no, title, sub){ return '<div class="blk band"><div class="eb">' + no + '</div><h2>' + title + '</h2>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>'; };
 
   /* ───── 표지 (첨부 시안 기준 배치) ───── */
@@ -19313,7 +19366,7 @@ function buildStrategyDoc_(c){
     else if (lo === 2 && ls === 2) sumLines.push('현재 흐름을 유지하며 해약 방어에 집중할 시기입니다.');
     else sumLines.push('부족한 부문을 보완하며 목표 달성에 집중할 시기입니다.');
   }
-  const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
+  const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', '인상·인하·해약 및 유지증감 분석', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
   const wd = (function () { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); } })().replace(/-/g, '.');  // 작성일자는 PDF를 만드는 오늘 날짜
   const cover = '<div class="pg cover">'
     + '<div class="cv-eb">S1 CORPORATION · NORTH SEOUL BRANCH · EXECUTIVE STRATEGY REPORT</div>'
@@ -19401,8 +19454,59 @@ function buildStrategyDoc_(c){
     + c.reps.map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b> <span class="sm">' + esc(r.style) + '</span></td><td class="n">' + K(r.orderAmt) + '천원 (' + r.orderCount + '건)</td><td class="n">' + (r.period > 0 ? r.period + '일' : '-') + (r.zeroDays !== null ? ' <span style="color:' + (r.zeroDays > 2 ? '#dc2626' : '#059669') + '">(' + r.zeroDays + '일)</span>' : '') + '</td><td class="n">' + r.unitAmt + '만 (' + r.cumUnitAmt + '만)</td><td>' + esc(r.motive) + '</td></tr>'; }).join('')
     + '</tbody></table><p class="note">무수주는 마지막 수주 이후 경과한 영업일(주말·공휴일 제외, 당월만)이며, 영업동기는 수주금액 기준 비중입니다.</p></div>');
 
-  /* ───── 5. 월말 전망 ───── */
-  add(band('CHAPTER 05 · 06', '5. ' + m + '월말 실적 전망 및 분석', '영업현황 월말 기준'), true);
+  /* ───── 5. 인상·인하·해약 및 유지증감 ───── */
+  add(band('CHAPTER 05 · PRICE &amp; CANCEL', '5. 인상·인하·해약 및 유지증감 분석', c.isCurMonth ? '당월 누계 · 전월 동기 대비' : '월 마감 · 전월 동기 대비'), true);
+  const pc = c.pc || null;
+  if (!pc) add('<div class="blk"><p>인상·인하·해약 집계 데이터를 불러오지 못했습니다.</p></div>');
+  else {
+    const dl = function(cur, prev, goodUp){
+      cur = Number(cur) || 0; prev = Number(prev) || 0;
+      if (!prev && !cur) return '-';
+      if (!prev) return '<span style="color:#64748b">신규</span>';
+      const p = r1((cur - prev) / prev * 100);
+      if (p === 0) return '0%';
+      const good = (p > 0) === !!goodUp;
+      return '<b style="color:' + (good ? '#0f766e' : '#b91c1c') + '">' + (p > 0 ? '▲' : '▼') + ' ' + A(p) + '%</b>';
+    };
+    const U = pc.up, Dn = pc.down, Cn = pc.cancel, Kp = pc.keep;
+    const netUp = U.amtK - Dn.amtK, netUpPrev = U.prevAmtK - Dn.prevAmtK;
+    add('<div class="blk"><h3 class="s">5.1 지사 인상·인하 실적 (천원)</h3><table><thead><tr><th>구분</th><th>금액</th><th>건수</th><th>평균</th><th>전월 동기</th><th>금액 증감</th><th>건수 증감</th></tr></thead><tbody>'
+      + '<tr><td><b style="color:#0f766e">인상</b></td><td class="n">+' + K(U.amtK) + '</td><td class="n">' + U.cnt + '건</td><td class="n">' + K(U.avgK) + '</td><td class="n">' + K(U.prevAmtK) + ' / ' + U.prevCnt + '건</td><td class="n">' + dl(U.amtK, U.prevAmtK, true) + '</td><td class="n">' + dl(U.cnt, U.prevCnt, true) + '</td></tr>'
+      + '<tr><td><b style="color:#b91c1c">인하</b></td><td class="n">−' + K(Dn.amtK) + '</td><td class="n">' + Dn.cnt + '건</td><td class="n">' + K(Dn.avgK) + '</td><td class="n">' + K(Dn.prevAmtK) + ' / ' + Dn.prevCnt + '건</td><td class="n">' + dl(Dn.amtK, Dn.prevAmtK, false) + '</td><td class="n">' + dl(Dn.cnt, Dn.prevCnt, false) + '</td></tr>'
+      + '<tr class="sum"><td>순 단가변동</td><td class="n">' + S(netUp) + '</td><td class="n">' + (U.cnt + Dn.cnt) + '건</td><td class="n">-</td><td class="n">' + S(netUpPrev) + '</td><td class="n">' + dl(netUp, netUpPrev, true) + '</td><td class="n">-</td></tr>'
+      + '</tbody></table><p class="note">인상·인하는 기산일 기준이며, 전월 동기는 전월 같은 일자까지의 실적입니다(마감 월은 전월 전체).</p></div>');
+    add('<div class="blk"><h3 class="s">5.2 컨설턴트별 인상·인하 (천원)</h3><table><thead><tr><th>컨설턴트</th><th>인상</th><th>인하</th><th>순 단가변동</th></tr></thead><tbody>'
+      + U.byRep.map(function(x, i){ const y2 = Dn.byRep[i] || { cnt: 0, amtK: 0 }; const nt = x.amtK - y2.amtK; return '<tr><td><b>' + esc(x.name) + '</b></td><td class="n" style="color:#0f766e">+' + K(x.amtK) + ' (' + x.cnt + '건)</td><td class="n" style="color:#b91c1c">−' + K(y2.amtK) + ' (' + y2.cnt + '건)</td><td class="n"><b>' + S(nt) + '</b></td></tr>'; }).join('')
+      + '<tr class="sum"><td>지사 합계</td><td class="n">+' + K(U.amtK) + ' (' + U.cnt + '건)</td><td class="n">−' + K(Dn.amtK) + ' (' + Dn.cnt + '건)</td><td class="n">' + S(netUp) + '</td></tr></tbody></table>'
+      + '<p class="note">'
+      + (U.byReceiver[0] ? ('인상 최다 접수자: <b>' + esc(U.byReceiver[0].name) + '</b> (' + U.byReceiver[0].cnt + '건, ' + K(U.byReceiver[0].amtK) + '천원). ') : '')
+      + (Dn.byReason[0] ? ('인하 주요 사유: <b>' + esc(Dn.byReason[0].name) + '</b> (' + Dn.byReason[0].cnt + '건, ' + K(Dn.byReason[0].amtK) + '천원, ' + Dn.byReason[0].pct + '%).') : '')
+      + '</p></div>');
+    const cTot = Cn.amtK || 0;
+    add('<div class="blk"><h3 class="s">5.3 해약 분석 (천원)</h3><p>당월 해약은 총 <b>' + Cn.cnt + '건, ' + K(Cn.amtK) + '천원</b>으로 전월 동기(' + Cn.prevCnt + '건, ' + K(Cn.prevAmtK) + '천원) 대비 ' + dl(Cn.amtK, Cn.prevAmtK, false) + '입니다.</p>'
+      + '<table><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액</th><th>비중</th><th>전월 동기</th></tr></thead><tbody>'
+      + Cn.byRep.slice().sort(function(a, b){ return b.amtK - a.amtK || b.cnt - a.cnt; }).map(function(x){ return '<tr><td><b>' + esc(x.name) + '</b></td><td class="n">' + x.cnt + '건</td><td class="n">' + K(x.amtK) + '</td><td class="n">' + (cTot ? r1(x.amtK / cTot * 100) : 0) + '%</td><td class="n">' + x.prevCnt + '건 / ' + K(x.prevAmtK) + '</td></tr>'; }).join('')
+      + '</tbody></table>'
+      + (Cn.byType.length ? ('<p class="note">해약 유형: ' + Cn.byType.map(function(x){ return esc(x.name) + ' ' + x.pct + '% (' + x.cnt + '건)'; }).join(' · ') + '</p>') : '') + '</div>');
+    const kNet = Kp.totNet, kTgt = Kp.totTgt;
+    add('<div class="blk"><h3 class="s">5.4 컨설턴트별 유지감소 대비 유지증가 (천원)</h3><table><thead><tr><th>컨설턴트</th><th>유지증가(개시)</th><th>유지감소</th><th>유증 실적</th><th>증가/감소</th><th>목표 달성</th></tr></thead><tbody>'
+      + Kp.rows.map(function(x){ return '<tr><td><b>' + esc(x.name) + '</b></td><td class="n" style="color:#0f766e">+' + K(x.inc) + '</td><td class="n" style="color:#b91c1c">−' + K(A(x.dec)) + '</td><td class="n"><b style="color:' + (x.net >= 0 ? '#0f766e' : '#b91c1c') + '">' + S(x.net) + '</b></td><td class="n">' + (x.dec > 0 ? Math.round(x.inc / x.dec * 100) + '%' : (x.inc > 0 ? '감소 없음' : '-')) + '</td><td class="n">' + (x.tgt > 0 ? Math.round(x.net / x.tgt * 100) + '%' : '목표 미설정') + '</td></tr>'; }).join('')
+      + '<tr class="sum"><td>지사 합계</td><td class="n">+' + K(Kp.totInc) + '</td><td class="n">−' + K(A(Kp.totDec)) + '</td><td class="n">' + S(kNet) + '</td><td class="n">' + (Kp.totDec > 0 ? Math.round(Kp.totInc / Kp.totDec * 100) + '%' : '-') + '</td><td class="n">' + (kTgt > 0 ? Math.round(kNet / kTgt * 100) + '%' : '-') + '</td></tr></tbody></table>'
+      + '<p class="note">유증 실적 = 유지증가(개시) − 유지감소(해약·인하 − 인상·재개시 반영). 증가/감소 100% 이상이면 해약을 개시로 방어하고 있는 상태입니다.</p></div>');
+    // 5.5 종합 분석
+    const lines = [];
+    const minRep = Kp.rows.length ? Kp.rows.slice().sort(function(a, b){ return a.net - b.net; })[0] : null;
+    const maxRep = Kp.rows.length ? Kp.rows.slice().sort(function(a, b){ return b.net - a.net; })[0] : null;
+    lines.push('현재 지사 유증 실적은 <b>' + S(kNet) + '천원</b>' + (kTgt > 0 ? ' (월 목표 ' + S(kTgt) + '천원 대비 ' + Math.round(kNet / kTgt * 100) + '%)' : '') + '이며, 개시 ' + K(Kp.totInc) + '천원으로 유지감소 ' + K(A(Kp.totDec)) + '천원을 ' + (Kp.totInc >= A(Kp.totDec) ? '방어하고 있습니다.' : '방어하지 못하고 있습니다.'));
+    if (maxRep && minRep && maxRep.name !== minRep.name) lines.push('컨설턴트별로는 <b>' + esc(maxRep.name) + '</b>(' + S(maxRep.net) + '천원)이 가장 높고, <b>' + esc(minRep.name) + '</b>(' + S(minRep.net) + '천원)이 가장 낮습니다.');
+    const topCan = Cn.byRep.slice().sort(function(a, b){ return b.amtK - a.amtK; })[0];
+    if (topCan && topCan.amtK > 0) lines.push('해약은 <b>' + esc(topCan.name) + '</b>이 ' + topCan.cnt + '건·' + K(topCan.amtK) + '천원(' + (cTot ? Math.round(topCan.amtK / cTot * 100) : 0) + '%)으로 가장 많아 우선 케어가 필요합니다.');
+    lines.push('단가변동은 인상 +' + K(U.amtK) + '천원, 인하 −' + K(Dn.amtK) + '천원으로 순 ' + S(netUp) + '천원이며, 전월 동기 대비 ' + dl(netUp, netUpPrev, true) + '입니다.');
+    add('<div class="blk card ' + (kNet >= 0 ? 'grn' : 'red') + '"><b>5.5 종합 분석</b><br>' + lines.map(function(t, i){ return (i + 1) + '. ' + t; }).join('<br>') + '</div>');
+  }
+
+  /* ───── 6. 월말 전망 ───── */
+  add(band('CHAPTER 05 · 06', '6. ' + m + '월말 실적 전망 및 분석', '영업현황 월말 기준'), true);
   const rt = c.rowToday, re = c.rowEnd;
   if (c.isFutureMonth) add('<div class="blk"><p>' + m + '월은 집계 전입니다.</p></div>');
   else if (!re) add('<div class="blk"><p>영업현황 일별 데이터가 없습니다.</p></div>');
@@ -19416,14 +19520,14 @@ function buildStrategyDoc_(c){
       ['단가변동', null, (Number(now.누계인상) || 0) + (Number(now.누계인하) || 0), (Number(re.누계인상) || 0) + (Number(re.누계인하) || 0), false],
       ['유지증가', c.net.tgt, now.누계유지증가, re.누계유지증가, true]
     ];
-    add('<div class="blk"><h3 class="s">5.1 ' + m + '월말 실적 전망 (천원)</h3><p>' + (c.isCurMonth ? '현재까지 실적과 영업현황의 ' + m + '월말 누계(오늘 이후 기산일로 이미 입력된 일보 건 반영)를 비교합니다.' : m + '월 최종 마감 수치입니다.') + '</p><table><thead><tr><th>구분</th><th>월간 목표</th><th>' + (c.isCurMonth ? '현재까지' : '마감') + '</th><th>월말 전망</th><th>목표 대비</th></tr></thead><tbody>'
+    add('<div class="blk"><h3 class="s">6.1 ' + m + '월말 실적 전망 (천원)</h3><p>' + (c.isCurMonth ? '현재까지 실적과 영업현황의 ' + m + '월말 누계(오늘 이후 기산일로 이미 입력된 일보 건 반영)를 비교합니다.' : m + '월 최종 마감 수치입니다.') + '</p><table><thead><tr><th>구분</th><th>월간 목표</th><th>' + (c.isCurMonth ? '현재까지' : '마감') + '</th><th>월말 전망</th><th>목표 대비</th></tr></thead><tbody>'
       + rowsT.map(function(x){ const bad = x[4] && x[1] && x[3] < x[1]; return '<tr' + (x[0] === '유지증가' ? ' class="sum"' : '') + '><td><b>' + x[0] + '</b></td><td class="n">' + (x[1] !== null ? (x[0] === '유지증가' ? S(x[1]) : K(x[1])) : '-') + '</td><td class="n">' + S(x[2]) + '</td><td class="n"><b>' + S(x[3]) + '</b></td><td class="n" style="color:' + (bad ? '#b91c1c' : '#0f766e') + '">' + (x[4] ? pctOf(x[3], x[1]) : '-') + '</td></tr>'; }).join('')
       + '</tbody></table></div>');
     const barRow = function(label, tgt, nowV, endV){
       const w = function(v){ return tgt > 0 ? Math.max(0, Math.min(100, v / tgt * 100)) : 0; };
       return '<div class="brow"><div class="bl">' + label + '</div><div class="bt"><div class="bf2" style="width:' + w(endV) + '%"></div>' + (c.isCurMonth ? '<div class="bf1" style="width:' + w(nowV) + '%"></div>' : '') + '</div><div class="bv">' + (c.isCurMonth ? '현재 ' + pctOf(nowV, tgt) + ' → ' : '') + '월말 <b>' + pctOf(endV, tgt) + '</b></div></div>';
     };
-    add('<div class="blk"><h3 class="s">5.2 목표 대비 달성 현황</h3>' + barRow('수주', c.ord.tgt, now.누계수주, re.누계수주) + barRow('개시', c.start.tgt, now.누계개시, re.누계개시) + barRow('유지증가', c.net.tgt, now.누계유지증가, re.누계유지증가)
+    add('<div class="blk"><h3 class="s">6.2 목표 대비 달성 현황</h3>' + barRow('수주', c.ord.tgt, now.누계수주, re.누계수주) + barRow('개시', c.start.tgt, now.누계개시, re.누계개시) + barRow('유지증가', c.net.tgt, now.누계유지증가, re.누계유지증가)
       + '<div class="sm" style="margin-top:.3em"><span class="lg l1"></span>' + (c.isCurMonth ? '현재까지 ' : '') + '<span class="lg l2"></span>월말 전망 (막대 끝 = 월간 목표 100%)</div></div>');
     const endNet = Number(re.누계유지증가) || 0, nowNet = Number(now.누계유지증가) || 0;
     const shortK = c.net.tgt - endNet;
@@ -19432,21 +19536,21 @@ function buildStrategyDoc_(c){
     const b1 = '월말 유지증가 전망은 <b>' + S(endNet) + '천원</b>으로 목표 ' + S(c.net.tgt) + '천원 대비 ' + pctOf(endNet, c.net.tgt) + '이며, ' + (shortK > 0 ? ('목표까지 <b>' + K(shortK) + '천원</b>이 부족합니다.') : '목표를 초과 달성하는 수준입니다.');
     const b2 = c.isCurMonth ? ('현재 누계 유지증가 ' + S(nowNet) + '천원에서 월말까지 ' + S(endNet - nowNet) + '천원 변동이 이미 일보에 반영되어 있고, 이 중 개시 예정 잔여액은 ' + K(pend) + '천원입니다. 기발생 해약·인하 합계는 ' + K(fixedLoss) + '천원입니다.') : ('최종 개시 ' + K(Number(re.누계개시) || 0) + '천원, 해약·인하 합계 ' + K(A(re.누계해약중지) + A(re.누계인하)) + '천원이 반영된 결과입니다.');
     const b3 = shortK > 0 ? ('부족분 ' + K(shortK) + '천원은 일보에 이미 입력된 건만으로는 메워지지 않으므로, 당월 즉시 유지증가로 계상되는 상품과 단가인상으로 보완하는 대책이 필요합니다.') : '현재 일보 기준으로 유지증가 목표는 달성 가능한 수준입니다. 해약 방어와 개시 일정 준수로 유지하세요.';
-    add('<div class="blk card ' + (shortK > 0 ? 'red' : 'grn') + '"><b>5.3 전망 분석</b><br>1. ' + b1 + '<br>2. ' + b2 + '<br>3. ' + b3 + '<br><span class="sm">※ 전망은 영업현황 월말 누계를 그대로 사용하며, 이후 신규 수주·해약은 반영되지 않습니다.</span></div>');
+    add('<div class="blk card ' + (shortK > 0 ? 'red' : 'grn') + '"><b>6.3 전망 분석</b><br>1. ' + b1 + '<br>2. ' + b2 + '<br>3. ' + b3 + '<br><span class="sm">※ 전망은 영업현황 월말 누계를 그대로 사용하며, 이후 신규 수주·해약은 반영되지 않습니다.</span></div>');
   }
 
   /* ───── 6. 4대 과제 ───── */
-  add(band('CHAPTER 07 · ACTION PLAN', '6. 북서울지사 4대 전략 실행 과제', ''), true);
+  add(band('CHAPTER 07 · ACTION PLAN', '7. 북서울지사 4대 전략 실행 과제', ''), true);
   const tn = ['과제 1. 타 지사 대비 수주 가속', '과제 2. 당월 유지증가 확보', '과제 3. 안전상품 수주 → 매출 전환', '과제 4. 블루스캔·휴엔·디지털 확대'];
   const tc = ['#d97706', '#dc2626', '#2563eb', '#7c3aed'];
   c.tasks.forEach(function(t, i){ add('<div class="blk card" style="border-left:.3em solid ' + tc[i] + '"><b style="color:' + tc[i] + '">' + tn[i] + '</b><br>' + t + '</div>'); });
 
   /* ───── 7. 행동수칙 ───── */
-  add(band('CONCLUSION & ACTION PROTOCOL', '7. 현장 인력 실천 수칙', ''), true);
+  add(band('CONCLUSION & ACTION PROTOCOL', '8. 현장 인력 실천 수칙', ''), true);
   const zeroNames = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; });
   const ordGap = Math.max(0, c.ord.tgt - c.ord.amt);
   const leadTxt = c.leadAvg > 0 ? ('현재 평균 ' + c.leadAvg + '일 → 단축') : '단축';
-  add('<div class="blk"><h3 class="s">7.1 직무별 실천 행동 수칙</h3><table><thead><tr><th>직무</th><th>당일 즉각 조치</th><th>잔여기간 목표</th></tr></thead><tbody>'
+  add('<div class="blk"><h3 class="s">8.1 직무별 실천 행동 수칙</h3><table><thead><tr><th>직무</th><th>당일 즉각 조치</th><th>잔여기간 목표</th></tr></thead><tbody>'
     + '<tr><td><b>영업 컨설턴트</b></td><td>당월 기산 가능 가망 안건 우선 접촉</td><td>수주 갭 ' + K(ordGap) + '천원 해소</td></tr>'
     + '<tr><td><b>CS 관리자</b></td><td>해약 통보 고객 즉시 상담·일시중지 유도</td><td>추가 해약 차단 (누계 ' + K(A(c.cancel.amt)) + ')</td></tr>'
     + '<tr><td><b>현장 기술사원</b></td><td>당월 개시처 시공 우선 배정·단가인상 제안</td><td>계약→기산 ' + leadTxt + '</td></tr>'
