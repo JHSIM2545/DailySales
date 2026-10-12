@@ -235,6 +235,32 @@ function detectDeviceInfo_(){
   return { browser: browser, deviceType: isMobile ? '모바일' : 'PC' };
 }
 
+// 로그인 이력(login_logs) 기록 — 접속 시스템명('영업일보')까지 남긴다.
+// login_logs에 system 컬럼이 없어도 기록되도록 단계적으로 재시도한다. (화면 이동 전에 반드시 await)
+async function logLoginEvent_(name, phone, role){
+  try {
+    const dev = detectDeviceInfo_();
+    const base = { name: name || '', phone: String(phone || '').trim(), browser: dev.browser, device_type: dev.deviceType };
+    const tries = [
+      Object.assign({}, base, { role: role || '', type: 'login_success', system: '영업일보' }),
+      Object.assign({}, base, { role: role || '', type: 'login_success · 영업일보' }),
+      Object.assign({}, base, { type: 'login_success · 영업일보' }),
+      Object.assign({}, base, { action: '로그인 · 영업일보' }),
+      base
+    ];
+    for (let i = 0; i < tries.length; i++) {
+      const r = await sbClient.from('login_logs').insert([tries[i]]);
+      if (!r.error) return true;
+      console.warn('[login_logs] 기록 재시도', i, r.error && r.error.message);
+    }
+  } catch(e) { console.warn('[login_logs] 기록 실패', e); }
+  return false;
+}
+// 최대 ms 만큼만 기다린다(기록이 느려도 로그인 진행은 막지 않음)
+function withTimeout_(promise, ms){
+  return Promise.race([promise, new Promise(function(res){ setTimeout(function(){ res(null); }, ms); })]);
+}
+
 // 세션 저장 및 화면 이동 (TA 관리 세션 키 호환)
 function goToDestination_(session){
   try {
@@ -296,6 +322,7 @@ async function doLogin(){
         isMaster: true,
         isMainMaster: true
       };
+      await withTimeout_(logLoginEvent_(session.name, session.phone, session.role), 3000);
       goToDestination_(session);
       return;
     }
@@ -351,24 +378,19 @@ async function doLogin(){
       isMainMaster: (role === '메인마스터' || role === 'master')
     };
 
-    // 로그인 로그 및 실시간 하트비트 즉시 기록 (백그라운드)
+    // 로그인 로그 및 실시간 하트비트 즉시 기록
+    let pendingLog_ = null;
     try {
       const dev = detectDeviceInfo_();
       const p = String(user.phone || phone).trim();
       const nowIso = new Date().toISOString();
 
-      // 1. login_logs 누적 기록
-      sbClient.from('login_logs').insert([{
-        name: user.name,
-        phone: p,
-        role: session.role,
-        type: 'login_success',
-        browser: dev.browser,
-        device_type: dev.deviceType
-      }]).then(() => {});
+      // 1. login_logs 누적 기록 (접속 시스템명 포함, 화면 이동 전에 완료될 때까지 기다림)
+      pendingLog_ = withTimeout_(logLoginEvent_(user.name, p, session.role), 3000);
 
-      // 2. system_settings 실시간 생존신호 즉시 등록 (온라인 표시)
-      sbClient.from('system_settings').upsert({
+      // 2. system_settings 실시간 생존신호 즉시 등록 (온라인 표시) — 화면 이동 전에 요청이 끝나도록 모아서 대기
+      const extra_ = [];
+      extra_.push(sbClient.from('system_settings').upsert({
         setting_key: 'HEARTBEAT_' + p,
         setting_value: JSON.stringify({
           phone: p,
@@ -381,18 +403,20 @@ async function doLogin(){
           last_activity: Date.now(),
           online: true
         })
-      }).then(() => {});
+      }).then(() => {}, () => {}));
 
       // 3. app_users 테이블 지원 시 업데이트
       try {
-        sbClient.from('app_users').update({
+        extra_.push(sbClient.from('app_users').update({
           last_login_at: nowIso,
           browser: dev.browser,
           device_type: dev.deviceType
-        }).eq('phone', p).then(() => {});
+        }).eq('phone', p).then(() => {}, () => {}));
       } catch(e){}
+      pendingLog_ = withTimeout_(Promise.all([pendingLog_].concat(extra_)), 3000);
     } catch(e){}
 
+    if (pendingLog_) { try { await pendingLog_; } catch(e){} }   // 기록 요청이 화면 이동으로 취소되지 않도록 대기
     goToDestination_(session);
 
   } catch(err) {
@@ -464,6 +488,7 @@ async function doRegister(){
       isMainMaster: (userRole === '메인마스터')
     };
 
+    await withTimeout_(logLoginEvent_(session.name, session.phone, session.role), 3000);
     goToDestination_(session);
 
   } catch(err) {
@@ -475,7 +500,7 @@ async function doRegister(){
 // ==========================================
 // 마스터 전용 긴급 로그인
 // ==========================================
-function doMasterLogin(){
+async function doMasterLogin(){
   if (BUSY) return;
   const password = (document.getElementById('master_password').value || '').trim();
   const errEl = document.getElementById('master_err');
@@ -494,6 +519,7 @@ function doMasterLogin(){
       isMaster: true,
       isMainMaster: true
     };
+    await withTimeout_(logLoginEvent_(session.name, session.phone, session.role), 3000);
     goToDestination_(session);
   } else {
     setBusy_(false, 'masterBtn', '로그인');

@@ -434,6 +434,19 @@ function getTzToday() {
   }
 
 
+  /** DB(UTC) 시각 → 한국시간(Asia/Seoul) 'YYYY-MM-DD HH:mm[:ss]' 문자열. 화면에 보이는 모든 기록 일시에 사용 */
+  function kstStr_(ts, withSec) {
+    if (!ts) return '';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return String(ts).slice(0, withSec ? 19 : 16).replace('T', ' ');
+      const o = { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+      if (withSec) o.second = '2-digit';
+      return new Intl.DateTimeFormat('sv-SE', o).format(d);
+    } catch (e) { return String(ts).slice(0, withSec ? 19 : 16).replace('T', ' '); }
+  }
+  try { window.kstStr_ = kstStr_; } catch (e) {}
+
   const Backend = {
     // ==========================================
     // TA 관리 표준 로그인 & 회원가입 (Backend 구현체)
@@ -1848,8 +1861,8 @@ function getTzToday() {
     adminListLoginHistory: async function(token, from, to) {
       const client = getSupabase();
       let q = client.from('login_logs').select('*').order('created_at', { ascending: false });
-      if (from) q = q.gte('created_at', from + 'T00:00:00');
-      if (to) q = q.lte('created_at', to + 'T23:59:59');
+      if (from) q = q.gte('created_at', from + 'T00:00:00+09:00');
+      if (to) q = q.lte('created_at', to + 'T23:59:59+09:00');
       let { data, error } = await q.limit(5000);
       if (error) {
         // select('*') 또는 정렬/필터 실패 시, 확인된 컬럼만으로 재시도
@@ -1864,8 +1877,8 @@ function getTzToday() {
       const rows = (data || []).map(r => [
         r.name,
         r.phone,
-        r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '',
-        r.action || '로그인',
+        (function(ts){ if (!ts) return ''; try { const d = new Date(ts); if (isNaN(d)) return String(ts).slice(0, 19).replace('T', ' '); const p = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(d); return p; } catch (e) { return String(ts).slice(0, 19).replace('T', ' '); } })(r.created_at),
+        r.type || r.action || '로그인',
         r.browser || '',
         r.device_type || '',
         r.system || r.system_name || r.app || r.service || r.site || ''
@@ -1873,30 +1886,72 @@ function getTzToday() {
       return { success: true, rows: rows };
     },
 
-    /** 로그아웃 시점을 login_logs에 기록 (action = '로그아웃 · 영업일보'). 실패해도 로그아웃 진행에는 영향 없음 */
+    /** login_logs 한 건 기록. 테이블에 system 컬럼이 없어도 동작하도록 단계적으로 재시도한다.
+     *  Login.html과 같은 형식: type = 'login_success' | 'logout'(+ ' · 시스템명'), browser, device_type */
+    _insertLoginLog: async function(client, ev) {
+      const kind = ev.kind === 'logout' ? 'logout' : 'login_success';
+      const base = { name: ev.name || '', phone: ev.phone || '', browser: ev.browser || '', device_type: ev.device || '' };
+      const sys = ev.system || '영업일보';
+      const tries = [
+        Object.assign({}, base, { role: ev.role || '', type: kind, system: sys }),
+        Object.assign({}, base, { role: ev.role || '', type: kind + ' · ' + sys }),
+        Object.assign({}, base, { type: kind + ' · ' + sys }),
+        Object.assign({}, base, { action: (kind === 'logout' ? '로그아웃' : '로그인') + ' · ' + sys })
+      ];
+      if (kind !== 'logout') tries.push(base);
+      let lastErr = null;
+      for (let i = 0; i < tries.length; i++) {
+        const { error } = await client.from('login_logs').insert([tries[i]]);
+        if (!error) return { success: true, variant: i };
+        lastErr = error;
+      }
+      console.warn('[login_logs] 기록 실패:', lastErr);
+      return { success: false, error: lastErr ? (lastErr.message || String(lastErr)) : '' };
+    },
+    _deviceInfo: function(ua) {
+      ua = ua || '';
+      const browser = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? '삼성인터넷' : /Whale\//.test(ua) ? 'Whale' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '기타';
+      const device = /Mobi|Android|iPhone|iPod/i.test(ua) ? '모바일' : 'PC';
+      return { browser: browser, device: device };
+    },
+
+    /** 로그인(접속) 시점 기록. 같은 시스템으로 3분 안에 이미 기록돼 있으면(Login.html 기록 포함) 중복 기록하지 않는다. */
+    recordLogin: async function(token, info) {
+      try {
+        const client = getSupabase();
+        const system = (info && info.system) || '영업일보';
+        const phone = (info && info.phone) || '';
+        try {
+          const since = new Date(Date.now() - 3 * 60000).toISOString();
+          const { data: recent } = await client.from('login_logs').select('*').eq('phone', phone).gte('created_at', since).limit(30);
+          const dup = (recent || []).some(function(r){
+            const t = String(r.type || r.action || '');
+            const parts = t.split('·').map(function(x){ return x.trim(); });
+            const isLogin = /^(login|로그인)/i.test(parts[0]) || !parts[0];
+            const sysOf = String(r.system || parts[1] || '').trim();
+            return isLogin && sysOf === system;
+          });
+          if (dup) return { success: true, skipped: true };
+        } catch (e0) { /* 중복 확인 실패해도 기록은 시도 */ }
+        const di = Backend._deviceInfo((info && info.ua) || '');
+        return await Backend._insertLoginLog(client, { kind: 'login', name: info && info.name, phone: phone, role: info && info.role, system: system, browser: di.browser, device: di.device });
+      } catch (e) { return { success: false, error: String(e) }; }
+    },
+
+    /** 로그아웃 시점 기록 (type = 'logout · 영업일보'). 실패해도 로그아웃 진행에는 영향 없음 */
     recordLogout: async function(token, info) {
       try {
         const client = getSupabase();
-        const ua = (info && info.ua) || '';
-        const browser = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung' : /Whale/.test(ua) ? 'Whale' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '-';
-        const device = /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';
-        const { error } = await client.from('login_logs').insert([{
-          name: (info && info.name) || '',
-          phone: (info && info.phone) || '',
-          action: '로그아웃 · ' + ((info && info.system) || '영업일보'),
-          browser: browser,
-          device_type: device,
-          created_at: new Date().toISOString()
-        }]);
-        return { success: !error };
+        const di = Backend._deviceInfo((info && info.ua) || '');
+        return await Backend._insertLoginLog(client, { kind: 'logout', name: info && info.name, phone: info && info.phone, role: info && info.role, system: (info && info.system) || '영업일보', browser: di.browser, device: di.device });
       } catch (e) { return { success: false }; }
     },
 
     adminListHistory: async function(token, from, to) {
       const client = getSupabase();
       let q = client.from('activity_logs').select('*').order('created_at', { ascending: false });
-      if (from) q = q.gte('created_at', from + 'T00:00:00');
-      if (to) q = q.lte('created_at', to + 'T23:59:59');
+      if (from) q = q.gte('created_at', from + 'T00:00:00+09:00');
+      if (to) q = q.lte('created_at', to + 'T23:59:59+09:00');
       let { data, error } = await q.limit(5000);
       if (error) {
         // select('*') 또는 정렬/필터 실패 시, 확인된 컬럼만으로 재시도
@@ -1915,7 +1970,7 @@ function getTzToday() {
       });
 
       const rows = filtered.map(r => {
-        const timeStr = r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '';
+        const timeStr = (kstStr_(r.created_at, true) || '');
         const consultant = r.consultant || '';
         const ch = r.changes || {};
         const scope = (ch && ch.scope) ? ch.scope : (r.company === '외부연동' ? '외부연동' : '데이터');
@@ -3472,7 +3527,7 @@ function getTzToday() {
       if (error) { console.error('inbox_ai_reports 조회 오류', error); return { success: false, error: '접수함 조회 실패: ' + (error.message || error.code || error) + ' (Supabase 권한/RLS 설정 확인)', items: [] }; }
       const items = (data || []).map(r => ({
         id: r.id,
-        submittedAt: r.submitted_at ? r.submitted_at.slice(0, 16).replace('T', ' ') : '',
+        submittedAt: (kstStr_(r.submitted_at) || ''),
         submittedBy: r.submitted_by,
         text: r.raw_text,
         source: r.source || '수동'
@@ -3560,7 +3615,7 @@ function getTzToday() {
       if (error) return { success: true, items: [] };
       const items = (data || []).map(r => ({
         id: r.id,
-        submittedAt: r.submitted_at ? r.submitted_at.slice(0, 16).replace('T', ' ') : '',
+        submittedAt: (kstStr_(r.submitted_at) || ''),
         submittedBy: r.submitted_by,
         text: r.raw_text
       }));
@@ -3610,7 +3665,7 @@ function getTzToday() {
         productType: data.product_type,
         branches: branches,
         rows: rows,
-        registeredAt: data.created_at ? data.created_at.slice(0, 16).replace('T', ' ') : '',
+        registeredAt: (kstStr_(data.created_at) || ''),
         registeredBy: data.registered_by || ''
       };
     },
@@ -3634,7 +3689,7 @@ function getTzToday() {
         productType: data.product_type,
         branches: branches,
         rows: rows,
-        registeredAt: data.created_at ? data.created_at.slice(0, 16).replace('T', ' ') : '',
+        registeredAt: (kstStr_(data.created_at) || ''),
         registeredBy: data.registered_by || ''
       };
     },
@@ -3657,7 +3712,7 @@ function getTzToday() {
         branches: branches,
         rows: rows,
         rawText: data.raw_text || '',
-        registeredAt: data.created_at ? data.created_at.slice(0, 16).replace('T', ' ') : '',
+        registeredAt: (kstStr_(data.created_at) || ''),
         registeredBy: data.registered_by || '',
         productType: data.product_type
       };
@@ -6765,6 +6820,20 @@ function pingSessionOnce_(){
  if (!SESSION || !SESSION.token) return;  
  google.script.run.withFailureHandler(function(){}).pingSession(SESSION.token);  
 }  
+/** 포털 바로가기(TA 관리/소개영업) 접속 기록 — 서버에서 3분 내 중복은 걸러냄 */
+function recordLoginPortal_(system){
+  try { if (!SESSION || !SESSION.phone) return; google.script.run.withFailureHandler(function(){}).recordLogin(SESSION.token, { name: SESSION.name || '', phone: SESSION.phone, system: system, ua: navigator.userAgent || '' }); } catch (e) {}
+}
+/** 접속 시스템별 로그인 기록(세션당 1회). system: '영업일보' | '소개영업' | 'TA 관리' */
+function recordLoginOnce_(system){
+  try {
+    if (!SESSION || !SESSION.token || !SESSION.phone || SESSION.phone === 'admin') return;
+    const key = 's1_login_logged_' + system + '_' + SESSION.token;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    google.script.run.withFailureHandler(function(){}).recordLogin(SESSION.token, { name: SESSION.name || '', phone: SESSION.phone, system: system, ua: navigator.userAgent || '' });
+  } catch (e) {}
+}
 function startHeartbeat_(){  
  if (HEARTBEAT_TIMER_) return;  
  pingSessionOnce_();  
@@ -7248,6 +7317,7 @@ function openTaPortalWithUrl_(baseUrl, win){
     console.warn('[TA SSO] 세션 저장 실패:', e);  
   }  
 
+  recordLoginPortal_('TA 관리');
   if (typeof logUserAction_ === 'function') {  
     logUserAction_('TA 포털 이동', '외부연동', '', { desc: userName + ' TA 관리 포털 바로가기 접속' });  
   }  
@@ -7350,6 +7420,7 @@ function openIntroPortalWithUrl_(baseUrl){
     localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);
   } catch(e) {}
 
+  recordLoginPortal_('소개영업');
   if (typeof logUserAction_ === 'function') {
     logUserAction_('소개 포털 이동', '외부연동', '', { desc: userName + ' 소개 포털 바로가기 접속' });
   }
@@ -12849,7 +12920,7 @@ async function loadMyRecentGaJungjiReports_(){
       let stBadge = '<span style="color:#b45309; font-weight:700;">대기(검토중)</span>';
       if (st === '처리완료') stBadge = '<span style="color:#16a34a; font-weight:700;">✓ 해약중지 등록완료</span>';
       else if (st === '무시됨') stBadge = '<span style="color:#64748b;">무시됨</span>';
-      const dt = r.submitted_at ? r.submitted_at.slice(0, 16).replace('T', ' ') : '-';
+      const dt = (kstStr_(r.submitted_at) || '-');
       const pInfo = r.processed_at ? ((r.processed_by || '마스터') + ' (' + r.processed_at.slice(5, 16).replace('T', ' ') + ')') : '-';
       html += '<tr>' +
         '<td style="padding:6px; border:1px solid #e2e8f0; text-align:center;">' + dt + '</td>' +
@@ -14920,6 +14991,7 @@ if (SESSION && SESSION.token) {
   loadAndApplyEditableLists_();
   preloadAllTabsInBackground_();
   startHeartbeat_();
+  recordLoginOnce_('영업일보');
 } else {
   showLogin();
 }
