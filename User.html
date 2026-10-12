@@ -11517,7 +11517,9 @@ function renderSalesStatus(){
  const reps = REP_TARGET_LIST;  
   
  // 컨설턴트별 고정 컬러 (차트 종류와 상관없이 항상 동일 인물 = 동일 색상)  
- const REP_COLORS = { '최영국': '#1e3a8a', '이수열': '#14532d', '박광춘': '#78350f', '정문재': '#6d28d9', '임영민': '#eab308' };  
+ const REP_COLORS = (typeof DASH_REP_COLORS !== 'undefined') ? DASH_REP_COLORS : {};
+  const grayMix_ = function(hex){ const h=String(hex).replace('#',''); if(h.length!==6) return '#9ca3af'; const c=[0,2,4].map(i=>parseInt(h.substr(i,2),16)); const g=[156,163,175]; return '#'+c.map((v,i)=>Math.round(v*0.5+g[i]*0.5).toString(16).padStart(2,'0')).join(''); };
+  
   
  // 값이 목표 대비 100%를 넘으면, 실제 최대값을 넘는 다음 100 단위까지 축을 유동적으로 확장 (예: 230% -> 300%, 310% -> 400%)  
  function gaugeAxisMax_(pctList) {  
@@ -11583,7 +11585,7 @@ function renderSalesStatus(){
  const color = REP_COLORS[rep] || '#888';  
  const isNeg = pct < 0;  
  const fillStyle = isNeg  
- ? `left: ${(50 - half)}%; width: ${half}%; background: ${color}; filter: saturate(35%);`  
+ ? `left: ${(50 - half)}%; width: ${half}%; background: ${grayMix_(color)};`  
  : `left: 50%; width: ${half}%; background: ${color};`;  
   
  chartHtml += `<div class="bar-row" title="실적: ${fmtK(val)} / 목표: ${fmtK(tgt)}">  

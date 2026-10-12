@@ -9301,7 +9301,9 @@ function renderSalesStatus(){
   const filterOptions = ['일반알람', '알람+휴엔', '정보보안'];
 
   const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : ['최영국', '이수열', '박광춘', '정문재', '임영민'];
-  const REP_COLORS = { '최영국': '#1e3a8a', '이수열': '#14532d', '박광춘': '#78350f', '정문재': '#6d28d9', '임영민': '#eab308' };
+  const REP_COLORS = (typeof DASH_REP_COLORS !== 'undefined') ? DASH_REP_COLORS : {};
+  const grayMix_ = function(hex){ const h=String(hex).replace('#',''); if(h.length!==6) return '#9ca3af'; const c=[0,2,4].map(i=>parseInt(h.substr(i,2),16)); const g=[156,163,175]; return '#'+c.map((v,i)=>Math.round(v*0.5+g[i]*0.5).toString(16).padStart(2,'0')).join(''); };
+
 
   const gaugeMetrics = [
     { key: '수주' },
@@ -9357,7 +9359,7 @@ function renderSalesStatus(){
       const color = REP_COLORS[rep] || '#888';
       const isNeg = pct < 0;
       const fillStyle = isNeg
-        ? `left: ${(50 - half)}%; width: ${half}%; background: ${color}; filter: saturate(35%);`
+        ? `left: ${(50 - half)}%; width: ${half}%; background: ${grayMix_(color)};`
         : `left: 50%; width: ${half}%; background: ${color};`;
 
       chartHtml += `<div class="bar-row" title="실적: ${fmtK(val)} / 목표: ${fmtK(tgt)}">
