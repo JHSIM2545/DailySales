@@ -1852,13 +1852,36 @@ function getTzToday() {
       if (to) q = q.lte('created_at', to + 'T23:59:59');
       const { data, error } = await q;
       if (error) return { success: true, rows: [] };
+      // [이름, 전화번호, 시각, 액션(로그인/로그아웃 · 시스템), 브라우저, 기기유형, 시스템(전용 컬럼이 있을 때)]
       const rows = (data || []).map(r => [
         r.name,
         r.phone,
         r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '',
-        r.action || '로그인'
+        r.action || '로그인',
+        r.browser || '',
+        r.device_type || '',
+        r.system || r.system_name || r.app || r.service || r.site || ''
       ]);
       return { success: true, rows: rows };
+    },
+
+    /** 로그아웃 시점을 login_logs에 기록 (action = '로그아웃 · 영업일보'). 실패해도 로그아웃 진행에는 영향 없음 */
+    recordLogout: async function(token, info) {
+      try {
+        const client = getSupabase();
+        const ua = (info && info.ua) || '';
+        const browser = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung' : /Whale/.test(ua) ? 'Whale' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '-';
+        const device = /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';
+        const { error } = await client.from('login_logs').insert([{
+          name: (info && info.name) || '',
+          phone: (info && info.phone) || '',
+          action: '로그아웃 · ' + ((info && info.system) || '영업일보'),
+          browser: browser,
+          device_type: device,
+          created_at: new Date().toISOString()
+        }]);
+        return { success: !error };
+      } catch (e) { return { success: false }; }
     },
 
     adminListHistory: async function(token, from, to) {
@@ -6938,9 +6961,15 @@ function doRegister(){
  .registerUser(name, phone, password, job);  
 }  
   
-function logout(){  
- clearSession();  
- redirectToLoginPage_();  
+function logout(){
+ let done_ = false;
+ const go_ = function(){ if (done_) return; done_ = true; clearSession(); redirectToLoginPage_(); };
+ try {
+   const ph = (SESSION && SESSION.phone) || localStorage.getItem('S1_LAST_LOGIN_PHONE') || '';
+   google.script.run.withSuccessHandler(go_).withFailureHandler(go_)
+     .recordLogout(SESSION ? SESSION.token : '', { name: SESSION ? SESSION.name : '', phone: ph, system: '영업일보', ua: navigator.userAgent || '' });
+   setTimeout(go_, 1500);
+ } catch (e) { go_(); }
 }  
   
 function handleSessionExpiry(res){  

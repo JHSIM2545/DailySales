@@ -1832,13 +1832,36 @@ function getTzToday() {
       if (to) q = q.lte('created_at', to + 'T23:59:59');
       const { data, error } = await q;
       if (error) return { success: true, rows: [] };
+      // [이름, 전화번호, 시각, 액션(로그인/로그아웃 · 시스템), 브라우저, 기기유형, 시스템(전용 컬럼이 있을 때)]
       const rows = (data || []).map(r => [
         r.name,
         r.phone,
         r.created_at ? r.created_at.slice(0, 19).replace('T', ' ') : '',
-        r.action || '로그인'
+        r.action || '로그인',
+        r.browser || '',
+        r.device_type || '',
+        r.system || r.system_name || r.app || r.service || r.site || ''
       ]);
       return { success: true, rows: rows };
+    },
+
+    /** 로그아웃 시점을 login_logs에 기록 (action = '로그아웃 · 영업일보'). 실패해도 로그아웃 진행에는 영향 없음 */
+    recordLogout: async function(token, info) {
+      try {
+        const client = getSupabase();
+        const ua = (info && info.ua) || '';
+        const browser = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung' : /Whale/.test(ua) ? 'Whale' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : '-';
+        const device = /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';
+        const { error } = await client.from('login_logs').insert([{
+          name: (info && info.name) || '',
+          phone: (info && info.phone) || '',
+          action: '로그아웃 · ' + ((info && info.system) || '영업일보'),
+          browser: browser,
+          device_type: device,
+          created_at: new Date().toISOString()
+        }]);
+        return { success: !error };
+      } catch (e) { return { success: false }; }
     },
 
     adminListHistory: async function(token, from, to) {
@@ -7393,7 +7416,16 @@ function redirectToLoginPage_(message){
 function showLogin(message){  
  redirectToLoginPage_(message);  
 }  
-function logout(){ clearSession(); FLAGGED_SET = new Set(); redirectToLoginPage_(); }  
+function logout(){
+  let done_ = false;
+  const go_ = function(){ if (done_) return; done_ = true; clearSession(); FLAGGED_SET = new Set(); redirectToLoginPage_(); };
+  try {
+    const ph = (SESSION && SESSION.phone) || localStorage.getItem('S1_LAST_LOGIN_PHONE') || '';
+    google.script.run.withSuccessHandler(go_).withFailureHandler(go_)
+      .recordLogout(SESSION ? SESSION.token : '', { name: SESSION ? SESSION.name : '', phone: ph, system: '영업일보', ua: navigator.userAgent || '' });
+    setTimeout(go_, 1500); // 기록이 지연돼도 1.5초 후엔 로그아웃 진행
+  } catch (e) { go_(); }
+}  
 function handleSessionExpiry(res){  
  if (res && res.error && String(res.error).indexOf('세션이 만료') !== -1) { clearSession(); showLogin(res.error); return true; }  
  return false;  
@@ -14610,32 +14642,92 @@ function loadLoginHistory(){
     .adminListLoginHistory(SESSION.token, fromVal, toVal);
 }
 
-/** 로그인 이력 화면 상단: 사용자별 현재 로그인 상태(최근접속/접속기기/실시간 접속/세션) */
+/** 로그인 이력 화면 상단: 지금 로그인(세션 유지/온라인) 중인 사용자만 표시 */
 function loginStatusTableHtml_(){
-  const users = USER_ROWS || [];
-  if (!users.length) return '';
+  const online = (USER_ROWS || []).filter(function(u){ return u.is_online || u.세션유지중; });
+  const hist = LOGIN_HISTORY_ROWS || [];
+  function lastSystem_(u){
+    for (let i = 0; i < hist.length; i++) { // hist는 최신순
+      const r = hist[i];
+      if (String(r[1] || '') === String(u.전화번호 || '') || String(r[0] || '') === String(u.이름 || '')) {
+        const p = parseLoginAction_(r);
+        if (p.type === '로그인' && p.system) return p.system;
+      }
+    }
+    return '-';
+  }
+  const td = 'padding:7px 12px; border:1px solid #cfd6dc; text-align:center;';
+  const th = 'padding:8px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;';
   let rowsHtml = '';
-  users.forEach(function(u){
+  online.forEach(function(u){
     const sess = getSessionStatus_(u);
-    const td = 'padding:7px 12px; border:1px solid #cfd6dc; text-align:center;';
     rowsHtml += '<tr>' +
-      '<td style="' + td + ' text-align:left; font-weight:500;">' + escHtml(u.이름) + '</td>' +
-      '<td style="' + td + ' text-align:left;">' + escHtml(u.전화번호) + '</td>' +
+      '<td style="' + td + ' text-align:left; font-weight:600;">' + escHtml(u.이름) + '</td>' +
+      '<td style="' + td + '">' + escHtml(u.전화번호) + '</td>' +
+      '<td style="' + td + '">' + escHtml(lastSystem_(u)) + '</td>' +
       '<td style="' + td + '">' + escHtml(u.최근접속일시) + '</td>' +
       '<td style="' + td + '">' + escHtml(formatDeviceDisplay_(u.브라우저, u.기기유형)) + '</td>' +
       '<td style="' + td + '">' + sess.onlineText + '</td>' +
-      '<td style="' + td + '">' + sess.sessionText + '</td>' +
       '<td style="' + td + '">' + escHtml(sess.endTime) + '</td>' +
     '</tr>';
   });
-  const th = 'padding:8px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;';
-  return '<div style="padding:10px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">현재 로그인 현황 <span style="font-weight:500; color:#64748b;">(' + users.length + '명)</span></div>' +
-    '<div style="overflow:auto; padding:0 16px 8px;"><table style="border-collapse:collapse; width:100%; white-space:nowrap; font-size:13px; background:#fff;">' +
-    '<thead><tr style="background:#4a86e8; color:#fff;">' +
-      '<th style="' + th + '">사용자명</th><th style="' + th + '">전화번호</th><th style="' + th + '">최근접속일시</th><th style="' + th + '">접속기기</th>' +
-      '<th style="' + th + '">실시간 접속</th><th style="' + th + '">세션 상태</th><th style="' + th + '">세션 종료 시각</th>' +
-    '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
-    '<div style="padding:6px 16px 2px; font-size:13px; font-weight:700; color:#1e293b;">로그인 이력</div>';
+  const body = online.length
+    ? '<div style="overflow:auto; padding:0 16px 8px;"><table style="border-collapse:collapse; width:100%; white-space:nowrap; font-size:13px; background:#fff;">' +
+      '<thead><tr style="background:#16a34a; color:#fff;">' +
+        '<th style="' + th + ' border-color:#15803d;">사용자명</th><th style="' + th + ' border-color:#15803d;">전화번호</th><th style="' + th + ' border-color:#15803d;">접속 시스템</th>' +
+        '<th style="' + th + ' border-color:#15803d;">로그인 시각</th><th style="' + th + ' border-color:#15803d;">접속기기</th><th style="' + th + ' border-color:#15803d;">실시간 접속</th><th style="' + th + ' border-color:#15803d;">세션 종료 예정</th>' +
+      '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
+    : '<div style="padding:6px 16px 10px; font-size:13px; color:#64748b;">현재 로그인 중인 사용자가 없습니다.</div>';
+  return '<div style="padding:10px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">🟢 현재 로그인 중 <span style="font-weight:500; color:#64748b;">(' + online.length + '명)</span></div>' + body;
+}
+
+/** login_logs 한 행 → {type:'로그인'|'로그아웃', system, ...} (action 문자열 '로그아웃 · 영업일보' 또는 전용 system 컬럼) */
+function parseLoginAction_(r){
+  const action = String(r[3] || '로그인');
+  const parts = action.split('·').map(function(x){ return x.trim(); });
+  const type = parts[0].indexOf('로그아웃') === 0 ? '로그아웃' : '로그인';
+  const system = String(r[6] || '').trim() || parts[1] || '';
+  return { type: type, system: system };
+}
+
+function fmtDuration_(ms){
+  if (!(ms >= 0)) return '-';
+  const m = Math.round(ms / 60000);
+  if (m < 60) return m + '분';
+  return Math.floor(m / 60) + '시간 ' + (m % 60) + '분';
+}
+
+/** 시간순 로그인 이력: 로그인 행마다 대응하는 로그아웃 시각(같은 사용자의 다음 로그아웃, 다음 로그인 전)을 붙인다 */
+function buildLoginSessions_(rows){
+  const ev = (rows || []).map(function(r){
+    const p = parseLoginAction_(r);
+    return { name: r[0], phone: r[1], time: String(r[2] || ''), type: p.type, system: p.system, browser: r[4], device: r[5] };
+  }).sort(function(a, b){ return a.time < b.time ? -1 : (a.time > b.time ? 1 : 0); });
+  const byUser = {};
+  const sessions = [];
+  ev.forEach(function(e){
+    const key = String(e.phone || e.name || '');
+    if (e.type === '로그인') {
+      const sess = { name: e.name, phone: e.phone, system: e.system, browser: e.browser, device: e.device, login: e.time, logout: '' };
+      sessions.push(sess);
+      (byUser[key] = byUser[key] || []).push(sess);
+    } else {
+      const list = byUser[key] || [];
+      // 아직 로그아웃이 없는 가장 최근 로그인에 매칭 (시스템이 같거나 불명이면)
+      for (let i = list.length - 1; i >= 0; i--) {
+        if (!list[i].logout && (!list[i].system || !e.system || list[i].system === e.system)) {
+          list[i].logout = e.time;
+          if (!list[i].system) list[i].system = e.system;
+          break;
+        }
+      }
+      if (!list.some(function(x){ return x.logout === e.time; })) {
+        // 짝이 되는 로그인 기록이 없는 로그아웃은 단독 행으로 표시
+        sessions.push({ name: e.name, phone: e.phone, system: e.system, browser: e.browser, device: e.device, login: '', logout: e.time });
+      }
+    }
+  });
+  return sessions.sort(function(a, b){ const ta = a.login || a.logout, tb = b.login || b.logout; return ta < tb ? 1 : (ta > tb ? -1 : 0); });
 }
 
 let USER_ACTION_HISTORY_ROWS = [];
@@ -16006,20 +16098,27 @@ function renderLoginHistory(){
   const container = document.getElementById('userMgmtBody');
   if (!container) return;
   const q = (document.getElementById('loginHistorySearchBox')?.value || '').trim().toLowerCase();
-  let rows = LOGIN_HISTORY_ROWS || [];
+  let sessions = buildLoginSessions_(LOGIN_HISTORY_ROWS || []);
   if (q) {
-    rows = rows.filter(function(r){ return r.some(function(c){ return String(c||'').toLowerCase().includes(q); }); });
+    sessions = sessions.filter(function(x){
+      return [x.name, x.phone, x.system, x.browser, x.device, x.login, x.logout].some(function(c){ return String(c || '').toLowerCase().includes(q); });
+    });
   }
   const countEl = document.getElementById('loginHistoryCount');
-  if (countEl) countEl.innerText = '총 ' + rows.length + '건';
+  if (countEl) countEl.innerText = '총 ' + sessions.length + '건';
   const statusHtml_ = loginStatusTableHtml_();
-  if (!rows.length) {
-    container.innerHTML = statusHtml_ + '<div class="placeholder">로그인 이력이 없습니다.</div>';
+  const head = '<div style="padding:8px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">📜 로그인 이력 <span style="font-weight:500; color:#64748b;">(시간순, 최신 먼저)</span></div>';
+  if (!sessions.length) {
+    container.innerHTML = statusHtml_ + head + '<div class="placeholder">로그인 이력이 없습니다.</div>';
     return;
   }
-  let html = statusHtml_ + '<div class="grid-wrap"><table><thead><tr><th>이름</th><th>전화번호</th><th>시간</th><th>액션</th></tr></thead><tbody>';
-  rows.forEach(function(r){
-    html += '<tr>' + r.map(function(c){ return '<td>' + escHtml(String(c||'')) + '</td>'; }).join('') + '</tr>';
+  let html = statusHtml_ + head + '<div class="grid-wrap"><table><thead><tr><th>사용자명</th><th>전화번호</th><th>접속 시스템</th><th>접속기기</th><th>로그인 시각</th><th>로그아웃 시각</th><th>사용시간</th></tr></thead><tbody>';
+  sessions.forEach(function(x){
+    const dev = formatDeviceDisplay_(x.browser, x.device);
+    let dur = '-';
+    if (x.login && x.logout) dur = fmtDuration_(new Date(x.logout.replace(' ', 'T')) - new Date(x.login.replace(' ', 'T')));
+    html += '<tr><td>' + escHtml(String(x.name || '')) + '</td><td>' + escHtml(String(x.phone || '')) + '</td><td>' + escHtml(x.system || '-') + '</td><td>' + escHtml(dev) + '</td><td>' +
+      escHtml(x.login || '-') + '</td><td>' + (x.logout ? escHtml(x.logout) : '<span style="color:#94a3b8;">기록 없음</span>') + '</td><td>' + escHtml(dur) + '</td></tr>';
   });
   html += '</tbody></table></div>';
   container.innerHTML = html;
