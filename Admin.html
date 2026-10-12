@@ -5179,14 +5179,20 @@ input[type="checkbox"] {
     max-width: 100% !important;
     width: 100% !important;
   }
-  /* 검색창 + 담당자 선택은 한 줄에 반반씩 */
+  /* 좁은 화면: [+ 등록][검색창][담당자 선택]을 한 줄에, 글자 크기는 상단 메뉴(13px)와 동일하게 */
+  .toolbar, .toolbar input, .toolbar select, .toolbar button, .toolbar label, .toolbar .count, .toolbar .sum-total {
+    font-size: 13px !important;
+  }
+  .toolbar button { padding: 4px 8px !important; }
   .toolbar input[type="text"][id$="earchBox"], .toolbar select[id^="repFilter"] {
-    width: calc(50% - 3px) !important;
-    max-width: calc(50% - 3px) !important;
-    flex: 1 1 calc(50% - 3px) !important;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    max-width: none !important;
     min-width: 0 !important;
     box-sizing: border-box !important;
+    padding: 4px 6px !important;
   }
+  .toolbar input[type="text"][id$="earchBox"] { flex: 1.4 1 0 !important; }
 
   /* 3. 대시보드 뷰포트 적응 */
   .dash-head {
@@ -5524,7 +5530,7 @@ input[type="checkbox"] {
 <div class="tabs" id="tabs"></div>  
   
 <div id="toolbar-order" class="toolbar" style="display:none;">  
- <button class="primary" onclick="openAddModal()">+ 신규 등록</button>  
+ <button class="primary" onclick="openAddModal()">+ 등록</button>  
  <input type="text" id="searchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
  <select id="repFilterOrder" onchange="render()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
@@ -5550,7 +5556,7 @@ input[type="checkbox"] {
  <span class="count" id="rowCount"></span>  
 </div>  
 <div id="toolbar-cancel" class="toolbar" style="display:none;">  
- <button class="primary" onclick="openAddCancelModal()">+ 신규 등록</button>  
+ <button class="primary" onclick="openAddCancelModal()">+ 등록</button>  
  <input type="text" id="cancelSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
  <select id="repFilterCancel" onchange="renderCancel()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
@@ -5576,7 +5582,7 @@ input[type="checkbox"] {
  <span class="count" id="cancelRowCount"></span>  
 </div>  
 <div id="toolbar-price" class="toolbar" style="display:none;">  
- <button class="primary" onclick="openAddPriceModal()">+ 신규 등록</button>  
+ <button class="primary" onclick="openAddPriceModal()">+ 등록</button>  
  <input type="text" id="priceSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
  <select id="repFilterPrice" onchange="renderPrice()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
@@ -5607,7 +5613,7 @@ input[type="checkbox"] {
  <span class="count" id="priceRowCount"></span>  
 </div>  
 <div id="toolbar-restart" class="toolbar" style="display:none;">  
- <button class="primary" onclick="openAddRestartModal()">+ 신규 등록</button>  
+ <button class="primary" onclick="openAddRestartModal()">+ 등록</button>  
  <input type="text" id="restartSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
  <select id="repFilterRestart" onchange="renderRestart()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
@@ -5633,7 +5639,7 @@ input[type="checkbox"] {
  <span class="count" id="restartRowCount"></span>  
 </div>  
 <div id="toolbar-product-daily" class="toolbar" style="display:none;">  
- <button class="primary" onclick="openAddProductDailyModal()">+ 신규 등록</button>  
+ <button class="primary" onclick="openAddProductDailyModal()">+ 등록</button>  
  <input type="text" id="productDailySearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
  <select id="repFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">전체</option><option value="박정훈">박정훈</option><option value="박광모">박광모</option><option value="김상훈">김상훈</option><option value="최영국">최영국</option><option value="이수열">이수열</option><option value="박광춘">박광춘</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
