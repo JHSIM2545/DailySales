@@ -4175,7 +4175,7 @@ function getTzToday() {
   background-image: url('./영업일보%20관리자페이지%20타이틀바.png');
   background-repeat: no-repeat;
   background-position: center center;
-  background-size: 100% 100%; /* 좌우만 화면폭에 맞춰 늘어나고 줄고, 높이는 바 높이 유지 */
+  background-size: cover;
   color: #fff;
   padding: 14px 20px;
   display: flex;
@@ -19551,6 +19551,31 @@ document.addEventListener('mousedown', function(e) {
   el.setAttribute('data-lpignore', 'true');
 }, true);
 
+</script>
+<script>
+/* 상단 타이틀바 이미지: 높이는 PC 기준(약 1900px폭) 크기로 고정, 좌우만 브라우저 폭에 맞춰 늘이고 줄임 */
+(function(){
+  var REF_W = 1900, imgH = 0;
+  function bar(){ return document.querySelector('.topbar'); }
+  function apply(){
+    var b = bar(); if (!b || !imgH) return;
+    b.style.backgroundSize = '100% ' + imgH + 'px';
+  }
+  function init(){
+    var b = bar(); if (!b) return;
+    var m = /url\(["']?([^"')]+)["']?\)/.exec(getComputedStyle(b).backgroundImage || '');
+    if (!m) return;
+    var im = new Image();
+    im.onload = function(){
+      var H = b.offsetHeight || 70;
+      var s0 = Math.max(REF_W / im.naturalWidth, H / im.naturalHeight);
+      imgH = Math.round(im.naturalHeight * s0);
+      apply();
+    };
+    im.src = m[1];
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
 </script>
 </body>
 </html>
