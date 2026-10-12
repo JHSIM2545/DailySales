@@ -7752,8 +7752,8 @@ function dashPriceCancelSectionsHtml_(d){
       '<span style="flex:1 1 120px; text-align:right; font-weight:900; color:' + nc + ';">순 ' + (net >= 0 ? '+' : '−') + kk(Math.abs(net)) + '천원</span>' +
       '</div>';
   }).join('');
-  const sec3 = '<div style="margin-bottom:14px;">' +
-    '<div style="' + card + '">' + head('3. 인상·인하 실적 분석', '(단위: 천원 · 전월 동기 대비)') +
+  const sec3 = '<div>' +
+    '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('3. 인상·인하 실적 분석', '(단위: 천원 · 전월 동기 대비)') +
     kpiRow +
     '<div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">컨설턴트별 인상·인하</div>' +
     '<div style="display:flex; flex-direction:column; gap:8px;">' + repLines + '</div></div></div>';
@@ -7765,7 +7765,7 @@ function dashPriceCancelSectionsHtml_(d){
   const repRows = reps.map(function(r){ const x = byRep[r] || {}; const p = prevByRep[r] || {}; return { name: r, count: x.count || 0, amount: x.amount || 0, avg: x.avgAmount || 0, pCount: p.count || 0, pAmount: p.amount || 0, reasons: x.byReason || [] }; })
     .sort(function(a, b){ return b.amount - a.amount || b.count - a.count; });
   const maxAmt = Math.max.apply(null, repRows.map(function(r){ return r.amount; }).concat([1]));
-  const repTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액(천원)</th><th>비중</th><th>평균(천원)</th><th>전월 동기</th><th>주요 유형</th></tr></thead><tbody>' +
+  const repTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액(천원)</th><th>비중</th><th>전월 동기</th></tr></thead><tbody>' +
     repRows.map(function(r){
       const color = (typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[r.name]) || '#475569';
       const share = totAmt ? Math.round(r.amount / totAmt * 100) : 0;
@@ -7773,8 +7773,8 @@ function dashPriceCancelSectionsHtml_(d){
       return '<tr><td style="font-weight:900; color:' + color + '; border-left:3.5px solid ' + color + ';">' + esc(r.name) + '</td>' +
         '<td class="num">' + r.count + '건</td>' +
         '<td class="num"><div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;"><span style="display:inline-block; height:8px; width:' + Math.round(r.amount / maxAmt * 60) + 'px; background:' + color + '; border-radius:2px;"></span><b>' + kk(r.amount) + '</b></div></td>' +
-        '<td class="num">' + share + '%</td><td class="num">' + kk(r.avg) + '</td>' +
-        '<td class="num" style="color:#64748b;">' + r.pCount + '건 / ' + kk(r.pAmount) + '</td><td class="center">' + top + '</td></tr>';
+        '<td class="num">' + share + '%</td>' +
+        '<td class="num" style="color:#64748b;">' + r.pCount + '건 / ' + kk(r.pAmount) + '</td></tr>';
     }).join('') + '</tbody></table>';
   const worst = repRows[0] && repRows[0].amount > 0 ? repRows[0] : null;
   const reasonText = cov.byReasonText || [];
@@ -7784,21 +7784,20 @@ function dashPriceCancelSectionsHtml_(d){
     topLine_(reasonText.filter(function(x){ return x.name !== '미기재'; }), '주요 사유', '') + topLine_(typeList, '주요 유형', '') +
     (reasonText[0] && reasonText[0].name === '미기재' ? '<br><span style="color:#b45309;">※ 해약 사유 미기재 건이 가장 많습니다 (' + reasonText[0].count + '건) — 사유 입력 보완이 필요합니다.</span>' : '') +
     '</div>';
-  const sec4 = '<div style="margin-bottom:14px;">' +
-    '<div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px;">🚨 4. 해약 분석</div>' +
-    '<div style="' + card + '">' + head('해약 현황', '(해약 확정일 기준 · 단위: 천원)') +
+  const sec4 = '<div>' +
+    '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('4. 해약 분석', '(해약 확정일 기준 · 단위: 천원)') +
     '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
       kpi_('해약 금액', kk(totAmt) + '천원', deltaBadge_(totAmt, (cov.prev || {}).amount, false)) +
       kpi_('해약 건수', totCnt + '건', deltaBadge_(totCnt, (cov.prev || {}).count, false, true)) +
       kpi_('평균 해약금액', kk(cov.avgAmount) + '천원', '') +
     '</div>' +
     '<div style="margin-top:10px; overflow-x:auto;">' + repTable + '</div>' +
-    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;">' +
+    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">' +
       '<div>' + barBlock_('해약 사유 (금액 비중)', reasonText, 6) + '</div>' +
       '<div>' + barBlock_('해약 유형', typeList, 6) + '</div>' +
       '<div>' + barBlock_('상품별 해약', cov.byProduct, 5) + '</div>' +
     '</div>' + cancelInsight + '</div></div>';
-  return sec3 + sec4;
+  return '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:12px; margin-bottom:14px;">' + sec3 + sec4 + '</div>';
 }
 
 function renderDashboard(){  
