@@ -4564,7 +4564,7 @@ td.amount-neg input {
  .field .err{ font-size:11px; color:#c00000; min-height:14px; }  
  .modal-actions{ margin-top:16px; display:flex; justify-content:flex-end; gap:8px; }  
  .userinfo{ font-size:16px; color:#e7c7d2; display:flex; align-items:center; gap:10px; }  
- .userinfo a{ color:#e7c7d2; cursor:pointer; text-decoration:underline; }  
+ .userinfo a{ color:#e7c7d2; cursor:pointer; text-decoration:underline; font-size:12px; }  
  .ai-report-topbtn{ background:#2563eb; color:#fff; border:none; padding:9px 26px; border-radius:6px; font-size:15px; font-weight:700; cursor:pointer; }  
  .ai-report-topbtn:hover{ background:#1d4ed8; }  
   
@@ -5510,7 +5510,6 @@ input[type="checkbox"] {
  <div class="userinfo">  
  <span id="whoami" style="display:none;"></span>  
  <a id="logoutLink" style="display:none;" onclick="logout()">로그아웃</a>  
- <button id="fileStoreTopBtn" title="파일 저장소" style="background:#2c3e50; color:#ffca28; border:1px solid #4a5568; width:38px; height:34px; padding:0; border-radius:6px; font-size:18px; line-height:1; cursor:pointer; margin-right:10px; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.2);" onclick="openFileStoreModal_()">📁</button>  
  <div class="sync-status" id="syncStatus" style="display:none;"></div>  
  </div>  
 </div>  
@@ -7463,7 +7462,8 @@ function renderTabs(){
    return `<div class="tab ${t.key===currentTab?'active':''} ${t.ready?'':'disabled'}"${styleAttr}${titleAttr}  
  onclick="${t.ready ? onclickExpr : ''}">${label}${t.ready?'':' (준비중)'}</div>`;  
  }).join('');  
- el.innerHTML = tabsHtml;  
+ const fileBtnHtml_ = (typeof openFileStoreModal_ === 'function') ? '<div class="tab" id="fileStoreTopBtn" title="파일 저장소" onclick="openFileStoreModal_()" style="font-size:13px; padding:8px 10px;">📁</div>' : '';
+ el.innerHTML = tabsHtml + fileBtnHtml_;  
 }  
 // 직무 저장값(서버에 저장된 값) -> 화면 표시용 이름. 저장값은 기존 사용자 데이터와의 호환을 위해 그대로 두고,  
 // 화면에 보이는 이름만 바꾼다. (2026-09-21: 직무명 표기 변경 요청)  
@@ -8317,8 +8317,8 @@ function renderDashboard(){
       <button onclick="dashShiftMonth(1)" style="padding:4px 10px; cursor:pointer;" title="다음 월">▶</button>
 
       <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer;">서울사업팀 현황</button>
-        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:6px 16px; border-radius:6px; font-weight:800; cursor:pointer; box-shadow:0 2px 4px rgba(142,47,78,0.25);">📄 영업전략 PDF</button>
+        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:3px 10px; border-radius:5px; font-size:12px; font-weight:700; cursor:pointer;">사업팀</button>
+        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:3px 10px; border-radius:5px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 1px 3px rgba(142,47,78,0.25);">📄 Report</button>
       </div>
     </div>
 

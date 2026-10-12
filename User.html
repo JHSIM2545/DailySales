@@ -4542,7 +4542,7 @@ td.amount-neg input {
  .modal-actions{ margin-top:16px; display:flex; justify-content:flex-end; gap:8px; }  
  .readonly-preview{ font-size:11px; color:#667; background:#f4f6f8; border-radius:4px; padding:8px; margin-bottom:12px; }  
  .userinfo{ font-size:16px; color:#c7d2e0; display:flex; align-items:center; gap:10px; }  
- .userinfo a{ color:#c7d2e0; cursor:pointer; text-decoration:underline; }  
+ .userinfo a{ color:#c7d2e0; cursor:pointer; text-decoration:underline; font-size:12px; }  
  .login-modal{ width:360px; }  
  .login-modal .field{ margin-bottom:10px; }  
   
@@ -7911,8 +7911,8 @@ function renderDashboard(){
       <button onclick="dashShiftMonth(1)" style="padding:4px 10px; cursor:pointer;" title="다음 월">▶</button>
 
       <div style="margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:6px 14px; border-radius:6px; font-weight:700; cursor:pointer;">서울사업팀 현황</button>
-        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:6px 16px; border-radius:6px; font-weight:800; cursor:pointer; box-shadow:0 2px 4px rgba(142,47,78,0.25);">📄 영업전략 PDF</button>
+        <button id="bizTeamOpenViewBtn" onclick="dashShowBizTeamView_()" style="background:#1f6f4a; color:#fff; border:1px solid #154f34; padding:3px 10px; border-radius:5px; font-size:12px; font-weight:700; cursor:pointer;">사업팀</button>
+        <button id="dashPdfBtn" onclick="downloadAllChaptersPdf_()" style="background:#8e2f4e; color:#fff; border:1px solid #701f3a; padding:3px 10px; border-radius:5px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 1px 3px rgba(142,47,78,0.25);">📄 Report</button>
       </div>
     </div>
 
