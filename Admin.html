@@ -1863,7 +1863,7 @@ function getTzToday() {
         r.device_type || '',
         r.system || r.system_name || r.app || r.service || r.site || ''
       ]);
-      return { success: true, rows: rows };
+      return { success: true, rows: rows, columns: (data && data[0]) ? Object.keys(data[0]) : [] };
     },
 
     /** login_logs 한 건 기록. 테이블에 system 컬럼이 없어도 동작하도록 단계적으로 재시도한다.
@@ -14952,7 +14952,7 @@ function loadLoginHistory(){
     .withFailureHandler(function(err){ usersErr = err; USER_ROWS = USER_ROWS || []; usersDone = true; finish_(); })
     .adminListUsers(SESSION.token);
   google.script.run
-    .withSuccessHandler(function(res){ LOGIN_HISTORY_ROWS = (res && res.rows) || []; if (res && res.success === false) histErr = res.error || '조회 실패'; LOGIN_HISTORY_RAW_COUNT = LOGIN_HISTORY_ROWS.length; histDone = true; finish_(); })
+    .withSuccessHandler(function(res){ LOGIN_HISTORY_ROWS = (res && res.rows) || []; if (res && res.success === false) histErr = res.error || '조회 실패'; LOGIN_HISTORY_RAW_COUNT = LOGIN_HISTORY_ROWS.length; LOGIN_HISTORY_COLS_ = (res && res.columns) || []; histDone = true; finish_(); })
     .withFailureHandler(function(err){ histErr = err; histDone = true; finish_(); })
     .adminListLoginHistory(SESSION.token, fromVal, toVal);
 }
@@ -16375,6 +16375,7 @@ function onDailyReportDateChange(){
 /* ===================== 사용자 이력 툴바 이벤트 ===================== */
 let LOGIN_HISTORY_ROWS = [];
 let LOGIN_HISTORY_RAW_COUNT = 0;
+let LOGIN_HISTORY_COLS_ = [];
 
 function onLoginHistoryModeChange(){
   if (currentTab !== 'users') return;
@@ -16430,7 +16431,19 @@ function renderLoginHistory(){
   }
   const countEl = document.getElementById('loginHistoryCount');
   if (countEl) countEl.innerText = '총 ' + sessions.length + '건';
-  const statusHtml_ = loginStatusTableHtml_();
+  let statusHtml_ = loginStatusTableHtml_();
+  // 접속 시스템명이 하나도 저장돼 있지 않으면 원인(컬럼 부재 등)을 화면에 안내
+  try {
+    const rowsAll_ = LOGIN_HISTORY_ROWS || [];
+    const anySys_ = rowsAll_.some(function(r){ return !!parseLoginAction_(r).system; });
+    if (rowsAll_.length && !anySys_) {
+      const cols_ = LOGIN_HISTORY_COLS_ || [];
+      statusHtml_ += '<div style="margin:8px 16px; padding:10px 14px; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; font-size:12px; line-height:1.7; color:#92400e;">' +
+        '<b>⚠ 접속 시스템명이 저장된 기록이 없습니다.</b> 현재 login_logs 컬럼: <code>' + escHtml(cols_.join(', ') || '(확인 불가)') + '</code><br>' +
+        (cols_.indexOf('system') === -1 ? 'Supabase SQL 편집기에서 다음을 한 번 실행해 주세요: <code>alter table login_logs add column if not exists system text, add column if not exists type text, add column if not exists role text;</code><br>' : '') +
+        '※ 수정된 Login.html을 배포하기 전에 로그인한 기록에는 시스템명이 없습니다. 배포 후 새로 로그인하면 표시됩니다.</div>';
+    }
+  } catch (e_) {}
   const head = '<div style="padding:8px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">📜 로그인 이력 <span style="font-weight:500; color:#64748b;">(시간순, 최신 먼저)</span></div>';
   if (!sessions.length) {
     container.innerHTML = statusHtml_ + head + '<div class="placeholder">로그인 이력이 없습니다.' + (LOGIN_HISTORY_RAW_COUNT ? '' : '<br><span style="font-size:12px;color:#94a3b8;">(조회된 로그 0건 — 날짜 조건을 비우거나, login_logs 테이블에 데이터/조회 권한(RLS)이 있는지 확인이 필요합니다)</span>') + '</div>';
