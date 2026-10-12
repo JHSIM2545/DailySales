@@ -17358,7 +17358,7 @@ function bizTeamTotalCell_(g, sub, rows, branches){
   return fmt(sumOf(mv), false);
 }
 
-const BIZ_TEAM_COL_W_ = 72; // 지사별 현황표: 모든 지사 데이터 열의 좌우폭을 동일하게 고정
+const BIZ_TEAM_COL_W_ = 78; // 지사별 현황표: 모든 지사 데이터 열의 좌우폭을 동일하게 고정
 function bizTeamGroupedTableHtml_(branches, rows, orderedIdx, productType){  
  const groups = bizTeamGroupsForProduct_(productType);  
  const th = 'padding:5px 7px; border:1px solid #0f1f36; background:#152a4a; color:#ffffff; font-size:12px; font-weight:700; white-space:nowrap;';  
@@ -17370,7 +17370,7 @@ function bizTeamGroupedTableHtml_(branches, rows, orderedIdx, productType){
  let html = '<table style="border-collapse:collapse; width:100%; font-size:12px;"><thead><tr>' +  
  '<th style="' + thLbl + ' text-align:left;">구분</th>' +  
  '<th style="' + thLbl + ' text-align:left;">항목</th>' +  
-'<th style="' + th + ' width:84px; min-width:84px; max-width:84px; box-sizing:border-box; text-align:center; background:#0b1730; border-right:2px solid #94a3b8;">사업팀 합계</th>' +  
+'<th style="' + th + ' width:90px; min-width:90px; max-width:90px; box-sizing:border-box; text-align:center; background:#0b1730; border-right:2px solid #94a3b8;">사업팀 합계</th>' +  
  displayBranches.map(function(b){  
  const isMine = (b === '북서울');  
  const mineShadow = isMine ? (' box-shadow: inset 3px 0 0 ' + MINE_COLOR_ + ', inset -3px 0 0 ' + MINE_COLOR_ + ', inset 0 3px 0 ' + MINE_COLOR_ + ';') : '';  
@@ -17388,7 +17388,7 @@ function bizTeamGroupedTableHtml_(branches, rows, orderedIdx, productType){
  html += '<td rowspan="' + g.subs.length + '" style="padding:5px 7px; width:1%; white-space:nowrap; border:1px solid #e2e6ea; font-weight:700; text-align:center; vertical-align:middle; background:' + g.color + ';">' + escHtml(g.group) + '</td>';  
  }  
  html += '<td style="padding:5px 7px; width:1%; border:1px solid #e2e6ea; font-weight:700; white-space:nowrap; background:' + g.color + ';">' + escHtml(sub.label) + '</td>';  
- html += '<td style="padding:5px 12px 5px 3px; width:84px; min-width:84px; max-width:84px; box-sizing:border-box; border:1px solid #e2e6ea; border-right:2px solid #94a3b8; text-align:right !important; text-align-last:right !important; font-weight:800; color:' + (isDaily ? '#1a56db' : '#0f172a') + '; background:' + bizTeamSatColor_(g.color) + ';">' + escHtml(bizTeamTotalCell_(g, sub, rows, branches)) + '</td>';  
+ html += '<td style="padding:5px 16px 5px 2px; width:90px; min-width:90px; max-width:90px; box-sizing:border-box; border:1px solid #e2e6ea; border-right:2px solid #94a3b8; text-align:right !important; text-align-last:right !important; font-weight:800; color:' + (isDaily ? '#1a56db' : '#0f172a') + '; background:' + bizTeamSatColor_(g.color) + ';">' + escHtml(bizTeamTotalCell_(g, sub, rows, branches)) + '</td>';  
  html += orderedIdx.map(function(origI){  
  const v = row && row.values ? row.values[origI] : '';  
  const isMine = branches[origI] === '북서울';  
@@ -17396,7 +17396,7 @@ function bizTeamGroupedTableHtml_(branches, rows, orderedIdx, productType){
  const mineShadow = isMine  
  ? (' box-shadow: inset 3px 0 0 ' + MINE_COLOR_ + ', inset -3px 0 0 ' + MINE_COLOR_ + (isLastRow ? (', inset 0 -3px 0 ' + MINE_COLOR_) : '') + ';')  
  : '';  
- return '<td style="padding:5px 12px 5px 3px; width:' + BIZ_TEAM_COL_W_ + 'px; min-width:' + BIZ_TEAM_COL_W_ + 'px; max-width:' + BIZ_TEAM_COL_W_ + 'px; box-sizing:border-box; border:1px solid #e2e6ea; position:relative;' + mineShadow + ' text-align:right !important; text-align-last:right !important; font-weight:700; color:' + fontColor + '; background:' + g.color + ';">' + escHtml(v != null ? v : '') + '</td>';  
+ return '<td style="padding:5px 16px 5px 2px; width:' + BIZ_TEAM_COL_W_ + 'px; min-width:' + BIZ_TEAM_COL_W_ + 'px; max-width:' + BIZ_TEAM_COL_W_ + 'px; box-sizing:border-box; border:1px solid #e2e6ea; position:relative;' + mineShadow + ' text-align:right !important; text-align-last:right !important; font-weight:700; color:' + fontColor + '; background:' + g.color + ';">' + escHtml(v != null ? v : '') + '</td>';  
  }).join('');  
  html += '</tr>';  
  rowCounter_++;  
