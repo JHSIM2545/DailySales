@@ -4208,7 +4208,8 @@ function getTzToday() {
  .tab-refresh-btn:disabled{ opacity:.3; cursor:default; }  
  .tab-refresh-btn.has-update{ animation: tabRefreshPulse 1.1s ease-in-out infinite; }  
  @keyframes tabRefreshPulse{ 0%,100%{ opacity:.75; } 50%{ opacity:.25; } }  
- .toolbar{ display:flex; align-items:center; gap:8px; padding:8px 16px; background:#fff; border-bottom:1px solid var(--grid-line); font-size:16px; flex-wrap:wrap; }  
+ .tb-break{ display:none; }
+.toolbar{ display:flex; align-items:center; gap:8px; padding:8px 16px; background:#fff; border-bottom:1px solid var(--grid-line); font-size:16px; flex-wrap:wrap; }  
  .toolbar input[type=text]{ padding:5px 8px; border:1px solid #c7cfd8; border-radius:3px; font-size:16px; width:200px; }  
  .toolbar select{ padding:5px 8px; border:1px solid #c7cfd8; border-radius:3px; font-size:16px; }  
  .toolbar .radio-group{ display:flex; align-items:center; gap:10px; }  
@@ -5184,6 +5185,9 @@ input[type="checkbox"] {
     font-size: 13px !important;
   }
   .toolbar button { padding: 4px 8px !important; }
+  /* 1줄: [+ 등록][검색][담당자] / 2줄: 체크박스·년월 / 3줄: 임시·영업현황·나머지 버튼 */
+  .tb-break { display: block !important; flex: 0 0 100% !important; height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; }
+  .toolbar > span[style*="border-left"] { display: none !important; }
   .toolbar input[type="text"][id$="earchBox"], .toolbar select[id^="repFilter"] {
     flex: 1 1 0 !important;
     width: auto !important;
@@ -5534,13 +5538,13 @@ input[type="checkbox"] {
  <input type="text" id="searchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
  <select id="repFilterOrder" onchange="render()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select>  
+ </select><span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyUnstartedOrder" checked onchange="render()">개시예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossOrder" onchange="render()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterOrder" value="" onchange="onYmFilterChange_('order', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
-   </span>  
+   </span><span class="tb-break"></span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
   
@@ -5560,13 +5564,13 @@ input[type="checkbox"] {
  <input type="text" id="cancelSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
  <select id="repFilterCancel" onchange="renderCancel()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select>  
+ </select><span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyPendingCancel" checked onchange="renderCancel()">해약예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossCancel" onchange="renderCancel()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterCancel" value="" onchange="onYmFilterChange_('cancel', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
-   </span>  
+   </span><span class="tb-break"></span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
   
@@ -5586,7 +5590,7 @@ input[type="checkbox"] {
  <input type="text" id="priceSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
  <select id="repFilterPrice" onchange="renderPrice()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select>  
+ </select><span class="tb-break"></span>  
  <span class="radio-group">  
  <label><input type="radio" name="priceTypeFilter" value="" checked onchange="renderPrice()">전체</label>  
  <label><input type="radio" name="priceTypeFilter" value="인상" onchange="renderPrice()">인상</label>  
@@ -5597,7 +5601,7 @@ input[type="checkbox"] {
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterPrice" value="" onchange="onYmFilterChange_('price', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
-   </span>  
+   </span><span class="tb-break"></span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
   
@@ -5617,13 +5621,13 @@ input[type="checkbox"] {
  <input type="text" id="restartSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
  <select id="repFilterRestart" onchange="renderRestart()">  
  <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select>  
+ </select><span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyStoppedRestart" checked onchange="renderRestart()">재개시예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossRestart" onchange="renderRestart()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterRestart" value="" onchange="onYmFilterChange_('restart', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
-   </span>  
+   </span><span class="tb-break"></span>  
    
 <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
   
@@ -5643,7 +5647,7 @@ input[type="checkbox"] {
  <input type="text" id="productDailySearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
  <select id="repFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">전체</option><option value="박정훈">박정훈</option><option value="박광모">박광모</option><option value="김상훈">김상훈</option><option value="최영국">최영국</option><option value="이수열">이수열</option><option value="박광춘">박광춘</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select>  
+ </select><span class="tb-break"></span>  
  <select id="gubunFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">구분 전체</option><option value="지사">지사</option><option value="법인">법인</option><option value="전략">전략</option>  
  </select>  
@@ -5651,7 +5655,7 @@ input[type="checkbox"] {
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
- </span>  
+ </span><span class="tb-break"></span>  
  <span style="border-left:1px solid #c7cfd8; margin:0 4px; height:20px;"></span>  
  <label class="chk"><input type="checkbox" id="onlyFlaggedProductDaily">선택</label>  
  <button title="인쇄" onclick="printGridData('productdaily')">🖨️</button>  
