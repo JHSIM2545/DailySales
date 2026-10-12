@@ -14377,7 +14377,7 @@ function buildStrategyDoc_(c){
   const gapS = function(g){ return (g > 0 ? '+' : '') + g + '%p'; };
   const traf = function(pct, o){
     const ref = (o.avg !== null && o.avg !== undefined && o.rank > 0) ? o.avg : c.workRatio;
-    const d = pct - ref;
+    const d = (o.rank > 0 && o.rank >= Math.ceil(nb * 0.6)) ? Math.min(pct - ref, -0.1) : (pct - ref);  // 사업팀 하위권이면 '양호' 불가
     return d >= 0 ? { t: '양호', col: '#0f766e', bg: '#ccfbf1' } : (d >= -5 ? { t: '주의', col: '#854d0e', bg: '#fef9c3' } : { t: '위험', col: '#991b1b', bg: '#fee2e2' });
   };
   const rankLine = function(o, label){
@@ -14400,13 +14400,20 @@ function buildStrategyDoc_(c){
   /* 지표별 개별 판정: 2=양호(목표 달성/상위권) 1=보통 0=미흡 */
   const lvl = function (o) {
     const hr = o.rank > 0;
-    if (o.pct >= refP || (hr && o.rank <= Math.ceil(nb / 3))) return 2;
-    if ((hr && o.rank >= Math.ceil(nb * 0.6)) || o.pct < refP - 5) return 0;
+    // 사업팀 순위 자료가 있으면 순위를 우선 반영: 하위권(상위 60% 밖)이면 영업일 진도를 넘겨도 '양호'가 될 수 없고, 상위 1/3이라도 진도가 크게 뒤처지면 '양호'가 될 수 없다.
+    if (hr) {
+      const low = o.rank >= Math.ceil(nb * 0.6), top = o.rank <= Math.ceil(nb / 3);
+      if (low) return (o.pct >= refP) ? 1 : 0;
+      if (top) return (o.pct >= refP - 5) ? 2 : 1;
+      return (o.pct >= refP) ? 2 : (o.pct < refP - 5 ? 0 : 1);
+    }
+    if (o.pct >= refP) return 2;
+    if (o.pct < refP - 5) return 0;
     return 1;
   };
   const lo = lvl(c.ord), ls = lvl(c.start);
   const wdL = ['미흡', '다소 부족', '양호'];
-  const prT = function (o) { return o.rank > 0 ? ('사업팀 ' + o.rank + '위') : ('달성률 ' + o.pct + '%'); };
+  const prT = function (o) { return o.rank > 0 ? ('사업팀 ' + o.rank + '위' + ((o.rank >= Math.ceil(nb * 0.6) && o.pct >= refP) ? '(진도율은 충족하나 하위권)' : '')) : ('달성률 ' + o.pct + '%'); };
   const weakList = [];
   if (c.isFutureMonth) sumLines.push(m + '월은 아직 실적 집계 전입니다.');
   else {
