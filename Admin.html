@@ -3190,6 +3190,29 @@ function getTzToday() {
       const priceUpPayload = buildPriceFor('인상');
       const priceDownPayload = buildPriceFor('인하');
 
+      // ── 전월 동기 대비(진행 중인 달은 전월 같은 일자까지, 마감된 달은 전월 전체) 비교용 집계 ──
+      const prevCutDs_ = prevYm + '-' + ((ym < todayYm) ? '99' : String(today).slice(8, 10));
+      function sumPrevPrice_(changeType) {
+        const rows = (prcRes.data || []).filter(r => r.billing_date && String(r.billing_date).slice(0, 7) === prevYm && String(r.billing_date).slice(0, 10) <= prevCutDs_)
+          .filter(r => changeType === '인상' ? (safeNum_(r.diff_amount) > 0) : (safeNum_(r.diff_amount) < 0))
+          .filter(r => String(r.gross_type) !== '법인');
+        const amt = rows.reduce((a, r) => a + Math.abs(safeNum_(r.diff_amount)), 0);
+        return { count: rows.length, amount: amt };
+      }
+      priceUpPayload.prev = sumPrevPrice_('인상');
+      priceDownPayload.prev = sumPrevPrice_('인하');
+      const prevCancelRows_ = (canRes.data || [])
+        .filter(r => r.confirm_date && String(r.confirm_date).slice(0, 7) === prevYm && String(r.confirm_date).slice(0, 10) <= prevCutDs_)
+        .filter(r => allowed.indexOf(String(r.product_name)) !== -1)
+        .filter(r => String(r.gross_type) !== '법인');
+      const cancelPrevByRep_ = {};
+      reps.forEach(rep => {
+        const rr = prevCancelRows_.filter(r => String(r.rep_name || '').trim() === rep);
+        cancelPrevByRep_[rep] = { count: rr.length, amount: rr.reduce((a, r) => a + safeNum_(r.monthly_fee), 0) };
+      });
+      // 해약 사유(자유기재 cancel_reason) 집계 — 비어 있으면 '미기재'
+      const cancelReasonText_ = aggregateComp(filteredCancels, r => (String(r.cancel_reason || '').trim() || '미기재'), r => safeNum_(r.monthly_fee));
+
 // 상품군별 종합 실적 집계 (일반알람, 블루스캔, 휴엔, 디지털)
       const PRODUCT_GROUPS = [
         { key: '일반알람', name: '일반알람 (알람/유지보수)', allowed: ['알람', '유지보수', '일반알람', '기본알람'] },
@@ -3289,7 +3312,7 @@ function getTzToday() {
         status: statusRes,
         working: { success: true, info: working },
         order: { success: true, yearMonth: ym, overall: orderOverall, byRep: orderByRep },
-        cancel: { success: true, yearMonth: ym, overall: cancelOverall, byRep: cancelByRep },
+        cancel: { success: true, yearMonth: ym, overall: Object.assign({}, cancelOverall, { prev: { count: prevCancelRows_.length, amount: prevCancelRows_.reduce((a, r) => a + safeNum_(r.monthly_fee), 0) }, byReasonText: cancelReasonText_.list }), byRep: cancelByRep, prevByRep: cancelPrevByRep_ },
         priceUp: Object.assign({ success: true, yearMonth: ym }, priceUpPayload),
         priceDown: Object.assign({ success: true, yearMonth: ym }, priceDownPayload),
         bizTeam: bizTeamRes,
@@ -8062,6 +8085,120 @@ function dashGaugeSectionHtml_(title, metricKey, targetTotal, planTotal, actualT
  return html;  
 }  
   
+/** 대시보드 3. 인상·인하 분석 / 4. 해약 분석 */
+function dashPriceCancelSectionsHtml_(d){
+  d = d || {};
+  const up = d.priceUp || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };
+  const down = d.priceDown || { overall: {}, byRep: [], byReceiver: [], byReason: [], byProduct: [] };
+  const can = d.cancel || { overall: {}, byRep: {} };
+  const cov = can.overall || {};
+  const kk = function(won){ return Math.round((Number(won) || 0) / 1000).toLocaleString('ko-KR'); };
+  const esc = function(t){ return String(t == null ? '' : t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  // 전월 동기 대비 증감 배지. goodWhenUp: 증가가 좋은 지표(인상)면 true, 나쁜 지표(인하·해약)면 false
+  function deltaBadge_(cur, prev, goodWhenUp, isCnt){
+    const fmtP_ = function(v){ return isCnt ? (Number(v) || 0) + '건' : kk(v) + '천원'; };
+    cur = Number(cur) || 0; prev = Number(prev) || 0;
+    if (!prev && !cur) return '<span style="color:#94a3b8;">전월 동기 -</span>';
+    if (!prev) return '<span style="color:#64748b;">전월 동기 0 → 신규 발생</span>';
+    const pct = Math.round(((cur - prev) / prev) * 1000) / 10;
+    if (pct === 0) return '<span style="color:#64748b;">전월 동기 대비 0%</span>';
+    const up_ = pct > 0, good = up_ === !!goodWhenUp;
+    return '<span style="color:' + (good ? '#059669' : '#dc2626') + '; font-weight:800;">' + (up_ ? '▲ ' : '▼ ') + Math.abs(pct) + '%</span> <span style="color:#64748b;">전월 동기 ' + fmtP_(prev) + ' 대비</span>';
+  }
+  function kpi_(label, val, sub){
+    return '<div style="flex:1 1 110px; min-width:110px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">' +
+      '<div style="font-size:10.5px; color:#64748b; font-weight:700;">' + label + '</div>' +
+      '<div style="font-size:15px; font-weight:900; color:#0f172a;">' + val + '</div>' +
+      (sub ? '<div style="font-size:10.5px; margin-top:2px;">' + sub + '</div>' : '') + '</div>';
+  }
+  function barBlock_(title, list, max){
+    list = (list || []).slice(0, max || 5);
+    return '<div style="margin-top:10px;"><div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:4px;">' + title + '</div>' +
+      (list.length ? compositionBarsHtml_(list) : '<div style="color:#999; font-size:12px; padding:4px 0;">데이터 없음</div>') + '</div>';
+  }
+  function topLine_(list, label, unit){
+    const t = (list || [])[0];
+    if (!t) return '';
+    return '<span style="display:inline-block; margin-right:10px;">' + label + ' <b>' + esc(t.name) + '</b> (' + t.count + '건, ' + kk(t.amount) + '천원, ' + (t.pctAmount || 0) + '%)</span>';
+  }
+  const card = 'background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);';
+  const head = function(t, right){ return '<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px; flex-wrap:wrap; gap:4px;"><span style="font-size:13.5px; font-weight:800; color:#0f172a;">' + t + '</span>' + (right ? '<span style="font-size:11.5px; color:#475569; font-weight:700;">' + right + '</span>' : '') + '</div>'; };
+
+  // ---------- 3. 인상·인하 ----------
+  const uo = up.overall || {}, dno = down.overall || {};
+  const netAmt = (Number(uo.amount) || 0) - (Number(dno.amount) || 0);
+  const prevNet = ((up.prev || {}).amount || 0) - ((down.prev || {}).amount || 0);
+  const upCard = '<div style="' + card + '">' + head('📈 인상', '(단위: 천원)') +
+    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+      kpi_('인상 금액', kk(uo.amount) + '천원', deltaBadge_(uo.amount, (up.prev || {}).amount, true)) +
+      kpi_('인상 건수', (uo.count || 0) + '건', deltaBadge_(uo.count, (up.prev || {}).count, true, true)) +
+      kpi_('평균 인상금액', kk(uo.avgAmount) + '천원', '') +
+    '</div>' +
+    barBlock_('접수자별 인상 (많은 순)', up.byReceiver) +
+    barBlock_('컨설턴트별 인상', up.byRep) +
+    barBlock_('인상 사유', up.byReason) +
+    '</div>';
+  const downCard = '<div style="' + card + '">' + head('📉 인하', '(단위: 천원)') +
+    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+      kpi_('인하 금액', kk(dno.amount) + '천원', deltaBadge_(dno.amount, (down.prev || {}).amount, false)) +
+      kpi_('인하 건수', (dno.count || 0) + '건', deltaBadge_(dno.count, (down.prev || {}).count, false, true)) +
+      kpi_('평균 인하금액', kk(dno.avgAmount) + '천원', '') +
+    '</div>' +
+    barBlock_('인하 사유 (많은 순)', down.byReason) +
+    barBlock_('컨설턴트별 인하', down.byRep) +
+    barBlock_('접수자별 인하', down.byReceiver) +
+    '</div>';
+  const priceInsight = '<div style="margin-top:10px; font-size:12px; color:#334155; line-height:1.7; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px;">' +
+    '<b>순 단가변동(인상 − 인하)</b> ' + (netAmt >= 0 ? '+' : '−') + kk(Math.abs(netAmt)) + '천원 · ' + deltaBadge_(netAmt, prevNet, true) + '<br>' +
+    topLine_(up.byReceiver, '인상 최다 접수자', '') + topLine_(up.byReason, '인상 주요 사유', '') + topLine_(down.byReason, '인하 주요 사유', '') +
+    '</div>';
+  const sec3 = '<div style="margin-bottom:14px;">' +
+    '<div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px;">📊 3. 인상·인하 실적 분석</div>' +
+    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px;">' + upCard + downCard + '</div>' + priceInsight + '</div>';
+
+  // ---------- 4. 해약 ----------
+  const reps = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : [];
+  const byRep = can.byRep || {}, prevByRep = can.prevByRep || {};
+  const totCnt = Number(cov.count) || 0, totAmt = Number(cov.amount) || 0;
+  const repRows = reps.map(function(r){ const x = byRep[r] || {}; const p = prevByRep[r] || {}; return { name: r, count: x.count || 0, amount: x.amount || 0, avg: x.avgAmount || 0, pCount: p.count || 0, pAmount: p.amount || 0, reasons: x.byReason || [] }; })
+    .sort(function(a, b){ return b.amount - a.amount || b.count - a.count; });
+  const maxAmt = Math.max.apply(null, repRows.map(function(r){ return r.amount; }).concat([1]));
+  const repTable = '<table class="ai-data-table" style="font-size:11px; width:100%;"><thead><tr><th>컨설턴트</th><th>해약 건수</th><th>해약 금액(천원)</th><th>비중</th><th>평균(천원)</th><th>전월 동기</th><th>주요 유형</th></tr></thead><tbody>' +
+    repRows.map(function(r){
+      const color = (typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[r.name]) || '#475569';
+      const share = totAmt ? Math.round(r.amount / totAmt * 100) : 0;
+      const top = r.reasons[0] ? (esc(r.reasons[0].name) + ' ' + (r.reasons[0].pctAmount || 0) + '%') : '-';
+      return '<tr><td style="font-weight:900; color:' + color + '; border-left:3.5px solid ' + color + ';">' + esc(r.name) + '</td>' +
+        '<td class="num">' + r.count + '건</td>' +
+        '<td class="num"><div style="display:flex; align-items:center; gap:6px; justify-content:flex-end;"><span style="display:inline-block; height:8px; width:' + Math.round(r.amount / maxAmt * 60) + 'px; background:' + color + '; border-radius:2px;"></span><b>' + kk(r.amount) + '</b></div></td>' +
+        '<td class="num">' + share + '%</td><td class="num">' + kk(r.avg) + '</td>' +
+        '<td class="num" style="color:#64748b;">' + r.pCount + '건 / ' + kk(r.pAmount) + '</td><td class="center">' + top + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  const worst = repRows[0] && repRows[0].amount > 0 ? repRows[0] : null;
+  const reasonText = cov.byReasonText || [];
+  const typeList = cov.byReason || [];
+  const cancelInsight = '<div style="margin-top:10px; font-size:12px; color:#334155; line-height:1.7; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px;">' +
+    (worst ? '<span style="display:inline-block; margin-right:10px;">해약 최다 <b>' + esc(worst.name) + '</b> (' + worst.count + '건, ' + kk(worst.amount) + '천원, 비중 ' + (totAmt ? Math.round(worst.amount / totAmt * 100) : 0) + '%)</span>' : '') +
+    topLine_(reasonText.filter(function(x){ return x.name !== '미기재'; }), '주요 사유', '') + topLine_(typeList, '주요 유형', '') +
+    (reasonText[0] && reasonText[0].name === '미기재' ? '<br><span style="color:#b45309;">※ 해약 사유 미기재 건이 가장 많습니다 (' + reasonText[0].count + '건) — 사유 입력 보완이 필요합니다.</span>' : '') +
+    '</div>';
+  const sec4 = '<div style="margin-bottom:14px;">' +
+    '<div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px;">🚨 4. 해약 분석</div>' +
+    '<div style="' + card + '">' + head('해약 현황', '(해약 확정일 기준 · 단위: 천원)') +
+    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
+      kpi_('해약 금액', kk(totAmt) + '천원', deltaBadge_(totAmt, (cov.prev || {}).amount, false)) +
+      kpi_('해약 건수', totCnt + '건', deltaBadge_(totCnt, (cov.prev || {}).count, false, true)) +
+      kpi_('평균 해약금액', kk(cov.avgAmount) + '천원', '') +
+    '</div>' +
+    '<div style="margin-top:10px; overflow-x:auto;">' + repTable + '</div>' +
+    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;">' +
+      '<div>' + barBlock_('해약 사유 (금액 비중)', reasonText, 6) + '</div>' +
+      '<div>' + barBlock_('해약 유형', typeList, 6) + '</div>' +
+      '<div>' + barBlock_('상품별 해약', cov.byProduct, 5) + '</div>' +
+    '</div>' + cancelInsight + '</div></div>';
+  return sec3 + sec4;
+}
+
 function renderDashboard(){  
   if (DASH_VIEW_ === 'biz_team') { renderBizTeamFullScreenView_(); return; }  
   const d = DASH_DATA || {};  
@@ -8613,6 +8750,8 @@ function renderDashboard(){
       </div>
 
     </div>
+
+    ${dashPriceCancelSectionsHtml_(d)}
 
     <!-- ===================== AI 종합 진단 (4대 핵심 진단 과제) ===================== -->
     <div style="background:#ffffff; border:1.5px solid #2563eb; border-radius:8px; padding:16px 20px; box-shadow:0 4px 12px rgba(37,99,235,0.08);">
@@ -16007,7 +16146,7 @@ function renderDailyReport(){
  <div class="status-wrap daily-report-wrap">  
  <div class="status-head">  
  <button onclick="shiftDailyReportDate(-1)">◀</button>  
- <h2>${dailyReportDate} 일일실적보고 (자동집계, 단위: 천원)</h2>  
+ <h2>${dailyReportDate} 일일실적</h2>  
  <button onclick="shiftDailyReportDate(1)">▶</button>  
  <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="date" id="dailyReportDateInput" value="${dailyReportDate}" onchange="onDailyReportDateInputChanged_(this.value)" style="margin-left:8px; padding:3px 6px; border:1px solid #c7cfd8; border-radius:4px; font-size:13px;">  
  <button onclick="dailyReportGoToday()">오늘</button>  
