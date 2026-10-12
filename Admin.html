@@ -14468,11 +14468,6 @@ function renderUsers(){
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; font-weight:500; text-align:left;">' + escHtml(u.이름) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:left;">' + escHtml(u.전화번호) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.등록일시) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.최근접속일시) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(formatDeviceDisplay_(u.브라우저, u.기기유형)) + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + sess.onlineText + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + sess.sessionText + '</td>' +
-      '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(sess.endTime) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + escHtml(u.권한) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center;">' + getJobBadgeHtml_(u.직무) + '</td>' +
       '<td style="padding:8px 12px; border:1px solid #cfd6dc; text-align:center; white-space:nowrap;">' +
@@ -14495,11 +14490,6 @@ function renderUsers(){
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">사용자명</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">전화번호</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">등록일시</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">최근접속일시</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">접속기기</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">실시간 접속</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">세션 상태</th>' +
-          '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">세션 종료 시각</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">권한</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">직무</th>' +
           '<th style="padding:9px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;">관리</th>' +
@@ -14600,22 +14590,52 @@ function loadLoginHistory(){
   const container = document.getElementById('userMgmtBody');
   if (!container) return;
   container.innerHTML = '<div class="loading loading-spin"><div class="loading-text">로그인 이력 로드 중...</div></div>';
+  const mode = document.querySelector('input[name="lhMode"]:checked')?.value || 'day';
+  let fromVal = document.getElementById('lhFrom')?.value || '';
+  let toVal = (mode === 'range') ? (document.getElementById('lhTo')?.value || '') : fromVal;
+  let usersDone = false, histDone = false, usersErr = null, histErr = null;
+  function finish_(){
+    if (!usersDone || !histDone) return;
+    if (currentTab !== 'users' || !document.getElementById('userMgmtBody')) return;
+    if (histErr) { container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(histErr)) + '</div>'; return; }
+    renderLoginHistory();
+  }
   google.script.run
-    .withSuccessHandler(function(res){
-      if (currentTab !== 'users' || !document.getElementById('userMgmtBody')) return;
-      const rows = res.rows || [];
-      if (!rows.length) { container.innerHTML = '<div class="placeholder">로그인 이력이 없습니다.</div>'; return; }
-      let html = '<table><thead><tr><th>이름</th><th>전화번호</th><th>시간</th><th>액션</th></tr></thead><tbody>';
-      rows.forEach(r => { html += '<tr>' + r.map(c => '<td>' + escHtml(String(c||'')) + '</td>').join('') + '</tr>'; });
-      html += '</tbody></table>';
-      container.innerHTML = html;
-    })
-    .withFailureHandler(function(err){ 
-      if (document.getElementById('userMgmtBody')) {
-        container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(err)) + '</div>'; 
-      }
-    })
-    .adminListLoginHistory(SESSION.token);
+    .withSuccessHandler(function(res){ USER_ROWS = (res && res.users) || []; usersDone = true; finish_(); })
+    .withFailureHandler(function(err){ usersErr = err; USER_ROWS = USER_ROWS || []; usersDone = true; finish_(); })
+    .adminListUsers(SESSION.token);
+  google.script.run
+    .withSuccessHandler(function(res){ LOGIN_HISTORY_ROWS = (res && res.rows) || []; histDone = true; finish_(); })
+    .withFailureHandler(function(err){ histErr = err; histDone = true; finish_(); })
+    .adminListLoginHistory(SESSION.token, fromVal, toVal);
+}
+
+/** 로그인 이력 화면 상단: 사용자별 현재 로그인 상태(최근접속/접속기기/실시간 접속/세션) */
+function loginStatusTableHtml_(){
+  const users = USER_ROWS || [];
+  if (!users.length) return '';
+  let rowsHtml = '';
+  users.forEach(function(u){
+    const sess = getSessionStatus_(u);
+    const td = 'padding:7px 12px; border:1px solid #cfd6dc; text-align:center;';
+    rowsHtml += '<tr>' +
+      '<td style="' + td + ' text-align:left; font-weight:500;">' + escHtml(u.이름) + '</td>' +
+      '<td style="' + td + ' text-align:left;">' + escHtml(u.전화번호) + '</td>' +
+      '<td style="' + td + '">' + escHtml(u.최근접속일시) + '</td>' +
+      '<td style="' + td + '">' + escHtml(formatDeviceDisplay_(u.브라우저, u.기기유형)) + '</td>' +
+      '<td style="' + td + '">' + sess.onlineText + '</td>' +
+      '<td style="' + td + '">' + sess.sessionText + '</td>' +
+      '<td style="' + td + '">' + escHtml(sess.endTime) + '</td>' +
+    '</tr>';
+  });
+  const th = 'padding:8px 12px; border:1px solid #3a72cc; font-weight:600; text-align:center;';
+  return '<div style="padding:10px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">현재 로그인 현황 <span style="font-weight:500; color:#64748b;">(' + users.length + '명)</span></div>' +
+    '<div style="overflow:auto; padding:0 16px 8px;"><table style="border-collapse:collapse; width:100%; white-space:nowrap; font-size:13px; background:#fff;">' +
+    '<thead><tr style="background:#4a86e8; color:#fff;">' +
+      '<th style="' + th + '">사용자명</th><th style="' + th + '">전화번호</th><th style="' + th + '">최근접속일시</th><th style="' + th + '">접속기기</th>' +
+      '<th style="' + th + '">실시간 접속</th><th style="' + th + '">세션 상태</th><th style="' + th + '">세션 종료 시각</th>' +
+    '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>' +
+    '<div style="padding:6px 16px 2px; font-size:13px; font-weight:700; color:#1e293b;">로그인 이력</div>';
 }
 
 let USER_ACTION_HISTORY_ROWS = [];
@@ -15992,11 +16012,12 @@ function renderLoginHistory(){
   }
   const countEl = document.getElementById('loginHistoryCount');
   if (countEl) countEl.innerText = '총 ' + rows.length + '건';
+  const statusHtml_ = loginStatusTableHtml_();
   if (!rows.length) {
-    container.innerHTML = '<div class="placeholder">로그인 이력이 없습니다.</div>';
+    container.innerHTML = statusHtml_ + '<div class="placeholder">로그인 이력이 없습니다.</div>';
     return;
   }
-  let html = '<div class="grid-wrap"><table><thead><tr><th>이름</th><th>전화번호</th><th>시간</th><th>액션</th></tr></thead><tbody>';
+  let html = statusHtml_ + '<div class="grid-wrap"><table><thead><tr><th>이름</th><th>전화번호</th><th>시간</th><th>액션</th></tr></thead><tbody>';
   rows.forEach(function(r){
     html += '<tr>' + r.map(function(c){ return '<td>' + escHtml(String(c||'')) + '</td>'; }).join('') + '</tr>';
   });
