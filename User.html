@@ -7717,35 +7717,46 @@ function dashPriceCancelSectionsHtml_(d){
 
   // ---------- 3. 인상·인하 ----------
   const uo = up.overall || {}, dno = down.overall || {};
+  const upPrev = up.prev || {}, dnPrev = down.prev || {};
   const netAmt = (Number(uo.amount) || 0) - (Number(dno.amount) || 0);
-  const prevNet = ((up.prev || {}).amount || 0) - ((down.prev || {}).amount || 0);
-  const upCard = '<div style="' + card + '">' + head('📈 인상', '(단위: 천원)') +
-    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
-      kpi_('인상 금액', kk(uo.amount) + '천원', deltaBadge_(uo.amount, (up.prev || {}).amount, true)) +
-      kpi_('인상 건수', (uo.count || 0) + '건', deltaBadge_(uo.count, (up.prev || {}).count, true, true)) +
-      kpi_('평균 인상금액', kk(uo.avgAmount) + '천원', '') +
-    '</div>' +
-    barBlock_('접수자별 인상 (많은 순)', up.byReceiver) +
-    barBlock_('컨설턴트별 인상', up.byRep) +
-    barBlock_('인상 사유', up.byReason) +
-    '</div>';
-  const downCard = '<div style="' + card + '">' + head('📉 인하', '(단위: 천원)') +
-    '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
-      kpi_('인하 금액', kk(dno.amount) + '천원', deltaBadge_(dno.amount, (down.prev || {}).amount, false)) +
-      kpi_('인하 건수', (dno.count || 0) + '건', deltaBadge_(dno.count, (down.prev || {}).count, false, true)) +
-      kpi_('평균 인하금액', kk(dno.avgAmount) + '천원', '') +
-    '</div>' +
-    barBlock_('인하 사유 (많은 순)', down.byReason) +
-    barBlock_('컨설턴트별 인하', down.byRep) +
-    barBlock_('접수자별 인하', down.byReceiver) +
-    '</div>';
-  const priceInsight = '<div style="margin-top:10px; font-size:12px; color:#334155; line-height:1.7; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px;">' +
-    '<b>순 단가변동(인상 − 인하)</b> ' + (netAmt >= 0 ? '+' : '−') + kk(Math.abs(netAmt)) + '천원 · ' + deltaBadge_(netAmt, prevNet, true) + '<br>' +
-    topLine_(up.byReceiver, '인상 최다 접수자', '') + topLine_(up.byReason, '인상 주요 사유', '') + topLine_(down.byReason, '인하 주요 사유', '') +
-    '</div>';
+  const prevNet = (Number(upPrev.amount) || 0) - (Number(dnPrev.amount) || 0);
+  function bigCard_(title, color, bg, border, o, p, goodWhenUp, sign){
+    return '<div style="flex:1 1 220px; background:' + bg + '; border:1px solid ' + border + '; border-left:5px solid ' + color + '; border-radius:8px; padding:12px 14px;">' +
+      '<div style="font-size:12px; font-weight:800; color:' + color + ';">' + title + '</div>' +
+      '<div style="font-size:22px; font-weight:900; color:' + color + '; margin:2px 0;">' + sign + kk(o.amount) + '<span style="font-size:12px; font-weight:800;"> 천원</span> <span style="font-size:13px; color:#475569; font-weight:800;">(' + (o.count || 0) + '건)</span></div>' +
+      '<div style="font-size:11.5px; line-height:1.6;">금액 ' + deltaBadge_(o.amount, p.amount, goodWhenUp) + '<br>건수 ' + deltaBadge_(o.count, p.count, goodWhenUp, true) + '</div>' +
+      '</div>';
+  }
+  const netColor = netAmt >= 0 ? '#1d4ed8' : '#b45309';
+  const kpiRow = '<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">' +
+    bigCard_('📈 인상 (지사 합계)', '#059669', '#ecfdf5', '#a7f3d0', uo, upPrev, true, '+') +
+    bigCard_('📉 인하 (지사 합계)', '#dc2626', '#fef2f2', '#fecaca', dno, dnPrev, false, '−') +
+    '<div style="flex:1 1 220px; background:#eff6ff; border:1px solid #bfdbfe; border-left:5px solid ' + netColor + '; border-radius:8px; padding:12px 14px;">' +
+      '<div style="font-size:12px; font-weight:800; color:' + netColor + ';">순 단가변동 (인상 − 인하)</div>' +
+      '<div style="font-size:22px; font-weight:900; color:' + netColor + '; margin:2px 0;">' + (netAmt >= 0 ? '+' : '−') + kk(Math.abs(netAmt)) + '<span style="font-size:12px; font-weight:800;"> 천원</span></div>' +
+      '<div style="font-size:11.5px; line-height:1.6;">금액 ' + deltaBadge_(netAmt, prevNet, true) + '</div>' +
+    '</div></div>';
+  // 컨설턴트별 인상/인하 (숫자 표기, 컬러)
+  function repMap_(list){ const m = {}; (list || []).forEach(function(x){ m[x.name] = x; }); return m; }
+  const upM = repMap_(up.byRep), dnM = repMap_(down.byRep);
+  const repNames = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : [];
+  const repLines = repNames.map(function(name){
+    const u = upM[name] || { count: 0, amount: 0 }, dn = dnM[name] || { count: 0, amount: 0 };
+    const net = (Number(u.amount) || 0) - (Number(dn.amount) || 0);
+    const theme = (typeof DASH_REP_THEME !== 'undefined' && DASH_REP_THEME[name]) || { primary: ((typeof DASH_REP_COLORS !== 'undefined' && DASH_REP_COLORS[name]) || '#2563eb'), bg: '#ffffff', border: '#cbd5e1' };
+    const nc = net > 0 ? '#1d4ed8' : (net < 0 ? '#b45309' : '#64748b');
+    return '<div style="display:flex; align-items:center; gap:8px; font-size:12px; flex-wrap:wrap; background:' + theme.bg + '; border:1px solid ' + theme.border + '; border-left:4px solid ' + theme.primary + '; padding:6px 10px; border-radius:6px;">' +
+      '<span style="width:52px; font-weight:900; color:' + theme.primary + '; font-size:12.5px;">' + esc(name) + '</span>' +
+      '<span style="flex:1 1 150px; text-align:right; font-weight:800; color:#059669;">📈 인상 +' + kk(u.amount) + '천원 <span style="color:#475569;">(' + (u.count || 0) + '건)</span></span>' +
+      '<span style="flex:1 1 150px; text-align:right; font-weight:800; color:#dc2626;">📉 인하 −' + kk(dn.amount) + '천원 <span style="color:#475569;">(' + (dn.count || 0) + '건)</span></span>' +
+      '<span style="flex:1 1 120px; text-align:right; font-weight:900; color:' + nc + ';">순 ' + (net >= 0 ? '+' : '−') + kk(Math.abs(net)) + '천원</span>' +
+      '</div>';
+  }).join('');
   const sec3 = '<div style="margin-bottom:14px;">' +
-    '<div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px;">📊 3. 인상·인하 실적 분석</div>' +
-    '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:12px;">' + upCard + downCard + '</div>' + priceInsight + '</div>';
+    '<div style="' + card + '">' + head('3. 인상·인하 실적 분석', '(단위: 천원 · 전월 동기 대비)') +
+    kpiRow +
+    '<div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">컨설턴트별 인상·인하</div>' +
+    '<div style="display:flex; flex-direction:column; gap:8px;">' + repLines + '</div></div></div>';
 
   // ---------- 4. 해약 ----------
   const reps = (typeof DASH_REP_LIST !== 'undefined') ? DASH_REP_LIST : [];
