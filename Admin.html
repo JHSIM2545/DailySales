@@ -2058,8 +2058,8 @@ function getTzToday() {
             if (cPart.d <= day) ordCum += fee;
             if (cPart.d === day) ordToday += fee;
           }
-          // 개시: 기산일(billing_date) 또는 개시일(start_date) 기준
-          const bPart = parseDatePart_(r.billing_date || r.start_date);
+          // 개시: 기산일(billing_date) 기준만 산입 (개시일=공사완료일은 실적에 산입하지 않음)
+          const bPart = parseDatePart_(r.billing_date);
           if (bPart && bPart.ym === ym) {
             if (bPart.d <= day) startCum += fee;
             if (bPart.d === day) startToday += fee;
@@ -2686,7 +2686,7 @@ function getTzToday() {
         const priceUpAmt = repPrices.filter(r => safeNum_(r.diff_amount) > 0).reduce((s, r) => s + Number(r.diff_amount), 0);
         const priceDownAmt = repPrices.filter(r => safeNum_(r.diff_amount) < 0).reduce((s, r) => s + Math.abs(Number(r.diff_amount)), 0);
 
-        const startOrders = repCur.filter(r => (r.start_ym === curYm || (r.billing_date && String(r.billing_date).slice(0, 7) === curYm) || (r.start_date && String(r.start_date).slice(0, 7) === curYm)) && (!r.billing_date || String(r.billing_date).slice(0, 10) <= today || !r.start_date || String(r.start_date).slice(0, 10) <= today));
+        const startOrders = repCur.filter(r => r.billing_date && String(r.billing_date).slice(0, 7) === curYm && String(r.billing_date).slice(0, 10) <= today);
         const startAmt = startOrders.reduce((s, r) => s + (safeNum_(r.monthly_fee)), 0);
         const netAmt = startAmt + priceUpAmt - cancelAmt - priceDownAmt;
         const startRate = curCount ? Math.round((startOrders.length / curCount) * 100) : 0;
@@ -2911,7 +2911,7 @@ function getTzToday() {
         const gapStart = list.map(r => daysBetween(r.contract_date, r.start_date)).filter(v => v !== null);
         const gapBase = list.map(r => daysBetween(r.contract_date, r.billing_date)).filter(v => v !== null);
         const orderedThisMonth = list;
-        const startedSameMonth = orderedThisMonth.filter(r => (r.start_ym === ym || (r.billing_date && String(r.billing_date).slice(0, 7) === ym) || (r.start_date && String(r.start_date).slice(0, 7) === ym)) && (!r.billing_date || String(r.billing_date).slice(0, 10) <= today || !r.start_date || String(r.start_date).slice(0, 10) <= today));
+        const startedSameMonth = orderedThisMonth.filter(r => r.billing_date && String(r.billing_date).slice(0, 7) === ym && String(r.billing_date).slice(0, 10) <= today);
         const monthlyStartRate = orderedThisMonth.length ? Math.round((startedSameMonth.length / orderedThisMonth.length) * 100) : 0;
 
         // 심층 분석: 영업동기(개척 vs 대리점), 무료테스트(개시-기산 격차), 차월기산, 해약 후 재수주
@@ -3173,7 +3173,7 @@ function getTzToday() {
         });
         const pOrdAmt = pOrders.reduce((s, r) => s + safeNum_(r.monthly_fee), 0);
 
-        // 개시: 개시일(start_date), 개시월(start_ym), 또는 기산일(billing_date) 당월 기준 (무료테스트/기산지연 개시건 모두 포괄)
+        // 개시: 기산일(billing_date) 당월 기준만 (개시일=공사완료일은 산입하지 않음)
         const pStarts = (ordRes.data || []).filter(r => {
           if (String(r.gross_type) === '법인') return false;
           if (!matchProductGroup_(r.product_name, g.allowed)) return false;
@@ -3181,7 +3181,7 @@ function getTzToday() {
           const sYm = r.start_ym ? String(r.start_ym).slice(0, 7) : '';
           const bDate = r.billing_date ? String(r.billing_date).slice(0, 10) : '';
           const bYm = r.billing_ym ? String(r.billing_ym).slice(0, 7) : '';
-          return (sYm === ym || sDate.slice(0, 7) === ym || bDate.slice(0, 7) === ym || bYm === ym);
+          return (bDate.slice(0, 7) === ym || (!bDate && bYm === ym)); // 기산일 기준만
         });
         const pStartAmt = pStarts.reduce((s, r) => s + safeNum_(r.monthly_fee), 0);
 
