@@ -3158,7 +3158,37 @@ function getTzToday() {
         stDefs.forEach(b => { stMap[b.key].pct = total ? Math.round((stMap[b.key].amount / total) * 100) : 0; });
         const startTiming = { total: total, buckets: stDefs.map(b => stMap[b.key]) };
 
+        // TEST 제공 분석: 개시일(공사완료) → 기산일 간격이 영업일 기준 1일 이내면 '즉시 기산', 2영업일 이상이면 TEST 제공 기간
+        function bizDaysAfter_(a, b) {
+          if (!a || !b) return null;
+          const A_ = String(a).slice(0, 10), B_ = String(b).slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(A_) || !/^\d{4}-\d{2}-\d{2}$/.test(B_)) return null;
+          if (B_ <= A_) return 0;
+          let cur = new Date(A_ + 'T00:00:00Z'); const end = new Date(B_ + 'T00:00:00Z'); let n = 0;
+          while (cur < end) {
+            cur = new Date(cur.getTime() + 86400000);
+            const ds = cur.toISOString().slice(0, 10), dow = cur.getUTCDay();
+            if (dow !== 0 && dow !== 6 && !HOLIDAYS.has(ds)) n++;
+          }
+          return n;
+        }
+        const testRows_ = [];
+        list.forEach(r => {
+          const bd = bizDaysAfter_(r.start_date, r.billing_date);
+          if (bd !== null && bd >= 2) testRows_.push({ biz: bd, cal: daysBetween(r.start_date, r.billing_date) || 0 });
+        });
+        const instantCnt_ = list.filter(r => { const bd = bizDaysAfter_(r.start_date, r.billing_date); return bd !== null && bd <= 1; }).length;
+        const testInfo = {
+          cnt: testRows_.length,
+          avgBiz: testRows_.length ? Math.round(testRows_.reduce((a, x) => a + x.biz, 0) / testRows_.length * 10) / 10 : 0,
+          avgCal: testRows_.length ? Math.round(testRows_.reduce((a, x) => a + x.cal, 0) / testRows_.length * 10) / 10 : 0,
+          instant: instantCnt_,
+          total: list.length,
+          pct: list.length ? Math.round(testRows_.length / list.length * 1000) / 10 : 0
+        };
+
         return {
+          testInfo: testInfo,
           count: list.length, amount: total, avgAmount: avg, startTiming: startTiming,
           byMotive: motive.list, byProduct: product.list,
           gapStart: { avg: avgOf(gapStart), buckets: bucketize(gapStart) },
@@ -8546,7 +8576,8 @@ function renderDashboard(){
       motive: motive,
       style: bo.archetype || '-',
       leadTime: leadTime,
-      leadTag: leadTag
+      leadTag: leadTag,
+      testInfo: bo.testInfo || null
     };
   });
   repRankings.sort(function (a, b) { return (b.orderAmt - a.orderAmt) || (DASH_REP_LIST.indexOf(a.name) - DASH_REP_LIST.indexOf(b.name)); });
@@ -8836,6 +8867,26 @@ function renderDashboard(){
               `;
             }).join('')}
           </div>
+        </div>
+
+        <!-- TEST 제공 현황: 개시일 → 기산일이 영업일 2일 이상(1일 이내는 개시 후 즉시 기산) -->
+        <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:10px;">
+          ${(function(){
+            const ov = ((order.overall || {}).testInfo) || { cnt: 0, avgBiz: 0, avgCal: 0, total: 0, pct: 0, instant: 0 };
+            const head = '<div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:4px; margin-bottom:4px;">' +
+              '<span style="font-size:11.5px; font-weight:700; color:#334155;">TEST 제공 현황 <span style="font-weight:500; color:#64748b;">(개시일 → 기산일 영업일 2일 이상)</span></span>' +
+              '<span style="font-size:11.5px; font-weight:800; color:#0f172a;">지사 합계: TEST <b style="color:#7c3aed;">' + ov.cnt + '건</b> · 평균 <b style="color:#7c3aed;">' + (ov.cnt ? ov.avgBiz + '영업일' : '-') + '</b>' + (ov.cnt ? ' <span style="font-weight:600; color:#64748b;">(' + ov.avgCal + '일)</span>' : '') + ' · 비중 <b style="color:#7c3aed;">' + ov.pct + '%</b> <span style="font-weight:600; color:#64748b;">(' + ov.cnt + '/' + ov.total + '건)</span></span></div>';
+            const tiles = repRankings.map(function(r){
+              const t = r.testInfo || { cnt: 0, avgBiz: 0, avgCal: 0, total: 0, pct: 0 };
+              const theme = (typeof DASH_REP_THEME !== 'undefined' && DASH_REP_THEME[r.name]) || { primary: '#2563eb', bg: '#f8fafc', border: '#e2e8f0' };
+              return '<div style="background:' + theme.bg + '; padding:7px 4px; border-radius:6px; border:1px solid ' + theme.border + '; border-top:3.5px solid ' + theme.primary + ';">' +
+                '<div style="font-weight:900; color:' + theme.primary + '; font-size:12px; margin-bottom:2px;">' + r.name + '</div>' +
+                '<div style="font-size:14px; font-weight:900; color:' + (t.cnt ? '#7c3aed' : '#94a3b8') + ';">' + t.cnt + '건</div>' +
+                '<div style="font-size:10.5px; color:#475569; font-weight:700;">평균 ' + (t.cnt ? t.avgBiz + '영업일' : '-') + '</div>' +
+                '<div style="font-size:10.5px; color:' + theme.primary + '; font-weight:800;">비중 ' + t.pct + '% <span style="color:#64748b; font-weight:600;">(' + t.cnt + '/' + t.total + ')</span></div></div>';
+            }).join('');
+            return head + '<div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:6px; text-align:center; font-size:11px;">' + tiles + '</div>';
+          })()}
         </div>
 
       </div>
