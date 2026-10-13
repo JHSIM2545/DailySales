@@ -4698,7 +4698,9 @@ td.amount-neg input {
  .daily-actual-row th, .daily-actual-row td{ color:#1a56db; font-weight:700; }  
  .daily-actual-row input{ color:#1a56db; font-weight:700; }  
  table.status-summary-full tr.row-diff th, table.status-summary-full tr.row-diff td{ color:#1a3fd6; }
-table.status-summary.status-summary-full tbody td, table.status-summary.status-summary-full thead th:not(:first-child){ text-align:right !important; }  
+table.status-summary.status-summary-full thead th{ text-align:center !important; }
+table.status-summary.status-summary-full tbody td{ text-align:right !important; padding-right:1.2em !important; }
+table.status-summary.status-summary-full tbody th{ text-align:center !important; }  
  .status-ratio{ margin-top:6px; font-size:16px; color:#0a7a2f; font-weight:600; display:flex; align-items:center; gap:12px; }  
  .status-filter-select{ margin-left:auto; padding:5px 10px; border:1px solid #c7cfd8; border-radius:4px; font-size:16px; }  
  .status-wrap table{ font-size:16px; }  
@@ -7368,7 +7370,7 @@ function renderSalesStatusPopupBody_(res){
  const parts = statusYearMonth.split('-').map(Number), y = parts[0], m = parts[1];  
  body.innerHTML =  
  (res.simulated ? '<div class="sim-popup-badge">🧪 임시모드 결과 – 실제 데이터가 아닙니다</div>' : '') +  
- '<div class="status-target-title">' + y + '.' + m + '월 영업현황 집계 (단위: 천원)</div>' +  
+ '<div class="status-target-title" style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;"><span>' + y + '.' + m + '월 영업현황 집계</span><span style="font-weight:600; font-size:0.85em;">(단위: 천원)</span></div>' +  
  statusSummaryTableHtml(res.target, res.actual, false, res.actualMonthEnd);  
 }  
   
@@ -9879,7 +9881,7 @@ function renderSalesStatus(){
       
       <div style="display:flex; gap:16px; align-items:stretch; margin-bottom:12px; flex-wrap:wrap;">
         <div class="status-target" style="margin-bottom:0; flex:0 0 auto;">
-          <div class="status-target-title">영업현황 집계 (단위: 천원)</div>
+          <div class="status-target-title" style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;"><span>영업현황 집계</span><span style="font-weight:600; font-size:0.85em;">(단위: 천원)</span></div>
           ${statusSummaryTableHtml(STATUS_TARGET, STATUS_ACTUAL, false, STATUS_ACTUAL_END)}
         </div>
         <div class="status-target" style="margin-bottom:0; flex:1 1 420px; min-width:0; background:#f4f6f8;">
@@ -17231,7 +17233,7 @@ function statusSummaryTableHtml(t, actualNow, _unused, monthEnd){
  <tbody>  
  <tr class="row-target"><th>목표</th>${row(cols.map(c => fmtK(c.목표)))}</tr>  
  <tr class="row-plan"><th>계획</th>${row(cols.map(c => fmtK(c.계획)))}</tr>  
- <tr class="row-actual"><th>실적<br><span style="font-size:10px; font-weight:600;">월말 전망</span></th>${row(cols.map(c => fmtK(c.실적)))}</tr>  
+ <tr class="row-actual"><th>실적</th>${row(cols.map(c => fmtK(c.실적)))}</tr>  
  <tr class="row-ratio"><th>(목표비)</th>${row(cols.map(c => pctVs_(c.실적, c.목표)))}</tr>  
  <tr class="row-diff"><th>차이</th>${row(cols.map(c => diffVs_(c.실적, c.목표)))}</tr>  
  <tr class="row-ratio"><th>(계획비)</th>${row(cols.map(c => pctVs_(c.실적, c.계획)))}</tr>  
