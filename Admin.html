@@ -4699,9 +4699,9 @@ td.amount-neg input {
  .daily-actual-row input{ color:#1a56db; font-weight:700; }  
  table.status-summary-full tr.row-diff th, table.status-summary-full tr.row-diff td{ color:#1a3fd6; }
 table.status-summary.status-summary-full thead th{ text-align:center !important; }
-table.status-summary.status-summary-full tbody td{ text-align:right !important; padding-right:0.7em !important; }
+table.status-summary.status-summary-full tbody td{ text-align:right !important; text-align-last:right !important; padding-right:0.7em !important; }
 table.status-summary.status-summary-full tbody th{ text-align:center !important; }
-.status-wrap .grid-wrap table tbody td:not(.datecell){ text-align:right !important; padding-right:0.7em !important; }
+.status-wrap .grid-wrap table tbody td:not(.datecell){ text-align:right !important; text-align-last:right !important; padding-right:0.7em !important; }
 .status-wrap .grid-wrap table thead th{ text-align:center !important; }  
  .status-ratio{ margin-top:6px; font-size:16px; color:#0a7a2f; font-weight:600; display:flex; align-items:center; gap:12px; }  
  .status-filter-select{ margin-left:auto; padding:5px 10px; border:1px solid #c7cfd8; border-radius:4px; font-size:16px; }  
@@ -9914,24 +9914,24 @@ function renderSalesStatus(){
     }
     html += `<tr class="${rowCls}"${rowIdAttr}>
 <td class="datecell${isBlockedDate(r.날짜)?' holi':''}">${fmtStatusDate(r.날짜)}</td>
-      <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.수주)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.개시)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.해약중지)}</td>
-      <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.인상)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.인하)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.재개시)}</td>
-      <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.일유증)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.유지증가)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${r.달성률}%</td>
-      <td class="num gap-left" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계수주)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계개시)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계해약중지)}</td>
-      <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계인상)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계인하)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계재개시)}</td>
-      <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계유지감소)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(r.누계유지증가)}</td>
+      <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.수주)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.개시)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.해약중지)}</td>
+      <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.인상)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.인하)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.재개시)}</td>
+      <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.일유증)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.유지증가)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${r.달성률}%</td>
+      <td class="num gap-left" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계수주)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계개시)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계해약중지)}</td>
+      <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계인상)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계인하)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계재개시)}</td>
+      <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계유지감소)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(r.누계유지증가)}</td>
     </tr>`;
   });
 
   const last = rows[rows.length - 1] || {};
   html += `<tr class="status-total-row">
     <td class="datecell">합계</td>
-    <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계수주||0)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계개시||0)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계해약중지||0)}</td>
-    <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계인상||0)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계인하||0)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계재개시||0)}</td>
-    <td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계유지증가||0)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${fmtK(last.누계유지증가||0)}</td><td class="num" style="text-align:right !important; padding-right:0.7em !important;">${last.달성률||0}%</td>
-    <td class="num gap-left" style="text-align:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td>
-    <td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td>
-    <td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; padding-right:0.7em !important;"></td>
+    <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계수주||0)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계개시||0)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계해약중지||0)}</td>
+    <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계인상||0)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계인하||0)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계재개시||0)}</td>
+    <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계유지증가||0)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${fmtK(last.누계유지증가||0)}</td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${last.달성률||0}%</td>
+    <td class="num gap-left" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td>
+    <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td>
+    <td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td><td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;"></td>
   </tr>`;
 
   html += '</tbody></table></div></div>';
@@ -17228,10 +17228,10 @@ function statusSummaryTableHtml(t, actualNow, _unused, monthEnd){
  { key:'유지감소', 목표:t.목표_유지감소, 계획:t.계획_유지감소, 실적:actual.유지감소 },  
  { key:'유지증가', 목표:t.목표_유지증가, 계획:t.계획_유지증가, 실적:actual.유지증가 }  
  ];  
- const row = (cells) => cells.map(c => `<td class="num" style="text-align:right !important; padding-right:0.7em !important;">${c}</td>`).join('');  
+ const row = (cells) => cells.map(c => `<td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${c}</td>`).join('');  
  return `  
  <table class="status-summary status-summary-full">  
- <thead><tr><th style="text-align:center !important;">${statusProductFilter}</th><th style="text-align:center !important;">수주</th><th style="text-align:center !important;">개시</th><th style="text-align:center !important;">유지감소</th><th style="text-align:center !important;">유지증가</th></tr></thead>  
+ <thead><tr><th style="text-align:center !important; text-align-last:center !important;">${statusProductFilter}</th><th style="text-align:center !important;">수주</th><th style="text-align:center !important;">개시</th><th style="text-align:center !important;">유지감소</th><th style="text-align:center !important;">유지증가</th></tr></thead>  
  <tbody>  
  <tr class="row-target"><th>목표</th>${row(cols.map(c => fmtK(c.목표)))}</tr>  
  <tr class="row-plan"><th>계획</th>${row(cols.map(c => fmtK(c.계획)))}</tr>  
