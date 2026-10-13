@@ -4667,7 +4667,7 @@ td.amount-neg input {
  .status-target input{ width:110px; padding:4px 6px; border:1px solid #c7cfd8; border-radius:3px; font-size:16px; }  
  .status-target button.save{ padding:5px 14px; background:#4a86e8; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:16px; }  
  table.status-summary{ width:auto; min-width:420px; border-collapse:collapse; }  
- table.status-summary th, table.status-summary td{ border:1px solid var(--grid-line); padding:5px 12px; font-size:16px; }  
+ table.status-summary th, table.status-summary td{ border:1px solid var(--grid-line); padding:5px 12px; font-size:13px; }  
  table.status-summary thead th{ position:static; background:#eef1f4; color:#333; }  
  table.status-summary tbody th{ background:#f6f8fa; color:#1c2f4a; text-align:left; }  
  table.status-summary-full tr.row-plan th, table.status-summary-full tr.row-plan td{ background:#fbe4d5; }  
@@ -4677,7 +4677,7 @@ td.amount-neg input {
  .daily-actual-row input{ color:#1a56db; font-weight:700; }  
  table.status-summary-full tr.row-diff th, table.status-summary-full tr.row-diff td{ color:#1a3fd6; }
 table.status-summary.status-summary-full thead th{ text-align:center !important; }
-table.status-summary.status-summary-full tbody td{ text-align:right !important; padding-right:1.2em !important; }
+table.status-summary.status-summary-full tbody td{ text-align:right !important; padding-right:6px !important; }
 table.status-summary.status-summary-full tbody th{ text-align:center !important; }  
  .status-ratio{ margin-top:6px; font-size:16px; color:#0a7a2f; font-weight:normal; }  
  .status-filter-select{ margin-left:auto; padding:5px 10px; border:1px solid #c7cfd8; border-radius:4px; font-size:16px; }  
@@ -11999,10 +11999,10 @@ function statusSummaryTableHtml(t, actualNow, _unused, monthEnd){
  { key:'유지감소', 목표:t.목표_유지감소, 계획:t.계획_유지감소, 실적:actual.유지감소 },  
  { key:'유지증가', 목표:t.목표_유지증가, 계획:t.계획_유지증가, 실적:actual.유지증가 }  
  ];  
- const row = (cells) => cells.map(c => `<td class="num">${c}</td>`).join('');  
+ const row = (cells) => cells.map(c => `<td class="num" style="text-align:right !important; padding-right:6px !important;">${c}</td>`).join('');  
  return `  
  <table class="status-summary status-summary-full">  
- <thead><tr><th>${statusProductFilter}</th><th>수주</th><th>개시</th><th>유지감소</th><th>유지증가</th></tr></thead>  
+ <thead><tr><th style="text-align:center !important;">${statusProductFilter}</th><th style="text-align:center !important;">수주</th><th style="text-align:center !important;">개시</th><th style="text-align:center !important;">유지감소</th><th style="text-align:center !important;">유지증가</th></tr></thead>  
  <tbody>  
  <tr class="row-target"><th>목표</th>${row(cols.map(c => fmtK(c.목표)))}</tr>  
  <tr class="row-plan"><th>계획</th>${row(cols.map(c => fmtK(c.계획)))}</tr>  
