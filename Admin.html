@@ -5614,6 +5614,7 @@ input[type="checkbox"] {
 .rep-perf-table { table-layout: auto; width: 100%; }
 .rep-perf-table th, .rep-perf-table td { white-space: normal !important; word-break: keep-all; overflow-wrap: anywhere; padding: 5px 6px !important; }
 .rep-perf-table td.motive-cell { min-width: 90px; line-height: 1.5; }
+@media (max-width: 768px) { .rep-perf-table .rep-style-col { display: none !important; } }
 
 /* @media print for 100% Vector clarity, zero cutoff */
 @media print {
@@ -8960,7 +8961,7 @@ function renderDashboard(){
               <th>수주주기 (무수주)</th>
               <th>수주단가 (누적)</th>
               <th>영업동기</th>
-              <th>고유 스타일</th>
+              <th class="rep-style-col">고유 스타일</th>
             </tr>
           </thead>
           <tbody>
@@ -8975,7 +8976,7 @@ function renderDashboard(){
                   <td class="center">${r.period > 0 ? r.period + '일' : '-'}${r.zeroDays !== null ? ` <span style="font-size:10px; color:${r.zeroDays>2?'#dc2626':'#059669'}; font-weight:800;">(${r.zeroDays}일)</span>` : ''}</td>
                   <td class="num">${r.unitAmt}만 <span style="font-size:10px; color:#64748b;">(${r.cumUnitAmt}만)</span></td>
                   <td class="center motive-cell" style="font-size:10.5px;">${String(r.motive == null ? '' : r.motive).split(' / ').map(function(t){ return '<span style="display:inline-block; white-space:nowrap;">' + t + '</span>'; }).join(' / ')}</td>
-                  <td>${(r.styleTags || []).map(function(x){ return '<span title="' + x.d + '" style="display:inline-block; font-size:10px; background:#ffffff; color:' + x.c + '; border:1px solid ' + x.c + '; padding:2px 6px; border-radius:4px; font-weight:800; margin:1px 2px 1px 0; white-space:nowrap;">' + x.t + '</span>'; }).join('')}</td>
+                  <td class="rep-style-col">${(r.styleTags || []).map(function(x){ return '<span title="' + x.d + '" style="display:inline-block; font-size:10px; background:#ffffff; color:' + x.c + '; border:1px solid ' + x.c + '; padding:2px 6px; border-radius:4px; font-weight:800; margin:1px 2px 1px 0;">' + x.t + '</span>'; }).join('')}</td>
                 </tr>
               `;
             }).join('')}
