@@ -8594,9 +8594,33 @@ function renderDashboard(){
       const growth = cnt > 0 && String(bo.momPace || '') === '전월 대비 가속';
       if (growth) tags.push({ t: '수주 성장 능력자', c: '#059669', d: '전월 대비 수주 스피드 향상' });
       if (cnt === 0 || (r.orderAmt < avgOrd && !growth)) tags.push({ t: '수주활동 개선 필요', c: '#dc2626', d: cnt === 0 ? '당월 수주 없음' : '수주 ' + r.orderAmt.toLocaleString('ko-KR') + '천원 < 컨설턴트 평균 ' + Math.round(avgOrd).toLocaleString('ko-KR') + '천원 (속도 부진)' });
+      const curPct_ = (function () { try { const b = bo.startTiming && bo.startTiming.buckets ? bo.startTiming.buckets.filter(function (x) { return x.key === 'cur'; })[0] : null; return b ? Number(b.pct) || 0 : 0; } catch (e_) { return 0; } })();
+      const leadAvg_ = (bo.gapBase && Number(bo.gapBase.avg)) || 0;
+      if (cnt > 0 && curPct_ < 50 && leadAvg_ > 30) tags.push({ t: '장기성과 창출', c: '#0369a1', d: '당월 개시 ' + curPct_ + '% · 평균 개시 리드타임 ' + leadAvg_ + '일 (30일 초과)' });
+      if (cnt >= 3 && (Number(bo.pioneerRate) || 0) >= 65) tags.push({ t: '자력 개척', c: '#0f766e', d: '개척 비중 ' + bo.pioneerRate + '% (당월 ' + cnt + '건)' });
+      if (cnt >= 3 && (Number(bo.agencyRate) || 0) >= 50) tags.push({ t: '대외 협력', c: '#9333ea', d: '대리점 비중 ' + bo.agencyRate + '% (당월 ' + cnt + '건)' });
       if (!tags.length) tags.push({ t: '표준 수행형', c: '#475569', d: '평균 수준의 수주 활동' });
-      r.styleTags = tags;
-      r.style = tags.map(function (x) { return x.t; }).join(' · ');
+      // 여러 조건을 하나의 문장형 스타일로 조합
+      const has_ = function (k) { return tags.some(function (x) { return x.t.indexOf(k) === 0; }); };
+      const fA = has_('안정적'), fU = has_('수준단가'), fS = has_('당월 개시'), fL = has_('장기성과'), fP = has_('자력'), fC = has_('대외 협력'), fG = has_('수주 성장'), fN = has_('유증'), fX = has_('수주활동');
+      const mods = [];
+      if (fP) mods.push('자력 개척 기반'); if (fC) mods.push('대외 협력 기반');
+      if (fA) mods.push('안정적'); if (fU) mods.push('고단가'); if (fN) mods.push('유증확보');
+      const core = fS ? '단기성과 창출' : (fL ? '장기성과 창출' : '');
+      let sentence;
+      if (core) {
+        sentence = mods.join(' ') + (mods.length ? ' ' : '') + core + (fG ? '의 성장형' : '형');
+      } else if (mods.length) {
+        const only_ = mods.length === 1 ? { '안정적': '안정적 수주형', '고단가': '고단가 확보형', '유증확보': '유증 확보형', '자력 개척 기반': '자력 개척형', '대외 협력 기반': '대외 협력형' }[mods[0]] : '';
+        sentence = fG ? (mods.length === 1 ? mods[0] + (mods[0].indexOf('기반') > 0 ? '' : (mods[0] === '안정적' ? ' 수주 기반' : ' 확보 기반')) + '의 성장형' : mods.join(' ') + ' 수주의 성장형')
+                      : (only_ || mods.join(' ') + ' 수주형');
+      } else {
+        sentence = fG ? '수주 가속 성장형' : (fX ? '' : '표준 수행형');
+      }
+      if (fX) sentence = sentence ? sentence + '이나 수주활동 개선 필요' : '수주활동 개선 필요';
+      const col_ = (fX && !mods.length && !core && !fG) ? '#dc2626' : (fN ? '#0f766e' : (fG ? '#059669' : (fX ? '#b45309' : '#1d4ed8')));
+      r.styleTags = [{ t: sentence, c: col_, d: tags.map(function (x) { return x.t + ': ' + x.d; }).join('\n') }];
+      r.style = sentence;
     });
   })();
   repRankings.sort(function (a, b) { return (b.orderAmt - a.orderAmt) || (DASH_REP_LIST.indexOf(a.name) - DASH_REP_LIST.indexOf(b.name)); });
