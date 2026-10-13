@@ -2354,7 +2354,7 @@ function getTzToday() {
     },
 
     // 12. 영업현황 및 종합대시보드
-    getSalesStatus: async function(token, yearMonth, productFilter) {
+    getSalesStatus: async function(token, yearMonth, productFilter, sim) {
       const ym = yearMonth || getTzToday().slice(0, 7);
       const pf = productFilter || '일반알람';
       const client = getSupabase();
@@ -2398,10 +2398,47 @@ function getTzToday() {
       const cutoffIdx_ = ym < todayDs_.slice(0, 7) ? daysInMonth : (ym === todayDs_.slice(0, 7) ? Number(todayDs_.slice(8, 10)) : 0);
       const cutoffDs_ = ym < todayDs_.slice(0, 7) ? '9999-12-31' : (ym === todayDs_.slice(0, 7) ? todayDs_ : '0000-00-00');
 
-      const orders = ordRes.data || [];
-      const cancels = canRes.data || [];
-      const prices = prcRes.data || [];
-      const restarts = rstRes.data || [];
+      let orders = ordRes.data || [];
+      let cancels = canRes.data || [];
+      let prices = prcRes.data || [];
+      let restarts = rstRes.data || [];
+      // 임시모드: 임시로 수정한 값/가상 신규 건을 반영해 집계 (DB에는 아무것도 쓰지 않음)
+      if (sim) {
+        const self_ = Backend;
+        const FMAP = {
+          order:   { '계약일': ['contract_date', 'd'], '기산일': ['billing_date', 'd'], '용역료': ['monthly_fee', 'n'], '상품': ['product_name', 's'], '그로스': ['gross_type', 's'] },
+          cancel:  { '확정일': ['confirm_date', 'd'], '용역료': ['monthly_fee', 'n'], '상품': ['product_name', 's'], '그로스': ['gross_type', 's'] },
+          price:   { '기산일': ['billing_date', 'd'], '금액': ['diff_amount', 'n'], '상품': ['product_name', 's'], '그로스': ['gross_type', 's'] },
+          restart: { '재개시일': ['restart_date', 'd'], '용역료': ['monthly_fee', 'n'], '상품': ['product_name', 's'], '그로스': ['gross_type', 's'] }
+        };
+        const conv_ = function (type, v) {
+          if (type === 'n') return safeNum_(v);
+          if (type === 'd') { const c = self_.cleanDateVal_(v); return c || null; }
+          return v == null ? '' : String(v);
+        };
+        const applyTo_ = function (list, sc) {
+          const part = (sim && sim[sc]) || {};
+          const ovs = part.overrides || {};
+          const map = FMAP[sc];
+          let out = list.map(function (r) {
+            const ov = ovs[String(r.sheet_row_id || r.id)];
+            if (!ov) return r;
+            const nr = Object.assign({}, r);
+            Object.keys(ov).forEach(function (k) { if (map[k]) nr[map[k][0]] = conv_(map[k][1], ov[k]); });
+            return nr;
+          });
+          (part.virtual || []).forEach(function (v) {
+            const nr = { gross_type: '일반', product_name: '알람' };
+            Object.keys(map).forEach(function (k) { if (v[k] !== undefined && v[k] !== '') nr[map[k][0]] = conv_(map[k][1], v[k]); });
+            out.push(nr);
+          });
+          return out;
+        };
+        orders = applyTo_(orders, 'order');
+        cancels = applyTo_(cancels, 'cancel');
+        prices = applyTo_(prices, 'price');
+        restarts = applyTo_(restarts, 'restart');
+      }
 
       const 수주Raw = new Array(daysInMonth).fill(0);
       const 개시Raw = new Array(daysInMonth).fill(0);
@@ -2626,7 +2663,7 @@ function getTzToday() {
     },
 
     simulateSalesStatus: async function(token, yearMonth, productFilter, overrides) {
-      const res = await Backend.getSalesStatus(token, yearMonth, productFilter);
+      const res = await Backend.getSalesStatus(token, yearMonth, productFilter, overrides || {});
       return Object.assign({}, res, { simulated: true });
     },
 
@@ -4660,7 +4697,8 @@ td.amount-neg input {
  table.status-summary-full tr.row-ratio th, table.status-summary-full tr.row-ratio td{ color:#1a3fd6; font-style:italic; }  
  .daily-actual-row th, .daily-actual-row td{ color:#1a56db; font-weight:700; }  
  .daily-actual-row input{ color:#1a56db; font-weight:700; }  
- table.status-summary-full tr.row-diff th, table.status-summary-full tr.row-diff td{ color:#1a3fd6; }  
+ table.status-summary-full tr.row-diff th, table.status-summary-full tr.row-diff td{ color:#1a3fd6; }
+table.status-summary.status-summary-full tbody td, table.status-summary.status-summary-full thead th:not(:first-child){ text-align:right !important; }  
  .status-ratio{ margin-top:6px; font-size:16px; color:#0a7a2f; font-weight:600; display:flex; align-items:center; gap:12px; }  
  .status-filter-select{ margin-left:auto; padding:5px 10px; border:1px solid #c7cfd8; border-radius:4px; font-size:16px; }  
  .status-wrap table{ font-size:16px; }  
@@ -7331,7 +7369,7 @@ function renderSalesStatusPopupBody_(res){
  body.innerHTML =  
  (res.simulated ? '<div class="sim-popup-badge">🧪 임시모드 결과 – 실제 데이터가 아닙니다</div>' : '') +  
  '<div class="status-target-title">' + y + '.' + m + '월 영업현황 집계 (단위: 천원)</div>' +  
- statusSummaryTableHtml(res.target, res.actual, false);  
+ statusSummaryTableHtml(res.target, res.actual, false, res.actualMonthEnd);  
 }  
   
 /** 수주개시/해약중지/인상인하/재개시 값이 바뀔 때마다 호출 — 영업현황 합계를 백그라운드에서 미리 다시  
@@ -9681,6 +9719,7 @@ function hideAllToolbars(){
 var STATUS_DATA = null;
 var STATUS_TARGET = null;
 var STATUS_ACTUAL = null;
+var STATUS_ACTUAL_END = null;
 var STATUS_REP_TARGETS = null;
 var STATUS_REP_METRICS = null;
 
@@ -9707,6 +9746,7 @@ function applySalesStatusResult_(res){
   STATUS_DATA = res.rows;
   STATUS_TARGET = res.target;
   STATUS_ACTUAL = res.actual;
+  STATUS_ACTUAL_END = res.actualMonthEnd || res.actual;
   STATUS_REP_METRICS = res.repMetrics; // 차트용 데이터 수신
   STATUS_REP_TARGETS = res.repTargets; // 담당자별 부여된 개인 목표(비율 배분 반영)
   renderSalesStatus();
@@ -9840,7 +9880,7 @@ function renderSalesStatus(){
       <div style="display:flex; gap:16px; align-items:stretch; margin-bottom:12px; flex-wrap:wrap;">
         <div class="status-target" style="margin-bottom:0; flex:0 0 auto;">
           <div class="status-target-title">영업현황 집계 (단위: 천원)</div>
-          ${statusSummaryTableHtml(STATUS_TARGET, STATUS_ACTUAL)}
+          ${statusSummaryTableHtml(STATUS_TARGET, STATUS_ACTUAL, false, STATUS_ACTUAL_END)}
         </div>
         <div class="status-target" style="margin-bottom:0; flex:1 1 420px; min-width:0; background:#f4f6f8;">
           <div class="status-target-title">컨설턴트별 달성률</div>
@@ -17174,8 +17214,10 @@ function normalizeCellForOutput_(td) {
 }
 
 /* --- statusSummaryTableHtml --- */
-function statusSummaryTableHtml(t, actual){  
- t = t || {}; actual = actual || {};  
+function statusSummaryTableHtml(t, actualNow, _unused, monthEnd){  
+ t = t || {}; actualNow = actualNow || {};
+ // 실적행은 월말 기준 전망치(월말까지 입력된 개시·해약·단가변동 누계)로 표시
+ const actual = monthEnd || actualNow;  
  const cols = [  
  { key:'수주', 목표:t.목표_수주금액, 계획:t.계획_수주금액, 실적:actual.수주 },  
  { key:'개시', 목표:t.목표_개시금액, 계획:t.계획_개시금액, 실적:actual.개시 },  
@@ -17189,7 +17231,7 @@ function statusSummaryTableHtml(t, actual){
  <tbody>  
  <tr class="row-target"><th>목표</th>${row(cols.map(c => fmtK(c.목표)))}</tr>  
  <tr class="row-plan"><th>계획</th>${row(cols.map(c => fmtK(c.계획)))}</tr>  
- <tr class="row-actual"><th>실적</th>${row(cols.map(c => fmtK(c.실적)))}</tr>  
+ <tr class="row-actual"><th>실적<br><span style="font-size:10px; font-weight:600;">월말 전망</span></th>${row(cols.map(c => fmtK(c.실적)))}</tr>  
  <tr class="row-ratio"><th>(목표비)</th>${row(cols.map(c => pctVs_(c.실적, c.목표)))}</tr>  
  <tr class="row-diff"><th>차이</th>${row(cols.map(c => diffVs_(c.실적, c.목표)))}</tr>  
  <tr class="row-ratio"><th>(계획비)</th>${row(cols.map(c => pctVs_(c.실적, c.계획)))}</tr>  
