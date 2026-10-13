@@ -8576,6 +8576,29 @@ function renderDashboard(){
       testInfo: bo.testInfo || null
     };
   });
+  // ===== 고유 스타일(변별형 다중 태그): 지사 평균·전월·유증 순위와 비교해 판정 =====
+  (function () {
+    const n_ = repRankings.length || 1;
+    const avgOrd = repRankings.reduce(function (s0, r) { return s0 + r.orderAmt; }, 0) / n_;
+    const brUnit = Number(((order.overall || {}).avgAmount)) || 0;
+    const maxNet = Math.max.apply(null, [0].concat(repRankings.map(function (r) { return Number((repMetrics[r.name] || {}).유지증가) || 0; })));
+    repRankings.forEach(function (r) {
+      const bo = (order.byRep && order.byRep[r.name]) || {};
+      const net = Number((repMetrics[r.name] || {}).유지증가) || 0;
+      const tags = [];
+      const cnt = r.orderCount;
+      if (cnt > 0 && net > 0 && net === maxNet) tags.push({ t: '유증 확보 능력자', c: '#0f766e', d: '유지증가 플러스 · 지사 최고 (' + net.toLocaleString('ko-KR') + '천원)' });
+      if (cnt > 0 && r.orderAmt >= avgOrd) tags.push({ t: '안정적 수주 능력자', c: '#1d4ed8', d: '수주 ' + r.orderAmt.toLocaleString('ko-KR') + '천원 ≥ 컨설턴트 평균 ' + Math.round(avgOrd).toLocaleString('ko-KR') + '천원' });
+      if (cnt > 0 && brUnit > 0 && (Number(bo.avgAmount) || 0) >= brUnit) tags.push({ t: '수준단가 확보 능력자', c: '#b45309', d: '건당 ' + Math.round((Number(bo.avgAmount) || 0) / 1000).toLocaleString('ko-KR') + '천원 ≥ 지사 평균 ' + Math.round(brUnit / 1000).toLocaleString('ko-KR') + '천원' });
+      if (cnt > 0 && (Number(bo.monthlyOrderCount) || 0) > 0 && (Number(bo.monthlyStartRate) || 0) >= 50) tags.push({ t: '당월 개시 능력자', c: '#7c3aed', d: '당월 수주 당월 개시 ' + bo.monthlyStartRate + '%' });
+      const growth = cnt > 0 && String(bo.momPace || '') === '전월 대비 가속';
+      if (growth) tags.push({ t: '수주 성장 능력자', c: '#059669', d: '전월 대비 수주 스피드 향상' });
+      if (cnt === 0 || (r.orderAmt < avgOrd && !growth)) tags.push({ t: '수주활동 개선 필요', c: '#dc2626', d: cnt === 0 ? '당월 수주 없음' : '수주 ' + r.orderAmt.toLocaleString('ko-KR') + '천원 < 컨설턴트 평균 ' + Math.round(avgOrd).toLocaleString('ko-KR') + '천원 (속도 부진)' });
+      if (!tags.length) tags.push({ t: '표준 수행형', c: '#475569', d: '평균 수준의 수주 활동' });
+      r.styleTags = tags;
+      r.style = tags.map(function (x) { return x.t; }).join(' · ');
+    });
+  })();
   repRankings.sort(function (a, b) { return (b.orderAmt - a.orderAmt) || (DASH_REP_LIST.indexOf(a.name) - DASH_REP_LIST.indexOf(b.name)); });
   (function () { let pa = null, pr = 0; repRankings.forEach(function (r, i) { if (r.orderAmt <= 0) { r.rank = '-'; return; } r.rank = (r.orderAmt === pa) ? pr : (i + 1); pa = r.orderAmt; pr = r.rank; }); })();
   const maxRepAmt = Math.max.apply(null, repRankings.map(function (r) { return r.orderAmt; }).concat([0]));
@@ -8928,7 +8951,7 @@ function renderDashboard(){
                   <td class="center">${r.period > 0 ? r.period + '일' : '-'}${r.zeroDays !== null ? ` <span style="font-size:10px; color:${r.zeroDays>2?'#dc2626':'#059669'}; font-weight:800;">(${r.zeroDays}일)</span>` : ''}</td>
                   <td class="num">${r.unitAmt}만 <span style="font-size:10px; color:#64748b;">(${r.cumUnitAmt}만)</span></td>
                   <td class="center motive-cell" style="font-size:10.5px;">${String(r.motive == null ? '' : r.motive).split(' / ').map(function(t){ return '<span style="display:inline-block; white-space:nowrap;">' + t + '</span>'; }).join(' / ')}</td>
-                  <td><span style="font-size:10px; background:${theme.badgeBg}; color:${theme.badgeText}; border:1px solid ${theme.border}; padding:2px 6px; border-radius:4px; font-weight:800;">${r.style}</span></td>
+                  <td>${(r.styleTags || []).map(function(x){ return '<span title="' + x.d + '" style="display:inline-block; font-size:10px; background:#ffffff; color:' + x.c + '; border:1px solid ' + x.c + '; padding:2px 6px; border-radius:4px; font-weight:800; margin:1px 2px 1px 0; white-space:nowrap;">' + x.t + '</span>'; }).join('')}</td>
                 </tr>
               `;
             }).join('')}
