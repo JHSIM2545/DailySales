@@ -1228,7 +1228,8 @@ function getTzToday() {
       const todayYm = getTzToday().slice(0, 7);
       const applyYm = isBillingUnknown ? '미정' : fields['기산일'].slice(0, 7);
       const standardVal = isBillingUnknown ? '미정' : (applyYm === todayYm ? '당월' : '이월');
-      const diffAmt = Number(String(fields['금액'] || 0).replace(/[^0-9.-]/g, ''));
+      let diffAmt = Number(String(fields['금액'] || 0).replace(/[^0-9.-]/g, ''));
+      if (String(fields['구분'] || '').trim() === '인하' && diffAmt > 0) diffAmt = -diffAmt;
       const currFee = Number(String(fields['現용역료'] || 0).replace(/[^0-9.-]/g, ''));
       const rate = (currFee && diffAmt) ? (diffAmt / currFee * 100).toFixed(1) + '%' : '';
 
@@ -10032,9 +10033,13 @@ function edParseFlexibleDate_(val, baseYear) {
 
 function edCleanMoney_(val) {
   if (val === null || val === undefined || val === '') return 0;
-  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  const raw = String(val).trim();
+  // 마이너스 표기 다양성 대응: -, −(유니코드), –, ▼, (45,000), 45,000-
+  const neg = /^[^0-9]{0,3}?[\-\u2212\u2013\u2012\u2010▼▽]/.test(raw) || /^\(.*\)$/.test(raw) || /[\-\u2212\u2013]\s*$/.test(raw);
+  const cleaned = raw.replace(/[^0-9.]/g, '');
   const n = parseInt(cleaned, 10);
-  return isNaN(n) ? 0 : n;
+  if (isNaN(n)) return 0;
+  return neg ? -Math.abs(n) : n;
 }
 
 function edCleanStr_(val) {
@@ -10203,6 +10208,15 @@ function edParseRestartRow_(cols) {
 const edParseRestartRow = edParseRestartRow_;
 
 function edParsePriceRow_(cols) {
+  const r_ = edParsePriceRowRaw_(cols);
+  if (r_ && r_['금액']) {
+    // 구분(인하/인상)과 부호가 어긋나면 구분 기준으로 부호 보정 (인하 → 음수)
+    if (r_['구분'] === '인하' && r_['금액'] > 0) r_['금액'] = -r_['금액'];
+    else if (r_['구분'] === '인상' && r_['금액'] < 0) r_['금액'] = Math.abs(r_['금액']);
+  }
+  return r_;
+}
+function edParsePriceRowRaw_(cols) {
   let cIdx = -1;
   for (let i = 0; i < cols.length; i++) {
     if (/^N\d+$/i.test(cols[i].trim())) { cIdx = i; break; }
