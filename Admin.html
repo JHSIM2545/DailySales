@@ -58,6 +58,13 @@ function getTzToday() {
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
   }
+  // 대시보드 산출 기준일 = 마감된 전일(어제). 당일은 아직 마감 전이므로 집계에서 제외한다.
+  function getDashBasisDate_() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  window.getDashBasisDate_ = getDashBasisDate_;
 
   function getSession_() {
     try {
@@ -2354,7 +2361,7 @@ function getTzToday() {
     },
 
     // 12. 영업현황 및 종합대시보드
-    getSalesStatus: async function(token, yearMonth, productFilter, sim) {
+    getSalesStatus: async function(token, yearMonth, productFilter, sim, asOf) {
       const ym = yearMonth || getTzToday().slice(0, 7);
       const pf = productFilter || '일반알람';
       const client = getSupabase();
@@ -2394,7 +2401,7 @@ function getTzToday() {
       const yy = Number(parts[0]), mm = Number(parts[1]);
       const daysInMonth = new Date(yy, mm, 0).getDate();
       // 실적은 '오늘까지 발생분'만 집계 (일일실적보고와 동일 기준). 과거 월=월말까지, 미래 월=0
-      const todayDs_ = getTzToday();
+      const todayDs_ = asOf || getTzToday();
       const cutoffIdx_ = ym < todayDs_.slice(0, 7) ? daysInMonth : (ym === todayDs_.slice(0, 7) ? Number(todayDs_.slice(8, 10)) : 0);
       const cutoffDs_ = ym < todayDs_.slice(0, 7) ? '9999-12-31' : (ym === todayDs_.slice(0, 7) ? todayDs_ : '0000-00-00');
 
@@ -2904,9 +2911,10 @@ function getTzToday() {
     },
 
     getDashboardBundle: async function(token, yearMonth, category) {
-      const ym = yearMonth || getTzToday().slice(0, 7);
+      const basis_ = getDashBasisDate_(); // 마감된 전일 기준
+      const ym = yearMonth || basis_.slice(0, 7);
       const cat = category || '일반알람';
-      const statusRes = await Backend.getSalesStatus(token, ym, cat);
+      const statusRes = await Backend.getSalesStatus(token, ym, cat, null, basis_);
 
       const HOLIDAYS = new Set([
         '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-03-01','2026-03-02',
@@ -2920,9 +2928,8 @@ function getTzToday() {
       const parts = String(ym).split('-');
       const yy = Number(parts[0]), mm = Number(parts[1]);
       const daysInMonth = new Date(yy, mm, 0).getDate();
-      const dNow = new Date();
-      const todayYm = `${dNow.getFullYear()}-${String(dNow.getMonth() + 1).padStart(2, '0')}`;
-      const todayDate = dNow.getDate();
+      const todayYm = basis_.slice(0, 7);
+      const todayDate = Number(basis_.slice(8, 10));
 
       let totalWorking = 0, elapsedWorking = 0;
       for (let d = 1; d <= daysInMonth; d++) {
@@ -2949,7 +2956,7 @@ function getTzToday() {
         client.from('daily_price_changes').select('*')
       ]);
 
-      const today = getTzToday();
+      const today = basis_;
       const SALES_STATUS_PRODUCT_FILTERS = {
         '일반알람': ['알람', '블루스캔', '유지보수'],
         '알람+휴엔': ['알람', '블루스캔', '유지보수', '휴엔'],
@@ -7940,7 +7947,7 @@ function openIntroPortalWithUrl_(baseUrl){
 }  
 
 /* ===================== 종합 대시보드 ===================== */  
-let DASH_YM = todayStr().slice(0,7);  
+let DASH_YM = (window.getDashBasisDate_ ? window.getDashBasisDate_() : todayStr()).slice(0,7);  
 // 종합대시보드 탭 내부에서 전환되는 화면: 'main'(기존 수주/해약/인상/인하 대시보드) | 'biz_team'(사업팀현황 전체화면)  
 let DASH_VIEW_ = 'main';  
 /** "사업팀 현황" 버튼 클릭 시: 화면 전환과 함께 매번 최신 데이터를 새로 받아오도록(전체 갱신) 캐시/메모리를 비운다. */  
@@ -8435,7 +8442,7 @@ function renderDashboard(){
   
   const [y, m] = DASH_YM.split('-').map(Number);
   // 월 구분은 하드코딩된 특정 월이 아니라 "오늘이 속한 월"과 비교해서 판단한다.
-  const todayDs_ = (typeof getTzToday === 'function' ? getTzToday() : todayStr());  // UTC 날짜가 아닌 한국(로컬) 날짜
+  const todayDs_ = (typeof window.getDashBasisDate_ === 'function' ? window.getDashBasisDate_() : (typeof getTzToday === 'function' ? getTzToday() : todayStr()));  // UTC 날짜가 아닌 한국(로컬) 날짜
   const todayYm_ = todayDs_.slice(0, 7);
   const isCurMonth = (DASH_YM === todayYm_);
   const isFutureMonth = (DASH_YM > todayYm_);
