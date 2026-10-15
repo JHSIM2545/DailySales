@@ -1693,7 +1693,7 @@ function getTzToday() {
       try {
         const { data: logs } = await client
           .from('login_logs')
-          .select('phone, name, browser, device_type, created_at')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(1000);
 
@@ -1846,6 +1846,32 @@ function getTzToday() {
       return { success: true };
     },
 
+    /** 로그인 이력 원인 진단: 조회(건수/컬럼)와 기록(테스트 행 삽입 후 삭제)을 각각 시험해 실제 오류 메시지를 돌려준다. */
+    adminDiagnoseLoginLogs: async function(token) {
+      const client = getSupabase();
+      const out = { count: null, countErr: '', columns: [], latest: '', selErr: '', insertErr: '', insertOk: false, deleteErr: '' };
+      try {
+        const c = await client.from('login_logs').select('*', { count: 'exact', head: true });
+        if (c.error) out.countErr = (c.error.message || String(c.error)) + (c.error.code ? ' (' + c.error.code + ')' : ''); else out.count = c.count;
+      } catch (e) { out.countErr = String(e); }
+      try {
+        const r = await client.from('login_logs').select('*').order('created_at', { ascending: false }).limit(1);
+        if (r.error) out.selErr = (r.error.message || String(r.error)) + (r.error.code ? ' (' + r.error.code + ')' : '');
+        else if (r.data && r.data[0]) { out.columns = Object.keys(r.data[0]); out.latest = kstStr_(r.data[0].created_at, true) || String(r.data[0].created_at || ''); }
+      } catch (e) { out.selErr = String(e); }
+      try {
+        const marker = '__진단__' + Date.now();
+        const ins = await client.from('login_logs').insert([{ name: marker, phone: '00000000000', action: '진단' }]).select();
+        if (ins.error) out.insertErr = (ins.error.message || String(ins.error)) + (ins.error.code ? ' (' + ins.error.code + ')' : '');
+        else {
+          out.insertOk = true;
+          const del = await client.from('login_logs').delete().eq('name', marker);
+          if (del.error) out.deleteErr = del.error.message || String(del.error);
+        }
+      } catch (e) { out.insertErr = String(e); }
+      return { success: true, diag: out };
+    },
+
     adminListLoginHistory: async function(token, from, to) {
       const client = getSupabase();
       let q = client.from('login_logs').select('*').order('created_at', { ascending: false });
@@ -1854,7 +1880,7 @@ function getTzToday() {
       let { data, error } = await q.limit(5000);
       if (error) {
         // select('*') 또는 정렬/필터 실패 시, 확인된 컬럼만으로 재시도
-        const r2 = await client.from('login_logs').select('phone, name, browser, device_type, created_at').order('created_at', { ascending: false }).limit(5000);
+        const r2 = await client.from('login_logs').select('phone, name, action, created_at').order('created_at', { ascending: false }).limit(5000);
         data = r2.data; error = r2.error;
       }
       if (error) {
@@ -1884,7 +1910,9 @@ function getTzToday() {
         Object.assign({}, base, { role: ev.role || '', type: kind, system: sys }),
         Object.assign({}, base, { role: ev.role || '', type: kind + ' · ' + sys }),
         Object.assign({}, base, { type: kind + ' · ' + sys }),
-        Object.assign({}, base, { action: (kind === 'logout' ? '로그아웃' : '로그인') + ' · ' + sys })
+        Object.assign({}, base, { action: (kind === 'logout' ? '로그아웃' : '로그인') + ' · ' + sys }),
+        // 기본 스키마(phone, name, action, created_at만 있는 login_logs)용
+        { name: base.name, phone: base.phone, action: (kind === 'logout' ? '로그아웃' : '로그인') + ' · ' + sys }
       ];
       if (kind !== 'logout') tries.push(base);
       let lastErr = null;
@@ -1943,7 +1971,7 @@ function getTzToday() {
       let { data, error } = await q.limit(5000);
       if (error) {
         // select('*') 또는 정렬/필터 실패 시, 확인된 컬럼만으로 재시도
-        const r2 = await client.from('login_logs').select('phone, name, browser, device_type, created_at').order('created_at', { ascending: false }).limit(5000);
+        const r2 = await client.from('login_logs').select('phone, name, action, created_at').order('created_at', { ascending: false }).limit(5000);
         data = r2.data; error = r2.error;
       }
       if (error) {
@@ -5849,7 +5877,8 @@ input[type="checkbox"] {
  </select>  
  <select id="gubunFilterProductDaily" onchange="renderProductDaily()">  
  <option value="">구분 전체</option><option value="지사">지사</option><option value="법인">법인</option><option value="전략">전략</option>  
- </select><span class="tb-break"></span>  
+ </select>
+ <select id="salesFilterProductDaily" onchange="renderProductDaily()"><option value="">매출여부 전체</option><option value="미매출">미매출</option><option value="매출">매출(확정)</option></select><span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
@@ -14609,6 +14638,7 @@ function onProductDailyFieldChange(id, field, value){
   const row = PRODUCT_DAILY_ROWS.find(r => r.id === id);  
   if (!row) return;  
   row[field] = value;  
+  if (field === '매출여부') { window.PD_KEEP_ = window.PD_KEEP_ || {}; window.PD_KEEP_[String(id)] = true; }
   if (field === '계약설치비' || field === '계약기기비') {
     const inst = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;
     const dev = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
@@ -15089,7 +15119,7 @@ function loadLoginHistory(){
   function finish_(){
     if (!usersDone || !histDone) return;
     if (currentTab !== 'users' || !document.getElementById('userMgmtBody')) return;
-    if (histErr) { container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(histErr)) + '</div>'; return; }
+    if (histErr) { container.innerHTML = '<div class="denied">로드 실패: ' + escHtml(String(histErr)) + '</div><div style="padding:8px 16px;"><button onclick="runLoginLogDiagnosis_()" style="padding:6px 14px; border:1px solid #2563eb; background:#eff6ff; color:#1d4ed8; border-radius:5px; font-weight:700; cursor:pointer;">🔍 로그인 이력 원인 진단</button><div id="loginDiagResult" style="margin-top:8px; font-size:12.5px; line-height:1.7;"></div></div>'; return; }
     renderLoginHistory();
   }
   google.script.run
@@ -16563,6 +16593,33 @@ function updateUserSelectOptions_(rows) {
   }
 }
 
+
+function runLoginLogDiagnosis_(){
+  const box = document.getElementById('loginDiagResult');
+  if (!box) return;
+  box.innerHTML = '진단 중...';
+  google.script.run
+    .withSuccessHandler(function(res){
+      const d = (res && res.diag) || {};
+      const ok = '<span style="color:#059669;font-weight:700;">정상</span>', bad = function(m){ return '<span style="color:#dc2626;font-weight:700;">오류</span> ' + escHtml(m); };
+      let h = '<div style="padding:10px 14px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px;">';
+      h += '① 조회(건수): ' + (d.countErr ? bad(d.countErr) : ok + ' — login_logs <b>' + d.count + '건</b>') + '<br>';
+      h += '② 조회(최신 1건): ' + (d.selErr ? bad(d.selErr) : ok + (d.latest ? ' — 최신 기록 ' + escHtml(d.latest) + ' · 컬럼: ' + escHtml(d.columns.join(', ')) : ' — 기록 없음')) + '<br>';
+      h += '③ 기록(테스트 삽입): ' + (d.insertErr ? bad(d.insertErr) : ok + ' (테스트 행은 즉시 삭제됨)') + '<br>';
+      const rls = /row-level security|permission denied|42501/i.test(d.countErr + d.selErr + d.insertErr);
+      if (d.insertErr || d.countErr || d.selErr) {
+        h += '<div style="margin-top:6px; color:#92400e;">' + (rls ? '⚠ 권한(RLS) 문제로 보입니다. ' : '') + 'Supabase SQL 편집기에서 아래를 실행하면 조회·기록이 허용됩니다.<br><code>alter table login_logs enable row level security; drop policy if exists login_logs_all on login_logs; create policy login_logs_all on login_logs for all using (true) with check (true);</code></div>';
+      } else if (d.count === 0) {
+        h += '<div style="margin-top:6px; color:#92400e;">조회·기록 권한은 정상이지만 저장된 기록이 0건입니다. 수정된 <b>Login.html</b>이 배포되지 않았거나, 로그인 후 기록 단계가 실행되지 않은 상태입니다. Login.html 배포 후 새로 로그인해 보세요.</div>';
+      } else {
+        h += '<div style="margin-top:6px; color:#059669;">기록은 정상 저장되고 있습니다 (총 ' + d.count + '건). 날짜 조건을 비우고 다시 조회해 보세요.</div>';
+      }
+      box.innerHTML = h + '</div>';
+    })
+    .withFailureHandler(function(err){ box.innerHTML = '<span style="color:#dc2626;">진단 실패: ' + escHtml(String(err)) + '</span>'; })
+    .adminDiagnoseLoginLogs(SESSION.token);
+}
+
 function renderLoginHistory(){
   if (currentTab !== 'users') return;
   const container = document.getElementById('userMgmtBody');
@@ -16591,7 +16648,7 @@ function renderLoginHistory(){
   } catch (e_) {}
   const head = '<div style="padding:8px 16px 4px; font-size:13px; font-weight:700; color:#1e293b;">📜 로그인 이력 <span style="font-weight:500; color:#64748b;">(시간순, 최신 먼저)</span></div>';
   if (!sessions.length) {
-    container.innerHTML = statusHtml_ + head + '<div class="placeholder">로그인 이력이 없습니다.' + (LOGIN_HISTORY_RAW_COUNT ? '' : '<br><span style="font-size:12px;color:#94a3b8;">(조회된 로그 0건 — 날짜 조건을 비우거나, login_logs 테이블에 데이터/조회 권한(RLS)이 있는지 확인이 필요합니다)</span>') + '</div>';
+    container.innerHTML = statusHtml_ + head + '<div style="padding:8px 16px;"><button onclick="runLoginLogDiagnosis_()" style="padding:6px 14px; border:1px solid #2563eb; background:#eff6ff; color:#1d4ed8; border-radius:5px; font-weight:700; cursor:pointer;">🔍 로그인 이력 원인 진단</button><div id="loginDiagResult" style="margin-top:8px; font-size:12.5px; line-height:1.7;"></div></div><div class="placeholder">로그인 이력이 없습니다.' + (LOGIN_HISTORY_RAW_COUNT ? '' : '<br><span style="font-size:12px;color:#94a3b8;">(조회된 로그 0건 — 날짜 조건을 비우거나, login_logs 테이블에 데이터/조회 권한(RLS)이 있는지 확인이 필요합니다)</span>') + '</div>';
     return;
   }
   let html = statusHtml_ + head + '<div class="grid-wrap"><table><thead><tr><th>사용자명</th><th>전화번호</th><th>접속 시스템</th><th>접속기기</th><th>로그인 시각</th><th>로그아웃 시각</th><th>사용시간</th></tr></thead><tbody>';
@@ -17263,7 +17320,10 @@ function sortedProductDailyRows(){
  // 상품일보 목록: 선택한 년월(기본 당월) 이후(당월 포함)가 매출예상월인 건만 표시. 매출예상월이 지난 건, 매출확정(매출) 건은 제외. 매출예상이 비어 있는 건은 보정 가능하도록 표시.
  const pdYmSel_ = ((document.getElementById('ymFilterProductDaily')||{}).value) || ((typeof productDailyGridYm !== 'undefined' && productDailyGridYm) ? productDailyGridYm : '') || todayStr().slice(0, 7);
  list = list.filter(r => {
- if (String(r.매출여부||'').trim() === '매출') return false;
+ const sf_ = ((document.getElementById('salesFilterProductDaily')||{}).value)||'';
+ if (sf_ && String(r.매출여부||'').trim() !== sf_) return false;
+ if (sf_ === '매출') return true; // 매출(확정) 조회 시 월 제한 없이 전체 표시
+ if (window.PD_KEEP_ && window.PD_KEEP_[String(r.id)]) return true; // 이번 세션에서 상태를 바꾼 건은 사라지지 않게 유지
  const fYm_ = parseForecastYm_(r.매출예상, r.보고일);
  return !fYm_ || fYm_ >= pdYmSel_;
  });
