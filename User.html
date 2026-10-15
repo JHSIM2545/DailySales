@@ -11072,7 +11072,7 @@ const LIST_PRODUCT_DAILY_REP = ['박정훈','박광모','김상훈','최영국',
 const PRODUCT_DAILY_CONTRACT_RE = /^T\d{7}$/;  
   
 let PRODUCT_DAILY_ROWS = [];  
-let productDailySortState = { key:'보고일', dir:'desc' };  
+let productDailySortState = { key:'매출예상', dir:'asc' };  
   
 function computeAutoProductDaily(row){  
  if (row.계약설치비 === '' && row.계약기기비 === '') return { 합계:'' };  
@@ -11428,7 +11428,9 @@ function sortedProductDailyRows(){
  });
 
   const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
-  list.sort((a,b) => {  
+  const fcKey_ = function(r){ return parseForecastYm_(r.매출예상, r.보고일) || ''; };
+ if (key === '매출예상') { list.sort((a,b) => { const x = fcKey_(a), y = fcKey_(b); if (!x && !y) return 0; if (!x) return 1; if (!y) return -1; return x < y ? -dir : (x > y ? dir : 0); }); return list; }
+ list.sort((a,b) => {  
     let va = a[key], vb = b[key];  
     const blankA = va === '' || va === null || va === undefined;  
     const blankB = vb === '' || vb === null || vb === undefined;  
@@ -11624,7 +11626,7 @@ function renderProductDaily(){
  if (PRODUCT_DAILY_AUTO_FIELDS.includes(h)) {  
  const disp = commaFmt(row[h]);  
  const autoCls = ('auto money' + (productDailySortState.key === h ? ' sort-col' : '')).trim();  
- html += `<td class="${autoCls}" style="font-weight:bold; color:blue;">${escHtml(disp)}</td>`;  
+ html += `<td class="${autoCls}" style="font-weight:bold; color:blue; text-align:right !important; text-align-last:right !important; padding-right:1.2em !important;">${escHtml(disp)}</td>`;  
  } else html += fieldCellHtmlProductDaily(row, h, rows);  
  });  
  html += '</tr>';  

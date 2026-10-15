@@ -14098,7 +14098,7 @@ const PRODUCT_DAILY_CONTRACT_RE = /^T\\d{7}$/;
 const PRODUCT_DAILY_DATE_FIELDS = ['보고일'];  
 
 let PRODUCT_DAILY_ROWS = [];  
-let productDailySortState = { key:'보고일', dir:'desc' };  
+let productDailySortState = { key:'매출예상', dir:'asc' };  
 let productDailySummaryYm = todayStr().slice(0,7);  
 let PRODUCT_DAILY_SUMMARY_EXTRA = null;  
 let productDailySummaryIncludeUnconfirmed = false; // 매출 집계에 "미매출" 포함 여부
@@ -14717,7 +14717,7 @@ function renderProductDaily(){
         const autoVal = (Number(String(row.계약설치비||0).replace(/[^0-9.-]/g,'')) || 0) + (Number(String(row.계약기기비||0).replace(/[^0-9.-]/g,'')) || 0);
         row.합계 = autoVal;
         const autoCls = ('auto money' + (productDailySortState.key === h ? ' sort-col' : '')).trim();  
-        html += `<td class="${autoCls}" style="font-weight:bold; color:blue; text-align:right;">${commaFmt(autoVal)}</td>`;  
+        html += `<td class="${autoCls}" style="font-weight:bold; color:blue; text-align:right !important; text-align-last:right !important; padding-right:1.2em !important;">${commaFmt(autoVal)}</td>`;  
       } else {
         html += fieldCellHtmlProductDaily(row, h, rows);  
       }
@@ -17327,6 +17327,8 @@ function sortedProductDailyRows(){
  return !fYm_ || fYm_ >= pdYmSel_;
  });
  const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
+ const fcKey_ = function(r){ return parseForecastYm_(r.매출예상, r.보고일) || ''; };
+ if (key === '매출예상') { list.sort((a,b) => { const x = fcKey_(a), y = fcKey_(b); if (!x && !y) return 0; if (!x) return 1; if (!y) return -1; return x < y ? -dir : (x > y ? dir : 0); }); return list; }
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
  const blankA = va === '' || va === null || va === undefined;  
