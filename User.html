@@ -8206,6 +8206,7 @@ function renderDashboard(){
       rank: 0,
       name: rep,
       orderAmt: Number(rm.수주) || 0,
+      repTgt: dashRepTargetFor_(repTargets, rep, '수주'),
       orderCount: cnt,
       unitAmt: cnt ? Math.round(((Number(bo.avgAmount) || 0) / 10000) * 10) / 10 : 0,
       cumUnitAmt: Math.round(((Number(bo.allAvg) || 0) / 10000) * 10) / 10,
@@ -14668,8 +14669,14 @@ function buildStrategyDoc_(c){
   if (c.isFutureMonth) sumLines.push(m + '월은 아직 실적 집계 전입니다.');
   else {
     const cur = m + '월 ' + (c.isCurMonth ? '현재 ' : '');
-    if (lo === ls) sumLines.push(cur + '수주 ' + prT(c.ord) + ', 개시 ' + prT(c.start) + '로 목표달성이 ' + wdL[lo] + (lo === 2 ? '합니다.' : '합니다.'));
-    else sumLines.push(cur + '수주는 ' + prT(c.ord) + '로 ' + wdL[lo] + ', 개시는 ' + prT(c.start) + '로 ' + wdL[ls] + '합니다.');
+    const wdX = function (o, l) {
+      const hr = o.rank > 0;
+      if (l === 2) return (hr && o.rank > Math.ceil(nb / 3)) ? '다소 양호' : '양호';
+      if (l === 1) return '다소 부족';
+      return (hr && o.rank >= Math.ceil(nb * 0.6)) ? '매우 미흡' : '미흡';
+    };
+    if (lo === ls) sumLines.push(cur + '수주 ' + prT(c.ord) + ', 개시 ' + prT(c.start) + '로 목표달성이 ' + wdL[lo] + '합니다.');
+    else sumLines.push(cur + '수주는 ' + prT(c.ord) + '로 ' + wdX(c.ord, lo) + '하나, 개시는 ' + prT(c.start) + '로 ' + wdX(c.start, ls) + '합니다.');
     if (lo === 0) weakList.push('수주'); if (ls === 0) weakList.push('개시');
     const lossTxt = (lossAll > c.start.amt ? '해약·인하 증가로 ' : '');
     const nl = vNet < 0 ? 0 : (pNet >= (c.isCurMonth ? Math.min(100, c.workRatio) : 100) ? 2 : (pNet >= 80 ? 1 : 0));
@@ -14679,7 +14686,7 @@ function buildStrategyDoc_(c){
       const so = c.safety.ordPct, ss = c.safety.salePct;
       const sref = refP;
       let tail;
-      if (so >= sref && ss >= sref) tail = '수주·매출 모두 목표를 초과했습니다.';
+      if (so >= sref && ss >= sref) tail = '수주·매출 모두 진도목표를 앞서고 있습니다.';
       else if (so >= sref) { tail = '수주는 양호하나 매출 전환은 다소 부족합니다.'; }
       else if (ss >= sref) tail = '매출은 양호하나 수주 확대가 필요합니다.';
       else { tail = '수주·매출 모두 목표에 미달합니다.'; weakList.push('안전상품'); }
@@ -14714,7 +14721,7 @@ function buildStrategyDoc_(c){
     + '<div class="card"><div class="ch"><b>(1) 수주진척도</b>' + badge(tO) + '</div><div class="kv">' + K(c.ord.amt) + '천원 <small>(' + c.ord.pct + '%)</small></div><div class="kt">목표 ' + K(c.ord.tgt) + '천원<br>' + rankLine(c.ord) + '</div></div>'
     + '<div class="card"><div class="ch"><b>(2) 개시진척도</b>' + badge(tS) + '</div><div class="kv">' + K(c.start.amt) + '천원 <small>(' + c.start.pct + '%)</small></div><div class="kt">목표 ' + K(c.start.tgt) + '천원<br>' + rankLine(c.start) + '</div></div>'
     + '<div class="card"><div class="ch"><b>(3) 유지증가' + (c.isCurMonth ? ' (현재까지)' : '') + '</b>' + badge(tN) + '</div><div class="kv" style="color:' + (c.net.amt < 0 ? '#b91c1c' : '#0f766e') + '">' + S(c.net.amt) + '천원 <small>(' + c.net.pct + '%)</small></div><div class="kt">목표 ' + S(c.net.tgt) + '천원<br>' + rankLine(c.net) + '</div></div>'
-    + '<div class="card"><div class="ch"><b>(4) 안전상품 수주 / 매출</b></div>' + (c.safety
+    + '<div class="card"><div class="ch"><b>(4) 안전상품 수주 / 매출</b>' + (c.safety ? badge(traf(c.safety.ordPct, {})) : '') + '</div>' + (c.safety
       ? ('<div class="kv">수주 ' + K(c.safety.ordAmt) + '천원 <small>(' + c.safety.ordPct + '%)</small></div><div class="kt">목표 ' + K(c.safety.ordTgt) + '천원<br>확정 매출 <b>' + K(c.safety.saleAmt) + '천원 (' + c.safety.salePct + '%)</b></div>')
       : '<div class="kt">상품일보 집계 데이터 없음</div>') + '</div>'
     + '</div></div>');
@@ -14770,13 +14777,35 @@ function buildStrategyDoc_(c){
     + '</tbody></table></div>');
 
   /* ───── 4. 성과표 ───── */
+  const repUrgency_ = function () {
+    if (c.isFutureMonth) return '';
+    const refR = c.isCurMonth ? c.workRatio : 100;
+    const reps = c.reps || [];
+    const avgAmt = reps.length ? reps.reduce(function (s0, r) { return s0 + (Number(r.orderAmt) || 0); }, 0) / reps.length : 0;
+    const crit = [], behind = [];
+    reps.forEach(function (r) {
+      const amt = Number(r.orderAmt) || 0, tg = Number(r.repTgt) || 0;
+      const hasT = tg > 0;
+      const pct = hasT ? r1(amt / tg * 100) : null;
+      const base = hasT ? ('수주 ' + K(amt) + '천원(개인 목표 대비 ' + pct + '%, 영업일 진척률 ' + refR + '% 대비 ' + gapS(r1(pct - refR)) + ')') : ('수주 ' + K(amt) + '천원(' + r.orderCount + '건, 지사 컨설턴트 평균 ' + K(Math.round(avgAmt)) + '천원)');
+      const isCrit = r.orderCount === 0 || amt <= 0 || (hasT ? pct < refR * 0.5 : (avgAmt > 0 && amt < avgAmt * 0.5));
+      const isBehind = hasT ? pct < refR : (avgAmt > 0 && amt < avgAmt);
+      if (isCrit) crit.push({ n: r.name, t: base, z: r.zeroDays });
+      else if (isBehind) behind.push({ n: r.name, t: base });
+    });
+    if (!crit.length && !behind.length) return '<p class="note" style="color:#0f766e"><b>컨설턴트별 수주 진도는 영업일 기준을 충족하고 있습니다.</b></p>';
+    let h = '<div class="card red" style="margin-top:6px">';
+    if (crit.length) h += '<div><b style="color:#b91c1c">🚨 긴급 점검 대상 (실적 현저히 부족):</b> ' + crit.map(function (x) { return '<b>' + esc(x.n) + '</b> — ' + x.t + (x.z ? ', 무수주 ' + x.z + '영업일째' : ''); }).join('; ') + '. 영업일이 경과할수록 월말 만회가 어려워지므로 <b>즉시 개별 면담과 가망 고객 점검, 이번 주 내 수주 계획 확정</b>이 시급합니다.</div>';
+    if (behind.length) h += '<div style="margin-top:3px"><b style="color:#854d0e">⚠ 영업일 기준 수주 미달:</b> ' + behind.map(function (x) { return '<b>' + esc(x.n) + '</b> — ' + x.t; }).join('; ') + '. 속도 회복을 위한 주간 단위 수주 진도 점검이 필요합니다.</div>';
+    return h + '</div>';
+  };
   add(band('PERFORMANCE MATRIX', '4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표', '당월 실적 기준'), true);
   const pr = function(label, r, cls, ind){ return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + (ind ? '└ ' : '') + '<b>' + label + '</b></td><td class="n">' + r.cnt + '건 / ' + K(r.ord) + '</td><td class="n">' + K(r.start) + '</td><td class="n">' + K(r.can) + '</td><td class="n">' + S(r.prc) + '</td><td class="n" style="color:' + (r.net < 0 ? '#b91c1c' : '#0f766e') + '"><b>' + S(r.net) + '</b></td></tr>'; };
   add('<div class="blk"><h3 class="s">4.1 상품군별 수주 및 유지증가 실적 (천원)</h3><table><thead><tr><th>상품군</th><th>수주 (건수/금액)</th><th>개시</th><th>해약</th><th>단가변동</th><th>유지증가</th></tr></thead><tbody>'
     + pr('⭐ 지사 합계', c.prod.tot, 'sum') + pr('일반알람', c.prod.alarm) + pr('블루스캔', c.prod.bscan, '', true) + pr('디지털', c.prod.digi) + pr('휴엔', c.prod.huen) + '</tbody></table></div>');
   add('<div class="blk"><h3 class="s">4.2 컨설턴트별 성과분석</h3><table><thead><tr><th>컨설턴트</th><th>수주 실적</th><th>수주주기 (무수주)</th><th>수주단가 (누적)</th><th>영업동기</th></tr></thead><tbody>'
     + c.reps.map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b> <span class="sm">' + esc(r.style) + '</span></td><td class="n">' + K(r.orderAmt) + '천원 (' + r.orderCount + '건)</td><td class="n">' + (r.period > 0 ? r.period + '일' : '-') + (r.zeroDays !== null ? ' <span style="color:' + (r.zeroDays > 2 ? '#dc2626' : '#059669') + '">(' + r.zeroDays + '일)</span>' : '') + '</td><td class="n">' + r.unitAmt + '만 (' + r.cumUnitAmt + '만)</td><td>' + esc(r.motive) + '</td></tr>'; }).join('')
-    + '</tbody></table><p class="note">무수주는 마지막 수주 이후 경과한 영업일(주말·공휴일 제외, 당월만)이며, 영업동기는 수주금액 기준 비중입니다.</p></div>');
+    + '</tbody></table><p class="note">무수주는 마지막 수주 이후 경과한 영업일(주말·공휴일 제외, 당월만)이며, 영업동기는 수주금액 기준 비중입니다.</p>' + repUrgency_() + '</div>');
 
   /* ───── 5. 인상·인하·해약 및 유지증감 ───── */
   add(band('CHAPTER 05 · PRICE &amp; CANCEL', '5. 인상·인하·해약 및 유지증감 분석', c.isCurMonth ? '당월 누계 · 전월 동기 대비' : '월 마감 · 전월 동기 대비'), true);
