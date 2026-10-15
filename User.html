@@ -5648,7 +5648,6 @@ td.prod-col, td.gross-col,
  <option value="">구분 전체</option><option value="지사">지사</option><option value="법인">법인</option><option value="전략">전략</option>  
  </select>
  <select id="salesFilterProductDaily" onchange="renderProductDaily()"><option value="">매출여부 전체</option><option value="미매출">미매출</option><option value="매출">매출(확정)</option></select><span class="tb-break"></span>  
- <label class="chk"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" onchange="toggleProductDailySummaryUnconfirmed()">미매출 포함</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
@@ -9710,8 +9709,9 @@ function onYmFilterChange_(scope, ym){
     clearScopeCacheKeys_('restartData_');  
     loadRestartData();  
   } else if (scope === 'productdaily') {  
-    productDailyGridYm = targetYm;  
-    renderProductDaily();  
+    productDailyGridYm = targetYm;
+    if (productDailySummaryYm !== targetYm) { productDailySummaryYm = targetYm; loadProductDailySummaryTarget_(function(){ renderProductDaily(); }); }
+    else renderProductDaily();  
   }  
 }  
 function clearScopeCacheKeys_(prefix){  
@@ -11104,12 +11104,14 @@ function shiftProductDailyGridMonth(delta){
 }
 
 function shiftProductDailySummaryMonth(delta){  
- const [y, m] = productDailySummaryYm.split('-').map(Number);  
- const d = new Date(y, m - 1 + delta, 1);  
- productDailySummaryYm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');  
- const ymEl = document.getElementById('ymFilterProductDaily');  
- if (ymEl) ymEl.value = productDailySummaryYm;  
- loadProductDailySummaryTarget_(function(){ renderProductDaily(); });  
+  const [y, m] = productDailySummaryYm.split('-').map(Number);  
+  const d = new Date(y, m - 1 + delta, 1);  
+  productDailySummaryYm = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');  
+  // 실적표 좌우 화살표 = 메뉴바 년월 + 리스트 필터와 연동
+  const ymEl = document.getElementById('ymFilterProductDaily');
+  if (ymEl) ymEl.value = productDailySummaryYm;
+  productDailyGridYm = productDailySummaryYm;
+  loadProductDailySummaryTarget_(function(){ renderProductDaily(); });
 }  
   
 function loadProductDailySummaryTarget_(cb){  
@@ -11224,7 +11226,7 @@ function productDailySummaryTableHtml_(){
   const ord잔략협력 = sumBy(r => r.구분 === '전략' && String(r.보고일||'').slice(0,7) === ymNow);  
   const ord합계 = ord계 + ord잔략협력;  
   
-  const includeUnconfirmed = document.getElementById('pdSummaryIncludeUnconfirmed') ? document.getElementById('pdSummaryIncludeUnconfirmed').checked : false;
+  const includeUnconfirmed = !!productDailySummaryIncludeUnconfirmed;
   const saleConfirmedOk = r => includeUnconfirmed || String(r.매출여부||'').trim() !== '미매출';  
   const sale지사 = sumBy(r => r.구분 === '지사' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r)) + cardSales;  
   const sale법인 = sumBy(r => r.구분 === '법인' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r));  
@@ -11247,18 +11249,19 @@ function productDailySummaryTableHtml_(){
   const ordPlan = toWon_(pln.수주);  
   const salePlan = toWon_(pln.매출);  
   
-  const rate = (actual, target) => target > 0 ? (Math.round((actual/target)*1000)/10) + '%' : '-';  
+  const rate = (actual, target) => target > 0 ? Math.round((actual/target)*100) + '%' : '-';  
   const fmt = (v) => fmtK ? fmtK(v) : Number(v||0).toLocaleString('ko-KR');  
   const dash = '<span style="color:#999;">-</span>';  
   
   // 3. 셀의 크기는 "000,000,000"의 숫자를 표기할 수 있는 고정 사이즈(100px)로 유지 및 우측 정렬
-  const B = 'border:1px solid #999; padding:5px 8px; text-align:right !important; width:100px; min-width:100px; max-width:100px; box-sizing:border-box; font-variant-numeric:tabular-nums;';  
+  const B = 'border:1px solid #999; padding:5px 1.1em 5px 8px !important; text-align:right !important; text-align-last:right !important; width:100px; min-width:100px; max-width:100px; box-sizing:border-box; font-variant-numeric:tabular-nums;';  
   const BH = 'border:1px solid #999; padding:5px 8px; text-align:center !important; box-sizing:border-box;';  
   const BLBL = 'border:1px solid #999; padding:5px 8px; font-weight:600; text-align:center !important; width:75px; min-width:75px; max-width:75px; box-sizing:border-box;';
   const ORD_BAND = 'background:#5b9bd5; color:#ffffff;';  
   const SALE_BAND = 'background:#e6a8a8; color:#333333;';  
   
   return `  
+  <div style="margin:2px 0 4px 2px;"><label class="chk" style="font-size:13px; cursor:pointer;"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" ${productDailySummaryIncludeUnconfirmed ? 'checked' : ''} onchange="toggleProductDailySummaryUnconfirmed()"> 미매출 포함</label></div>
   <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; flex-wrap:wrap;">  
     <div style="padding:4px 0; overflow-x:auto; display:inline-block;">  
       <table style="border-collapse:collapse; font-size:11pt; white-space:nowrap; table-layout:fixed; width:1075px;">  
@@ -11412,7 +11415,7 @@ function sortedProductDailyRows(){
   const repFilter = (document.getElementById('repFilterProductDaily')||{}).value || '';  
   const gubunFilter = (document.getElementById('gubunFilterProductDaily')||{}).value || '';  
   const ymFilter = (document.getElementById('ymFilterProductDaily')||{}).value || productDailyGridYm || todayStr().slice(0, 7);  
-  const includeUnconfirmed = document.getElementById('pdSummaryIncludeUnconfirmed') ? document.getElementById('pdSummaryIncludeUnconfirmed').checked : false;
+  const includeUnconfirmed = !!productDailySummaryIncludeUnconfirmed;
 
   let list = PRODUCT_DAILY_ROWS.map(r => Object.assign({}, r, computeAutoProductDaily(r)));  
   if (filterText) list = list.filter(r => String(r.서비스제공처||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
@@ -11548,8 +11551,7 @@ function fieldCellHtmlProductDaily(row, field, allRows){
  if (field === '매출예상') {
    const fVal = parseForecastYm_(val, row.보고일);
    const inner = `<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%;">` +
-     `<input type="text" class="cell-align-center" style="text-align:center !important; width:100%; height:100%; padding-right:30px; box-sizing:border-box; background:transparent; border:none; outline:none;" value="${escAttr(formatForecastYmDisplay_(val) || val)}" onchange="onPdForecastTyped_(this, '${row.id}')">` +
-     `<button type="button" class="pd-cal-btn" title="월 선택 (달력)" onclick="openMonthPickerForPd_(this)" style="position:absolute; right:3px; top:50%; transform:translateY(-50%); z-index:3; border:none; background:transparent; cursor:pointer; font-size:15px; line-height:1; padding:2px 4px;">📅</button>` +
+     `<input type="text" class="cell-align-center" style="text-align:center !important; width:100%; height:100%; cursor:pointer; box-sizing:border-box; background:transparent; border:none; outline:none;" value="${escAttr(formatForecastYmDisplay_(val) || val)}" onclick="openMonthPickerForPd_(this)" onchange="onPdForecastTyped_(this, '${row.id}')">` +
      `<input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; pointer-events:none; z-index:0; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
      `</div>`;
    return `<td class="${cls}" style="text-align:center !important;">${inner}</td>`;
