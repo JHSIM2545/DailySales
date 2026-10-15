@@ -8563,15 +8563,16 @@ function renderDashboard(){
     return '<span title="' + String(tip || '').replace(/"/g, '&quot;') + '" style="display:inline-flex;gap:3px;align-items:center;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:3px 6px;flex-shrink:0;">' + lamp('R') + lamp('Y') + lamp('G') + '</span>';
   }
   const tlOrdAvg_ = (biz && biz.ord && biz.ord.avgVal !== undefined && biz.ord.avgVal !== null) ? Number(biz.ord.avgVal) : tlRef_;
-  const tlOrd_ = ordPct >= 100 || ordPct >= tlOrdAvg_ + 3 ? 'G' : (ordPct > tlOrdAvg_ ? 'Y' : 'R');
-  const tlStart_ = startPct > tlRef_ + 3 ? 'G' : (startPct >= tlRef_ - 3 ? 'Y' : 'R');
-  const tlNet_ = (netAmt < 0 || netPct < tlRef_) ? 'R' : (netPct < tlRef_ + 5 ? 'Y' : 'G');
+  const tlBand_ = function (p, ref) { return p > ref + 5 ? 'G' : (p >= ref - 3 ? 'Y' : 'R'); }; // 기준 -3%p ~ +5%p 노랑 / 미달 빨강 / 초과 청록
+  const tlOrd_ = tlBand_(ordPct, tlOrdAvg_);
+  const tlStart_ = tlBand_(startPct, tlRef_);
+  const tlNet_ = netAmt < 0 ? 'R' : (netPct >= tlRef_ ? 'G' : 'Y'); // 마이너스 빨강 / 플러스 노랑 / 목표수준 청록
   const tlSafe_ = function (p) { return p > tlRef_ + 3 ? 'G' : (p >= tlRef_ - 3 ? 'Y' : 'R'); };
   const tlSafeOrd_ = hasSafety ? tlSafe_(safeOrdPct) : '';
   const tlSafeSale_ = hasSafety ? tlSafe_(safeSalePct) : '';
 
   const viewModeTitle = isCurMonth
-    ? (m + '월 ' + elDays + '영업일 경과 (' + workRatio + '%) 기준')
+    ? (Number(todayDs_.slice(5, 7)) + '/' + Number(todayDs_.slice(8, 10)) + '일 마감기준 (' + workRatio + '%)')
     : (isPastMonth ? (m + '월 최종 실적 마감 기준') : (m + '월 (실적 집계 전)'));
   const guidelineHeaderTitle = `${y}년 ${m}월 가이드 라인`;
   const guidelineBadge = isCurMonth ? '현황·원인·전망·대책 일체형' : (isPastMonth ? '실적 마감 평가' : '차월 선행 점검');
@@ -8841,7 +8842,7 @@ function renderDashboard(){
     <!-- ===================== 1. 북서울 지사 영업 현황 (4대 핵심 지표 & 신호등 체계) ===================== -->
     <div style="margin-bottom:14px;">
       <div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-        <span>🎯 1. 북서울지사 영업 현황 관제 (${viewModeTitle})</span>
+        <span>🎯 1. 북서울지사 영업 현황 &nbsp;-&nbsp; ${viewModeTitle}</span>
       </div>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px;">
         
@@ -8849,7 +8850,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #3b82f6; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(1) 수주진척도</span>
-            ${tlHtml_(tlOrd_, '수주: 사업팀 평균 이하 빨강 / 평균+3%p 미만 노랑 / 평균+3%p 이상 또는 100% 이상 청록')}
+            ${tlHtml_(tlOrd_, '수주진척도: 사업팀 평균 -3%p ~ +5%p 노랑 / 미달 빨강 / +5%p 초과 청록')}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(ordAmt)}천원 <span style="font-size:13px; font-weight:700; color:#2563eb;">(${ordPct}%)</span></div>
@@ -8864,7 +8865,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #2563eb; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(2) 개시진척도</span>
-            ${tlHtml_(tlStart_, '개시: 진도율 ±3%p 이내 노랑 / 미만 빨강 / 초과 청록')}
+            ${tlHtml_(tlStart_, '개시진척도: 경과일수 대비 -3%p ~ +5%p 노랑 / 미달 빨강 / +5%p 초과 청록')}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:#0f172a;">${fmtK(startAmt)}천원 <span style="font-size:13px; font-weight:700; color:#2563eb;">(${startPct}%)</span></div>
@@ -8879,7 +8880,7 @@ function renderDashboard(){
         <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:12px 14px; border-top:4px solid #dc2626; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <span style="font-size:12px; font-weight:700; color:#475569;">(3) 유지증가 수준${isCurMonth ? ' (현재까지)' : ''}</span>
-            ${tlHtml_(tlNet_, '유지증가: 마이너스 또는 진도율 미만 빨강 / 진도율+5%p 미만 노랑 / 이상 청록')}
+            ${tlHtml_(tlNet_, '유지증가: 마이너스 빨강 / 플러스 노랑 / 목표수준(영업일 진도율 이상) 청록')}
           </div>
           <div style="display:flex; justify-content:space-between; align-items:baseline;">
             <div style="font-size:20px; font-weight:900; color:${netAmt<0?'#dc2626':'#0f766e'};">${netAmt>0?'+':''}${fmtK(netAmt)}천원 <span style="font-size:13px; font-weight:700;">(${netPct}%)</span></div>
@@ -14638,7 +14639,6 @@ function onProductDailyFieldChange(id, field, value){
   const row = PRODUCT_DAILY_ROWS.find(r => r.id === id);  
   if (!row) return;  
   row[field] = value;  
-  if (field === '매출여부') { window.PD_KEEP_ = window.PD_KEEP_ || {}; window.PD_KEEP_[String(id)] = true; }
   if (field === '계약설치비' || field === '계약기기비') {
     const inst = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;
     const dev = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
@@ -17322,8 +17322,6 @@ function sortedProductDailyRows(){
  list = list.filter(r => {
  const sf_ = ((document.getElementById('salesFilterProductDaily')||{}).value)||'';
  if (sf_ && String(r.매출여부||'').trim() !== sf_) return false;
- if (sf_ === '매출') return true; // 매출(확정) 조회 시 월 제한 없이 전체 표시
- if (window.PD_KEEP_ && window.PD_KEEP_[String(r.id)]) return true; // 이번 세션에서 상태를 바꾼 건은 사라지지 않게 유지
  const fYm_ = parseForecastYm_(r.매출예상, r.보고일);
  return !fYm_ || fYm_ >= pdYmSel_;
  });
