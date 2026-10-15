@@ -11261,7 +11261,6 @@ function productDailySummaryTableHtml_(){
   const SALE_BAND = 'background:#e6a8a8; color:#333333;';  
   
   return `  
-  <div style="margin:2px 0 4px 2px;"><label class="chk" style="font-size:13px; cursor:pointer;"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" ${productDailySummaryIncludeUnconfirmed ? 'checked' : ''} onchange="toggleProductDailySummaryUnconfirmed()"> 미매출 포함</label></div>
   <div style="display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; flex-wrap:wrap;">  
     <div style="padding:4px 0; overflow-x:auto; display:inline-block;">  
       <table style="border-collapse:collapse; font-size:11pt; white-space:nowrap; table-layout:fixed; width:1075px;">  
@@ -11361,7 +11360,8 @@ function productDailySummaryTableHtml_(){
     <div style="border:1px solid #90caf9; border-radius:4px; padding:10px 16px; background:#eaf6fd; min-width:170px;">  
       <div style="font-weight:700; font-size:11pt; margin-bottom:8px; color:#0d5c8a;">카드매출 (단위 : 원)</div>  
       <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="cardSalesInput" value="${fmt(cardSales)}" oninput="formatMoneyInput(this)" onchange="onCardSalesChange_(this.value)"
-        style="width:140px; padding:6px 8px; border:1px solid #c7cfd8; border-radius:4px; text-align:right; font-size:12pt; background:#ffffff; box-sizing:border-box; font-weight:bold; color:#0d5c8a;">  
+        style="width:140px; padding:6px 8px; border:1px solid #c7cfd8; border-radius:4px; text-align:right; font-size:12pt; background:#ffffff; box-sizing:border-box; font-weight:bold; color:#0d5c8a;">
+      <div style="margin-top:8px;"><label class="chk" style="font-size:12.5px; cursor:pointer; color:#0d5c8a;"><input type="checkbox" id="pdSummaryIncludeUnconfirmed" ${productDailySummaryIncludeUnconfirmed ? 'checked' : ''} onchange="toggleProductDailySummaryUnconfirmed()"> 미매출 포함</label></div>  
     </div>  
   </div>`;  
 }  
