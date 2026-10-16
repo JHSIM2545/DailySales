@@ -4165,12 +4165,24 @@ function getTzToday() {
         // 1. 대용량 파일 데이터 본문(dataUrl)은 독립 키로 안전하게 분리 저장
         if (client && payload.dataUrl) {
           try {
-            await client.from('system_settings').upsert({
-              setting_key: 'FILE_DATA_' + payload.id,
-              setting_value: payload.dataUrl
-            });
+            const CH_ = 400000; // 한 행당 약 400KB로 분할 저장 (대용량 파일 저장 실패 방지)
+            const du_ = String(payload.dataUrl);
+            const parts_ = [];
+            for (let p_ = 0; p_ < du_.length; p_ += CH_) parts_.push(du_.slice(p_, p_ + CH_));
+            if (parts_.length <= 1) {
+              const r0_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: du_ });
+              if (r0_.error) throw r0_.error;
+            } else {
+              for (let i_ = 0; i_ < parts_.length; i_++) {
+                const ri_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id + '__' + i_, setting_value: parts_[i_] });
+                if (ri_.error) throw ri_.error;
+              }
+              const rm_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: '__CHUNKED__:' + parts_.length });
+              if (rm_.error) throw rm_.error;
+            }
           } catch(e) {
             console.warn('[adminUploadStoredFile] file data upsert error:', e);
+            return { success: false, error: '파일 본문 저장 실패: ' + ((e && e.message) || e) };
           }
         }
 
@@ -4264,7 +4276,19 @@ function getTzToday() {
               .eq('setting_key', 'FILE_DATA_' + id)
               .maybeSingle();
             if (!error && data && data.setting_value) {
-              return { success: true, dataUrl: data.setting_value };
+              const sv_ = String(data.setting_value);
+              if (sv_.indexOf('__CHUNKED__:') === 0) {
+                const n_ = Number(sv_.split(':')[1]) || 0;
+                let acc_ = '', okc_ = n_ > 0;
+                for (let i_ = 0; i_ < n_; i_++) {
+                  const rc_ = await client.from('system_settings').select('setting_value').eq('setting_key', 'FILE_DATA_' + id + '__' + i_).maybeSingle();
+                  if (rc_.error || !rc_.data || rc_.data.setting_value == null) { okc_ = false; break; }
+                  acc_ += rc_.data.setting_value;
+                }
+                if (okc_) return { success: true, dataUrl: acc_ };
+              } else {
+                return { success: true, dataUrl: sv_ };
+              }
             }
           } catch(e) {}
 
@@ -4301,6 +4325,10 @@ function getTzToday() {
               .from('system_settings')
               .delete()
               .eq('setting_key', 'FILE_DATA_' + id);
+            await client
+              .from('system_settings')
+              .delete()
+              .like('setting_key', 'FILE_DATA_' + id + '\\_\\_%');
           } catch(e) {}
         }
 
