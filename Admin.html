@@ -1238,7 +1238,7 @@ function getTzToday() {
       let diffAmt = Number(String(fields['금액'] || 0).replace(/[^0-9.-]/g, ''));
       if (String(fields['구분'] || '').trim() === '인하' && diffAmt > 0) diffAmt = -diffAmt;
       const currFee = Number(String(fields['現용역료'] || 0).replace(/[^0-9.-]/g, ''));
-      const rate = (currFee && diffAmt) ? (diffAmt / currFee * 100).toFixed(1) + '%' : '';
+      const rate = (currFee && diffAmt) ? Math.round(diffAmt / currFee * 100) + '%' : '';
 
       const record = {
         category: diffAmt < 0 ? '인하' : '인상',
@@ -13372,7 +13372,7 @@ function computeAutoPrice(row){
  반영월 = ym;  
  }  
  const before = Number(row.現용역료);  
- const 인상인하율 = (row.現용역료 && before !== 0 && !isNaN(before)) ? ((amount / before * 100).toFixed(1) + '%') : '';  
+ const 인상인하율 = (row.現용역료 && before !== 0 && !isNaN(before)) ? (Math.round(amount / before * 100) + '%') : '';  
  return { 구분, 기준, 반영월, 인상인하율 };  
 }  
 function statusClassPrice(field, v){  
