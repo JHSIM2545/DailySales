@@ -6527,6 +6527,28 @@ loadUserFlags_();
 function toggleFlag(scope, id){  
   const strId = String(id);
   const isSet = !FLAGGED_SET.has(strId);  
+  // Shift+클릭: 직전에 선택한 행과 이번 행 사이의 모든 행을 같은 상태로 일괄 선택/해제
+  const shiftOn_ = !!(window.event && window.event.shiftKey);
+  const anchor_ = window.__flagAnchor_;
+  window.__flagAnchor_ = { scope: scope, id: strId };
+  if (shiftOn_ && anchor_ && anchor_.scope === scope && anchor_.id !== strId) {
+    const trs_ = Array.prototype.slice.call(document.querySelectorAll('.grid-wrap table tbody tr[data-id]'));
+    const ids_ = trs_.map(function(t){ return String(t.getAttribute('data-id')); });
+    const a_ = ids_.indexOf(anchor_.id), b_ = ids_.indexOf(strId);
+    if (a_ >= 0 && b_ >= 0) {
+      const lo_ = Math.min(a_, b_), hi_ = Math.max(a_, b_);
+      for (let i_ = lo_; i_ <= hi_; i_++) {
+        if (isSet) FLAGGED_SET.add(ids_[i_]); else FLAGGED_SET.delete(ids_[i_]);
+        trs_[i_].classList.toggle('flagged', isSet);
+        const cb_ = trs_[i_].querySelector('td.flag-cell input[type="checkbox"]');
+        if (cb_) cb_.checked = isSet;
+      }
+      try { localStorage.setItem(getUserFlagStorageKey_(), JSON.stringify(Array.from(FLAGGED_SET))); } catch(e){}
+      updateFlaggedSumDisplay_(scope);
+      if (window.google && window.google.script && window.google.script.run && google.script.run.saveUserFlags) google.script.run.saveUserFlags(Array.from(FLAGGED_SET));
+      return;
+    }
+  }
   if (isSet) FLAGGED_SET.add(strId); else FLAGGED_SET.delete(strId);  
 
   // 사용자별 로컬 스토리지에 즉시 보관
@@ -13522,9 +13544,9 @@ function fieldCellHtmlPrice(row, field, allRows){
  } else if (PRICE_DATE_FIELDS.indexOf(field) !== -1) {  
  inner = dateCellInputHtml('price', row.id, field, val);  
  } else if (field === '금액') {  
- inner = `<input type="text" class="${alignCls}" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatSignedMoneyInput(this);livePriceCalc_(this)" onchange="onPriceFieldChange('${row.id}','${field}',signedMoneyValue(this))">`;  
  } else if (field === '現용역료') {  
- inner = `<input type="text" class="${alignCls}" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
+ inner = `<input type="text" class="${alignCls}" inputmode="numeric" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:right !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(commaFmt(val))}" oninput="formatMoneyInput(this);livePriceCalc_(this)" onchange="onPriceFieldChange('${row.id}','${field}',moneyValue(this))">`;  
  } else {  
  inner = `<input type="text" class="${alignCls}" autocomplete="one-time-code" style="width:100%;height:100%;background:transparent !important;background-color:transparent !important;border:none !important;box-shadow:none !important;border-radius:0 !important;text-align:${align} !important;padding:4px 6px !important;color:inherit !important;" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onPriceFieldChange('${row.id}','${field}',this.value)">`;  
  }  
@@ -13550,6 +13572,29 @@ function fieldCellHtmlPrice(row, field, allRows){
  return `<td class="${cls.trim()}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
 }  
   
+/* 금액/現용역료 입력 즉시 구분·인상인하율 자동 재계산 (입력 중 실시간 반영) */
+function livePriceCalc_(el){
+  try {
+    const tr = el.closest('tr'); if (!tr) return;
+    const row = PRICE_ROWS.find(r => String(r.id) === String(tr.getAttribute('data-id'))); if (!row) return;
+    const cells = tr.children;
+    const iAmt = 1 + PRICE_HEADERS.indexOf('금액'), iFee = 1 + PRICE_HEADERS.indexOf('現용역료');
+    const amtEl = cells[iAmt] && cells[iAmt].querySelector('input'), feeEl = cells[iFee] && cells[iFee].querySelector('input');
+    if (!amtEl || !feeEl) return;
+    const tmp = Object.assign({}, row, { 금액: signedMoneyValue(amtEl), 現용역료: moneyValue(feeEl) });
+    Object.assign(tmp, computeAutoPrice(tmp));
+    PRICE_AUTO_FIELDS.forEach(function(h){
+      const td = cells[1 + PRICE_HEADERS.indexOf(h)];
+      if (td) td.outerHTML = priceAutoCellHtml(tmp, h);
+    });
+    const amtTd = cells[iAmt];
+    if (amtTd) {
+      const n = Number(tmp.금액);
+      amtTd.classList.remove('amt-up','pcbg-up','amt-down','pcbg-down');
+      if (tmp.금액 !== '' && !isNaN(n)) { if (n < 0) amtTd.classList.add('amt-down','pcbg-down'); else amtTd.classList.add('amt-up','pcbg-up'); }
+    }
+  } catch(e) { console.warn('livePriceCalc_', e); }
+}
 function priceAutoCellHtml(row, h){  
  const val = row[h] !== undefined && row[h] !== null ? row[h] : '';  
  const 구분 = row.구분 || '';  
@@ -13625,7 +13670,7 @@ function onPriceFieldChange(id, field, value){
  const oldYm = yearMonthOf_(row['기산일']);  
  row[field] = value;  
  row._unsynced = true; row._syncError = false;  
- if (priceSortState.key === field || field === '계약번호' || field === '상품' || field === '그로스' || !updateRowSyncClassOnly_(row, 'price')) preserveRowFocusAndRerender_(id, renderPrice);  
+ if (priceSortState.key === field || field === '금액' || field === '現용역료' || field === '계약번호' || field === '상품' || field === '그로스' || !updateRowSyncClassOnly_(row, 'price')) preserveRowFocusAndRerender_(id, renderPrice);  
  pushSavePrice(row);  
  scheduleSnapshotRefreshForMonths_([oldYm, yearMonthOf_(row['기산일'])]);  
 }  

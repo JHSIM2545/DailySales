@@ -6213,6 +6213,28 @@ function flaggedSumText_(rows, field){
 function toggleFlag(scope, id){  
   const strId = String(id);
   const isSet = !FLAGGED_SET.has(strId);  
+  // Shift+클릭: 직전에 선택한 행과 이번 행 사이의 모든 행을 같은 상태로 일괄 선택/해제
+  const shiftOn_ = !!(window.event && window.event.shiftKey);
+  const anchor_ = window.__flagAnchor_;
+  window.__flagAnchor_ = { scope: scope, id: strId };
+  if (shiftOn_ && anchor_ && anchor_.scope === scope && anchor_.id !== strId) {
+    const trs_ = Array.prototype.slice.call(document.querySelectorAll('.grid-wrap table tbody tr[data-id]'));
+    const ids_ = trs_.map(function(t){ return String(t.getAttribute('data-id')); });
+    const a_ = ids_.indexOf(anchor_.id), b_ = ids_.indexOf(strId);
+    if (a_ >= 0 && b_ >= 0) {
+      const lo_ = Math.min(a_, b_), hi_ = Math.max(a_, b_);
+      for (let i_ = lo_; i_ <= hi_; i_++) {
+        if (isSet) FLAGGED_SET.add(ids_[i_]); else FLAGGED_SET.delete(ids_[i_]);
+        trs_[i_].classList.toggle('flagged', isSet);
+        const cb_ = trs_[i_].querySelector('td.flag-cell input[type="checkbox"]');
+        if (cb_) cb_.checked = isSet;
+      }
+      try { localStorage.setItem(getUserFlagStorageKey_(), JSON.stringify(Array.from(FLAGGED_SET))); } catch(e){}
+      updateFlaggedSumDisplay_(scope);
+      if (window.google && window.google.script && window.google.script.run && google.script.run.saveUserFlags) google.script.run.saveUserFlags(Array.from(FLAGGED_SET));
+      return;
+    }
+  }
   if (isSet) FLAGGED_SET.add(strId); else FLAGGED_SET.delete(strId);  
 
   // 사용자별 로컬 스토리지에 즉시 보관
