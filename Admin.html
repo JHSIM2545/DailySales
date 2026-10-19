@@ -5810,7 +5810,6 @@ input[type="checkbox"] {
  <input type="text" id="searchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
 <span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyUnstartedOrder" checked onchange="render()">개시예정</label>  
- <label class="chk"><input type="checkbox" id="excludeGrossOrder" onchange="render()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterOrder" value="" onchange="onYmFilterChange_('order', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
@@ -5834,7 +5833,6 @@ input[type="checkbox"] {
  <input type="text" id="cancelSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
 <span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyPendingCancel" checked onchange="renderCancel()">해약예정</label>  
- <label class="chk"><input type="checkbox" id="excludeGrossCancel" onchange="renderCancel()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterCancel" value="" onchange="onYmFilterChange_('cancel', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
@@ -5863,7 +5861,6 @@ input[type="checkbox"] {
  <label><input type="radio" name="priceTypeFilter" value="인하" onchange="renderPrice()">인하</label>  
  </span>  
  <label class="chk"><input type="checkbox" id="onlyPendingPrice" checked onchange="renderPrice()">미반영</label>  
- <label class="chk"><input type="checkbox" id="excludeGrossPrice" onchange="renderPrice()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterPrice" value="" onchange="onYmFilterChange_('price', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
@@ -5887,7 +5884,6 @@ input[type="checkbox"] {
  <input type="text" id="restartSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
 <span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyStoppedRestart" checked onchange="renderRestart()">재개시예정</label>  
- <label class="chk"><input type="checkbox" id="excludeGrossRestart" onchange="renderRestart()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterRestart" value="" onchange="onYmFilterChange_('restart', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
