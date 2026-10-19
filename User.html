@@ -4721,6 +4721,11 @@ td.amount-neg input {
 table.status-summary.status-summary-full thead th{ text-align:center !important; }
 table.status-summary.status-summary-full tbody td{ text-align:right !important; text-align-last:right !important; padding-right:0.7em !important; }
 table.status-summary.status-summary-full tbody th{ text-align:center !important; }
+ table.status-summary.status-summary-popup{ width:100% !important; min-width:0 !important; table-layout:fixed; }
+ table.status-summary.status-summary-popup th, table.status-summary.status-summary-popup td{ width:auto !important; min-width:0 !important; padding:4px 3px !important; font-size:11.5px !important; white-space:nowrap; overflow:hidden; }
+ table.status-summary.status-summary-popup th:first-child, table.status-summary.status-summary-popup td:first-child{ width:15% !important; }
+ table.status-summary.status-summary-popup.status-summary-full tbody td{ padding-right:0.45em !important; }
+
 .status-wrap .grid-wrap table tbody td:not(.datecell){ text-align:right !important; text-align-last:right !important; padding-right:0.7em !important; }
 .status-wrap .grid-wrap table thead th{ text-align:center !important; }  
  .status-ratio{ margin-top:6px; font-size:16px; color:#0a7a2f; font-weight:normal; }  
@@ -6316,6 +6321,82 @@ function toggleAllFlags(scope){
     }
   }
 }
+
+/* ===== 엑셀처럼 마우스로 긁어서(드래그) 여러 행을 한 번에 선택/해제 =====
+ * 표 안에서 마우스를 누른 채 다른 행까지 끌면 시작~끝 행이 모두 체크(깃발) 선택된다.
+ * 시작 행이 이미 선택된 행이면 범위 전체를 해제한다. 그냥 클릭이나 셀 안에서의 글자 입력/선택은 그대로 동작. */
+(function(){
+  if (window.__rowDragSelInit_) return; window.__rowDragSelInit_ = true;
+  try {
+    const stl = document.createElement('style');
+    stl.textContent = 'body.row-drag-sel, body.row-drag-sel *{ user-select:none !important; -webkit-user-select:none !important; cursor:row-resize !important; } tr.drag-sel td{ background:#bfdbfe !important; background-color:#bfdbfe !important; }';
+    document.head.appendChild(stl);
+  } catch(e){}
+  let st = null;
+  const trOf = function(t){ return (t && t.closest) ? t.closest('.grid-wrap table tbody tr[data-id]') : null; };
+  const scopeNow = function(){
+    if (typeof currentTab === 'undefined') return 'order';
+    return currentTab === 'cancel' ? 'cancel' : (currentTab === 'price_change' ? 'price' : (currentTab === 'restart' ? 'restart' : (currentTab === 'product_daily' ? 'productdaily' : 'order')));
+  };
+  const rowsBetween = function(a, b){
+    const trs = Array.prototype.slice.call(st.tbl.querySelectorAll('tbody tr[data-id]'));
+    const i = trs.indexOf(a), j = trs.indexOf(b);
+    if (i < 0 || j < 0) return [];
+    return trs.slice(Math.min(i, j), Math.max(i, j) + 1);
+  };
+  const clearPaint = function(){ document.querySelectorAll('tr.drag-sel').forEach(function(t){ t.classList.remove('drag-sel'); }); };
+  document.addEventListener('mousedown', function(e){
+    if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey) { st = null; return; }
+    if (e.target.closest && e.target.closest('select, button, a, .col-resizer, .flag-chk, th, textarea, .modal, .float-win')) { st = null; return; }
+    const tr = trOf(e.target);
+    if (!tr || !tr.querySelector('td.flag-cell')) { st = null; return; }
+    st = { tr: tr, tbl: tr.closest('table'), moved: false, end: tr };
+  }, true);
+  document.addEventListener('mousemove', function(e){
+    if (!st) return;
+    if (!(e.buttons & 1)) { st = null; clearPaint(); document.body.classList.remove('row-drag-sel'); return; }
+    const over = trOf(document.elementFromPoint(e.clientX, e.clientY));
+    if (!st.moved) {
+      if (!over || over === st.tr || over.closest('table') !== st.tbl) return;
+      st.moved = true;
+      document.body.classList.add('row-drag-sel');
+      try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); const sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); } catch(_){}
+    }
+    e.preventDefault();
+    if (over && over.closest('table') === st.tbl) {
+      st.end = over;
+      clearPaint();
+      rowsBetween(st.tr, st.end).forEach(function(t){ t.classList.add('drag-sel'); });
+    }
+  }, true);
+  document.addEventListener('mouseup', function(e){
+    if (!st) return;
+    const cur = st; st = null;
+    if (!cur.moved) return;
+    st = cur;
+    const rows = rowsBetween(cur.tr, cur.end);
+    st = null;
+    clearPaint();
+    document.body.classList.remove('row-drag-sel');
+    if (!rows.length) return;
+    const newState = !FLAGGED_SET.has(String(cur.tr.getAttribute('data-id')));
+    rows.forEach(function(t){
+      const id = String(t.getAttribute('data-id'));
+      if (newState) FLAGGED_SET.add(id); else FLAGGED_SET.delete(id);
+      t.classList.toggle('flagged', newState);
+      const cb = t.querySelector('td.flag-cell input[type="checkbox"]');
+      if (cb) cb.checked = newState;
+    });
+    window.__flagAnchor_ = { scope: scopeNow(), id: String(cur.end.getAttribute('data-id')) };
+    try { localStorage.setItem(getUserFlagStorageKey_(), JSON.stringify(Array.from(FLAGGED_SET))); } catch(_){}
+    try { updateFlaggedSumDisplay_(scopeNow()); } catch(_){}
+    if (window.google && window.google.script && window.google.script.run && google.script.run.saveUserFlags) google.script.run.saveUserFlags(Array.from(FLAGGED_SET));
+    // 드래그 직후 셀에 클릭이 전달돼 편집 상태가 되는 것을 방지
+    const stop = function(ev){ ev.stopPropagation(); ev.preventDefault(); document.removeEventListener('click', stop, true); };
+    document.addEventListener('click', stop, true);
+    setTimeout(function(){ document.removeEventListener('click', stop, true); }, 0);
+  }, true);
+})();
 
 /** 표 전체를 다시 그리지 않고 깃발(체크)만 토글했을 때도 상단 "합계 : ..." 표시가 바로 갱신되도록  
  * 해당 화면의 합계 span만 다시 계산해서 채워준다. */  
@@ -12093,13 +12174,14 @@ function statusSummaryTableHtml(t, actualNow, _unused, monthEnd, detail){
  { k:'해약', 실:-Math.abs(Number(actual.해약)||0), tg:false },
  { k:'인상', 실:Math.abs(Number(actual.인상)||0), tg:false },
  { k:'인하', 실:-Math.abs(Number(actual.인하)||0), tg:false },
+ { k:'유지감소', 목:t.목표_유지감소, 계:t.계획_유지감소, 실:actual.유지감소, tg:true },
  { k:'유지증가', 목:t.목표_유지증가, 계:t.계획_유지증가, 실:actual.유지증가, tg:true }
  ];
  const R = (cells) => cells.map(c => `<td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${c}</td>`).join('');
  const H = dc.map(c => `<th style="text-align:center !important; text-align-last:center !important;">${c.k}</th>`).join('');
  const D = '<span style="color:#9aa3af;">-</span>';
  return `
- <table class="status-summary status-summary-full">
+ <table class="status-summary status-summary-full status-summary-popup">
  <thead><tr><th style="text-align:center !important; text-align-last:center !important;">${statusProductFilter}</th>${H}</tr></thead>
  <tbody>
  <tr class="row-target"><th>목표</th>${R(dc.map(c => c.tg ? fmtK(c.목) : D))}</tr>
