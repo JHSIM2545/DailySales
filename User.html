@@ -4721,6 +4721,13 @@ td.amount-neg input {
 table.status-summary.status-summary-full thead th{ text-align:center !important; }
 table.status-summary.status-summary-full tbody td{ text-align:right !important; text-align-last:right !important; padding-right:0.7em !important; }
 table.status-summary.status-summary-full tbody th{ text-align:center !important; }
+ th.col-filter-th{ cursor:pointer; }
+ th.col-filter-th .cf-label{ pointer-events:none; white-space:nowrap; }
+ th.col-filter-th .cf-arrow{ font-size:0.8em; opacity:.8; }
+ th.col-filter-th select.col-filter-sel{ position:absolute; left:0; top:0; width:100%; height:100%; opacity:0; cursor:pointer; border:none; margin:0; padding:0; z-index:4; font-size:13px; }
+ th.col-filter-th select.col-filter-sel option{ color:#111; background:#fff; }
+ th.col-filtered{ background:#ffe08a !important; color:#5a3b00 !important; }
+
  table.status-summary.status-summary-popup{ width:100% !important; min-width:0 !important; table-layout:fixed; }
  table.status-summary.status-summary-popup th, table.status-summary.status-summary-popup td{ width:auto !important; min-width:0 !important; padding:4px 3px !important; font-size:11.5px !important; white-space:nowrap; overflow:hidden; }
  table.status-summary.status-summary-popup th:first-child, table.status-summary.status-summary-popup td:first-child{ width:15% !important; }
@@ -9924,12 +9931,14 @@ function sortedRows(){
  const filterText = (document.getElementById('searchBox')||{}).value || '';  
  const repFilter = (document.getElementById('repFilterOrder')||{}).value || '';  
  let list = ROWS.map(r => Object.assign({}, r, computeAutoFields(r)));  
+ COL_BASE_.order = list;
  if (filterText) {  
  list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  }  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
  if (chkVal('onlyUnstartedOrder', true)) list = list.filter(r => r.구분 === '미개시');  
  if (chkVal('excludeGrossOrder', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
+ list = applyColFilters_('order', list);
  const key = sortState.key, dir = sortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
@@ -9953,12 +9962,60 @@ function setSort(key){
 }  
   
 /* ===================== 그리드 렌더 ===================== */  
-function headerCell(h){  
- const arrow = sortState.key === h ? (sortState.dir === 'asc' ? '▲' : '▼') : '';  
- const sw = localStorage.getItem('colw_order_' + h);  
- const style = sw ? ` style="width:${sw}px; min-width:${sw}px;"` : '';  
- return `<th${style} onclick="setSort('${h}')">${h}<span class="arrow">${arrow}</span><div class="col-resizer" onclick="event.stopPropagation()" onmousedown="initColResize(event, 'order', '${h}')"></div></th>`;  
-}  
+/* ===== 열 머리글: 날짜 열만 클릭 정렬, 나머지 열은 풀다운 선택 필터 (사유·금액류는 필터 없음) ===== */
+const COL_FILTERS_ = { order:{}, cancel:{}, price:{}, restart:{}, productdaily:{} };
+const COL_BASE_ = { order:[], cancel:[], price:[], restart:[], productdaily:[] };
+const COL_NO_FILTER_ = ['사유','금액','現용역료','용역료','계약설치비','계약기기비','합계','비고'];
+const COL_SORT_FIELDS_ = { order:['보고일','계약일','개시일','기산일','수주월','개시월'], cancel:['접수일','확정일'], price:['접수일','기산일','반영월'], restart:['재개시일','중지일'], productdaily:['보고일','매출예상'] };
+const COL_RENDER_FN_ = { order:'render', cancel:'renderCancel', price:'renderPrice', restart:'renderRestart', productdaily:'renderProductDaily' };
+function colFilterOptions_(scope, field){
+  const set = {}; let hasEmpty = false;
+  (COL_BASE_[scope] || []).forEach(function(r){
+    const v = (r[field] === undefined || r[field] === null) ? '' : String(r[field]).trim();
+    if (v === '') hasEmpty = true; else set[v] = 1;
+  });
+  const arr = Object.keys(set).sort(function(a, b){ return a.localeCompare(b, 'ko'); });
+  return { vals: arr, hasEmpty: hasEmpty };
+}
+function applyColFilters_(scope, list){
+  const f = COL_FILTERS_[scope] || {};
+  Object.keys(f).forEach(function(field){
+    const want = f[field];
+    list = list.filter(function(r){
+      const v = (r[field] === undefined || r[field] === null) ? '' : String(r[field]).trim();
+      return want === '__EMPTY__' ? v === '' : v === want;
+    });
+  });
+  return list;
+}
+function setColFilter_(scope, field, val){
+  if (val) COL_FILTERS_[scope][field] = val; else delete COL_FILTERS_[scope][field];
+  const fn = window[COL_RENDER_FN_[scope]] || eval(COL_RENDER_FN_[scope]);
+  if (typeof fn === 'function') fn();
+}
+function colHeaderHtml_(scope, h, sortFn, sortState){
+  const sw = localStorage.getItem('colw_' + scope + '_' + h);
+  const wStyle = sw ? 'width:' + sw + 'px; min-width:' + sw + 'px;' : '';
+  const resizer = '<div class="col-resizer" style="z-index:6;" onclick="event.stopPropagation()" onmousedown="initColResize(event, \'' + scope + '\', \'' + h + '\')"></div>';
+  if ((COL_SORT_FIELDS_[scope] || []).indexOf(h) !== -1) {
+    const arrow = sortState.key === h ? (sortState.dir === 'asc' ? '▲' : '▼') : '';
+    return '<th' + (wStyle ? ' style="' + wStyle + '"' : '') + ' onclick="' + sortFn + '(\'' + h + '\')">' + h + '<span class="arrow">' + arrow + '</span>' + resizer + '</th>';
+  }
+  if (COL_NO_FILTER_.indexOf(h) !== -1) {
+    return '<th' + (wStyle ? ' style="' + wStyle + '"' : '') + '>' + h + resizer + '</th>';
+  }
+  const cur = (COL_FILTERS_[scope] || {})[h] || '';
+  const o = colFilterOptions_(scope, h);
+  let opts = '<option value="">' + h + '</option>';
+  o.vals.forEach(function(v){ opts += '<option value="' + escAttr(v) + '"' + (cur === v ? ' selected' : '') + '>' + escHtml(v) + '</option>'; });
+  if (o.hasEmpty) opts += '<option value="__EMPTY__"' + (cur === '__EMPTY__' ? ' selected' : '') + '>(빈값)</option>';
+  const shown = cur ? (cur === '__EMPTY__' ? '(빈값)' : cur) : h;
+  return '<th class="col-filter-th' + (cur ? ' col-filtered' : '') + '"' + (wStyle ? ' style="' + wStyle + '"' : '') + '>' +
+    '<span class="cf-label">' + escHtml(shown) + ' <span class="cf-arrow">▾</span></span>' +
+    '<select class="col-filter-sel" title="' + escAttr(h) + ' 선택" onclick="event.stopPropagation()" onchange="setColFilter_(\'' + scope + '\',\'' + h + '\',this.value)">' + opts + '</select>' + resizer + '</th>';
+}
+
+function headerCell(h){ return colHeaderHtml_('order', h, 'setSort', sortState); }  
   
 const ORDER_DATE_FIELDS = ['보고일','계약일','개시일','기산일'];  
 const ORDER_MONTH_FIELDS = ['수주월','개시월'];  
@@ -10390,11 +10447,13 @@ function sortedCancelRows(){
  const filterText = (document.getElementById('cancelSearchBox')||{}).value || '';  
  const repFilter = (document.getElementById('repFilterCancel')||{}).value || '';  
  let list = CANCEL_ROWS.map(r => Object.assign({}, r, computeAutoCancel(r)));  
+ COL_BASE_.cancel = list;
  if (filterText) list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
   
  if (chkVal('onlyPendingCancel', true)) list = list.filter(r => isPendingDate(r.확정일));  
  if (chkVal('excludeGrossCancel', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
+ list = applyColFilters_('cancel', list);
  const key = cancelSortState.key, dir = cancelSortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
@@ -10415,12 +10474,7 @@ function setCancelSort(key){
  else { cancelSortState.key = key; cancelSortState.dir = 'asc'; }  
  renderCancel();  
 }  
-function headerCellCancel(h){  
- const arrow = cancelSortState.key === h ? (cancelSortState.dir === 'asc' ? '▲' : '▼') : '';  
- const sw = localStorage.getItem('colw_cancel_' + h);  
- const style = sw ? ` style="width:${sw}px; min-width:${sw}px;"` : '';  
- return `<th${style} onclick="setCancelSort('${h}')">${h}<span class="arrow">${arrow}</span><div class="col-resizer" onclick="event.stopPropagation()" onmousedown="initColResize(event, 'cancel', '${h}')"></div></th>`;  
-}  
+function headerCellCancel(h){ return colHeaderHtml_('cancel', h, 'setCancelSort', cancelSortState); }  
   
 const CANCEL_DATE_FIELDS = ['접수일','확정일'];  
   
@@ -10778,11 +10832,13 @@ function sortedPriceRows(){
  const typeFilterEl = document.querySelector('input[name="priceTypeFilter"]:checked');  
  const typeFilter = typeFilterEl ? typeFilterEl.value : '';  
  let list = PRICE_ROWS.map(r => Object.assign({}, r, computeAutoPrice(r)));  
+ COL_BASE_.price = list;
  if (filterText) list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
  if (typeFilter) list = list.filter(r => r.구분 === typeFilter);  
  if (chkVal('onlyPendingPrice', true)) list = list.filter(r => isPendingDate(r.기산일));  
  if (chkVal('excludeGrossPrice', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
+ list = applyColFilters_('price', list);
  const key = priceSortState.key, dir = priceSortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
@@ -10803,12 +10859,7 @@ function setPriceSort(key){
  else { priceSortState.key = key; priceSortState.dir = 'asc'; }  
  renderPrice();  
 }  
-function headerCellPrice(h){  
- const arrow = priceSortState.key === h ? (priceSortState.dir === 'asc' ? '▲' : '▼') : '';  
- const sw = localStorage.getItem('colw_price_' + h);  
- const style = sw ? ` style="width:${sw}px; min-width:${sw}px;"` : '';  
- return `<th${style} onclick="setPriceSort('${h}')">${h}<span class="arrow">${arrow}</span><div class="col-resizer" onclick="event.stopPropagation()" onmousedown="initColResize(event, 'price', '${h}')"></div></th>`;  
-}  
+function headerCellPrice(h){ return colHeaderHtml_('price', h, 'setPriceSort', priceSortState); }  
 const PRICE_DATE_FIELDS = ['접수일','기산일'];  
   
 function priceCellClass(field, val, allRows){  
@@ -11127,10 +11178,12 @@ function sortedRestartRows(){
  const filterText = (document.getElementById('restartSearchBox')||{}).value || '';  
  const repFilter = (document.getElementById('repFilterRestart')||{}).value || '';  
  let list = RESTART_ROWS.map(r => Object.assign({}, r, computeAutoRestart(r)));  
+ COL_BASE_.restart = list;
  if (filterText) list = list.filter(r => String(r.계약처명||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
  if (repFilter) list = list.filter(r => r.영업담당 === repFilter);  
  if (chkVal('onlyStoppedRestart', false)) list = list.filter(r => String(r.현상태||'') === '중지');  
  if (chkVal('excludeGrossRestart', false)) list = list.filter(r => String(r.그로스 || '').trim() === '일반');  
+ list = applyColFilters_('restart', list);
  const key = restartSortState.key, dir = restartSortState.dir === 'asc' ? 1 : -1;  
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
@@ -11151,12 +11204,7 @@ function setRestartSort(key){
  else { restartSortState.key = key; restartSortState.dir = 'asc'; }  
  renderRestart();  
 }  
-function headerCellRestart(h){  
- const arrow = restartSortState.key === h ? (restartSortState.dir === 'asc' ? '▲' : '▼') : '';  
- const sw = localStorage.getItem('colw_restart_' + h);  
- const style = sw ? ` style="width:${sw}px; min-width:${sw}px;"` : '';  
- return `<th${style} onclick="setRestartSort('${h}')">${h}<span class="arrow">${arrow}</span><div class="col-resizer" onclick="event.stopPropagation()" onmousedown="initColResize(event, 'restart', '${h}')"></div></th>`;  
-}  
+function headerCellRestart(h){ return colHeaderHtml_('restart', h, 'setRestartSort', restartSortState); }  
 const RESTART_DATE_FIELDS = ['재개시일','중지일'];  
   
 function restartCellClass(field, val, allRows){  
@@ -11572,6 +11620,7 @@ function sortedProductDailyRows(){
   const includeUnconfirmed = !!productDailySummaryIncludeUnconfirmed;
 
   let list = PRODUCT_DAILY_ROWS.map(r => Object.assign({}, r, computeAutoProductDaily(r)));  
+ COL_BASE_.productdaily = list;
   if (filterText) list = list.filter(r => String(r.서비스제공처||'').includes(filterText) || String(r.계약번호||'').includes(filterText));  
   if (repFilter) list = list.filter(r => r.계약담당자 === repFilter);  
   if (gubunFilter) list = list.filter(r => r.구분 === gubunFilter);  
@@ -11584,6 +11633,7 @@ function sortedProductDailyRows(){
  return !fYm_ || fYm_ >= pdYmSel_;
  });
 
+ list = applyColFilters_('productdaily', list);
   const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
   const fcKey_ = function(r){ return parseForecastYm_(r.매출예상, r.보고일) || ''; };
  if (key === '매출예상') { list.sort((a,b) => { const x = fcKey_(a), y = fcKey_(b); if (!x && !y) return 0; if (!x) return 1; if (!y) return -1; return x < y ? -dir : (x > y ? dir : 0); }); return list; }
@@ -11604,12 +11654,7 @@ function setProductDailySort(key){
  else { productDailySortState.key = key; productDailySortState.dir = 'asc'; }  
  renderProductDaily();  
 }  
-function headerCellProductDaily(h){  
- const arrow = productDailySortState.key === h ? (productDailySortState.dir === 'asc' ? '▲' : '▼') : '';  
- const sw = localStorage.getItem('colw_productdaily_' + h);  
- const style = sw ? ` style="width:${sw}px; min-width:${sw}px;"` : '';  
- return `<th${style} onclick="setProductDailySort('${h}')">${h}<span class="arrow">${arrow}</span><div class="col-resizer" onclick="event.stopPropagation()" onmousedown="initColResize(event, 'productdaily', '${h}')"></div></th>`;  
-}  
+function headerCellProductDaily(h){ return colHeaderHtml_('productdaily', h, 'setProductDailySort', productDailySortState); }  
 const PRODUCT_DAILY_DATE_FIELDS = ['보고일'];  
   
 function productDailyContractBad(val, allRows){  
