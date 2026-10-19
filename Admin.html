@@ -5808,9 +5808,7 @@ input[type="checkbox"] {
 <div id="toolbar-order" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddModal()">+ 등록</button>  
  <input type="text" id="searchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="render()">  
- <select id="repFilterOrder" onchange="render()">  
- <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select><span class="tb-break"></span>  
+<span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyUnstartedOrder" checked onchange="render()">개시예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossOrder" onchange="render()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
@@ -5834,9 +5832,7 @@ input[type="checkbox"] {
 <div id="toolbar-cancel" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddCancelModal()">+ 등록</button>  
  <input type="text" id="cancelSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderCancel()">  
- <select id="repFilterCancel" onchange="renderCancel()">  
- <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select><span class="tb-break"></span>  
+<span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyPendingCancel" checked onchange="renderCancel()">해약예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossCancel" onchange="renderCancel()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
@@ -5860,9 +5856,7 @@ input[type="checkbox"] {
 <div id="toolbar-price" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddPriceModal()">+ 등록</button>  
  <input type="text" id="priceSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderPrice()">  
- <select id="repFilterPrice" onchange="renderPrice()">  
- <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select><span class="tb-break"></span>  
+<span class="tb-break"></span>  
  <span class="radio-group">  
  <label><input type="radio" name="priceTypeFilter" value="" checked onchange="renderPrice()">전체</label>  
  <label><input type="radio" name="priceTypeFilter" value="인상" onchange="renderPrice()">인상</label>  
@@ -5891,9 +5885,7 @@ input[type="checkbox"] {
 <div id="toolbar-restart" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddRestartModal()">+ 등록</button>  
  <input type="text" id="restartSearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="계약처명 / 계약번호 검색" oninput="renderRestart()">  
- <select id="repFilterRestart" onchange="renderRestart()">  
- <option value="">전체</option><option value="최영국">최영국</option><option value="박광춘">박광춘</option><option value="이수열">이수열</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select><span class="tb-break"></span>  
+<span class="tb-break"></span>  
  <label class="chk"><input type="checkbox" id="onlyStoppedRestart" checked onchange="renderRestart()">재개시예정</label>  
  <label class="chk"><input type="checkbox" id="excludeGrossRestart" onchange="renderRestart()">그로스제외</label>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
@@ -5917,13 +5909,7 @@ input[type="checkbox"] {
 <div id="toolbar-product-daily" class="toolbar" style="display:none;">  
  <button class="primary" onclick="openAddProductDailyModal()">+ 등록</button>  
  <input type="text" id="productDailySearchBox" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="서비스제공처 / 계약번호 검색" oninput="renderProductDaily()">  
- <select id="repFilterProductDaily" onchange="renderProductDaily()">  
- <option value="">전체</option><option value="박정훈">박정훈</option><option value="박광모">박광모</option><option value="김상훈">김상훈</option><option value="최영국">최영국</option><option value="이수열">이수열</option><option value="박광춘">박광춘</option><option value="정문재">정문재</option><option value="임영민">임영민</option>  
- </select>  
- <select id="gubunFilterProductDaily" onchange="renderProductDaily()">  
- <option value="">구분 전체</option><option value="지사">지사</option><option value="법인">법인</option><option value="전략">전략</option>  
- </select>
- <select id="salesFilterProductDaily" onchange="renderProductDaily()"><option value="">매출여부 전체</option><option value="미매출">미매출</option><option value="매출">매출(확정)</option></select><span class="tb-break"></span>  
+<span class="tb-break"></span>  
  <span class="ym-filter-wrap" style="display:inline-flex; align-items:center; gap:4px; font-size:13px; color:#495057;">  
      
    <input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="month" id="ymFilterProductDaily" value="" oninput="onYmFilterChange_('productdaily', this.value)" onchange="onYmFilterChange_('productdaily', this.value)" style="border:1px solid #c7cfd8; border-radius:4px; padding:2px 4px; font-size:13px; font-family:inherit; cursor:pointer;">  
@@ -12647,7 +12633,7 @@ function setSort(key){
 /* ===== 열 머리글: 날짜 열만 클릭 정렬, 나머지 열은 풀다운 선택 필터 (사유·금액류는 필터 없음) ===== */
 const COL_FILTERS_ = { order:{}, cancel:{}, price:{}, restart:{}, productdaily:{} };
 const COL_BASE_ = { order:[], cancel:[], price:[], restart:[], productdaily:[] };
-const COL_NO_FILTER_ = ['사유','금액','現용역료','용역료','계약설치비','계약기기비','합계','비고'];
+const COL_NO_FILTER_ = ['계약번호','계약처명','서비스제공처','인상인하율','사유','금액','現용역료','용역료','계약설치비','계약기기비','합계','비고'];
 const COL_SORT_FIELDS_ = { order:['보고일','계약일','개시일','기산일','수주월','개시월'], cancel:['접수일','확정일'], price:['접수일','기산일','반영월'], restart:['재개시일','중지일'], productdaily:['보고일','매출예상'] };
 const COL_RENDER_FN_ = { order:'render', cancel:'renderCancel', price:'renderPrice', restart:'renderRestart', productdaily:'renderProductDaily' };
 function colFilterOptions_(scope, field){
