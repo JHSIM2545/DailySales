@@ -2406,6 +2406,26 @@ function getTzToday() {
         client.from('sales_targets_rep').select('*').eq('year_month', ym)
       ]);
 
+      // 해당 월에 목표가 아직 입력되지 않았으면 가장 최근에 목표가 입력된 이전 달 목표를 대신 사용(화면에 안내 표시)
+      let targetFallbackYm_ = null;
+      try {
+        if (!(tgtProdRes.data || []).length) {
+          const prevRes = await client.from('sales_targets_product').select('year_month').lt('year_month', ym).order('year_month', { ascending: false }).limit(1);
+          const prevYm = prevRes.data && prevRes.data[0] && prevRes.data[0].year_month;
+          if (prevYm) {
+            const [pp, pr] = await Promise.all([
+              client.from('sales_targets_product').select('*').eq('year_month', prevYm),
+              client.from('sales_targets_rep').select('*').eq('year_month', prevYm)
+            ]);
+            if ((pp.data || []).length) {
+              tgtProdRes.data = pp.data;
+              if (!(tgtRepRes.data || []).length) tgtRepRes.data = pr.data || [];
+              targetFallbackYm_ = prevYm;
+            }
+          }
+        }
+      } catch (e) { console.warn('[영업현황] 직전월 목표 대체 실패', e); }
+
       const SALES_STATUS_PRODUCT_FILTERS = {
         '일반알람': ['알람', '블루스캔', '유지보수'],
         '알람+휴엔': ['알람', '블루스캔', '유지보수', '휴엔'],
@@ -2687,6 +2707,7 @@ function getTzToday() {
       const result = {
         success: true,
         yearMonth: ym,
+        targetFallbackYm: targetFallbackYm_,
         target: target,
         actual: actual,
         actualMonthEnd: actualMonthEnd,
@@ -9906,6 +9927,7 @@ var STATUS_ACTUAL = null;
 var STATUS_ACTUAL_END = null;
 var STATUS_REP_TARGETS = null;
 var STATUS_REP_METRICS = null;
+var STATUS_TARGET_FALLBACK_YM = null;
 
 function repTargetFor_(rep, key) {
   const t = STATUS_REP_TARGETS && STATUS_REP_TARGETS[rep];
@@ -9932,6 +9954,7 @@ function applySalesStatusResult_(res){
   STATUS_ACTUAL = res.actual;
   STATUS_ACTUAL_END = res.actualMonthEnd || res.actual;
   STATUS_REP_METRICS = res.repMetrics; // 차트용 데이터 수신
+  STATUS_TARGET_FALLBACK_YM = res.targetFallbackYm || null;
   STATUS_REP_TARGETS = res.repTargets; // 담당자별 부여된 개인 목표(비율 배분 반영)
   renderSalesStatus();
 }
@@ -10067,7 +10090,7 @@ function renderSalesStatus(){
           ${statusSummaryTableHtml(STATUS_TARGET, STATUS_ACTUAL, false, STATUS_ACTUAL_END)}
         </div>
         <div class="status-target" style="margin-bottom:0; flex:1 1 420px; min-width:0; background:#f4f6f8;">
-          <div class="status-target-title">컨설턴트별 달성률</div>
+          <div class="status-target-title">컨설턴트별 달성률${STATUS_TARGET_FALLBACK_YM ? ' <span style="font-weight:normal; font-size:0.8em; color:#b45309;">※ 이 달 목표 미입력 – ' + STATUS_TARGET_FALLBACK_YM + ' 목표 기준</span>' : ''}</div>
           ${chartHtml}
         </div>
       </div>
