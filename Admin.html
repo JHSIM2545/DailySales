@@ -2596,10 +2596,13 @@ function getTzToday() {
 
       const last = (cutoffIdx_ > 0 ? rows[Math.min(cutoffIdx_, rows.length) - 1] : null) || {};
       const lastFull_ = rows[rows.length - 1] || {};
-      const actualMonthEnd = { 수주: lastFull_.누계수주 || 0, 개시: lastFull_.누계개시 || 0, 유지감소: lastFull_.누계유지감소 || 0, 유지증가: lastFull_.누계유지증가 || 0 }; // 월말(예정 포함) 전망용
+      const actualMonthEnd = { 수주: lastFull_.누계수주 || 0, 개시: lastFull_.누계개시 || 0, 해약: lastFull_.누계해약중지 || 0, 인상: lastFull_.누계인상 || 0, 인하: lastFull_.누계인하 || 0, 유지감소: lastFull_.누계유지감소 || 0, 유지증가: lastFull_.누계유지증가 || 0 }; // 월말(예정 포함) 전망용
       const actual = {
         수주: last.누계수주 || 0,
         개시: last.누계개시 || 0,
+        해약: last.누계해약중지 || 0,
+        인상: last.누계인상 || 0,
+        인하: last.누계인하 || 0,
         유지감소: last.누계유지감소 || 0,
         유지증가: last.누계유지증가 || 0
       };
@@ -6902,6 +6905,27 @@ function endColResize(e) {
   
 /* ---- 그리드 날짜 셀(편집형): M/D로 보여주고 포커스 시 원본(YYYY-MM-DD) 표시. 팝업 캘린더 아이콘으로도 입력 가능 ---- */  
 /* ---- 그리드 날짜 셀(편집형): M/D로 보여주고, 클릭 시 달력 선택창(showPicker) 팝업, 키보드 직접 입력도 지원 ---- */  
+/* 날짜 수정 시 체크(선택)된 행이 2건 이상이면 일괄 반영 여부를 묻고, 예이면 선택된 모든 행에 같은 날짜를 반영 (임시모드 포함) */
+function applyDateChangeWithBulk_(scope, id, field, value){
+  const fn = DATE_CELL_HANDLERS[scope];
+  if (!fn) return;
+  try {
+    const sid = String(id);
+    if (typeof FLAGGED_SET !== 'undefined' && FLAGGED_SET.has(sid)) {
+      const table = document.querySelector('.grid-wrap table');
+      const ids = table ? Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-id]')).map(function(tr){ return String(tr.getAttribute('data-id')); }).filter(function(x){ return FLAGGED_SET.has(x); }) : [];
+      if (ids.length >= 2) {
+        const show = (value === '' ? '(비움)' : value);
+        const ok = confirm('체크 선택된 ' + ids.length + '건 모두의 [' + field + ']을(를) ' + show + '(으)로 일괄 반영하시겠습니까?\n\n[확인] 선택된 ' + ids.length + '건 일괄 반영\n[취소] 이 행만 반영' + ((typeof SIM_MODE !== 'undefined' && SIM_MODE) ? '\n\n※ 임시모드: 종료하면 원래 데이터로 돌아갑니다.' : ''));
+        if (ok) {
+          ids.forEach(function(x){ fn(x, field, value); });
+          return;
+        }
+      }
+    }
+  } catch(e) { console.warn('applyDateChangeWithBulk_', e); }
+  fn(id, field, value);
+}
 const DATE_CELL_HANDLERS = {};  
 function dateCellInputHtml(scope, id, field, val){  
   const raw = String(val === null || val === undefined ? '' : val).trim();  
@@ -6948,8 +6972,7 @@ function onDateCellBlur(el, scope, id, field){
     el.dataset.raw = parsed;  
     el.value = parsed ? parsed : '';  
     el.title = parsed;  
-    const fn = DATE_CELL_HANDLERS[scope];  
-    if (fn) fn(id, field, parsed);  
+    applyDateChangeWithBulk_(scope, id, field, parsed);  
     return;  
   }  
   const parsed = parseDateInput(typed);  
@@ -6961,8 +6984,7 @@ function onDateCellBlur(el, scope, id, field){
   el.dataset.raw = parsed;  
   el.value = (parsed === '미정' || parsed === '해약방어') ? parsed : fmtMD(parsed);  
   el.title = parsed;  
-  const fn = DATE_CELL_HANDLERS[scope];  
-  if (fn) fn(id, field, parsed);  
+  applyDateChangeWithBulk_(scope, id, field, parsed);  
 }  
 function onDatePickerChange_(hiddenEl){  
   const wrap = hiddenEl.closest('.datecell-wrap');  
@@ -6985,8 +7007,7 @@ function onDatePickerChange_(hiddenEl){
     textEl.value = (parsed === '미정' || parsed === '해약방어') ? parsed : fmtMD(parsed);  
     textEl.title = parsed;  
   }  
-  const fn = DATE_CELL_HANDLERS[scope];  
-  if (fn) fn(id, field, parsed);  
+  applyDateChangeWithBulk_(scope, id, field, parsed);  
 }  
   
   
@@ -7460,7 +7481,7 @@ function renderSalesStatusPopupBody_(res){
  body.innerHTML =  
  (res.simulated ? '<div class="sim-popup-badge">🧪 임시모드 결과 – 실제 데이터가 아닙니다</div>' : '') +  
  '<div class="status-target-title" style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;"><span>' + y + '.' + m + '월 영업현황 집계</span><span style="font-weight:600; font-size:0.85em;">(단위: 천원)</span></div>' +  
- statusSummaryTableHtml(res.target, res.actual, false, res.actualMonthEnd);  
+ statusSummaryTableHtml(res.target, res.actual, false, res.actualMonthEnd, true);  
 }  
   
 /** 수주개시/해약중지/인상인하/재개시 값이 바뀔 때마다 호출 — 영업현황 합계를 백그라운드에서 미리 다시  
@@ -17362,10 +17383,37 @@ function normalizeCellForOutput_(td) {
 }
 
 /* --- statusSummaryTableHtml --- */
-function statusSummaryTableHtml(t, actualNow, _unused, monthEnd){  
+function statusSummaryTableHtml(t, actualNow, _unused, monthEnd, detail){  
  t = t || {}; actualNow = actualNow || {};
  // 실적행은 월말 기준 전망치(월말까지 입력된 개시·해약·단가변동 누계)로 표시
- const actual = monthEnd || actualNow;  
+  const actual = monthEnd || actualNow;  
+ if (detail) {
+ // 팝업용 세분화 표: 수주 / 개시 / 해약 / 인상 / 인하 / 유지증가 (해약·인하는 유지에 미치는 영향이므로 − 로 표시, 해약·인상·인하는 목표/계획이 없어 '-')
+ const dc = [
+ { k:'수주', 목:t.목표_수주금액, 계:t.계획_수주금액, 실:actual.수주, tg:true },
+ { k:'개시', 목:t.목표_개시금액, 계:t.계획_개시금액, 실:actual.개시, tg:true },
+ { k:'해약', 실:-Math.abs(Number(actual.해약)||0), tg:false },
+ { k:'인상', 실:Math.abs(Number(actual.인상)||0), tg:false },
+ { k:'인하', 실:-Math.abs(Number(actual.인하)||0), tg:false },
+ { k:'유지증가', 목:t.목표_유지증가, 계:t.계획_유지증가, 실:actual.유지증가, tg:true }
+ ];
+ const R = (cells) => cells.map(c => `<td class="num" style="text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;">${c}</td>`).join('');
+ const H = dc.map(c => `<th style="text-align:center !important; text-align-last:center !important;">${c.k}</th>`).join('');
+ const D = '<span style="color:#9aa3af;">-</span>';
+ return `
+ <table class="status-summary status-summary-full">
+ <thead><tr><th style="text-align:center !important; text-align-last:center !important;">${statusProductFilter}</th>${H}</tr></thead>
+ <tbody>
+ <tr class="row-target"><th>목표</th>${R(dc.map(c => c.tg ? fmtK(c.목) : D))}</tr>
+ <tr class="row-plan"><th>계획</th>${R(dc.map(c => c.tg ? fmtK(c.계) : D))}</tr>
+ <tr class="row-actual"><th>실적</th>${R(dc.map(c => fmtK(c.실)))}</tr>
+ <tr class="row-ratio"><th>(목표비)</th>${R(dc.map(c => c.tg ? pctVs_(c.실, c.목) : D))}</tr>
+ <tr class="row-diff"><th>차이</th>${R(dc.map(c => c.tg ? diffVs_(c.실, c.목) : D))}</tr>
+ <tr class="row-ratio"><th>(계획비)</th>${R(dc.map(c => c.tg ? pctVs_(c.실, c.계) : D))}</tr>
+ <tr class="row-diff"><th>차이</th>${R(dc.map(c => c.tg ? diffVs_(c.실, c.계) : D))}</tr>
+ </tbody>
+ </table>`;
+ }
  const cols = [  
  { key:'수주', 목표:t.목표_수주금액, 계획:t.계획_수주금액, 실적:actual.수주 },  
  { key:'개시', 목표:t.목표_개시금액, 계획:t.계획_개시금액, 실적:actual.개시 },  
