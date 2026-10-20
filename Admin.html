@@ -17539,9 +17539,9 @@ function statusSummaryTableHtml(t, actualNow, _unused, monthEnd, detail){
  <tr class="row-target"><th>목표</th>${R(dc.map(c => c.tg ? fmtK(c.목) : D))}</tr>
  <tr class="row-plan"><th>계획</th>${R(dc.map(c => c.tg ? fmtK(c.계) : D))}</tr>
  <tr class="row-actual"><th>실적</th>${R(dc.map(c => fmtK(c.실)))}</tr>
- <tr class="row-ratio"><th>(목표비)</th>${R(dc.map(c => c.tg ? pctVs_(c.실, c.목) : D))}</tr>
+ <tr class="row-ratio"><th>(목표비)</th>${R(dc.map(c => c.tg ? (c.k==='유지감소' ? pctVsInv_(c.실, c.목) : pctVs_(c.실, c.목)) : D))}</tr>
  <tr class="row-diff"><th>차이</th>${R(dc.map(c => c.tg ? diffVs_(c.실, c.목) : D))}</tr>
- <tr class="row-ratio"><th>(계획비)</th>${R(dc.map(c => c.tg ? pctVs_(c.실, c.계) : D))}</tr>
+ <tr class="row-ratio"><th>(계획비)</th>${R(dc.map(c => c.tg ? (c.k==='유지감소' ? pctVsInv_(c.실, c.계) : pctVs_(c.실, c.계)) : D))}</tr>
  <tr class="row-diff"><th>차이</th>${R(dc.map(c => c.tg ? diffVs_(c.실, c.계) : D))}</tr>
  </tbody>
  </table>`;
@@ -17560,9 +17560,9 @@ function statusSummaryTableHtml(t, actualNow, _unused, monthEnd, detail){
  <tr class="row-target"><th>목표</th>${row(cols.map(c => fmtK(c.목표)))}</tr>  
  <tr class="row-plan"><th>계획</th>${row(cols.map(c => fmtK(c.계획)))}</tr>  
  <tr class="row-actual"><th>실적</th>${row(cols.map(c => fmtK(c.실적)))}</tr>  
- <tr class="row-ratio"><th>(목표비)</th>${row(cols.map(c => pctVs_(c.실적, c.목표)))}</tr>  
+ <tr class="row-ratio"><th>(목표비)</th>${row(cols.map(c => c.key==='유지감소' ? pctVsInv_(c.실적, c.목표) : pctVs_(c.실적, c.목표)))}</tr>  
  <tr class="row-diff"><th>차이</th>${row(cols.map(c => diffVs_(c.실적, c.목표)))}</tr>  
- <tr class="row-ratio"><th>(계획비)</th>${row(cols.map(c => pctVs_(c.실적, c.계획)))}</tr>  
+ <tr class="row-ratio"><th>(계획비)</th>${row(cols.map(c => c.key==='유지감소' ? pctVsInv_(c.실적, c.계획) : pctVs_(c.실적, c.계획)))}</tr>  
  <tr class="row-diff"><th>차이</th>${row(cols.map(c => diffVs_(c.실적, c.계획)))}</tr>  
  </tbody>  
  </table>`;  
@@ -18104,6 +18104,12 @@ function ensureProductDailyLoaded_(cb){
 
 /* ===================== 부가 추출 헬퍼 (Index.html 동기화) ===================== */
 /* --- pctVs_ --- */
+/** 유지감소 비율: 2 - (실적/기준). 실적이 기준과 같으면 100%, 적게 감소할수록 100%를 넘는다. */
+function pctVsInv_(actual, base){
+ const a = Number(actual) || 0, b = Number(base) || 0;
+ if (b === 0) return '-';
+ return Math.round((2 - a / b) * 100) + '%';
+}
 function pctVs_(actual, base){  
  const a = Number(actual) || 0, b = Number(base) || 0;  
  if (b === 0) return '-';  
