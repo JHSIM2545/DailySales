@@ -5974,12 +5974,7 @@ input[type="checkbox"] {
  <span class="count" id="userHistoryCount" style="font-weight:600; color:#475569; margin-left:auto;"></span>  
 </div>  
   
-<div id="toolbar-target" class="toolbar" style="display:none;">  
- <button onclick="shiftTargetMonth(-1)">◀</button>  
- <b id="targetMonthLabel" style="min-width:90px; text-align:center;"></b>  
- <button onclick="shiftTargetMonth(1)">▶</button>  
- <button class="primary" onclick="saveTargetInput()">저장</button>  
-</div>  
+  
   
 <div id="toolbar-daily-report" class="toolbar" style="display:none;">  
  <button onclick="shiftDailyReportDate(-1)">◀</button>  
@@ -7845,7 +7840,6 @@ const TABS = [
  { key: 'sales_status', label: '영업현황', ready: true },
  { key: 'excel_daily', label: '엑셀일보', ready: true },  
  { key: 'ai_report', label: '영업보고 자동입력', labelMainMaster: '자동등록', ready: true },  
- { key: 'target_input', label: '월별 목표/계획 입력', ready: true, master: true },  
  { key: 'daily_report', label: '일일실적보고', ready: true, admin: true },  
  { key: 'users', label: '사용자관리', ready: true, master: true },  
  { key: 'ta_portal', label: 'TA', ready: true, external: true, alignRight: true, taGate: true },  
@@ -9778,8 +9772,16 @@ function renderSettingsTab_(){
  '<button class="primary" onclick="settingsSaveAll_()">전체 저장</button>' +  
  '</div>' +  
  '<div class="chart-grid">' + taPortalCard + introPortalCard + cards + '</div>' +  
+ '<div class="dash-head" style="margin-top:28px; display:flex; align-items:center; gap:10px;"><h2 style="margin:0;">월별 목표/계획 입력</h2>' +  
+ '<button onclick="shiftTargetMonth(-1)">◀</button>' +  
+ '<b id="targetMonthLabel" style="min-width:90px; text-align:center;"></b>' +  
+ '<button onclick="shiftTargetMonth(1)">▶</button>' +  
+ '<button class="primary" onclick="saveTargetInput()">저장</button>' +  
+ '</div>' +  
+ '<div id="settingsTargetArea"></div>' +  
  '</div>';  
  document.getElementById('content').innerHTML = html;  
+ if (typeof loadTargetInput === 'function') loadTargetInput();  
 }  
 let TA_PORTAL_URL_ = '';  
 function loadTaPortalUrlForSettings_(){  
@@ -9916,7 +9918,7 @@ function settingsSaveAll_(){
   
   
 function hideAllToolbars(){  
- ['toolbar-order','toolbar-cancel','toolbar-price','toolbar-restart','toolbar-product-daily','toolbar-users','toolbar-loginhistory','toolbar-userhistory','toolbar-target','toolbar-daily-report'].forEach(id => document.getElementById(id).style.display = 'none');  
+ ['toolbar-order','toolbar-cancel','toolbar-price','toolbar-restart','toolbar-product-daily','toolbar-users','toolbar-loginhistory','toolbar-userhistory','toolbar-daily-report'].forEach(id => document.getElementById(id).style.display = 'none');  
 }  
   
 
@@ -10176,7 +10178,7 @@ window.renderSalesStatus = renderSalesStatus;
 
 function selectTab(key){  
  checkSheetFreshness_(); // 탭 이동 시 다른 화면/다른 사용자의 변경사항이 있었는지 가볍게 확인  
- if (currentTab === 'target_input' && key !== 'target_input' && TARGET_REP_DIRTY) {  
+ if (currentTab === 'settings' && key !== 'settings' && TARGET_REP_DIRTY) {  
  if (confirm('컨설턴트별 목표에 저장하지 않은 변경사항이 있습니다. 저장하시겠습니까?')) {  
  saveRepTargetsAll_(function(){ selectTab(key); });  
  return;  
@@ -10198,7 +10200,6 @@ function selectTab(key){
  else if (key === 'excel_daily') { loadExcelDailyTab_(); }  
  else if (key === 'ai_report') { loadAutoRegisterTab_(); }  
  else if (key === 'users') { selectUserMgmtView(USERMGMT_VIEW || 'info'); }  
- else if (key === 'target_input') { document.getElementById('toolbar-target').style.display = 'flex'; loadTargetInput(); }  
  else if (key === 'daily_report') { loadDailyReport(); }  
  else if (key === 'settings') { loadEditableLists_(); loadTaPortalUrlForSettings_(); loadIntroPortalUrlForSettings_(); }  
  else document.getElementById('content').innerHTML =  
@@ -15650,7 +15651,7 @@ function loadTargetInput(){
   updateTargetMonthLabel_();
   const ym = getTargetInputYearMonth();
   if (typeof showLoadingProgress_ === 'function') {
-    showLoadingProgress_('content', '목표 데이터를 불러오는 중입니다...', 'loadTargetInput');
+    showLoadingProgress_(document.getElementById('settingsTargetArea') ? 'settingsTargetArea' : 'content', '목표 데이터를 불러오는 중입니다...', 'loadTargetInput');
   }
   setLoadingCursor(true);
 
@@ -15754,7 +15755,7 @@ function tgtVals_(pre, p){
 }
 
 function renderTargetInput(){
-  const container = document.getElementById('content');
+  const container = document.getElementById('settingsTargetArea') || document.getElementById('content');
   if (!container || !TARGET_INPUT_STATE) return;
 
   const ym = TARGET_INPUT_STATE.yearMonth;
@@ -15879,7 +15880,6 @@ function renderTargetInput(){
   const html = `
     <div id="targetInputWrap" style="padding:18px 24px; max-width:1600px; margin:0 auto; background:#f4f6f8; min-height:calc(100vh - 120px);">
       <div style="font-size:16px; font-weight:700; color:#5c1c2f; margin-bottom:6px;">${y}.${m}월 상품종류별 목표/계획 (단위: 천원)</div>
-      <div style="font-size:12px; color:#64748b; margin-bottom:10px;">유지증가 = 개시 − 유지감소 (자동)</div>
 
       <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:28px;">
         <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.04); overflow-x:auto;">
@@ -15926,10 +15926,9 @@ function renderTargetInput(){
       </div>
 
       <div style="font-size:16px; font-weight:700; color:#1c2f4a; margin-top:24px; margin-bottom:4px;">컨설턴트별 목표 입력</div>
-      <div style="font-size:12px; color:#64748b; margin-bottom:10px;">컨설턴트별 비율 1가지가 수주·개시·유지감소에 같은 비율로 적용됩니다. 공통 비율을 바꾸면 모든 상품에 일괄 적용되고, 상품별 비율은 개별 수정할 수 있습니다.</div>
 
       <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-block; margin-bottom:16px;">
-        <div style="font-size:15px; font-weight:700; color:#5c1c2f; margin-bottom:4px;">공통 비율 <span style="font-size:11px; font-weight:normal; color:#64748b;">(알람·블루스캔·휴엔·정보보안 전체에 일괄 적용)</span></div>
+        <div style="font-size:15px; font-weight:700; color:#5c1c2f; margin-bottom:4px;">공통 비율</div>
         <table class="tgt-table" style="border-collapse:collapse; font-size:12.5px;">
           <thead><tr style="background:#f5e6e8 !important;"><th style="${TH}">영업담당</th><th style="${TH}">비율(%)</th></tr></thead>
           <tbody>${commonRows}
@@ -15944,6 +15943,24 @@ function renderTargetInput(){
     </div>`;
 
   container.innerHTML = html;
+  alignTargetNumbers_();
+}
+
+// 표 안의 숫자(입력칸·합계·금액·차이)는 모두 우측 정렬, 이름/구분 라벨은 가운데 유지
+function alignTargetNumbers_(){
+  const wrap = document.getElementById('targetInputWrap');
+  if (!wrap) return;
+  wrap.querySelectorAll('tbody td').forEach(function(td){
+    const hasInput = !!td.querySelector('input');
+    const txt = (td.textContent || '').trim();
+    if (hasInput || (txt && /^[+\-]?[\d,.]+(%|천원)?$/.test(txt))) {
+      td.style.setProperty('text-align', 'right', 'important');
+      td.style.setProperty('text-align-last', 'right', 'important');
+      td.style.setProperty('padding-right', '10px', 'important');
+      const flex = td.querySelector('div[style*="inline-flex"]');
+      if (flex) flex.style.setProperty('justify-content', 'flex-end', 'important');
+    }
+  });
 }
 
 function markTargetDirty_(){
