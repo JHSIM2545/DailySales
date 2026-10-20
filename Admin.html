@@ -4988,9 +4988,16 @@ table.status-summary.status-summary-full tbody th{ text-align:center !important;
 .settings-item-row.dragging{ opacity:.4; }
 .settings-item-row.drag-over-top{ border-top:2px solid #4a86e8; }
 .settings-item-row.drag-over-bottom{ border-bottom:2px solid #4a86e8; }
-.settings-grid4{ display:grid !important; margin-bottom:12px; grid-template-columns:repeat(4, minmax(0, 1fr)) !important; gap:10px !important; align-items:start; }
-@media screen and (max-width:1300px){ .settings-grid4{ grid-template-columns:repeat(3, minmax(0, 1fr)) !important; } }
-@media screen and (max-width:980px){ .settings-grid4{ grid-template-columns:repeat(2, minmax(0, 1fr)) !important; } }
+.settings-grid4{ display:grid !important; margin-bottom:12px; grid-template-columns:repeat(auto-fill, minmax(175px, 1fr)) !important; gap:8px !important; align-items:start; }
+.settings-grid4 > .settings-portal-card{ grid-column:span 2; }
+@media screen and (max-width:700px){ .settings-grid4{ grid-template-columns:1fr !important; } .settings-grid4 > .settings-portal-card{ grid-column:auto; } }
+.settings-grid4 .chart-card{ padding:8px !important; }
+.settings-grid4 .chart-card-title{ font-size:12px !important; }
+.settings-grid4 .settings-item-row{ font-size:11.5px; }
+.settings-grid4 button{ padding:3px 8px; font-size:12px; }
+.settings-grid4 input[type=text]{ min-width:0 !important; }
+.settings-grid4 button{ white-space:nowrap; flex:0 0 auto; }
+.settings-grid4 .chart-card input[id^=settings_input_]{ width:0 !important; flex:1 1 0 !important; padding:4px 6px !important; font-size:12px; }
 .settings-item-row{ gap:4px !important; padding:3px 5px !important; }
 .settings-item-name-input{ min-width:0; width:100%; }  
  .settings-order-btns a{ color:#666; text-decoration:none; font-size:10px; cursor:pointer; }  
@@ -9762,7 +9769,7 @@ function settingsCategorySectionHtml_(category, label){
 function renderSettingsTab_(){  
  const cards = SETTINGS_CATEGORY_ORDER_.map(function(cat){ return settingsCategorySectionHtml_(cat, SETTINGS_CATEGORY_LABELS_[cat]); }).join('');  
  const IN_ = 'autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" placeholder="https://..." style="flex:1; min-width:0; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;"';
- const taPortalCard = '<div class="chart-card" style="min-width:0;">' +
+ const taPortalCard = '<div class="chart-card settings-portal-card" style="min-width:0;">' +
  '<div class="chart-card-title"><span>연계 포털 링크</span></div>' +
  '<div style="font-size:11px; color:#666; margin-bottom:3px;">TA 관리 포털</div>' +
  '<div style="display:flex; gap:6px; margin-bottom:10px;">' +
