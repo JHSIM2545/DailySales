@@ -74,6 +74,7 @@
       <a class="link" onclick="showView('registerView')">사용자 등록</a>
       <button class="primary" id="loginBtn" onclick="doLogin()">로그인</button>
     </div>
+    <div id="bioRegBox" style="margin-top:8px; font-size:12px; color:#6b7280; text-align:center;"></div>
     <div id="bioBox" style="display:none; margin-top:10px; text-align:center;">
       <button class="primary" id="bioLoginBtn" type="button" onclick="bioLogin()" style="width:100%; background:#1d4ed8;">🔐 지문/얼굴로 로그인</button>
       <div style="margin-top:6px; font-size:11px;"><a class="link" onclick="bioRemoveHere()">이 기기 생체인증 해제</a></div>
@@ -383,11 +384,8 @@ async function offerBioRegister_(session){
   const creds = bioLoad_();
   const key = normPhone_(session.phone);
   if (creds[key]) return;                                   // 이미 등록됨
-  if (localStorage.getItem('S1_BIO_DECLINED_' + key) === '1') return;   // 이전에 '다음에' 선택
-  if (!confirm(session.name + '님, 이 기기에서 지문/얼굴 인식으로 다음부터 간편하게 로그인하시겠습니까?\n\n(생체정보는 기기 밖으로 나가지 않습니다. 이 기기에만 등록됩니다.)')) {
-    localStorage.setItem('S1_BIO_DECLINED_' + key, '1');
-    return;
-  }
+  const chk = document.getElementById('bioRegChk');
+  if (!chk || !chk.checked) return;                         // 체크박스를 켠 경우에만 등록
   try {
     const cred = await navigator.credentials.create({ publicKey: {
       challenge: crypto.getRandomValues(new Uint8Array(32)),
@@ -404,6 +402,7 @@ async function offerBioRegister_(session){
     }
   } catch(e) {
     console.warn('[bio] 등록 취소/실패', e);
+    alert('생체인증 등록이 완료되지 않았습니다. (' + ((e && e.name) || '') + ')\n다음 로그인 때 다시 시도할 수 있습니다.');
   }
 }
 
@@ -445,9 +444,22 @@ function bioRemoveHere(){
 }
 async function refreshBioUi_(){
   const box = document.getElementById('bioBox');
-  if (!box) return;
+  const reg = document.getElementById('bioRegBox');
   const has = Object.keys(bioLoad_()).length > 0;
-  box.style.display = (has && await bioAvailable_()) ? 'block' : 'none';
+  const ok = await bioAvailable_();
+  if (box) box.style.display = (has && ok) ? 'block' : 'none';
+  if (!reg) return;
+  if (ok) {
+    reg.innerHTML = has
+      ? '<label style="cursor:pointer;"><input type="checkbox" id="bioRegChk"> 다른 사용자도 이 기기에 생체인증 등록</label>'
+      : '<label style="cursor:pointer;"><input type="checkbox" id="bioRegChk" checked> 로그인 후 이 기기에 지문/얼굴 인증 등록</label>';
+  } else {
+    let why = '이 기기/브라우저에서는 생체인증을 사용할 수 없습니다.';
+    if (!window.isSecureContext) why = '생체인증은 보안 연결(https) 주소에서만 사용할 수 있습니다.';
+    else if (!window.PublicKeyCredential) why = '이 브라우저는 생체인증(WebAuthn)을 지원하지 않습니다.';
+    else why = '이 기기에 지문/얼굴/Windows Hello 등 화면잠금 생체인증이 설정되어 있지 않습니다.';
+    reg.innerText = '🔐 ' + why;
+  }
 }
 window.addEventListener('DOMContentLoaded', function(){ refreshBioUi_(); });
 
