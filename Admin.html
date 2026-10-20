@@ -7861,7 +7861,6 @@ const TABS = [
  { key: 'excel_daily', label: '엑셀일보', ready: true },  
  { key: 'ai_report', label: '영업보고 자동입력', labelMainMaster: '자동등록', ready: true },  
  { key: 'daily_report', label: '일일실적보고', ready: true, admin: true },  
- { key: 'users', label: '사용자관리', ready: true, master: true },  
  { key: 'ta_portal', label: 'TA', ready: true, external: true, alignRight: true, taGate: true },  
  { key: 'intro_portal', label: '소개', ready: true, external: true, alignRight: true, introGate: true },  
  { key: 'settings', label: '⚙️', title: '설정', ready: true, master: true, alignRight: true }  
@@ -7905,7 +7904,7 @@ function renderTabs(){
    }
    const styleAttr = extraStyles.length ? ` style="${extraStyles.join(' ')}"` : '';  
    const titleAttr = t.title ? ` title="${t.title}"` : '';  
-   return `<div class="tab ${t.key===currentTab?'active':''} ${t.ready?'':'disabled'}"${styleAttr}${titleAttr}  
+   return `<div class="tab ${(t.key===currentTab || (t.key==='settings' && currentTab==='users'))?'active':''} ${t.ready?'':'disabled'}"${styleAttr}${titleAttr}  
  onclick="${t.ready ? onclickExpr : ''}">${label}${t.ready?'':' (준비중)'}</div>`;  
  }).join('');  
  const fileBtnHtml_ = (typeof openFileStoreModal_ === 'function') ? '<div class="tab" id="fileStoreTopBtn" title="파일 저장소" onclick="openFileStoreModal_()" style="font-size:13px; padding:8px 10px; line-height:1.2;">📁</div>' : '';
@@ -9784,11 +9783,7 @@ function renderSettingsTab_(){
  '</div>';
  const introPortalCard = '';
  const subTab = (typeof SETTINGS_SUBTAB_ !== 'undefined' && SETTINGS_SUBTAB_ === 'targets') ? 'targets' : 'lists';
- const tabBtn = function(key, label){
-   const on = subTab === key;
-   return '<button onclick="settingsSwitchSub_(\'' + key + '\')" style="padding:8px 18px; border:1px solid #c7cfd8; border-bottom:' + (on ? '2px solid #5c1c2f' : '1px solid #c7cfd8') + '; background:' + (on ? '#fff' : '#eef1f4') + '; color:' + (on ? '#5c1c2f' : '#555') + '; font-weight:' + (on ? '700' : '500') + '; border-radius:6px 6px 0 0; cursor:pointer;">' + label + '</button>';
- };
- const tabBar = '<div style="display:flex; gap:4px; margin-bottom:12px; border-bottom:1px solid #c7cfd8;">' + tabBtn('lists', '기초 목록값 관리') + tabBtn('targets', '월별 목표/계획 관리') + '</div>';
+ const tabBar = settingsSubTabBarHtml_(subTab);
  let body;
  if (subTab === 'lists') {
    body = '<div class="dash-head"><h2>기초 목록값 관리</h2>' +
@@ -9809,12 +9804,28 @@ function renderSettingsTab_(){
  if (subTab === 'targets' && typeof loadTargetInput === 'function') loadTargetInput();
 }
 var SETTINGS_SUBTAB_ = 'lists';
+/** 사용자 관리 등 Master 전용 화면용 엄격한 권한 판정: 수정가능(isAdmin) 권한만으로는 Master가 아니다. */
+function isStrictMaster_(){
+  const s = (typeof SESSION !== 'undefined') ? SESSION : null;
+  if (!s) return false;
+  return !!(s.isMaster || s.isMainMaster || s.role === '메인마스터' || s.role === '서브마스터' || s.role === 'master');
+}
+function settingsSubTabBarHtml_(active){
+  const btn = function(key, label){
+    const on = active === key;
+    return '<button onclick="settingsSwitchSub_(\'' + key + '\')" style="padding:8px 18px; border:1px solid #c7cfd8; border-bottom:' + (on ? '2px solid #5c1c2f' : '1px solid #c7cfd8') + '; background:' + (on ? '#fff' : '#eef1f4') + '; color:' + (on ? '#5c1c2f' : '#555') + '; font-weight:' + (on ? '700' : '500') + '; border-radius:6px 6px 0 0; cursor:pointer;">' + label + '</button>';
+  };
+  return '<div style="display:flex; gap:4px; margin-bottom:12px; border-bottom:1px solid #c7cfd8;">' + btn('lists', '기초 목록값 관리') + btn('targets', '월별 목표/계획 관리') + (isStrictMaster_() ? btn('users', '사용자 관리') : '') + '</div>';
+}
 function settingsSwitchSub_(key){
-  if (SETTINGS_SUBTAB_ === 'targets' && key !== 'targets' && TARGET_REP_DIRTY) {
+  if (key === 'users' && !isStrictMaster_()) return;
+  if (SETTINGS_SUBTAB_ === 'targets' && currentTab === 'settings' && key !== 'targets' && TARGET_REP_DIRTY) {
     if (!confirm('저장하지 않은 목표 변경사항이 있습니다. 저장하지 않고 이동할까요?')) return;
     TARGET_REP_DIRTY = false;
   }
+  if (key === 'users') { selectTab('users'); return; }
   SETTINGS_SUBTAB_ = key;
+  if (currentTab !== 'settings') { selectTab('settings'); return; }
   renderSettingsTab_();
 }
 let TA_PORTAL_URL_ = '';  
@@ -10304,6 +10315,8 @@ function selectTab(key){
  }  
  TARGET_REP_DIRTY = false; // 저장하지 않고 이동(변경사항 폐기)  
  }  
+ if (key === 'users' && !isStrictMaster_()) { alert('사용자 관리는 Master 권한만 사용할 수 있습니다.'); return; }
+ const prevTab_ = currentTab;
  currentTab = key;  
  renderTabs();  
  if (['order_start', 'cancel', 'price_change', 'restart', 'product_daily'].includes(key)) { loadUserFlags_(); }  
@@ -10320,7 +10333,7 @@ function selectTab(key){
  else if (key === 'ai_report') { loadAutoRegisterTab_(); }  
  else if (key === 'users') { selectUserMgmtView(USERMGMT_VIEW || 'info'); }  
  else if (key === 'daily_report') { loadDailyReport(); }  
- else if (key === 'settings') { SETTINGS_SUBTAB_ = 'lists'; loadEditableLists_(); loadTaPortalUrlForSettings_(); loadIntroPortalUrlForSettings_(); }  
+ else if (key === 'settings') { if (prevTab_ !== 'users') SETTINGS_SUBTAB_ = 'lists'; loadEditableLists_(); loadTaPortalUrlForSettings_(); loadIntroPortalUrlForSettings_(); }  
  else document.getElementById('content').innerHTML =  
  `<div class="placeholder"><h2>준비 중입니다</h2><p>"${TABS.find(t=>t.key===key).label}" 시트 필드 정의 완료 후 동일한 방식으로 탭이 활성화됩니다.</p></div>`;  
 }  
@@ -15183,7 +15196,8 @@ function selectUserMgmtView(view){
   const isLogin = USERMGMT_VIEW === 'login';
   const isAction = USERMGMT_VIEW === 'action';
 
-  content.innerHTML = '<div style="background:#f1f5f9; padding:10px 16px; border-bottom:1px solid #cbd5e1; display:flex; gap:8px;">' +
+  content.innerHTML = '<div style="padding:12px 16px 0;">' + settingsSubTabBarHtml_('users') + '</div>' +
+  '<div style="background:#f1f5f9; padding:10px 16px; border-bottom:1px solid #cbd5e1; display:flex; gap:8px;">' +
     '<button class="' + (isInfo ? 'primary' : '') + '" onclick="selectUserMgmtView(\'info\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">👥 사용자 정보</button>' +
     '<button class="' + (isLogin ? 'primary' : '') + '" onclick="selectUserMgmtView(\'login\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">🔑 로그인 이력</button>' +
     '<button class="' + (isAction ? 'primary' : '') + '" onclick="selectUserMgmtView(\'action\')" style="padding:6px 14px; border-radius:4px; font-size:13px; font-weight:600; cursor:pointer;">📋 사용자 작업내역</button>' +
