@@ -9767,22 +9767,40 @@ function renderSettingsTab_(){
  '</div>' +  
  '</div>';  
 
- const html = '<div class="dash-wrap">' +  
- '<div class="dash-head"><h2>설정 - 목록값 관리</h2>' +  
- '<button class="primary" onclick="settingsSaveAll_()">전체 저장</button>' +  
- '</div>' +  
- '<div class="chart-grid">' + taPortalCard + introPortalCard + cards + '</div>' +  
- '<div class="dash-head" style="margin-top:28px; display:flex; align-items:center; gap:10px;"><h2 style="margin:0;">월별 목표/계획 입력</h2>' +  
- '<button onclick="shiftTargetMonth(-1)">◀</button>' +  
- '<b id="targetMonthLabel" style="min-width:90px; text-align:center;"></b>' +  
- '<button onclick="shiftTargetMonth(1)">▶</button>' +  
- '<button class="primary" onclick="saveTargetInput()">저장</button>' +  
- '</div>' +  
- '<div id="settingsTargetArea"></div>' +  
- '</div>';  
- document.getElementById('content').innerHTML = html;  
- if (typeof loadTargetInput === 'function') loadTargetInput();  
-}  
+const subTab = (typeof SETTINGS_SUBTAB_ !== 'undefined' && SETTINGS_SUBTAB_ === 'targets') ? 'targets' : 'lists';
+ const tabBtn = function(key, label){
+   const on = subTab === key;
+   return '<button onclick="settingsSwitchSub_(\'' + key + '\')" style="padding:8px 18px; border:1px solid #c7cfd8; border-bottom:' + (on ? '2px solid #5c1c2f' : '1px solid #c7cfd8') + '; background:' + (on ? '#fff' : '#eef1f4') + '; color:' + (on ? '#5c1c2f' : '#555') + '; font-weight:' + (on ? '700' : '500') + '; border-radius:6px 6px 0 0; cursor:pointer;">' + label + '</button>';
+ };
+ const tabBar = '<div style="display:flex; gap:4px; margin-bottom:12px; border-bottom:1px solid #c7cfd8;">' + tabBtn('lists', '기초 목록값 관리') + tabBtn('targets', '월별 목표/계획 관리') + '</div>';
+ let body;
+ if (subTab === 'lists') {
+   body = '<div class="dash-head"><h2>기초 목록값 관리</h2>' +
+     '<button class="primary" onclick="settingsSaveAll_()">전체 저장</button>' +
+     '</div>' +
+     '<div class="chart-grid">' + taPortalCard + introPortalCard + cards + '</div>';
+ } else {
+   body = '<div class="dash-head" style="display:flex; align-items:center; gap:10px;"><h2 style="margin:0;">월별 목표/계획 관리</h2>' +
+     '<button onclick="shiftTargetMonth(-1)">◀</button>' +
+     '<b id="targetMonthLabel" style="min-width:90px; text-align:center;"></b>' +
+     '<button onclick="shiftTargetMonth(1)">▶</button>' +
+     '<button class="primary" onclick="saveTargetInput()">저장</button>' +
+     '</div>' +
+     '<div id="settingsTargetArea"></div>';
+ }
+ const html = '<div class="dash-wrap">' + tabBar + body + '</div>';
+ document.getElementById('content').innerHTML = html;
+ if (subTab === 'targets' && typeof loadTargetInput === 'function') loadTargetInput();
+}
+var SETTINGS_SUBTAB_ = 'lists';
+function settingsSwitchSub_(key){
+  if (SETTINGS_SUBTAB_ === 'targets' && key !== 'targets' && TARGET_REP_DIRTY) {
+    if (!confirm('저장하지 않은 목표 변경사항이 있습니다. 저장하지 않고 이동할까요?')) return;
+    TARGET_REP_DIRTY = false;
+  }
+  SETTINGS_SUBTAB_ = key;
+  renderSettingsTab_();
+}
 let TA_PORTAL_URL_ = '';  
 function loadTaPortalUrlForSettings_(){  
  google.script.run  
@@ -10201,7 +10219,7 @@ function selectTab(key){
  else if (key === 'ai_report') { loadAutoRegisterTab_(); }  
  else if (key === 'users') { selectUserMgmtView(USERMGMT_VIEW || 'info'); }  
  else if (key === 'daily_report') { loadDailyReport(); }  
- else if (key === 'settings') { loadEditableLists_(); loadTaPortalUrlForSettings_(); loadIntroPortalUrlForSettings_(); }  
+ else if (key === 'settings') { SETTINGS_SUBTAB_ = 'lists'; loadEditableLists_(); loadTaPortalUrlForSettings_(); loadIntroPortalUrlForSettings_(); }  
  else document.getElementById('content').innerHTML =  
  `<div class="placeholder"><h2>준비 중입니다</h2><p>"${TABS.find(t=>t.key===key).label}" 시트 필드 정의 완료 후 동일한 방식으로 탭이 활성화됩니다.</p></div>`;  
 }  
