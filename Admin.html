@@ -2017,21 +2017,13 @@ function getTzToday() {
       const client = getSupabase();
       const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
       const { data } = await client.from('sales_targets_product').select('*').eq('year_month', yearMonth);
-      // 해약·재개시·인상·인하 세부 목표/계획은 system_settings(TARGET_EXTRA_<년월>)에 JSON으로 보관 (DB 컬럼 추가 불필요)
-      let extra = {};
-      try {
-        const ex = await client.from('system_settings').select('setting_value').eq('setting_key', 'TARGET_EXTRA_' + yearMonth).maybeSingle();
-        if (ex && ex.data && ex.data.setting_value) extra = JSON.parse(ex.data.setting_value) || {};
-      } catch (e) { extra = {}; }
       const map = {};
       PRODUCTS.forEach(p => {
-        map[p] = { 상품종류: p, 목표_수주금액: 0, 목표_개시금액: 0, 목표_해약: 0, 목표_재개시: 0, 목표_인상: 0, 목표_인하: 0, 목표_유지감소: 0,
-                   계획_수주금액: 0, 계획_개시금액: 0, 계획_해약: 0, 계획_재개시: 0, 계획_인상: 0, 계획_인하: 0, 계획_유지감소: 0 };
+        map[p] = { 상품종류: p, 목표_수주금액: 0, 목표_개시금액: 0, 목표_유지감소: 0, 계획_수주금액: 0, 계획_개시금액: 0, 계획_유지감소: 0 };
       });
       (data || []).forEach(r => {
         if (map[r.product_type]) {
-          const ex = extra[r.product_type];
-          const it = {
+          map[r.product_type] = {
             상품종류: r.product_type,
             목표_수주금액: Number(r.target_order) || 0,
             목표_개시금액: Number(r.target_start) || 0,
@@ -2040,14 +2032,6 @@ function getTzToday() {
             계획_개시금액: Number(r.plan_start) || 0,
             계획_유지감소: Number(r.plan_cancel) || 0
           };
-          if (ex) {
-            it.목표_해약 = Number(ex.t_can) || 0; it.목표_재개시 = Number(ex.t_re) || 0; it.목표_인상 = Number(ex.t_up) || 0; it.목표_인하 = Number(ex.t_down) || 0;
-            it.계획_해약 = Number(ex.p_can) || 0; it.계획_재개시 = Number(ex.p_re) || 0; it.계획_인상 = Number(ex.p_up) || 0; it.계획_인하 = Number(ex.p_down) || 0;
-          } else {
-            // 세부 항목이 저장된 적 없는 기존 월: 기존 유지감소 값을 해약으로 간주(유지감소는 그대로 유지)
-            it.목표_해약 = it.목표_유지감소; it.계획_해약 = it.계획_유지감소;
-          }
-          map[r.product_type] = Object.assign(map[r.product_type], it);
         }
       });
       return { success: true, yearMonth: yearMonth, products: PRODUCTS, items: PRODUCTS.map(p => map[p]) };
@@ -2055,31 +2039,19 @@ function getTzToday() {
 
     saveSalesTargetByProduct: async function(token, yearMonth, items) {
       const client = getSupabase();
-      const extra = {};
-      const rows = (items || []).map(it => {
-        const tdown = -Math.abs(Number(it.목표_인하) || 0), pdown = -Math.abs(Number(it.계획_인하) || 0);
-        const tdec = (Number(it.목표_해약) || 0) - (Number(it.목표_재개시) || 0) - tdown - (Number(it.목표_인상) || 0);
-        const pdec = (Number(it.계획_해약) || 0) - (Number(it.계획_재개시) || 0) - pdown - (Number(it.계획_인상) || 0);
-        extra[it.상품종류] = {
-          t_can: Number(it.목표_해약) || 0, t_re: Number(it.목표_재개시) || 0, t_up: Number(it.목표_인상) || 0, t_down: tdown,
-          p_can: Number(it.계획_해약) || 0, p_re: Number(it.계획_재개시) || 0, p_up: Number(it.계획_인상) || 0, p_down: pdown
-        };
-        return {
-          year_month: yearMonth,
-          product_type: it.상품종류,
-          target_order: Number(it.목표_수주금액) || 0,
-          target_start: Number(it.목표_개시금액) || 0,
-          target_cancel: tdec,          // 유지감소 = 해약 - 재개시 - 인하 - 인상 (기존 컬럼 그대로 사용)
-          plan_order: Number(it.계획_수주금액) || 0,
-          plan_start: Number(it.계획_개시금액) || 0,
-          plan_cancel: pdec,
-          updated_at: new Date().toISOString()
-        };
-      });
+      const rows = (items || []).map(it => ({
+        year_month: yearMonth,
+        product_type: it.상품종류,
+        target_order: Number(it.목표_수주금액) || 0,
+        target_start: Number(it.목표_개시금액) || 0,
+        target_cancel: Number(it.목표_유지감소) || 0,
+        plan_order: Number(it.계획_수주금액) || 0,
+        plan_start: Number(it.계획_개시금액) || 0,
+        plan_cancel: Number(it.계획_유지감소) || 0,
+        updated_at: new Date().toISOString()
+      }));
       const { error } = await client.from('sales_targets_product').upsert(rows, { onConflict: 'year_month,product_type' });
       if (error) throw error;
-      const ex = await client.from('system_settings').upsert({ setting_key: 'TARGET_EXTRA_' + yearMonth, setting_value: JSON.stringify(extra) });
-      if (ex && ex.error) throw ex.error;
       return { success: true };
     },
 
@@ -15754,14 +15726,11 @@ function initTargetRatios_(items, repItems){
   reps.forEach(rep => { TARGET_COMMON_RATIOS[rep] = (TARGET_REP_RATIOS['알람'] && TARGET_REP_RATIOS['알람'][rep] != null) ? TARGET_REP_RATIOS['알람'][rep] : 0; });
 }
 
-// 상품종류별 목표/계획 입력 구성. dec(유지감소)=해약-재개시-인하-인상 (인하는 음수 입력)
+// 상품종류별 목표/계획 입력 구성 (유지감소는 직접 입력, 유지증가=개시-유지감소 자동)
 const TGT_FIELDS_ = [
   { k: 'ord', label: '수주' },
   { k: 'start', label: '개시' },
-  { k: 'can', label: '해약' },
-  { k: 're', label: '재개시' },
-  { k: 'up', label: '인상' },
-  { k: 'down', label: '인하' }
+  { k: 'dec', label: '유지감소' }
 ];
 const TGT_FIELD_KEY_ = { ord: '수주금액', start: '개시금액', can: '해약', re: '재개시', up: '인상', down: '인하' };
 
@@ -15780,8 +15749,6 @@ function formatTgtInput_(el, isDown){
 function tgtVals_(pre, p){
   const v = {};
   TGT_FIELDS_.forEach(f => { v[f.k] = parseTgtNum_(pre + '_' + f.k + '_' + p); });
-  v.down = -Math.abs(v.down);
-  v.dec = v.can - v.re - v.down - v.up;
   v.inc = v.start - v.dec;
   return v;
 }
@@ -15803,12 +15770,8 @@ function renderTargetInput(){
     const v = {
       ord: Number(it[cat + '_수주금액']) || 0,
       start: Number(it[cat + '_개시금액']) || 0,
-      can: Number(it[cat + '_해약']) || 0,
-      re: Number(it[cat + '_재개시']) || 0,
-      up: Number(it[cat + '_인상']) || 0,
-      down: -Math.abs(Number(it[cat + '_인하']) || 0)
+      dec: Number(it[cat + '_유지감소']) || 0
     };
-    v.dec = v.can - v.re - v.down - v.up;
     v.inc = v.start - v.dec;
     return v;
   };
@@ -15824,16 +15787,14 @@ function renderTargetInput(){
     if (withProduct) h += `<td rowspan="2" style="border:1px solid #dce3ea; font-weight:700; text-align:center; vertical-align:middle; background:#ffffff !important; font-size:13px; color:#1c2f4a;">${p}</td>`;
     h += `<td style="${TD_LBL}">${label}</td>`;
     TGT_FIELDS_.forEach(f => {
-      const isDown = f.k === 'down';
-      h += `<td style="${TD_IN}"><input ${INPUT_ATTR} id="${pre}_${f.k}_${p}" value="${fmt(v[f.k])}" oninput="formatTgtInput_(this, ${isDown}); onTargetProductChange_('${p}');"></td>`;
+      h += `<td style="${TD_IN}"><input ${INPUT_ATTR} id="${pre}_${f.k}_${p}" value="${fmt(v[f.k])}" oninput="formatTgtInput_(this, false); onTargetProductChange_('${p}');"></td>`;
     });
-    h += `<td style="${TD_AUTO}" id="${pre}_dec_disp_${p}">${fmt(v.dec)}</td>`;
     h += `<td style="${TD_AUTO}" id="${pre}_inc_disp_${p}">${fmt(v.inc)}</td>`;
     return h + '</tr>';
   };
 
   let prodRowsHtml = '';
-  const tot = { tgt: { ord:0,start:0,can:0,re:0,up:0,down:0,dec:0,inc:0 }, pln: { ord:0,start:0,can:0,re:0,up:0,down:0,dec:0,inc:0 } };
+  const tot = { tgt: { ord:0,start:0,dec:0,inc:0 }, pln: { ord:0,start:0,dec:0,inc:0 } };
   PRODUCTS.forEach(p => {
     const t = getVals(p, '목표'), pl = getVals(p, '계획');
     Object.keys(tot.tgt).forEach(k => { tot.tgt[k] += t[k]; tot.pln[k] += pl[k]; });
@@ -15844,14 +15805,14 @@ function renderTargetInput(){
     let h = '<tr class="summary-row" style="background:#ffffff !important;">';
     if (withProduct) h += '<td rowspan="2" style="border:1px solid #dce3ea !important; font-weight:700; text-align:center; vertical-align:middle; background:#ffffff !important; font-size:13px; color:#1c2f4a;">합계</td>';
     h += `<td style="border:1px solid #dce3ea !important; font-weight:700; text-align:center; background:#ffffff !important; font-size:13px; color:#334155;">${label}</td>`;
-    ['ord','start','can','re','up','down','dec','inc'].forEach(k => {
+    ['ord','start','dec','inc'].forEach(k => {
       h += `<td style="border:1px solid #dce3ea !important; padding:6px 10px; text-align:right; font-weight:700; color:#1c2f4a; background:#ffffff !important;" id="tot_${pre}_${k}">${fmt(o[k])}</td>`;
     });
     return h + '</tr>';
   };
 
   // 공통 비율 카드 + 상품별 컨설턴트 패널
-  const COMPS = [['ord','수주'],['start','개시'],['can','해약'],['re','재개시'],['up','인상'],['down','인하'],['dec','유지감소'],['inc','유지증가']];
+  const COMPS = [['ord','수주'],['start','개시'],['dec','유지감소'],['inc','유지증가']];
   const RATIO_INPUT_ATTR = 'autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="tgt-ratio-input" style="background:rgb(255,255,0) !important;"';
 
   let commonRows = '';
@@ -15871,7 +15832,7 @@ function renderTargetInput(){
     const t = getVals(p, '목표');
     let repRows = '';
     let sumRatio = 0;
-    const sums = { ord:0,start:0,can:0,re:0,up:0,down:0,dec:0,inc:0 };
+    const sums = { ord:0,start:0,dec:0,inc:0 };
     reps.forEach(rep => {
       const r = Number((TARGET_REP_RATIOS[p] || {})[rep]) || 0;
       sumRatio += r;
@@ -15918,7 +15879,7 @@ function renderTargetInput(){
   const html = `
     <div id="targetInputWrap" style="padding:18px 24px; max-width:1600px; margin:0 auto; background:#f4f6f8; min-height:calc(100vh - 120px);">
       <div style="font-size:16px; font-weight:700; color:#5c1c2f; margin-bottom:6px;">${y}.${m}월 상품종류별 목표/계획 (단위: 천원)</div>
-      <div style="font-size:12px; color:#64748b; margin-bottom:10px;">유지감소 = 해약 − 재개시 − 인하 − 인상 (인하는 음수로 입력) · 유지증가 = 개시 − 유지감소</div>
+      <div style="font-size:12px; color:#64748b; margin-bottom:10px;">유지증가 = 개시 − 유지감소 (자동)</div>
 
       <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:28px;">
         <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.04); overflow-x:auto;">
@@ -15926,8 +15887,7 @@ function renderTargetInput(){
             <thead>
               <tr style="background:#f5e6e8 !important;">
                 <th style="${TH}">상품종류</th><th style="${TH}">구분</th>
-                <th style="${TH}">수주</th><th style="${TH}">개시</th><th style="${TH}">해약</th><th style="${TH}">재개시</th><th style="${TH}">인상</th><th style="${TH}">인하<br><span style="font-size:11px; font-weight:normal;">(음수)</span></th>
-                <th style="${TH}">유지감소<br><span style="font-size:11px; font-weight:normal;">(자동)</span></th>
+                <th style="${TH}">수주</th><th style="${TH}">개시</th><th style="${TH}">유지감소</th>
                 <th style="${TH}">유지증가<br><span style="font-size:11px; font-weight:normal;">(자동)</span></th>
               </tr>
             </thead>
@@ -15966,7 +15926,7 @@ function renderTargetInput(){
       </div>
 
       <div style="font-size:16px; font-weight:700; color:#1c2f4a; margin-top:24px; margin-bottom:4px;">컨설턴트별 목표 입력</div>
-      <div style="font-size:12px; color:#64748b; margin-bottom:10px;">컨설턴트별 비율 1가지로 수주·개시·해약·재개시·인상·인하에 같은 비율이 적용됩니다. 공통 비율을 바꾸면 모든 상품에 일괄 적용되고, 상품별 비율은 개별 수정할 수 있습니다.</div>
+      <div style="font-size:12px; color:#64748b; margin-bottom:10px;">컨설턴트별 비율 1가지가 수주·개시·유지감소에 같은 비율로 적용됩니다. 공통 비율을 바꾸면 모든 상품에 일괄 적용되고, 상품별 비율은 개별 수정할 수 있습니다.</div>
 
       <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-block; margin-bottom:16px;">
         <div style="font-size:15px; font-weight:700; color:#5c1c2f; margin-bottom:4px;">공통 비율 <span style="font-size:11px; font-weight:normal; color:#64748b;">(알람·블루스캔·휴엔·정보보안 전체에 일괄 적용)</span></div>
@@ -15998,11 +15958,10 @@ function parseTgtNum_(id){
   return s.indexOf('-') >= 0 ? -n : n;
 }
 
-// 컨설턴트 금액: 구성 6개는 상품목표 × 비율, 유지감소 = 해약-재개시-인하-인상, 유지증가 = 개시-유지감소
+// 컨설턴트 금액: 수주·개시·유지감소 = 상품목표 × 비율, 유지증가 = 개시-유지감소
 function repAmounts_(t, ratio){
   const a = {};
-  ['ord','start','can','re','up','down'].forEach(k => { a[k] = Math.round((t[k] || 0) * ratio / 100); });
-  a.dec = a.can - a.re - a.down - a.up;
+  ['ord','start','dec'].forEach(k => { a[k] = Math.round((t[k] || 0) * ratio / 100); });
   a.inc = a.start - a.dec;
   return a;
 }
@@ -16013,12 +15972,12 @@ function onTargetProductChange_(prod){
   const fmt = tgtSignedFmt_;
   const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = fmt(val); };
 
-  const tot = { tgt: { ord:0,start:0,can:0,re:0,up:0,down:0,dec:0,inc:0 }, pln: { ord:0,start:0,can:0,re:0,up:0,down:0,dec:0,inc:0 } };
+  const tot = { tgt: { ord:0,start:0,dec:0,inc:0 }, pln: { ord:0,start:0,dec:0,inc:0 } };
   PRODUCTS.forEach(p => {
     ['tgt', 'pln'].forEach(pre => {
       const v = tgtVals_(pre, p);
       Object.keys(tot[pre]).forEach(k => { tot[pre][k] += v[k]; });
-      if (p === prod) { setEl(pre + '_dec_disp_' + p, v.dec); setEl(pre + '_inc_disp_' + p, v.inc); }
+      if (p === prod) { setEl(pre + '_inc_disp_' + p, v.inc); }
     });
   });
   ['tgt', 'pln'].forEach(pre => {
@@ -16059,8 +16018,8 @@ function recalcRepPanel_(prod){
   const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : TARGET_DEFAULT_REPS;
   const fmt = tgtSignedFmt_;
   const t = tgtVals_('tgt', prod);
-  const KEYS = ['ord','start','can','re','up','down','dec','inc'];
-  const sums = { ord:0,start:0,can:0,re:0,up:0,down:0,dec:0,inc:0 };
+  const KEYS = ['ord','start','dec','inc'];
+  const sums = { ord:0,start:0,dec:0,inc:0 };
   let sumRatio = 0;
 
   reps.forEach(rep => {
@@ -16090,13 +16049,13 @@ function saveTargetInput(cb){
   const PRODUCTS = ['알람', '블루스캔', '휴엔', '정보보안'];
   const reps = (typeof REP_TARGET_LIST !== 'undefined' && REP_TARGET_LIST.length) ? REP_TARGET_LIST : TARGET_DEFAULT_REPS;
 
-  // 1. 상품별 목표/계획 (유지감소는 해약-재개시-인하-인상으로 자동계산된 값을 저장)
+  // 1. 상품별 목표/계획
   const prodItems = PRODUCTS.map(p => {
     const t = tgtVals_('tgt', p), pl = tgtVals_('pln', p);
     return {
       상품종류: p,
-      목표_수주금액: t.ord, 목표_개시금액: t.start, 목표_해약: t.can, 목표_재개시: t.re, 목표_인상: t.up, 목표_인하: t.down, 목표_유지감소: t.dec,
-      계획_수주금액: pl.ord, 계획_개시금액: pl.start, 계획_해약: pl.can, 계획_재개시: pl.re, 계획_인상: pl.up, 계획_인하: pl.down, 계획_유지감소: pl.dec
+      목표_수주금액: t.ord, 목표_개시금액: t.start, 목표_유지감소: t.dec,
+      계획_수주금액: pl.ord, 계획_개시금액: pl.start, 계획_유지감소: pl.dec
     };
   });
 
