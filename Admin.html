@@ -4983,7 +4983,16 @@ table.status-summary.status-summary-full tbody th{ text-align:center !important;
  .settings-chip a{ color:#c00000; text-decoration:none; font-weight:bold; cursor:pointer; }  
  .settings-item-list{ display:flex; flex-direction:column; gap:4px; min-height:30px; }  
  .settings-item-row{ display:flex; align-items:center; gap:8px; padding:4px 8px; background:#f7f8fa; border:1px solid #e3e6ea; border-radius:4px; font-size:12px; }  
- .settings-order-btns{ display:flex; flex-direction:column; line-height:1; gap:1px; }  
+ .settings-order-btns{ display:flex; flex-direction:column; line-height:1; gap:1px; }
+.settings-drag-handle{ cursor:grab; color:#9aa3af; font-size:14px; line-height:1; padding:0 2px; user-select:none; }
+.settings-item-row.dragging{ opacity:.4; }
+.settings-item-row.drag-over-top{ border-top:2px solid #4a86e8; }
+.settings-item-row.drag-over-bottom{ border-bottom:2px solid #4a86e8; }
+.settings-grid4{ display:grid !important; margin-bottom:12px; grid-template-columns:repeat(4, minmax(0, 1fr)) !important; gap:10px !important; align-items:start; }
+@media screen and (max-width:1300px){ .settings-grid4{ grid-template-columns:repeat(3, minmax(0, 1fr)) !important; } }
+@media screen and (max-width:980px){ .settings-grid4{ grid-template-columns:repeat(2, minmax(0, 1fr)) !important; } }
+.settings-item-row{ gap:4px !important; padding:3px 5px !important; }
+.settings-item-name-input{ min-width:0; width:100%; }  
  .settings-order-btns a{ color:#666; text-decoration:none; font-size:10px; cursor:pointer; }  
  .settings-item-name{ flex:1; color:#333; }  
  .settings-item-name-input{ flex:1; color:#333; border:1px solid transparent; background:transparent; padding:3px 5px; font-size:12px; border-radius:3px; font-family:inherit; }  
@@ -5068,6 +5077,10 @@ table.status-summary.status-summary-full tbody th{ text-align:center !important;
   font-size: 13px !important;
   position: static !important;
 }
+#targetInputWrap .tgt-panels-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(350px, 1fr)); gap:10px; align-items:start; }
+#targetInputWrap table.tgt-table.tgt-compact thead th { padding:4px 4px !important; font-size:12px !important; }
+#targetInputWrap table.tgt-table.tgt-compact tbody td { padding:3px 4px !important; font-size:12px !important; }
+#targetInputWrap table.tgt-table.tgt-compact .tgt-ratio-input { width:46px !important; height:22px !important; font-size:12px !important; }
 #targetInputWrap table.tgt-table tbody tr.summary-row {
   background: #fdf5f6 !important;
   font-weight: 700 !important;
@@ -9727,19 +9740,16 @@ function settingsCategorySectionHtml_(category, label){
  const def = SETTINGS_DEFAULTS[category] || '';  
  const rows = items.map(function(it, idx){  
  const isDefault = (it.value === def);  
- return '<div class="settings-item-row">' +  
- '<span class="settings-order-btns">' +  
- '<a href="javascript:void(0)" onclick="settingsMoveItem_(\'' + category + '\', ' + idx + ', -1)" title="위로">▲</a>' +  
- '<a href="javascript:void(0)" onclick="settingsMoveItem_(\'' + category + '\', ' + idx + ', 1)" title="아래로">▼</a>' +  
- '</span>' +  
- '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="settings-item-name-input" value="' + escAttr(it.value) + '" ' +  
- 'title="' + (it.orig ? ('원래 이름: ' + escAttr(it.orig)) : '신규 항목') + '" ' +  
- 'onchange="settingsRenameItem_(\'' + category + '\', ' + idx + ', this.value)">' +  
- '<a href="javascript:void(0)" class="settings-default-star' + (isDefault ? ' active' : '') + '" onclick="settingsSetDefault_(\'' + category + '\', \'' + escAttr(it.value) + '\')" title="기본값으로 설정">' + (isDefault ? '★ 기본값' : '☆ 기본값 지정') + '</a>' +  
- '<a href="javascript:void(0)" class="settings-remove" onclick="settingsRemoveItem_(\'' + category + '\', ' + idx + ')">삭제</a>' +  
- '</div>';  
+ return '<div class="settings-item-row" ondragover="settingsDragOver_(event, \'' + category + '\', ' + idx + ')" ondragleave="settingsDragLeave_(event)" ondrop="settingsDrop_(event, \'' + category + '\', ' + idx + ')">' +
+ '<span class="settings-drag-handle" draggable="true" ondragstart="settingsDragStart_(event, \'' + category + '\', ' + idx + ')" ondragend="settingsDragEnd_()" title="끌어서 순서 변경">⠿</span>' +
+ '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" class="settings-item-name-input" value="' + escAttr(it.value) + '" ' +
+ 'title="' + (it.orig ? ('원래 이름: ' + escAttr(it.orig)) : '신규 항목') + '" ' +
+ 'onchange="settingsRenameItem_(\'' + category + '\', ' + idx + ', this.value)">' +
+ '<a href="javascript:void(0)" class="settings-default-star' + (isDefault ? ' active' : '') + '" onclick="settingsSetDefault_(\'' + category + '\', \'' + escAttr(it.value) + '\')" title="' + (isDefault ? '기본값' : '기본값으로 지정') + '">' + (isDefault ? '★' : '☆') + '</a>' +
+ '<a href="javascript:void(0)" class="settings-remove" onclick="settingsRemoveItem_(\'' + category + '\', ' + idx + ')" title="삭제">✕</a>' +
+ '</div>';
  }).join('');  
- return '<div class="chart-card" style="min-width:300px;">' +  
+ return '<div class="chart-card" style="min-width:0;">' +  
  '<div class="chart-card-title"><span>' + label + '</span></div>' +  
  '<div class="settings-item-list" id="settings_list_' + category + '">' + (rows || '<div style="color:#999; font-size:12px;">항목 없음</div>') + '</div>' +  
  '<div style="display:flex; gap:6px; margin-top:10px;">' +  
@@ -9751,23 +9761,22 @@ function settingsCategorySectionHtml_(category, label){
   
 function renderSettingsTab_(){  
  const cards = SETTINGS_CATEGORY_ORDER_.map(function(cat){ return settingsCategorySectionHtml_(cat, SETTINGS_CATEGORY_LABELS_[cat]); }).join('');  
- const taPortalCard = '<div class="chart-card" style="min-width:300px;">' +  
- '<div class="chart-card-title"><span>TA 관리 포털 링크</span></div>' +  
- '<div style="display:flex; gap:6px;">' +  
- '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="settings_ta_portal_url" placeholder="https://..." value="' + escAttr(TA_PORTAL_URL_ || '') + '" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;">' +  
- '<button onclick="saveTaPortalUrlSetting_()">저장</button>' +  
- '</div>' +  
- '</div>';  
-
- const introPortalCard = '<div class="chart-card" style="min-width:300px;">' +  
- '<div class="chart-card-title"><span>소개영업 포털 링크</span></div>' +  
- '<div style="display:flex; gap:6px;">' +  
- '<input autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" id="settings_intro_portal_url" placeholder="https://..." value="' + escAttr(INTRO_PORTAL_URL_ || '') + '" style="flex:1; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;">' +  
- '<button onclick="saveIntroPortalUrlSetting_()">저장</button>' +  
- '</div>' +  
- '</div>';  
-
-const subTab = (typeof SETTINGS_SUBTAB_ !== 'undefined' && SETTINGS_SUBTAB_ === 'targets') ? 'targets' : 'lists';
+ const IN_ = 'autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" placeholder="https://..." style="flex:1; min-width:0; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;"';
+ const taPortalCard = '<div class="chart-card" style="min-width:0;">' +
+ '<div class="chart-card-title"><span>연계 포털 링크</span></div>' +
+ '<div style="font-size:11px; color:#666; margin-bottom:3px;">TA 관리 포털</div>' +
+ '<div style="display:flex; gap:6px; margin-bottom:10px;">' +
+ '<input ' + IN_ + ' id="settings_ta_portal_url" value="' + escAttr(TA_PORTAL_URL_ || '') + '">' +
+ '<button onclick="saveTaPortalUrlSetting_()">저장</button>' +
+ '</div>' +
+ '<div style="font-size:11px; color:#666; margin-bottom:3px;">소개영업 포털</div>' +
+ '<div style="display:flex; gap:6px;">' +
+ '<input ' + IN_ + ' id="settings_intro_portal_url" value="' + escAttr(INTRO_PORTAL_URL_ || '') + '">' +
+ '<button onclick="saveIntroPortalUrlSetting_()">저장</button>' +
+ '</div>' +
+ '</div>';
+ const introPortalCard = '';
+ const subTab = (typeof SETTINGS_SUBTAB_ !== 'undefined' && SETTINGS_SUBTAB_ === 'targets') ? 'targets' : 'lists';
  const tabBtn = function(key, label){
    const on = subTab === key;
    return '<button onclick="settingsSwitchSub_(\'' + key + '\')" style="padding:8px 18px; border:1px solid #c7cfd8; border-bottom:' + (on ? '2px solid #5c1c2f' : '1px solid #c7cfd8') + '; background:' + (on ? '#fff' : '#eef1f4') + '; color:' + (on ? '#5c1c2f' : '#555') + '; font-weight:' + (on ? '700' : '500') + '; border-radius:6px 6px 0 0; cursor:pointer;">' + label + '</button>';
@@ -9776,9 +9785,9 @@ const subTab = (typeof SETTINGS_SUBTAB_ !== 'undefined' && SETTINGS_SUBTAB_ === 
  let body;
  if (subTab === 'lists') {
    body = '<div class="dash-head"><h2>기초 목록값 관리</h2>' +
-     '<button class="primary" onclick="settingsSaveAll_()">전체 저장</button>' +
+     '<span id="settings_autosave_status" style="font-size:12px; color:#6b7280;">변경하면 자동 저장됩니다</span>' +
      '</div>' +
-     '<div class="chart-grid">' + taPortalCard + introPortalCard + cards + '</div>';
+     '<div class="settings-grid4">' + taPortalCard + introPortalCard + cards + '</div>';
  } else {
    body = '<div class="dash-head" style="display:flex; align-items:center; gap:10px;"><h2 style="margin:0;">월별 목표/계획 관리</h2>' +
      '<button onclick="shiftTargetMonth(-1)">◀</button>' +
@@ -9862,11 +9871,93 @@ function settingsMoveItem_(category, idx, dir){
  if (!arr || newIdx < 0 || newIdx >= arr.length) return;  
  const tmp = arr[idx]; arr[idx] = arr[newIdx]; arr[newIdx] = tmp;  
  renderSettingsTab_();  
-}  
-  
+ settingsAutoSave_();
+}
+
+/* 드래그로 순서 변경 */
+var SETTINGS_DRAG_ = null;
+function settingsDragStart_(e, category, idx){
+  SETTINGS_DRAG_ = { cat: category, idx: idx };
+  try {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', category + ':' + idx);
+    const row = e.target.closest('.settings-item-row');
+    if (row) { e.dataTransfer.setDragImage(row, 10, 10); setTimeout(function(){ row.classList.add('dragging'); }, 0); }
+  } catch (err) {}
+}
+function settingsDragEnd_(){
+  SETTINGS_DRAG_ = null;
+  document.querySelectorAll('.settings-item-row.dragging, .settings-item-row.drag-over-top, .settings-item-row.drag-over-bottom').forEach(function(r){ r.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom'); });
+}
+function settingsDragOver_(e, category, idx){
+  if (!SETTINGS_DRAG_ || SETTINGS_DRAG_.cat !== category) return;
+  e.preventDefault();
+  const row = e.currentTarget, rect = row.getBoundingClientRect();
+  const top = (e.clientY - rect.top) < rect.height / 2;
+  row.classList.toggle('drag-over-top', top);
+  row.classList.toggle('drag-over-bottom', !top);
+}
+function settingsDragLeave_(e){ e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom'); }
+function settingsDrop_(e, category, idx){
+  if (!SETTINGS_DRAG_ || SETTINGS_DRAG_.cat !== category) return;
+  e.preventDefault();
+  const row = e.currentTarget, rect = row.getBoundingClientRect();
+  const after = (e.clientY - rect.top) >= rect.height / 2;
+  const from = SETTINGS_DRAG_.idx;
+  const arr = SETTINGS_LISTS[category];
+  settingsDragEnd_();
+  if (!arr || from == null) return;
+  let to = idx + (after ? 1 : 0);
+  const item = arr.splice(from, 1)[0];
+  if (from < to) to--;
+  arr.splice(to, 0, item);
+  renderSettingsTab_();
+  settingsAutoSave_();
+}
+
+/* 변경 즉시 자동 저장 (짧게 모아서 한 번에) */
+var SETTINGS_AUTOSAVE_TIMER_ = null;
+function settingsAutoSave_(){
+  if (SETTINGS_AUTOSAVE_TIMER_) clearTimeout(SETTINGS_AUTOSAVE_TIMER_);
+  const st = document.getElementById('settings_autosave_status');
+  if (st) { st.innerText = '저장 중...'; st.style.color = '#6b7280'; }
+  SETTINGS_AUTOSAVE_TIMER_ = setTimeout(function(){
+    SETTINGS_AUTOSAVE_TIMER_ = null;
+    const payload = {};
+    for (let i = 0; i < SETTINGS_CATEGORY_ORDER_.length; i++){
+      const category = SETTINGS_CATEGORY_ORDER_[i];
+      const items = SETTINGS_LISTS[category] || [];
+      if (!items.length) {
+        const s2 = document.getElementById('settings_autosave_status');
+        if (s2) { s2.innerText = '⚠ "' + (SETTINGS_CATEGORY_LABELS_[category] || category) + '"에 최소 1개 항목이 필요해 저장하지 않았습니다'; s2.style.color = '#c00000'; }
+        return;
+      }
+      const values = items.map(function(it){ return it.value; });
+      const renames = {};
+      items.forEach(function(it){ if (it.orig && it.orig !== it.value) renames[it.orig] = it.value; });
+      payload[category] = { items: values, defaultValue: SETTINGS_DEFAULTS[category] || values[0], renames: renames };
+    }
+    google.script.run
+      .withSuccessHandler(function(res){
+        const s3 = document.getElementById('settings_autosave_status');
+        if (!res || !res.success) { if (s3) { s3.innerText = '⚠ 자동 저장 실패: ' + ((res && res.error) || ''); s3.style.color = '#c00000'; } return; }
+        SETTINGS_CATEGORY_ORDER_.forEach(function(cat){ (SETTINGS_LISTS[cat] || []).forEach(function(it){ it.orig = it.value; }); });
+        if (res.defaults) SETTINGS_DEFAULTS = res.defaults;
+        applyEditableListsToClient_(res.lists, SETTINGS_DEFAULTS);
+        if (s3) { s3.innerText = '✓ 자동 저장됨 ' + new Date().toLocaleTimeString('ko-KR'); s3.style.color = '#15803d'; }
+      })
+      .withFailureHandler(function(err){
+        const s3 = document.getElementById('settings_autosave_status');
+        if (s3) { s3.innerText = '⚠ 자동 저장 실패: ' + err; s3.style.color = '#c00000'; }
+      })
+      .saveEditableListsBulk(SESSION.token, payload);
+  }, 500);
+}
+
 function settingsSetDefault_(category, value){  
  SETTINGS_DEFAULTS[category] = value;  
  renderSettingsTab_();  
+ settingsAutoSave_();
 }  
   
 function settingsRemoveItem_(category, idx){  
@@ -9875,6 +9966,7 @@ function settingsRemoveItem_(category, idx){
  arr.splice(idx, 1);  
  if (SETTINGS_DEFAULTS[category] === removed.value) SETTINGS_DEFAULTS[category] = (arr[0] && arr[0].value) || '';  
  renderSettingsTab_();  
+ settingsAutoSave_();
 }  
   
 function settingsAddItem_(category){  
@@ -9888,6 +9980,7 @@ function settingsAddItem_(category){
  renderSettingsTab_();  
  const newEl = document.getElementById('settings_input_' + category);  
  if (newEl) newEl.focus();  
+ settingsAutoSave_();
 }  
   
 /** 항목 명칭 수정: 입력창에서 포커스가 빠질 때(onchange) 호출됨. orig(원래 이름)는 그대로 유지하고 value만 바꾼다. */  
@@ -9905,6 +9998,7 @@ function settingsRenameItem_(category, idx, newValue){
  if (SETTINGS_DEFAULTS[category] === it.value) SETTINGS_DEFAULTS[category] = v; // 기본값으로 지정돼 있던 항목이면 기본값도 함께 갱신  
  it.value = v;  
  renderSettingsTab_();  
+ settingsAutoSave_();
 }  
   
 function settingsSaveAll_(){  
@@ -15868,9 +15962,9 @@ function renderTargetInput(){
     const sumStyle = 'border:1px solid #dce3ea !important; padding:6px 10px; background:#fdf5f6 !important;';
     const diffFmt = d => `<span class="${d === 0 ? 'diff-zero' : 'diff-warn'}">${d > 0 ? '+' + fmt(d) : fmt(d)}</span>`;
     panelsHtml += `
-      <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); flex:0 0 auto;">
-        <div style="font-size:15px; font-weight:700; color:#1c2f4a; margin-bottom:4px;">${p}</div>
-        <table class="tgt-table" style="border-collapse:collapse; font-size:12.5px; white-space:nowrap;">
+      <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:10px 12px; box-shadow:0 1px 3px rgba(0,0,0,0.04); min-width:0;">
+        <div style="font-size:14px; font-weight:700; color:#1c2f4a; margin-bottom:4px;">${p}</div>
+        <table class="tgt-table tgt-compact" style="border-collapse:collapse; font-size:12px; white-space:nowrap; width:100% !important;">
           <thead><tr style="background:#f5e6e8 !important;">
             <th style="${TH}">영업담당</th><th style="${TH}">비율(%)</th>
             ${COMPS.map(c => `<th style="${TH}">${c[1]}${(c[0]==='dec'||c[0]==='inc') ? '<br><span style="font-size:10px; font-weight:normal;">(자동)</span>' : ''}</th>`).join('')}
@@ -15878,16 +15972,16 @@ function renderTargetInput(){
           <tbody>
             ${repRows}
             <tr class="summary-row" style="font-weight:700; color:#1c2f4a;">
-              <td style="${sumStyle} text-align:center;">비율합계 / 합계(천원)</td>
+              <td style="${sumStyle} text-align:center;">합계</td>
               <td style="${sumStyle} text-align:center;" id="sum_ratio_${p}">${sumRatio.toFixed(2)}%</td>
               ${COMPS.map(c => `<td style="${sumStyle} text-align:right;" id="sum_amt_${p}_${c[0]}">${fmt(sums[c[0]])}</td>`).join('')}
             </tr>
             <tr class="summary-row" style="font-weight:700; color:#1c2f4a;">
-              <td style="${sumStyle} text-align:center;">${p} 목표</td><td style="${sumStyle}"></td>
+              <td style="${sumStyle} text-align:center;">목표</td><td style="${sumStyle}"></td>
               ${COMPS.map(c => `<td style="${sumStyle} text-align:right;" id="ref_tgt_${p}_${c[0]}">${fmt(t[c[0]])}</td>`).join('')}
             </tr>
             <tr class="summary-row" style="font-weight:700;">
-              <td style="${sumStyle} text-align:center; color:#1c2f4a;">차이(합계-상품목표)</td><td style="${sumStyle}"></td>
+              <td style="${sumStyle} text-align:center; color:#1c2f4a;">차이</td><td style="${sumStyle}"></td>
               ${COMPS.map(c => `<td style="${sumStyle} text-align:right;" id="diff_${p}_${c[0]}">${diffFmt(sums[c[0]] - t[c[0]])}</td>`).join('')}
             </tr>
           </tbody>
@@ -15896,7 +15990,7 @@ function renderTargetInput(){
   });
 
   const html = `
-    <div id="targetInputWrap" style="padding:18px 24px; max-width:1600px; margin:0 auto; background:#f4f6f8; min-height:calc(100vh - 120px);">
+    <div id="targetInputWrap" style="padding:12px 12px; max-width:none; margin:0 auto; background:#f4f6f8; min-height:calc(100vh - 120px);">
       <div style="font-size:16px; font-weight:700; color:#5c1c2f; margin-bottom:6px;">${y}.${m}월 상품종류별 목표/계획 (단위: 천원)</div>
 
       <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:28px;">
@@ -15945,8 +16039,8 @@ function renderTargetInput(){
 
       <div style="font-size:16px; font-weight:700; color:#1c2f4a; margin-top:24px; margin-bottom:4px;">컨설턴트별 목표 입력</div>
 
-      <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:14px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-block; margin-bottom:16px;">
-        <div style="font-size:15px; font-weight:700; color:#5c1c2f; margin-bottom:4px;">공통 비율</div>
+      <div style="background:#ffffff; border:1px solid #dce3ea; border-radius:6px; padding:10px 12px; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-block; margin-bottom:10px;">
+        <div style="font-size:14px; font-weight:700; color:#5c1c2f; margin-bottom:4px;">공통 비율</div>
         <table class="tgt-table" style="border-collapse:collapse; font-size:12.5px;">
           <thead><tr style="background:#f5e6e8 !important;"><th style="${TH}">영업담당</th><th style="${TH}">비율(%)</th></tr></thead>
           <tbody>${commonRows}
@@ -15955,7 +16049,7 @@ function renderTargetInput(){
         </table>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:16px; overflow-x:auto; padding-bottom:16px;">
+      <div class="tgt-panels-grid">
         ${panelsHtml}
       </div>
     </div>`;
