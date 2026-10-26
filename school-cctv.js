@@ -22,9 +22,10 @@
   var VISIT_OPTS = ['미방문', '전화', '직접방문'];
   var RESULT_OPTS = ['내용확인', '견적제출', '계약예정', '계약완료', '실패'];
   var OPTS = { budget_status: BUDGET_OPTS, visit_type: VISIT_OPTS, visit_result: RESULT_OPTS };
-  var NUM_MAX = { budget_amount: 99999999999, add_camera: 9999, add_recorder: 9999 };
+  var NUM_MAX = { budget_amount: 99999999999, quote_amount: 99999999999, add_camera: 9999, add_recorder: 9999 };
+  var AMT_FIELDS = { budget_amount: 1, quote_amount: 1 };      // 금액 필드(천원 단위, 항상 우측 정렬)
   var FIELD_LABEL = {
-    budget_status: '예산확보여부', budget_amount: '확보예산금액', add_camera: '증설 카메라',
+    budget_status: '예산확보여부', budget_amount: '확보예산금액', quote_amount: '견적제출 금액', add_camera: '증설 카메라',
     add_recorder: '증설 녹화장비', visit_type: '방문여부', visit_result: '방문결과'
   };
 
@@ -40,6 +41,9 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  function effBudget(r) { return r.budget_status || '미확인'; }                 // 기본값: 예산확보여부 '미확인'
+  function effAmt(r) { return r.budget_amount == null ? 0 : Number(r.budget_amount); }   // 기본값: 확보예산금액 0
+  function effVisit(r) { return r.visit_type || '미방문'; }      // 서버 값이 비어 있어도 '미방문'으로 취급
   function fmt(v) { return (v === null || v === undefined || v === '') ? '' : Number(v).toLocaleString('ko-KR'); }
   function numOrZero(v) { return (v === null || v === undefined || v === '') ? 0 : Number(v); }
   function pct(a, b) { return b ? (Math.round(a * 1000 / b) / 10).toFixed(1) + '%' : '-'; }
@@ -92,6 +96,14 @@
       '.scc-btn:hover{background:#f1f5f9;}',
       '.scc-head .scc-btn{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.35);}',
       '.scc-head .scc-btn:hover{background:rgba(255,255,255,.26);}',
+      '.scc-top{background:#fff;border-bottom:1px solid #d5dbe3;padding:10px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;}',
+      '.scc-card{border:1px solid #cfd8e3;border-left:4px solid var(--scc-head,#1c2f4a);border-radius:8px;padding:7px 12px;background:#f8fafc;min-width:0;}',
+      '.scc-card .l{font-size:11px;color:#64748b;}',
+      '.scc-card .v{font-size:22px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap;}',
+      '.scc-card .v small{font-size:13px;font-weight:600;color:#64748b;margin-left:2px;}',
+      '.scc-card .s{font-size:11px;color:#64748b;margin-top:1px;}',
+      '.scc-card.amt .l,.scc-card.amt .v,.scc-card.amt .s{text-align:right;}',
+      '.amt{text-align:right !important;}',
       '.scc-sum{background:#fff;border-bottom:1px solid #d5dbe3;padding:10px 18px 12px;overflow:auto;max-height:46vh;}',
       '.scc-sum.hide{display:none;}',
       '.scc-tiles{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}',
@@ -160,18 +172,24 @@
       'tr.scc-saving td.in{opacity:.55;}',
       'tr.scc-saved td.in.ro{background:#dcfce7;}',
       'tr.scc-err td.in.ro{background:#fee2e2;}',
+      'table.scc .sx{position:sticky;right:0;z-index:2;text-align:center;padding:1px 2px;box-shadow:-2px 0 0 #cbd5e1;}',
+      'table.scc thead th.sx{z-index:5;font-size:11px;}',
+      '.scc-x{width:26px;height:26px;border-radius:50%;border:1px solid #fca5a5;background:#fff;color:#dc2626;font-size:14px;font-weight:700;line-height:1;cursor:pointer;padding:0;}',
+      '.scc-x:hover{background:#dc2626;color:#fff;border-color:#dc2626;}',
+      '.scc-x.idle{opacity:.28;}',
+      '.scc-x.idle:hover{background:#fff;color:#dc2626;}',
       '.scc-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1f2937;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:100001;max-width:92vw;box-shadow:0 6px 20px rgba(0,0,0,.3);}',
       '.scc-toast.err{background:#b91c1c;}',
       '.scc-setup{margin:30px auto;max-width:720px;background:#fff;border:1px solid #fca5a5;border-radius:10px;padding:20px 24px;font-size:14px;line-height:1.7;}',
       '.scc-setup code{background:#f1f5f9;padding:1px 6px;border-radius:4px;}',
-      '@media (max-width:700px){.scc-head{padding:8px 10px;gap:6px;}.scc-head h2{font-size:16px;}.scc-head .scc-btn{padding:5px 8px;font-size:12px;}.scc-bar-tools{padding:6px 10px;}.scc-sum{padding:8px 10px;}}'
+      '@media (max-width:700px){.scc-top{padding:6px 10px;gap:6px;grid-template-columns:1fr 1fr;}.scc-card{padding:5px 8px;}.scc-card .v{font-size:16px;}.scc-card .v small{font-size:11px;}.scc-card .s{font-size:10px;}.scc-head{padding:8px 10px;gap:6px;}.scc-head h2{font-size:16px;}.scc-head .scc-btn{padding:5px 8px;font-size:12px;}.scc-bar-tools{padding:6px 10px;}.scc-sum{padding:8px 10px;}}'
     ].join('\n');
     var st = document.createElement('style'); st.id = 'scc-style'; st.textContent = css;
     document.head.appendChild(st);
   }
 
   /* ------------------------------------------------------------------ 골격 */
-  var COLS = [44, 176, 74, 62, 74, 118, 60, 46, 46, 46, 58, 98, 112, 84, 92, 100, 78, 100, 96];
+  var COLS = [44, 176, 74, 62, 74, 118, 60, 46, 46, 46, 58, 98, 112, 84, 92, 100, 78, 100, 124, 96, 46];
 
   function buildShell() {
     if (document.getElementById('sccOverlay')) return;
@@ -188,12 +206,13 @@
         '<button class="scc-btn" id="sccRefreshBtn">↻ 새로고침</button>' +
         '<button class="scc-btn" id="sccCloseBtn">✕ 닫기</button>' +
       '</div>' +
+      '<div class="scc-top" id="sccTop"></div>' +
       '<div class="scc-sum" id="sccSum" style="display:none;"></div>' +
       '<div class="scc-bar-tools" id="sccTools">' +
         '<input type="text" id="sccQ" placeholder="학교명 검색" autocomplete="off">' +
         '<select id="sccFOffice"></select><select id="sccFDistrict"></select><select id="sccFGuard"></select>' +
         '<select id="sccFBudget"></select><select id="sccFVisit"></select><select id="sccFResult"></select>' +
-        '<label class="chk"><input type="checkbox" id="sccFUnfilled">방문여부 미입력만</label>' +
+        '<label class="chk"><input type="checkbox" id="sccFUnfilled">미방문만 보기</label>' +
         '<label class="chk"><input type="checkbox" id="sccFMine">내가 입력한 것만</label>' +
         '<button class="scc-btn" id="sccResetBtn">필터 초기화</button>' +
         '<span class="scc-cnt" id="sccCnt"></span>' +
@@ -205,14 +224,14 @@
               '<th rowspan="2" class="s1">No</th><th rowspan="2" class="s2">학교명</th>' +
               '<th rowspan="2">교육지원청</th><th rowspan="2">구</th><th rowspan="2">경비업체</th><th rowspan="2">비고</th>' +
               '<th colspan="5">기존 CCTV 설치현황</th>' +
-              '<th colspan="2" class="g-in">예산</th><th colspan="2" class="g-in2">증설대수</th><th colspan="3" class="g-in">방문</th>' +
-              '<th rowspan="2" class="g-in2">최종수정</th>' +
+              '<th colspan="2" class="g-in">예산</th><th colspan="2" class="g-in2">증설대수</th><th colspan="4" class="g-in">방문</th>' +
+              '<th rowspan="2" class="g-in2">최종수정</th><th rowspan="2" class="sx" title="행 입력 내용 초기화">초기화</th>' +
             '</tr>' +
             '<tr class="r2">' +
               '<th>설치대수</th><th>복도</th><th>계단</th><th>교문</th><th>출입구</th>' +
-              '<th class="g-in">확보여부</th><th class="g-in">확보금액(천원)</th>' +
+              '<th class="g-in">확보여부</th><th class="g-in amt">확보금액(천원)</th>' +
               '<th class="g-in2">카메라(대)</th><th class="g-in2">녹화장비(대)</th>' +
-              '<th class="g-in">방문여부</th><th class="g-in">방문자</th><th class="g-in">방문결과</th>' +
+              '<th class="g-in">방문여부</th><th class="g-in">방문자</th><th class="g-in">방문결과</th><th class="g-in amt">견적제출금액(천원)</th>' +
             '</tr>' +
           '</thead><tbody id="sccBody"></tbody>' +
         '</table>' +
@@ -232,15 +251,19 @@
 
     var body = o.querySelector('#sccBody');
     body.addEventListener('change', onCellChange);
+    body.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('[data-act="reset"]') : null;
+      if (b) resetRow(b.closest('tr'));
+    });
     body.addEventListener('focusin', function (e) {
       var el = e.target;
-      if (el.getAttribute && el.getAttribute('data-f') === 'budget_amount') {
+      if (el.getAttribute && AMT_FIELDS[el.getAttribute('data-f')]) {
         el.value = el.value.replace(/,/g, ''); try { el.select(); } catch (x) { /* noop */ }
       }
     });
     body.addEventListener('focusout', function (e) {
       var el = e.target;
-      if (el.getAttribute && el.getAttribute('data-f') === 'budget_amount') {
+      if (el.getAttribute && AMT_FIELDS[el.getAttribute('data-f')]) {
         var raw = el.value.replace(/,/g, '').trim();
         if (/^\d+$/.test(raw)) el.value = fmt(raw);
       }
@@ -330,7 +353,7 @@
     var code = err && err.code ? String(err.code) : '';
     var noTable = code === '42P01' || code === 'PGRST205' || /does not exist|schema cache|Could not find the table/i.test(msg);
     var rls = code === '42501' || /row-level security|permission denied/i.test(msg);
-    var h = '<tr><td colspan="19" style="height:auto;white-space:normal;padding:0;border:0;"><div class="scc-setup">' +
+    var h = '<tr><td colspan="21" style="height:auto;white-space:normal;padding:0;border:0;"><div class="scc-setup">' +
       '<b style="color:#b91c1c;">학교 CCTV 데이터를 불러오지 못했습니다.</b><br>' +
       (noTable ? '<code>school_cctv</code> 테이블이 아직 없습니다. Supabase <b>SQL Editor</b>에서 <code>school_cctv.sql</code> 파일 전체를 한 번 실행한 뒤 [새로고침]을 눌러 주세요.' :
         rls ? '권한(RLS) 문제입니다. <code>school_cctv.sql</code> 파일 안의 policy / grant 구문이 실행되었는지 확인해 주세요.' :
@@ -356,10 +379,10 @@
     fillSelect('sccFOffice', '교육지원청 전체', distinct('edu_office'), f.office);
     fillSelect('sccFDistrict', '구 전체', distinct('district'), f.district);
     fillSelect('sccFGuard', '경비업체 전체', distinct('guard_company'), f.guard);
-    fillSelect('sccFBudget', '예산 전체', ['__none'].concat(BUDGET_OPTS), f.budget);
-    fillSelect('sccFVisit', '방문여부 전체', ['__none'].concat(VISIT_OPTS), f.visit);
+    fillSelect('sccFBudget', '예산확보여부 전체', BUDGET_OPTS, f.budget);
+    fillSelect('sccFVisit', '방문여부 전체', VISIT_OPTS, f.visit);
     fillSelect('sccFResult', '방문결과 전체', ['__none'].concat(RESULT_OPTS), f.result);
-    ['sccFBudget', 'sccFVisit', 'sccFResult'].forEach(function (id) {
+    ['sccFResult'].forEach(function (id) {
       var op = document.querySelector('#' + id + ' option[value="__none"]'); if (op) op.textContent = '(미입력)';
     });
   }
@@ -391,10 +414,10 @@
       if (f.office && r.edu_office !== f.office) return false;
       if (f.district && r.district !== f.district) return false;
       if (f.guard && r.guard_company !== f.guard) return false;
-      if (!matchEnum(r.budget_status, f.budget)) return false;
-      if (!matchEnum(r.visit_type, f.visit)) return false;
+      if (!matchEnum(effBudget(r), f.budget)) return false;
+      if (!matchEnum(effVisit(r), f.visit)) return false;
       if (!matchEnum(r.visit_result, f.result)) return false;
-      if (f.unfilled && r.visit_type) return false;
+      if (f.unfilled && effVisit(r) !== '미방문') return false;
       if (f.mine && !(who && (r.visitor === who || r.updated_by === who))) return false;
       return true;
     });
@@ -402,13 +425,17 @@
 
   /* ------------------------------------------------------------------ 표 렌더 */
   function selectHtml(field, cur) {
-    var o = '<option value=""></option>' + OPTS[field].map(function (v) {
+    var o = (field === 'visit_type' || field === 'budget_status' ? '' : '<option value=""></option>') + OPTS[field].map(function (v) {
       return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
     }).join('');
     return '<select class="scc-in" data-f="' + field + '" data-v="' + esc(cur || '') + '">' + o + '</select>';
   }
   function numInput(field, v) {
     return '<input class="scc-in num" type="number" min="0" step="1" data-f="' + field + '" value="' + (v == null ? '' : esc(v)) + '" placeholder="0">';
+  }
+  function hasInput(r) {     // 직원이 입력한 값이 있는지 (기본값: 미방문 / 미확인 / 금액 0 은 입력으로 보지 않음)
+    return !!(effBudget(r) !== '미확인' || effAmt(r) > 0 || r.add_camera != null || r.add_recorder != null || r.quote_amount != null ||
+      r.visit_result || r.visitor || effVisit(r) !== '미방문');
   }
   function budgetWarn(r) { return numOrZero(r.budget_amount) > 0 && r.budget_status !== '확보'; }
   var WARN_TITLE = '확보예산금액이 입력되었지만 예산확보여부가 \'확보\'가 아닙니다. 확인해 주세요.';
@@ -423,46 +450,51 @@
       '<td class="num">' + fmt(r.install_cnt) + '</td><td class="num">' + fmt(r.cnt_corridor) + '</td>' +
       '<td class="num">' + fmt(r.cnt_stairs) + '</td><td class="num">' + fmt(r.cnt_gate) + '</td>' +
       '<td class="num">' + fmt(r.cnt_entrance) + '</td>' +
-      '<td class="in">' + selectHtml('budget_status', r.budget_status) + '</td>' +
-      '<td class="in"><input class="scc-in num' + (budgetWarn(r) ? ' warn' : '') + '"' + (budgetWarn(r) ? ' title="' + WARN_TITLE + '"' : '') + ' type="text" inputmode="numeric" data-f="budget_amount" value="' + esc(fmt(r.budget_amount)) + '" placeholder="천원"></td>' +
+      '<td class="in">' + selectHtml('budget_status', effBudget(r)) + '</td>' +
+      '<td class="in"><input class="scc-in num amt' + (budgetWarn(r) ? ' warn' : '') + '"' + (budgetWarn(r) ? ' title="' + WARN_TITLE + '"' : '') + ' type="text" inputmode="numeric" data-f="budget_amount" value="' + esc(fmt(effAmt(r))) + '" placeholder="천원"></td>' +
       '<td class="in">' + numInput('add_camera', r.add_camera) + '</td>' +
       '<td class="in">' + numInput('add_recorder', r.add_recorder) + '</td>' +
-      '<td class="in">' + selectHtml('visit_type', r.visit_type) + '</td>' +
+      '<td class="in">' + selectHtml('visit_type', effVisit(r)) + '</td>' +
       '<td class="in ro" data-c="visitor">' + esc(r.visitor) + '</td>' +
       '<td class="in">' + selectHtml('visit_result', r.visit_result) + '</td>' +
+      '<td class="in"><input class="scc-in num amt" type="text" inputmode="numeric" data-f="quote_amount" value="' + esc(fmt(r.quote_amount)) + '" placeholder="천원"></td>' +
       '<td class="in ro" data-c="upd" title="' + esc(r.updated_by) + '">' + esc(r.updated_at && r.updated_by ? fmtTime(r.updated_at) : '') + '</td>' +
+      '<td class="sx"><button type="button" class="scc-x' + (hasInput(r) ? '' : ' idle') + '" data-act="reset" title="이 행에 입력한 내용 초기화" aria-label="초기화">✕</button></td>' +
       '</tr>';
   }
   function renderTable() {
     var rows = visibleRows();
     var body = document.getElementById('sccBody');
     body.innerHTML = rows.length ? rows.map(rowHtml).join('') :
-      '<tr><td colspan="19" style="height:80px;text-align:center;color:#64748b;">조건에 맞는 학교가 없습니다.</td></tr>';
+      '<tr><td colspan="21" style="height:80px;text-align:center;color:#64748b;">조건에 맞는 학교가 없습니다.</td></tr>';
     document.getElementById('sccCnt').textContent = '표시 ' + rows.length + ' / 전체 ' + state.rows.length + '개교';
   }
   function renderAll() {
     document.getElementById('sccSub').textContent = '북서울지사 · 총 ' + state.rows.length + '개교 · 입력 로그인: ' + me();
     renderFilterOptions(); renderTable();
-    if (isBoss()) renderSummary();
+    renderTop(); if (isBoss()) renderSummary();
   }
 
   /* ------------------------------------------------------------------ 저장 */
   function parseValue(field, raw) {
     raw = String(raw == null ? '' : raw).trim();
     if (OPTS[field]) {
-      if (raw === '') return null;
+      if (raw === '') return field === 'visit_type' ? '미방문' : (field === 'budget_status' ? '미확인' : null);
       if (OPTS[field].indexOf(raw) < 0) throw new Error('허용되지 않는 값입니다: ' + raw);
       return raw;
     }
     raw = raw.replace(/,/g, '');
-    if (raw === '') return null;
+    if (raw === '') return field === 'budget_amount' ? 0 : null;
     if (!/^\d+$/.test(raw)) throw new Error(FIELD_LABEL[field] + ': 0 이상의 숫자만 입력할 수 있습니다.');
     var n = Number(raw);
     if (n > NUM_MAX[field]) throw new Error(FIELD_LABEL[field] + ': 값이 너무 큽니다. (최대 ' + fmt(NUM_MAX[field]) + ')');
     return n;
   }
   function displayValue(field, v) {
-    if (field === 'budget_amount') return fmt(v);
+    if (field === 'budget_amount') return fmt(v == null ? 0 : v);
+    if (AMT_FIELDS[field]) return fmt(v);
+    if (field === 'visit_type') return v || '미방문';
+    if (field === 'budget_status') return v || '미확인';
     return v == null ? '' : String(v);
   }
 
@@ -474,7 +506,8 @@
     var val;
     try { val = parseValue(field, el.value); }
     catch (err) { toast(err.message, true); el.value = displayValue(field, row[field]); return; }
-    if (val === (row[field] == null ? null : row[field])) { el.value = displayValue(field, row[field]); return; }
+    var cur = field === 'visit_type' ? effVisit(row) : field === 'budget_status' ? effBudget(row) : field === 'budget_amount' ? effAmt(row) : (row[field] == null ? null : row[field]);
+    if (val === cur) { el.value = displayValue(field, row[field]); return; }
     saveField(row, field, val, el, tr);
   }
 
@@ -497,26 +530,69 @@
       applyRowToDom(tr, row, field);
       tr.classList.remove('scc-saving'); tr.classList.add('scc-saved');
       setTimeout(function () { tr.classList.remove('scc-saved'); }, 1200);
-      if (isBoss()) renderSummary();
+      renderTop(); if (isBoss()) renderSummary();
       logChange(row, field, before, val);
     } catch (err) {
       tr.classList.remove('scc-saving'); tr.classList.add('scc-err');
       el.value = displayValue(field, before);
-      if (el.tagName === 'SELECT') el.setAttribute('data-v', before || '');
+      if (el.tagName === 'SELECT') el.setAttribute('data-v', field === 'visit_type' ? (before || '미방문') : field === 'budget_status' ? (before || '미확인') : (before || ''));
       var m = err && err.message ? err.message : String(err);
       toast('저장 실패 — ' + m + (/row-level security|permission denied/i.test(m) ? ' (school_cctv.sql 의 policy/grant 실행 여부 확인)' : ''), true);
     } finally { state.pending--; }
   }
 
   function applyRowToDom(tr, row, changedField) {
+    var xb = tr.querySelector('.scc-x'); if (xb) xb.classList.toggle('idle', !hasInput(row));
     var v = tr.querySelector('[data-c="visitor"]'); if (v) v.textContent = row.visitor || '';
     var u = tr.querySelector('[data-c="upd"]');
     if (u) { u.textContent = row.updated_by ? fmtTime(row.updated_at) : ''; u.title = row.updated_by || ''; }
-    tr.querySelectorAll('select[data-f]').forEach(function (s) { s.setAttribute('data-v', row[s.getAttribute('data-f')] || ''); });
+    tr.querySelectorAll('select[data-f]').forEach(function (s) {
+      var f = s.getAttribute('data-f'); s.setAttribute('data-v', f === 'visit_type' ? effVisit(row) : f === 'budget_status' ? effBudget(row) : (row[f] || ''));
+    });
     var amt = tr.querySelector('[data-f="budget_amount"]');
     if (amt) { amt.classList.toggle('warn', budgetWarn(row)); if (budgetWarn(row)) amt.title = WARN_TITLE; else amt.removeAttribute('title'); }
     var inp = tr.querySelector('[data-f="' + changedField + '"]');
     if (inp && inp.tagName !== 'SELECT') inp.value = displayValue(changedField, row[changedField]);
+  }
+
+  /* 행 초기화: 직원이 입력한 항목만 처음 상태로 되돌린다(학교 기본정보는 유지). 방문여부는 기본값 '미방문', 최종수정 정보도 비운다. */
+  async function resetRow(tr) {
+    if (!tr) return;
+    var no = Number(tr.getAttribute('data-no')), row = state.byNo[no];
+    if (!row) return;
+    if (!me()) { toast('로그인 정보를 확인할 수 없습니다. 다시 로그인해 주세요.', true); return; }
+    if (!hasInput(row)) { toast('초기화할 입력 내용이 없습니다.'); return; }
+    var msg = '「' + row.school_name + '」 행에 입력한 내용을 모두 초기화할까요?\n\n' +
+      '예산확보여부(→미확인) · 확보예산금액(→0) · 증설대수 · 방문여부(→미방문) · 방문자 · 방문결과 · 견적제출금액이 처음 상태로 돌아갑니다.\n(되돌릴 수 없습니다)';
+    if (!window.confirm(msg)) return;
+    var patch = { budget_status: '미확인', budget_amount: 0, add_camera: null, add_recorder: null, visit_type: '미방문',
+      visitor: null, visit_result: null, quote_amount: null, updated_by: null, updated_at: null };
+    var before = Object.assign({}, row);
+    state.pending++; tr.classList.remove('scc-saved', 'scc-err'); tr.classList.add('scc-saving');
+    try {
+      var res = await db().from(TABLE).update(patch).eq('no', row.no).select();
+      if (res.error) throw res.error;
+      if (!res.data || !res.data.length) throw new Error('저장된 행이 없습니다. (권한 정책을 확인해 주세요)');
+      Object.assign(row, res.data[0]);
+      var cur = document.querySelector('#sccBody tr[data-no="' + no + '"]') || tr;
+      cur.outerHTML = rowHtml(row);
+      var nt = document.querySelector('#sccBody tr[data-no="' + no + '"]');
+      if (nt) { nt.classList.add('scc-saved'); setTimeout(function () { nt.classList.remove('scc-saved'); }, 1200); }
+      renderTop(); if (isBoss()) renderSummary();
+      toast('「' + row.school_name + '」 입력 내용을 초기화했습니다.');
+      try {
+        if (typeof window.logUserAction_ === 'function') {
+          var p = window.logUserAction_('학교CCTV 수정', 'schoolcctv', 'S' + row.no,
+            { company: row.school_name, desc: row.school_name + ' · 입력 내용 초기화 (이전: 방문여부 ' + effVisit(before) + ', 방문결과 ' + (before.visit_result || '없음') +
+              ', 예산 ' + effBudget(before) + ', 예산금액 ' + fmt(effAmt(before)) + ', 견적금액 ' + fmt(before.quote_amount) + ')' });
+          if (p && p.catch) p.catch(function () { });
+        }
+      } catch (e) { /* noop */ }
+    } catch (err) {
+      tr.classList.remove('scc-saving'); tr.classList.add('scc-err');
+      var m = err && err.message ? err.message : String(err);
+      toast('초기화 실패 — ' + m + (/row-level security|permission denied/i.test(m) ? ' (school_cctv.sql 의 policy/grant 실행 여부 확인)' : ''), true);
+    } finally { state.pending--; }
   }
 
   function logChange(row, field, before, after) {      // 기존 포털의 변경이력(activity_logs)에 함께 남긴다. 실패해도 무시.
@@ -552,13 +628,14 @@
   };
   function agg(list) {
     var a = {
-      n: list.length, install: 0, visited: 0, budgetOk: 0, amount: 0, cam: 0, rec: 0, quote: 0, plan: 0, done: 0, fail: 0
+      n: list.length, install: 0, visited: 0, budgetOk: 0, amount: 0, qAmt: 0, qN: 0, cam: 0, rec: 0, quote: 0, plan: 0, done: 0, fail: 0
     };
     list.forEach(function (r) {
       a.install += numOrZero(r.install_cnt);
       if (r.visit_type === '전화' || r.visit_type === '직접방문') a.visited++;
       if (r.budget_status === '확보') a.budgetOk++;
       a.amount += numOrZero(r.budget_amount); a.cam += numOrZero(r.add_camera); a.rec += numOrZero(r.add_recorder);
+      a.qAmt += numOrZero(r.quote_amount); if (numOrZero(r.quote_amount) > 0) a.qN++;
       if (r.visit_result === '견적제출') a.quote++;
       if (r.visit_result === '계약예정') a.plan++;
       if (r.visit_result === '계약완료') a.done++;
@@ -567,11 +644,33 @@
     return a;
   }
   function count(list, key, val) { return list.filter(function (r) { return val === null ? !r[key] : r[key] === val; }).length; }
+  function won(amountK) {     // 천원 단위 금액을 읽기 쉬운 원 단위 표기로 (예: 1,235,067천원 → 약 12.35억원)
+    var w = amountK * 1000;
+    if (w >= 1e8) return '약 ' + (w / 1e8).toFixed(2) + '억원';
+    if (w >= 1e4) return '약 ' + Math.round(w / 1e4).toLocaleString('ko-KR') + '만원';
+    return w.toLocaleString('ko-KR') + '원';
+  }
 
-  function barHtml(title, list, key, opts, colors) {
-    var total = list.length || 1, segs = '', leg = '';
-    opts.concat([null]).forEach(function (o, i) {
-      var c = count(list, key, o), w = c * 100 / total, col = o === null ? '#e5e7eb' : colors[i];
+  /* 상단 요약 (모든 사용자): 방문학교수/전체학교수 · 예산확보 학교수 · 예산총액 · 당사제안총액 */
+  function renderTop() {
+    var el = document.getElementById('sccTop'); if (!el) return;
+    var list = state.rows, a = agg(list), mismatch = list.filter(budgetWarn).length;
+    var cards = [
+      { l: '방문 학교 / 전체 학교', v: a.visited + ' / ' + fmt(a.n) + '<small>개교</small>', s: '방문율 ' + pct(a.visited, a.n) + ' (전화+직접방문)' },
+      { l: '예산 확보 학교', v: a.budgetOk + '<small>개교</small>', s: '전체 대비 ' + pct(a.budgetOk, a.n) },
+      { l: '예산 총액 (확보예산금액 합)', v: fmt(a.amount) + '<small>천원</small>', s: won(a.amount) + (mismatch ? ' · ⚠ 확보 아님 상태에 금액 ' + mismatch + '건 포함' : ''), amt: 1 },
+      { l: '당사 제안 총액 (견적제출금액 합)', v: fmt(a.qAmt) + '<small>천원</small>', s: '제안 ' + a.qN + '개교 · ' + won(a.qAmt), amt: 1 }
+    ];
+    el.innerHTML = cards.map(function (c) {
+      return '<div class="scc-card' + (c.amt ? ' amt' : '') + '"><div class="l">' + c.l + '</div><div class="v">' + c.v + '</div><div class="s">' + esc(c.s) + '</div></div>';
+    }).join('');
+  }
+
+  function barHtml(title, list, getter, opts, colors, showNone) {
+    var total = list.length || 1, segs = '', leg = '', all = showNone ? opts.concat([null]) : opts;
+    all.forEach(function (o, i) {
+      var c = list.filter(function (r) { var v = getter(r); return o === null ? !v : v === o; }).length;
+      var w = c * 100 / total, col = o === null ? '#e5e7eb' : colors[i];
       var name = o === null ? '미입력' : o;
       if (c) segs += '<i title="' + esc(name) + ' ' + c + '" style="width:' + w + '%;background:' + col + '"></i>';
       leg += '<span><b style="background:' + (o === null ? '#cbd5e1' : col) + '"></b>' + esc(name) + ' ' + c + '</span>';
@@ -582,10 +681,10 @@
     var g = GROUPS[gb], buckets = {}, order = [];
     list.forEach(function (r) { var k = g.key(r); if (!buckets[k]) { buckets[k] = []; order.push(k); } buckets[k].push(r); });
     order.sort(function (a, b) { return buckets[b].length - buckets[a].length; });
-    var th = '<tr><th>구분</th><th>학교수</th><th>설치대수</th><th>방문</th><th>방문율</th><th>예산확보</th><th>확보예산(천원)</th><th>증설 카메라</th><th>증설 녹화</th><th>견적</th><th>계약예정</th><th>계약완료</th></tr>';
+    var th = '<tr><th>구분</th><th>학교수</th><th>설치대수</th><th>방문</th><th>방문율</th><th>예산확보</th><th>확보예산(천원)</th><th>제안금액(천원)</th><th>증설 카메라</th><th>증설 녹화</th><th>견적</th><th>계약예정</th><th>계약완료</th></tr>';
     function tr(name, a, cls) {
       return '<tr class="' + (cls || '') + '"><td>' + esc(name) + '</td><td>' + fmt(a.n) + '</td><td>' + fmt(a.install) + '</td><td>' + a.visited + '</td><td>' + pct(a.visited, a.n) +
-        '</td><td>' + a.budgetOk + '</td><td>' + fmt(a.amount) + '</td><td>' + fmt(a.cam) + '</td><td>' + fmt(a.rec) + '</td><td>' + a.quote + '</td><td>' + a.plan + '</td><td>' + a.done + '</td></tr>';
+        '</td><td>' + a.budgetOk + '</td><td>' + fmt(a.amount) + '</td><td>' + fmt(a.qAmt) + '</td><td>' + fmt(a.cam) + '</td><td>' + fmt(a.rec) + '</td><td>' + a.quote + '</td><td>' + a.plan + '</td><td>' + a.done + '</td></tr>';
     }
     return '<table class="scc-mini">' + th + order.map(function (k) { return tr(k, agg(buckets[k])); }).join('') + tr('합계', agg(list), 'tot') + '</table>';
   }
@@ -594,29 +693,26 @@
     list.forEach(function (r) { if (!r.visitor) return; if (!by[r.visitor]) { by[r.visitor] = []; order.push(r.visitor); } by[r.visitor].push(r); });
     order.sort(function (a, b) { return by[b].length - by[a].length; });
     if (!order.length) return '<div style="font-size:12px;color:#64748b;padding:6px 0;">아직 입력된 방문 데이터가 없습니다.</div>';
-    var th = '<tr><th>입력자</th><th>학교수</th><th>직접방문</th><th>전화</th><th>견적</th><th>계약예정</th><th>계약완료</th><th>실패</th></tr>';
+    var th = '<tr><th>입력자</th><th>학교수</th><th>직접방문</th><th>전화</th><th>견적</th><th>제안금액(천원)</th><th>계약예정</th><th>계약완료</th><th>실패</th></tr>';
     return '<table class="scc-mini">' + th + order.map(function (k) {
       var l = by[k], a = agg(l);
-      return '<tr><td>' + esc(k) + '</td><td>' + l.length + '</td><td>' + count(l, 'visit_type', '직접방문') + '</td><td>' + count(l, 'visit_type', '전화') + '</td><td>' + a.quote + '</td><td>' + a.plan + '</td><td>' + a.done + '</td><td>' + a.fail + '</td></tr>';
+      return '<tr><td>' + esc(k) + '</td><td>' + l.length + '</td><td>' + count(l, 'visit_type', '직접방문') + '</td><td>' + count(l, 'visit_type', '전화') + '</td><td>' + a.quote + '</td><td>' + fmt(a.qAmt) + '</td><td>' + a.plan + '</td><td>' + a.done + '</td><td>' + a.fail + '</td></tr>';
     }).join('') + '</table>';
   }
+  /* 지사장 상세 집계 (요약 4종은 상단 renderTop 으로 이동, 여기서는 세부 분포·구분별 표) */
   function renderSummary() {
     var el = document.getElementById('sccSum'); if (!el) return;
-    var list = state.rows, a = agg(list), entered = list.filter(function (r) { return r.visit_type; }).length;
-    var mismatch = list.filter(budgetWarn).length;
+    var list = state.rows, a = agg(list);
     var tiles = [
-      ['전체 학교', fmt(a.n) + '개교', '설치대수 ' + fmt(a.install) + '대'],
-      ['방문여부 입력', entered + '개교', '진행률 ' + pct(entered, a.n)],
-      ['방문(전화+직접)', a.visited + '개교', '방문율 ' + pct(a.visited, a.n)],
-      ['예산 확보', a.budgetOk + '개교', '확보예산 합계 ' + fmt(a.amount) + '천원' +
-        (mismatch ? ' · ⚠ 확보 아님 상태에 금액 입력 ' + mismatch + '건 포함' : '')],
-      ['증설 카메라', fmt(a.cam) + '대', '녹화장비 ' + fmt(a.rec) + '대'],
-      ['견적제출 이상', (a.quote + a.plan + a.done) + '개교', '견적 ' + a.quote + ' · 예정 ' + a.plan + ' · 완료 ' + a.done]
+      ['설치대수 합계', fmt(a.install) + '대', '전체 ' + fmt(a.n) + '개교'],
+      ['증설 카메라', fmt(a.cam) + '대', ''],
+      ['증설 녹화장비', fmt(a.rec) + '대', ''],
+      ['견적·계약 진행', (a.quote + a.plan + a.done) + '개교', '견적 ' + a.quote + ' · 예정 ' + a.plan + ' · 완료 ' + a.done]
     ].map(function (t) { return '<div class="scc-tile"><div class="l">' + t[0] + '</div><div class="v">' + t[1] + '</div><div class="s">' + t[2] + '</div></div>'; }).join('');
     var bars = '<div class="scc-bars">' +
-      barHtml('방문여부', list, 'visit_type', VISIT_OPTS, ['#94a3b8', '#3b82f6', '#10b981']) +
-      barHtml('방문결과', list, 'visit_result', RESULT_OPTS, ['#38bdf8', '#f59e0b', '#fb923c', '#16a34a', '#6b7280']) +
-      barHtml('예산확보여부', list, 'budget_status', BUDGET_OPTS, ['#16a34a', '#ef4444', '#94a3b8']) + '</div>';
+      barHtml('방문여부', list, effVisit, VISIT_OPTS, ['#94a3b8', '#3b82f6', '#10b981'], false) +
+      barHtml('방문결과', list, function (r) { return r.visit_result; }, RESULT_OPTS, ['#38bdf8', '#f59e0b', '#fb923c', '#16a34a', '#6b7280'], true) +
+      barHtml('예산확보여부', list, effBudget, BUDGET_OPTS, ['#16a34a', '#ef4444', '#94a3b8'], false) + '</div>';
     var gsel = '<select id="sccGroupBy">' + Object.keys(GROUPS).map(function (k) {
       return '<option value="' + k + '"' + (k === state.groupBy ? ' selected' : '') + '>' + GROUPS[k].label + '</option>';
     }).join('') + '</select>';
@@ -628,12 +724,12 @@
   /* ------------------------------------------------------------------ CSV */
   function exportCsv() {
     var head = ['No', '교육지원청', '구', '학교명', '지사', '경비업체', '비고', '설치대수', '복도', '계단', '교문', '건물출입구',
-      '예산확보여부', '확보예산금액(천원)', '증설_카메라(대)', '증설_녹화장비(대)', '방문여부', '방문자', '방문결과', '최종수정자', '최종수정일시'];
+      '예산확보여부', '확보예산금액(천원)', '증설_카메라(대)', '증설_녹화장비(대)', '방문여부', '방문자', '방문결과', '견적제출금액(천원)', '최종수정자', '최종수정일시'];
     function c(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
     var lines = [head.join(',')].concat(state.rows.map(function (r) {
       return [r.no, r.edu_office, r.district, r.school_name, r.branch, r.guard_company, r.guard_note, r.install_cnt, r.cnt_corridor, r.cnt_stairs,
-        r.cnt_gate, r.cnt_entrance, r.budget_status, r.budget_amount, r.add_camera, r.add_recorder, r.visit_type, r.visitor, r.visit_result,
-        r.updated_by, r.updated_at ? new Date(r.updated_at).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }) : ''].map(c).join(',');
+        r.cnt_gate, r.cnt_entrance, effBudget(r), effAmt(r), r.add_camera, r.add_recorder, effVisit(r), r.visitor, r.visit_result,
+        r.quote_amount, r.updated_by, r.updated_at ? new Date(r.updated_at).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }) : ''].map(c).join(',');
     }));
     var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
     var ymd = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).replace(/-/g, '');
