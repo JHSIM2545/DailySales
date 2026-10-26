@@ -4462,7 +4462,9 @@ function getTzToday() {
  .topbar h1{ margin:0; font-size:17px; font-weight:600; }  
  .topbar p{ margin:4px 0 0; font-size:16px; color:#c7d2e0; }  
  .ai-report-topbtn{ background:#2563eb; color:#fff; border:none; padding:9px 26px; border-radius:6px; font-size:15px; font-weight:700; cursor:pointer; }  
- .ai-report-topbtn:hover{ background:#1d4ed8; }  
+ .ai-report-topbtn:hover{ background:#1d4ed8; }
+ .scc-topbtn{ background:#0f766e; color:#fff; border:none; padding:9px 26px; border-radius:6px; font-size:15px; font-weight:700; cursor:pointer; }
+ .scc-topbtn:hover{ background:#0b5f58; }  
  .sync-status{ font-size:16px; padding:4px 10px; border-radius:4px; white-space:nowrap; transition: all 0.3s; user-select:none; }  
  .sync-status.saving{ background:#fff3cd; color:#7a5c00; }  
  .sync-status.error{ background:#ffebee; color:#c00000; cursor:pointer; font-weight:bold; border:1px solid #c00000; }  
@@ -5590,6 +5592,7 @@ td.prod-col, td.gross-col,
  <div style="flex:1; text-align:center; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;">  
  <button id="aiReportTopBtn" class="ai-report-topbtn" style="display:none;" onclick="openAiReportModal_()">영업보고</button>  
  <button id="gaJungjiTopBtn" class="ai-report-topbtn" style="display:none; background:#c0392b; border-color:#c0392b;" onclick="openGaJungjiModal_()">가중지 보고</button>  
+ <button id="schoolCctvTopBtn" class="scc-topbtn" onclick="if(window.openSchoolCctv_){openSchoolCctv_();}else{alert('school-cctv.js 파일이 함께 배포되지 않았습니다.');}">학교 CCTV</button>  
  </div>  
  <div class="userinfo">  
  <span id="whoami" style="display:none;"></span>  
@@ -15598,5 +15601,6 @@ document.addEventListener('mousedown', function(e) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
+<script src="school-cctv.js?v=20261026"></script>
 </body>
 </html>
