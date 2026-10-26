@@ -132,6 +132,7 @@
       '.scc-bar-tools label.chk{display:inline-flex;align-items:center;gap:3px;cursor:pointer;}',
       '.scc-cnt{margin-left:auto;color:#475569;font-size:12px;}',
       '.scc-status{font-size:12px;color:#92400e;}',
+      '.scc-head .scc-status{color:#fde68a;font-weight:700;}',
       '.scc-wrap{flex:1;overflow:auto;background:#fff;position:relative;}',
       'table.scc{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12px;}',
       'table.scc th,table.scc td{border-right:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:2px 5px;height:32px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#fff;}',
@@ -342,6 +343,7 @@
       state.loaded = true;
       setStatus('');
       renderAll();
+      setStatus(schemaWarning());
     } catch (err) {
       setStatus('');
       if (!silent || !state.loaded) showLoadError(err);
@@ -536,8 +538,7 @@
       tr.classList.remove('scc-saving'); tr.classList.add('scc-err');
       el.value = displayValue(field, before);
       if (el.tagName === 'SELECT') el.setAttribute('data-v', field === 'visit_type' ? (before || '미방문') : field === 'budget_status' ? (before || '미확인') : (before || ''));
-      var m = err && err.message ? err.message : String(err);
-      toast('저장 실패 — ' + m + (/row-level security|permission denied/i.test(m) ? ' (school_cctv.sql 의 policy/grant 실행 여부 확인)' : ''), true);
+      toast('저장 실패 — ' + friendlyError(err), true);
     } finally { state.pending--; }
   }
 
@@ -567,6 +568,7 @@
     if (!window.confirm(msg)) return;
     var patch = { budget_status: '미확인', budget_amount: 0, add_camera: null, add_recorder: null, visit_type: '미방문',
       visitor: null, visit_result: null, quote_amount: null, updated_by: null, updated_at: null };
+    Object.keys(patch).forEach(function (k) { if (!(k in row)) delete patch[k]; });      // 구버전 DB(없는 열)는 건너뜀
     var before = Object.assign({}, row);
     state.pending++; tr.classList.remove('scc-saved', 'scc-err'); tr.classList.add('scc-saving');
     try {
@@ -590,8 +592,7 @@
       } catch (e) { /* noop */ }
     } catch (err) {
       tr.classList.remove('scc-saving'); tr.classList.add('scc-err');
-      var m = err && err.message ? err.message : String(err);
-      toast('초기화 실패 — ' + m + (/row-level security|permission denied/i.test(m) ? ' (school_cctv.sql 의 policy/grant 실행 여부 확인)' : ''), true);
+      toast('초기화 실패 — ' + friendlyError(err), true);
     } finally { state.pending--; }
   }
 
@@ -602,6 +603,21 @@
       var p = window.logUserAction_('학교CCTV 수정', 'schoolcctv', 'S' + row.no, { company: row.school_name, desc: row.school_name + ' · ' + d });
       if (p && p.catch) p.catch(function () { });
     } catch (e) { /* noop */ }
+  }
+
+  function friendlyError(err) {
+    var m = err && err.message ? String(err.message) : String(err);
+    var mc = m.match(/Could not find the '([^']+)' column/);
+    if (mc) return "DB에 '" + mc[1] + "' 열이 없습니다. Supabase SQL Editor에서 school_cctv.sql 을 다시 실행한 뒤 [새로고침]을 눌러 주세요.";
+    if (/row-level security|permission denied/i.test(m)) return m + ' (school_cctv.sql 의 policy/grant 실행 여부 확인)';
+    return m;
+  }
+  /* DB 가 구버전(없는 열이 있음)이면 상단에 계속 알려준다. 서버가 돌려준 행의 키로 판단. */
+  var REQUIRED_COLS = ['quote_amount'];
+  function schemaWarning() {
+    if (!state.rows.length) return '';
+    var miss = REQUIRED_COLS.filter(function (c) { return !(c in state.rows[0]); });
+    return miss.length ? '⚠ DB 업데이트 필요: school_cctv.sql 다시 실행 (없는 열: ' + miss.join(', ') + ')' : '';
   }
 
   var toastTimer = null;
