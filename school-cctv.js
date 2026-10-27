@@ -2,7 +2,7 @@
  * 북서울지사 영업일보 포털 - 「학교 CCTV」 화면 (Admin.html / User.html 공용)
  *
  *  - 상단 타이틀바의 [학교 CCTV] 버튼 -> openSchoolCctv_() 로 전체화면 패널을 연다.
- *  - 174개 학교 전체를 한 화면의 표로 보여주고, 직원이 아래 항목을 바로 입력한다.
+ *  - 대상학교 전체를 한 화면의 표로 보여주고, 직원이 아래 항목을 바로 입력한다.
  *      예산확보여부(확보/미확보/미확인) · 확보예산금액(천원) · 증설대수(카메라/녹화장비)
  *      방문여부(미방문/전화/직접방문) · 방문자(입력자 이름 자동) · 방문결과(내용확인/견적제출/계약예정/계약완료/실패)
  *  - 지사장(관리자 권한)에게는 집계 패널과 CSV 내보내기가 추가로 보인다.
@@ -190,7 +190,7 @@
   }
 
   /* ------------------------------------------------------------------ 골격 */
-  var COLS = [44, 176, 74, 62, 74, 118, 60, 46, 46, 46, 58, 98, 112, 84, 92, 100, 78, 100, 124, 96, 46];
+  var COLS = [44, 176, 74, 62, 74, 118, 60, 46, 46, 46, 58, 86, 66, 96, 98, 112, 84, 92, 100, 78, 100, 124, 96, 46];
 
   function buildShell() {
     if (document.getElementById('sccOverlay')) return;
@@ -225,11 +225,12 @@
               '<th rowspan="2" class="s1">No</th><th rowspan="2" class="s2">학교명</th>' +
               '<th rowspan="2">교육지원청</th><th rowspan="2">구</th><th rowspan="2">경비업체</th><th rowspan="2">비고</th>' +
               '<th colspan="5">기존 CCTV 설치현황</th>' +
-              '<th colspan="2" class="g-in">예산</th><th colspan="2" class="g-in2">증설대수</th><th colspan="4" class="g-in">방문</th>' +
+              '<th colspan="3">지원내역(첨부)</th><th colspan="2" class="g-in">예산</th><th colspan="2" class="g-in2">증설대수</th><th colspan="4" class="g-in">방문</th>' +
               '<th rowspan="2" class="g-in2">최종수정</th><th rowspan="2" class="sx" title="행 입력 내용 초기화">초기화</th>' +
             '</tr>' +
             '<tr class="r2">' +
               '<th>설치대수</th><th>복도</th><th>계단</th><th>교문</th><th>출입구</th>' +
+              '<th>급별·설립</th><th title="CCTV 필수장소(개소)">필수장소</th><th class="amt" title="지원예산 합계 (CCTV+녹화기+모니터+기타)">지원예산(천원)</th>' +
               '<th class="g-in">확보여부</th><th class="g-in amt">확보금액(천원)</th>' +
               '<th class="g-in2">카메라(대)</th><th class="g-in2">녹화장비(대)</th>' +
               '<th class="g-in">방문여부</th><th class="g-in">방문자</th><th class="g-in">방문결과</th><th class="g-in amt">견적제출금액(천원)</th>' +
@@ -338,7 +339,9 @@
     try {
       var res = await db().from(TABLE).select('*').order('no', { ascending: true }).range(0, 999);
       if (res.error) throw res.error;
-      state.rows = res.data || [];
+      state.rows = (res.data || []).slice().sort(function (a, b) {
+        var x = a.seq == null ? 1e9 + a.no : a.seq, y = b.seq == null ? 1e9 + b.no : b.seq; return x - y;
+      });
       state.byNo = {}; state.rows.forEach(function (r) { state.byNo[r.no] = r; });
       state.loaded = true;
       setStatus('');
@@ -441,10 +444,18 @@
   }
   function budgetWarn(r) { return numOrZero(r.budget_amount) > 0 && r.budget_status !== '확보'; }
   var WARN_TITLE = '확보예산금액이 입력되었지만 예산확보여부가 \'확보\'가 아닙니다. 확인해 주세요.';
+  function lvlShort(r) {
+    var l = String(r.school_level || '').replace('학교', ''), f = r.found_type || '';
+    return (l || f) ? (l + (l && f ? ' · ' : '') + f) : '';
+  }
+  function supTitle(r) {
+    if (r.sup_total == null) return '';
+    return 'CCTV ' + fmt(r.sup_cctv) + ' / 녹화기 ' + fmt(r.sup_recorder) + ' / 모니터 ' + fmt(r.sup_monitor) + ' / 기타 ' + fmt(r.sup_etc) + ' (천원)';
+  }
   function rowHtml(r) {
     var gcls = r.guard_company === '에스원' ? 'gd-s1' : (r.guard_company === '미이용' || r.guard_company === '확인불가' ? 'gd-none' : '');
     return '<tr data-no="' + r.no + '">' +
-      '<td class="s1 ctr num">' + r.no + '</td>' +
+      '<td class="s1 ctr num">' + (r.seq != null ? r.seq : r.no) + '</td>' +
       '<td class="s2 name" title="' + esc(r.school_name) + '">' + esc(r.school_name) + '</td>' +
       '<td class="ctr">' + esc(r.edu_office) + '</td><td class="ctr">' + esc(r.district) + '</td>' +
       '<td class="ctr ' + gcls + '">' + esc(r.guard_company) + '</td>' +
@@ -452,6 +463,8 @@
       '<td class="num">' + fmt(r.install_cnt) + '</td><td class="num">' + fmt(r.cnt_corridor) + '</td>' +
       '<td class="num">' + fmt(r.cnt_stairs) + '</td><td class="num">' + fmt(r.cnt_gate) + '</td>' +
       '<td class="num">' + fmt(r.cnt_entrance) + '</td>' +
+      '<td class="ctr">' + esc(lvlShort(r)) + '</td><td class="num">' + fmt(r.sup_places) + '</td>' +
+      '<td class="num" title="' + esc(supTitle(r)) + '">' + fmt(r.sup_total) + '</td>' +
       '<td class="in">' + selectHtml('budget_status', effBudget(r)) + '</td>' +
       '<td class="in"><input class="scc-in num amt' + (budgetWarn(r) ? ' warn' : '') + '"' + (budgetWarn(r) ? ' title="' + WARN_TITLE + '"' : '') + ' type="text" inputmode="numeric" data-f="budget_amount" value="' + esc(fmt(effAmt(r))) + '" placeholder="천원"></td>' +
       '<td class="in">' + numInput('add_camera', r.add_camera) + '</td>' +
@@ -613,7 +626,7 @@
     return m;
   }
   /* DB 가 구버전(없는 열이 있음)이면 상단에 계속 알려준다. 서버가 돌려준 행의 키로 판단. */
-  var REQUIRED_COLS = ['quote_amount'];
+  var REQUIRED_COLS = ['quote_amount', 'sup_total'];
   function schemaWarning() {
     if (!state.rows.length) return '';
     var miss = REQUIRED_COLS.filter(function (c) { return !(c in state.rows[0]); });
@@ -640,7 +653,7 @@
     guard: { label: '경비업체별', key: function (r) { return r.guard_company || '(미분류)'; } },
     district: { label: '구별', key: function (r) { return r.district || '(미분류)'; } },
     office: { label: '교육지원청별', key: function (r) { return r.edu_office || '(미분류)'; } },
-    level: { label: '학교급별(학교명 기준)', key: function (r) { return levelOf(r.school_name); } }
+    level: { label: '학교급별', key: function (r) { return r.school_level || levelOf(r.school_name); } }
   };
   function agg(list) {
     var a = {
@@ -739,12 +752,13 @@
 
   /* ------------------------------------------------------------------ CSV */
   function exportCsv() {
-    var head = ['No', '교육지원청', '구', '학교명', '지사', '경비업체', '비고', '설치대수', '복도', '계단', '교문', '건물출입구',
+    var head = ['연번', '교육지원청', '구', '학교명', '지사', '경비업체', '비고', '설치대수', '복도', '계단', '교문', '건물출입구',
+      '급별', '설립별', '필수장소(개소)', '지원_CCTV(천원)', '지원_녹화기(천원)', '지원_모니터(천원)', '지원_기타(천원)', '지원_합계(천원)',
       '예산확보여부', '확보예산금액(천원)', '증설_카메라(대)', '증설_녹화장비(대)', '방문여부', '방문자', '방문결과', '견적제출금액(천원)', '최종수정자', '최종수정일시'];
     function c(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
     var lines = [head.join(',')].concat(state.rows.map(function (r) {
-      return [r.no, r.edu_office, r.district, r.school_name, r.branch, r.guard_company, r.guard_note, r.install_cnt, r.cnt_corridor, r.cnt_stairs,
-        r.cnt_gate, r.cnt_entrance, effBudget(r), effAmt(r), r.add_camera, r.add_recorder, effVisit(r), r.visitor, r.visit_result,
+      return [r.seq != null ? r.seq : r.no, r.edu_office, r.district, r.school_name, r.branch, r.guard_company, r.guard_note, r.install_cnt, r.cnt_corridor, r.cnt_stairs,
+        r.cnt_gate, r.cnt_entrance, r.school_level, r.found_type, r.sup_places, r.sup_cctv, r.sup_recorder, r.sup_monitor, r.sup_etc, r.sup_total, effBudget(r), effAmt(r), r.add_camera, r.add_recorder, effVisit(r), r.visitor, r.visit_result,
         r.quote_amount, r.updated_by, r.updated_at ? new Date(r.updated_at).toLocaleString('sv-SE', { timeZone: 'Asia/Seoul' }) : ''].map(c).join(',');
     }));
     var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
