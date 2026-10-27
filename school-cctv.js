@@ -26,7 +26,7 @@
   var AMT_FIELDS = { budget_amount: 1, quote_amount: 1 };      // 금액 필드(천원 단위, 항상 우측 정렬)
   var FIELD_LABEL = {
     budget_status: '예산확보여부', budget_amount: '확보예산금액', quote_amount: '견적제출 금액', add_camera: '증설 카메라',
-    add_recorder: '증설 녹화장비', visit_type: '방문여부', visit_result: '방문결과'
+    add_recorder: '증설 녹화장비', visit_type: '방문여부', visit_result: '방문결과', visitor: '방문자'
   };
 
   var state = {
@@ -190,7 +190,7 @@
   }
 
   /* ------------------------------------------------------------------ 골격 */
-  var COLS = [44, 176, 74, 62, 74, 118, 60, 46, 46, 46, 58, 86, 66, 96, 98, 112, 84, 92, 100, 78, 100, 124, 96, 46];
+  var COLS = [44, 176, 74, 62, 74, 118, 60, 46, 46, 46, 58, 86, 66, 96, 98, 112, 84, 92, 100, 96, 100, 124, 96, 46];
 
   function buildShell() {
     if (document.getElementById('sccOverlay')) return;
@@ -305,6 +305,7 @@
     document.getElementById('sccCsvBtn').style.display = boss ? '' : 'none';
     document.getElementById('sccSum').style.display = boss ? '' : 'none';
     applySummaryVisibility();
+    fetchNames();
     load(false);
     clearInterval(state.refreshTimer);
     state.refreshTimer = setInterval(function () {      // 다른 직원의 입력을 주기적으로 반영 (입력 중에는 건너뜀)
@@ -435,6 +436,39 @@
     }).join('');
     return '<select class="scc-in" data-f="' + field + '" data-v="' + esc(cur || '') + '">' + o + '</select>';
   }
+  /* 방문자: 지사원 전체 명단에서 선택(기본값은 입력·수정한 로그인 사용자). 명단은 포털의 사용자 목록(getUserNames)을 사용 */
+  function nameList(cur) {
+    var seen = {}, out = [];
+    (state.names || []).concat([me(), cur]).forEach(function (n) { n = String(n || '').trim(); if (n && !seen[n]) { seen[n] = 1; out.push(n); } });
+    return out;
+  }
+  function visitorOptions(cur) {
+    return '<option value=""></option>' + nameList(cur).map(function (n) {
+      return '<option value="' + esc(n) + '"' + (n === cur ? ' selected' : '') + '>' + esc(n) + '</option>';
+    }).join('');
+  }
+  function visitorSelect(cur) {
+    return '<select class="scc-in vis" data-f="visitor" data-v="visitor" title="방문자 (변경 가능)">' + visitorOptions(cur || '') + '</select>';
+  }
+  function fetchNames() {
+    var list = [];
+    try { if (typeof USER_NAMES !== 'undefined' && Array.isArray(USER_NAMES)) list = USER_NAMES.slice(); } catch (e) { /* noop */ }
+    state.names = list;
+    try {
+      var g = window.google, s = sess();
+      if (g && g.script && g.script.run && s && s.token) {
+        g.script.run.withSuccessHandler(function (res) {
+          if (res && res.success && res.names && res.names.length) { state.names = res.names.slice(); refreshVisitorSelects(); }
+        }).withFailureHandler(function () { }).getUserNames(s.token);
+      }
+    } catch (e) { /* 명단을 못 불러와도 기본 명단/본인 이름으로 동작 */ }
+  }
+  function refreshVisitorSelects() {
+    document.querySelectorAll('#sccBody select[data-f="visitor"]').forEach(function (sel) {
+      var tr = sel.closest('tr'), row = tr && state.byNo[Number(tr.getAttribute('data-no'))];
+      sel.innerHTML = visitorOptions(row ? row.visitor || '' : sel.value);
+    });
+  }
   function numInput(field, v) {
     return '<input class="scc-in num" type="number" min="0" step="1" data-f="' + field + '" value="' + (v == null ? '' : esc(v)) + '" placeholder="0">';
   }
@@ -470,7 +504,7 @@
       '<td class="in">' + numInput('add_camera', r.add_camera) + '</td>' +
       '<td class="in">' + numInput('add_recorder', r.add_recorder) + '</td>' +
       '<td class="in">' + selectHtml('visit_type', effVisit(r)) + '</td>' +
-      '<td class="in ro" data-c="visitor">' + esc(r.visitor) + '</td>' +
+      '<td class="in">' + visitorSelect(r.visitor) + '</td>' +
       '<td class="in">' + selectHtml('visit_result', r.visit_result) + '</td>' +
       '<td class="in"><input class="scc-in num amt" type="text" inputmode="numeric" data-f="quote_amount" value="' + esc(fmt(r.quote_amount)) + '" placeholder="천원"></td>' +
       '<td class="in ro" data-c="upd" title="' + esc(r.updated_by) + '">' + esc(r.updated_at && r.updated_by ? fmtTime(r.updated_at) : '') + '</td>' +
@@ -493,6 +527,7 @@
   /* ------------------------------------------------------------------ 저장 */
   function parseValue(field, raw) {
     raw = String(raw == null ? '' : raw).trim();
+    if (field === 'visitor') return raw === '' ? null : raw;
     if (OPTS[field]) {
       if (raw === '') return field === 'visit_type' ? '미방문' : (field === 'budget_status' ? '미확인' : null);
       if (OPTS[field].indexOf(raw) < 0) throw new Error('허용되지 않는 값입니다: ' + raw);
@@ -533,8 +568,8 @@
     var patch = {}; patch[field] = val;
     patch.updated_by = who;
     patch.updated_at = new Date().toISOString();
-    // 방문자 = 데이터 입력자 이름: 방문여부/방문결과를 입력·변경하거나, 아직 방문자가 없으면 입력자로 기록
-    if (field === 'visit_type' || field === 'visit_result' || !row.visitor) patch.visitor = who;
+    // 방문자 기본값 = 입력한 로그인 사용자: 방문자가 비어 있을 때만 자동 기록(직접 고른 방문자는 덮어쓰지 않음)
+    if (field !== 'visitor' && !row.visitor) patch.visitor = who;
 
     state.pending++; tr.classList.remove('scc-saved', 'scc-err'); tr.classList.add('scc-saving');
     try {
@@ -557,7 +592,8 @@
 
   function applyRowToDom(tr, row, changedField) {
     var xb = tr.querySelector('.scc-x'); if (xb) xb.classList.toggle('idle', !hasInput(row));
-    var v = tr.querySelector('[data-c="visitor"]'); if (v) v.textContent = row.visitor || '';
+    var v = tr.querySelector('select[data-f="visitor"]');
+    if (v) { v.innerHTML = visitorOptions(row.visitor || ''); v.value = row.visitor || ''; }
     var u = tr.querySelector('[data-c="upd"]');
     if (u) { u.textContent = row.updated_by ? fmtTime(row.updated_at) : ''; u.title = row.updated_by || ''; }
     tr.querySelectorAll('select[data-f]').forEach(function (s) {
