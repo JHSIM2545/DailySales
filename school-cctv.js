@@ -31,7 +31,7 @@
 
   var state = {
     rows: [], byNo: {}, loaded: false, loading: false, pending: 0, open: false,
-    summaryOpen: true, groupBy: 'guard', refreshTimer: null,
+    refreshTimer: null,
     f: { q: '', office: '', district: '', guard: '', budget: '', visit: '', result: '', unfilled: false, mine: false }
   };
 
@@ -98,34 +98,17 @@
       '.scc-head .scc-btn:hover{background:rgba(255,255,255,.26);}',
       '.scc-top{background:#fff;border-bottom:1px solid #d5dbe3;padding:10px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;}',
       '.scc-card{border:1px solid #cfd8e3;border-left:4px solid var(--scc-head,#1c2f4a);border-radius:8px;padding:7px 12px;background:#f8fafc;min-width:0;}',
+      '.scc-card.s1c{border-left-color:#0f766e;background:#f0fdfa;}',
       '.scc-card .l{font-size:11px;color:#64748b;}',
       '.scc-card .v{font-size:22px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums;white-space:nowrap;}',
       '.scc-card .v small{font-size:13px;font-weight:600;color:#64748b;margin-left:2px;}',
       '.scc-card .s{font-size:11px;color:#64748b;margin-top:1px;}',
       '.scc-card.amt .l,.scc-card.amt .v,.scc-card.amt .s{text-align:right;}',
       '.amt{text-align:right !important;}',
-      '.scc-sum{background:#fff;border-bottom:1px solid #d5dbe3;padding:10px 18px 12px;overflow:auto;max-height:46vh;}',
-      '.scc-sum.hide{display:none;}',
-      '.scc-tiles{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}',
-      '.scc-tile{flex:1 1 130px;min-width:120px;border:1px solid #dbe2ea;border-radius:8px;padding:7px 10px;background:#f8fafc;}',
-      '.scc-tile .l{font-size:11px;color:#64748b;}',
-      '.scc-tile .v{font-size:19px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums;}',
-      '.scc-tile .s{font-size:11px;color:#64748b;margin-top:1px;}',
-      '.scc-bars{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px 18px;margin-bottom:10px;}',
-      '.scc-bar-t{font-size:12px;font-weight:700;margin-bottom:3px;}',
-      '.scc-bar{display:flex;height:16px;border-radius:4px;overflow:hidden;background:#e5e7eb;}',
-      '.scc-bar i{display:block;height:100%;}',
-      '.scc-leg{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:3px;font-size:11px;color:#475569;}',
-      '.scc-leg b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px;}',
       '.scc-grids{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px;}',
       '@media (max-width:1100px){.scc-grids{grid-template-columns:1fr;}}',
       '.scc-gt{font-size:12px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;}',
       '.scc-gt select{font-size:12px;padding:2px 4px;border:1px solid #c7cfd8;border-radius:4px;}',
-      '.scc-mini{border-collapse:collapse;width:100%;font-size:12px;}',
-      '.scc-mini th,.scc-mini td{border:1px solid #dbe2ea;padding:3px 6px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}',
-      '.scc-mini th{background:#f1f5f9;font-weight:600;text-align:center;}',
-      '.scc-mini td:first-child{text-align:left;font-weight:600;}',
-      '.scc-mini tr.tot td{background:#f8fafc;font-weight:700;}',
       '.scc-bar-tools{background:#fff;border-bottom:1px solid #d5dbe3;padding:7px 18px;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;font-size:13px;}',
       '.scc-bar-tools input[type=text],.scc-bar-tools select{border:1px solid #c7cfd8;border-radius:5px;padding:4px 6px;font-size:13px;background:#fff;}',
       '.scc-bar-tools input[type=text]{width:150px;}',
@@ -202,13 +185,11 @@
       '<div class="scc-head">' +
         '<h2>🏫 학교 CCTV</h2><span class="sub" id="sccSub"></span><span class="sp"></span>' +
         '<span class="scc-status" id="sccStatus"></span>' +
-        '<button class="scc-btn" id="sccSumBtn" style="display:none;">📊 집계 접기</button>' +
         '<button class="scc-btn" id="sccCsvBtn" style="display:none;">⬇ CSV 내보내기</button>' +
         '<button class="scc-btn" id="sccRefreshBtn">↻ 새로고침</button>' +
         '<button class="scc-btn" id="sccCloseBtn">✕ 닫기</button>' +
       '</div>' +
       '<div class="scc-top" id="sccTop"></div>' +
-      '<div class="scc-sum" id="sccSum" style="display:none;"></div>' +
       '<div class="scc-bar-tools" id="sccTools">' +
         '<input type="text" id="sccQ" placeholder="학교명 검색" autocomplete="off">' +
         '<select id="sccFOffice"></select><select id="sccFDistrict"></select><select id="sccFGuard"></select>' +
@@ -243,9 +224,6 @@
     o.querySelector('#sccCloseBtn').addEventListener('click', closePanel);
     o.querySelector('#sccRefreshBtn').addEventListener('click', function () { load(true); });
     o.querySelector('#sccCsvBtn').addEventListener('click', exportCsv);
-    o.querySelector('#sccSumBtn').addEventListener('click', function () {
-      state.summaryOpen = !state.summaryOpen; applySummaryVisibility();
-    });
     o.querySelector('#sccResetBtn').addEventListener('click', resetFilters);
     var tools = o.querySelector('#sccTools');
     tools.addEventListener('input', onFilterInput);
@@ -269,9 +247,6 @@
         var raw = el.value.replace(/,/g, '').trim();
         if (/^\d+$/.test(raw)) el.value = fmt(raw);
       }
-    });
-    o.querySelector('#sccSum').addEventListener('change', function (e) {
-      if (e.target && e.target.id === 'sccGroupBy') { state.groupBy = e.target.value; renderSummary(); }
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && state.open) {
@@ -300,11 +275,7 @@
     document.body.dataset.sccOv = document.body.style.overflow || '';
     document.body.style.overflow = 'hidden';
     var boss = isBoss();
-    if (!state.sumInit) { state.sumInit = true; state.summaryOpen = window.innerWidth >= 900 && window.innerHeight >= 780; }   // 작은 화면은 표가 먼저 보이도록 접힌 상태로 시작
-    document.getElementById('sccSumBtn').style.display = boss ? '' : 'none';
     document.getElementById('sccCsvBtn').style.display = boss ? '' : 'none';
-    document.getElementById('sccSum').style.display = boss ? '' : 'none';
-    applySummaryVisibility();
     fetchNames();
     load(false);
     clearInterval(state.refreshTimer);
@@ -321,13 +292,6 @@
     state.open = false;
     clearInterval(state.refreshTimer);
     document.body.style.overflow = document.body.dataset.sccOv || '';
-  }
-
-  function applySummaryVisibility() {
-    var sum = document.getElementById('sccSum'), btn = document.getElementById('sccSumBtn');
-    if (!sum || !btn) return;
-    sum.classList.toggle('hide', !state.summaryOpen);
-    btn.textContent = state.summaryOpen ? '📊 집계 접기' : '📊 집계 보기';
   }
 
   /* ------------------------------------------------------------------ 데이터 로드 */
@@ -521,7 +485,7 @@
   function renderAll() {
     document.getElementById('sccSub').textContent = '북서울지사 · 총 ' + state.rows.length + '개교 · 입력 로그인: ' + me();
     renderFilterOptions(); renderTable();
-    renderTop(); if (isBoss()) renderSummary();
+    renderTop();
   }
 
   /* ------------------------------------------------------------------ 저장 */
@@ -580,7 +544,7 @@
       applyRowToDom(tr, row, field);
       tr.classList.remove('scc-saving'); tr.classList.add('scc-saved');
       setTimeout(function () { tr.classList.remove('scc-saved'); }, 1200);
-      renderTop(); if (isBoss()) renderSummary();
+      renderTop();
       logChange(row, field, before, val);
     } catch (err) {
       tr.classList.remove('scc-saving'); tr.classList.add('scc-err');
@@ -629,7 +593,7 @@
       cur.outerHTML = rowHtml(row);
       var nt = document.querySelector('#sccBody tr[data-no="' + no + '"]');
       if (nt) { nt.classList.add('scc-saved'); setTimeout(function () { nt.classList.remove('scc-saved'); }, 1200); }
-      renderTop(); if (isBoss()) renderSummary();
+      renderTop();
       toast('「' + row.school_name + '」 입력 내용을 초기화했습니다.');
       try {
         if (typeof window.logUserAction_ === 'function') {
@@ -677,20 +641,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.style.display = 'none'; }, isErr ? 6000 : 2200);
   }
 
-  /* ------------------------------------------------------------------ 집계 (지사장) */
-  function levelOf(name) {      // 학교명 끝글자 기준 구분(추정 아님: 이름 규칙 그대로). 특수학교 등은 '기타'
-    name = String(name || '');
-    if (/초등학교$/.test(name)) return '초등학교';
-    if (/중학교$/.test(name)) return '중학교';
-    if (/고등학교$/.test(name)) return '고등학교';
-    return '기타(특수 등)';
-  }
-  var GROUPS = {
-    guard: { label: '경비업체별', key: function (r) { return r.guard_company || '(미분류)'; } },
-    district: { label: '구별', key: function (r) { return r.district || '(미분류)'; } },
-    office: { label: '교육지원청별', key: function (r) { return r.edu_office || '(미분류)'; } },
-    level: { label: '학교급별', key: function (r) { return r.school_level || levelOf(r.school_name); } }
-  };
+  /* ------------------------------------------------------------------ 상단 요약 */
   function agg(list) {
     var a = {
       n: list.length, install: 0, visited: 0, budgetOk: 0, amount: 0, qAmt: 0, qN: 0, cam: 0, rec: 0, quote: 0, plan: 0, done: 0, fail: 0
@@ -716,74 +667,22 @@
     return w.toLocaleString('ko-KR') + '원';
   }
 
-  /* 상단 요약 (모든 사용자): 방문학교수/전체학교수 · 예산확보 학교수 · 예산총액 · 당사제안총액 */
+  /* 상단 요약 (모든 사용자): 방문학교수/전체학교수 · 예산확보 학교수 · 예산총액 · 당사제안총액 · 에스원 고객 학교 방문/예산 */
   function renderTop() {
     var el = document.getElementById('sccTop'); if (!el) return;
     var list = state.rows, a = agg(list), mismatch = list.filter(budgetWarn).length;
+    var s1 = agg(list.filter(function (r) { return r.guard_company === '에스원'; }));   // 경비업체 = 에스원 고객 학교
     var cards = [
       { l: '방문 학교 / 전체 학교', v: a.visited + ' / ' + fmt(a.n) + '<small>개교</small>', s: '방문율 ' + pct(a.visited, a.n) + ' (전화+직접방문)' },
       { l: '예산 확보 학교', v: a.budgetOk + '<small>개교</small>', s: '전체 대비 ' + pct(a.budgetOk, a.n) },
       { l: '예산 총액 (확보예산금액 합)', v: fmt(a.amount) + '<small>천원</small>', s: won(a.amount) + (mismatch ? ' · ⚠ 확보 아님 상태에 금액 ' + mismatch + '건 포함' : ''), amt: 1 },
-      { l: '당사 제안 총액 (견적제출금액 합)', v: fmt(a.qAmt) + '<small>천원</small>', s: '제안 ' + a.qN + '개교 · ' + won(a.qAmt), amt: 1 }
+      { l: '당사 제안 총액 (견적제출금액 합)', v: fmt(a.qAmt) + '<small>천원</small>', s: '제안 ' + a.qN + '개교 · ' + won(a.qAmt), amt: 1 },
+      { l: '에스원 고객 학교 중 방문', v: s1.visited + ' / ' + fmt(s1.n) + '<small>개교</small>', s: '방문율 ' + pct(s1.visited, s1.n) + ' (전화+직접방문)', s1: 1 },
+      { l: '에스원 고객 학교 예산 합계 (확보예산금액 합)', v: fmt(s1.amount) + '<small>천원</small>', s: won(s1.amount) + ' · 예산확보 ' + s1.budgetOk + '개교', amt: 1, s1: 1 }
     ];
     el.innerHTML = cards.map(function (c) {
-      return '<div class="scc-card' + (c.amt ? ' amt' : '') + '"><div class="l">' + c.l + '</div><div class="v">' + c.v + '</div><div class="s">' + esc(c.s) + '</div></div>';
+      return '<div class="scc-card' + (c.amt ? ' amt' : '') + (c.s1 ? ' s1c' : '') + '"><div class="l">' + c.l + '</div><div class="v">' + c.v + '</div><div class="s">' + esc(c.s) + '</div></div>';
     }).join('');
-  }
-
-  function barHtml(title, list, getter, opts, colors, showNone) {
-    var total = list.length || 1, segs = '', leg = '', all = showNone ? opts.concat([null]) : opts;
-    all.forEach(function (o, i) {
-      var c = list.filter(function (r) { var v = getter(r); return o === null ? !v : v === o; }).length;
-      var w = c * 100 / total, col = o === null ? '#e5e7eb' : colors[i];
-      var name = o === null ? '미입력' : o;
-      if (c) segs += '<i title="' + esc(name) + ' ' + c + '" style="width:' + w + '%;background:' + col + '"></i>';
-      leg += '<span><b style="background:' + (o === null ? '#cbd5e1' : col) + '"></b>' + esc(name) + ' ' + c + '</span>';
-    });
-    return '<div><div class="scc-bar-t">' + esc(title) + '</div><div class="scc-bar">' + segs + '</div><div class="scc-leg">' + leg + '</div></div>';
-  }
-  function groupTable(list, gb) {
-    var g = GROUPS[gb], buckets = {}, order = [];
-    list.forEach(function (r) { var k = g.key(r); if (!buckets[k]) { buckets[k] = []; order.push(k); } buckets[k].push(r); });
-    order.sort(function (a, b) { return buckets[b].length - buckets[a].length; });
-    var th = '<tr><th>구분</th><th>학교수</th><th>설치대수</th><th>방문</th><th>방문율</th><th>예산확보</th><th>확보예산(천원)</th><th>제안금액(천원)</th><th>증설 카메라</th><th>증설 녹화</th><th>견적</th><th>계약예정</th><th>계약완료</th></tr>';
-    function tr(name, a, cls) {
-      return '<tr class="' + (cls || '') + '"><td>' + esc(name) + '</td><td>' + fmt(a.n) + '</td><td>' + fmt(a.install) + '</td><td>' + a.visited + '</td><td>' + pct(a.visited, a.n) +
-        '</td><td>' + a.budgetOk + '</td><td>' + fmt(a.amount) + '</td><td>' + fmt(a.qAmt) + '</td><td>' + fmt(a.cam) + '</td><td>' + fmt(a.rec) + '</td><td>' + a.quote + '</td><td>' + a.plan + '</td><td>' + a.done + '</td></tr>';
-    }
-    return '<table class="scc-mini">' + th + order.map(function (k) { return tr(k, agg(buckets[k])); }).join('') + tr('합계', agg(list), 'tot') + '</table>';
-  }
-  function staffTable(list) {
-    var by = {}, order = [];
-    list.forEach(function (r) { if (!r.visitor) return; if (!by[r.visitor]) { by[r.visitor] = []; order.push(r.visitor); } by[r.visitor].push(r); });
-    order.sort(function (a, b) { return by[b].length - by[a].length; });
-    if (!order.length) return '<div style="font-size:12px;color:#64748b;padding:6px 0;">아직 입력된 방문 데이터가 없습니다.</div>';
-    var th = '<tr><th>입력자</th><th>학교수</th><th>직접방문</th><th>전화</th><th>견적</th><th>제안금액(천원)</th><th>계약예정</th><th>계약완료</th><th>실패</th></tr>';
-    return '<table class="scc-mini">' + th + order.map(function (k) {
-      var l = by[k], a = agg(l);
-      return '<tr><td>' + esc(k) + '</td><td>' + l.length + '</td><td>' + count(l, 'visit_type', '직접방문') + '</td><td>' + count(l, 'visit_type', '전화') + '</td><td>' + a.quote + '</td><td>' + fmt(a.qAmt) + '</td><td>' + a.plan + '</td><td>' + a.done + '</td><td>' + a.fail + '</td></tr>';
-    }).join('') + '</table>';
-  }
-  /* 지사장 상세 집계 (요약 4종은 상단 renderTop 으로 이동, 여기서는 세부 분포·구분별 표) */
-  function renderSummary() {
-    var el = document.getElementById('sccSum'); if (!el) return;
-    var list = state.rows, a = agg(list);
-    var tiles = [
-      ['설치대수 합계', fmt(a.install) + '대', '전체 ' + fmt(a.n) + '개교'],
-      ['증설 카메라', fmt(a.cam) + '대', ''],
-      ['증설 녹화장비', fmt(a.rec) + '대', ''],
-      ['견적·계약 진행', (a.quote + a.plan + a.done) + '개교', '견적 ' + a.quote + ' · 예정 ' + a.plan + ' · 완료 ' + a.done]
-    ].map(function (t) { return '<div class="scc-tile"><div class="l">' + t[0] + '</div><div class="v">' + t[1] + '</div><div class="s">' + t[2] + '</div></div>'; }).join('');
-    var bars = '<div class="scc-bars">' +
-      barHtml('방문여부', list, effVisit, VISIT_OPTS, ['#94a3b8', '#3b82f6', '#10b981'], false) +
-      barHtml('방문결과', list, function (r) { return r.visit_result; }, RESULT_OPTS, ['#38bdf8', '#f59e0b', '#fb923c', '#16a34a', '#6b7280'], true) +
-      barHtml('예산확보여부', list, effBudget, BUDGET_OPTS, ['#16a34a', '#ef4444', '#94a3b8'], false) + '</div>';
-    var gsel = '<select id="sccGroupBy">' + Object.keys(GROUPS).map(function (k) {
-      return '<option value="' + k + '"' + (k === state.groupBy ? ' selected' : '') + '>' + GROUPS[k].label + '</option>';
-    }).join('') + '</select>';
-    el.innerHTML = '<div class="scc-tiles">' + tiles + '</div>' + bars +
-      '<div class="scc-grids"><div><div class="scc-gt">집계 기준 ' + gsel + '</div>' + groupTable(list, state.groupBy) + '</div>' +
-      '<div><div class="scc-gt">입력자(직원)별</div>' + staffTable(list) + '</div></div>';
   }
 
   /* ------------------------------------------------------------------ CSV */
@@ -805,5 +704,5 @@
   }
 
   // 테스트/디버그용 내부 노출 (화면 동작에는 영향 없음)
-  window.__scc = { state: state, summarize: agg, levelOf: levelOf };
+  window.__scc = { state: state, summarize: agg };
 })();
