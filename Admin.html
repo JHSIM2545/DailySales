@@ -4861,8 +4861,6 @@ table.status-summary.status-summary-full tbody th{ text-align:center !important;
  .ai-report-topbtn:hover{ background:#1d4ed8; }
  .scc-topbtn{ background:#0f766e; color:#fff; border:none; padding:9px 26px; border-radius:6px; font-size:15px; font-weight:700; cursor:pointer; }
  .scc-topbtn:hover{ background:#0b5f58; }  
- .calc-topbtn{ background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.6); padding:6px 14px; border-radius:6px; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; }  
- .calc-topbtn:hover{ background:rgba(255,255,255,.3); }  
   
 /* 컨설턴트별 차트 스타일 */  
  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }  
@@ -5845,7 +5843,6 @@ input[type="checkbox"] {
  <button id="schoolCctvTopBtn" class="scc-topbtn" onclick="if(window.openSchoolCctv_){openSchoolCctv_();}else{alert('school-cctv.js 파일이 함께 배포되지 않았습니다.');}">학교 CCTV</button>
  </div>  
  <div class="userinfo">  
- <button id="calcTopBtn" class="calc-topbtn" title="계산기 (숫자는 복사·붙여넣기 가능)" onclick="if(window.openCalculator_){openCalculator_();}else{alert('calculator.js 파일이 함께 배포되지 않았습니다.');}">🧮 계산기</button>
  <span id="whoami" style="display:none;"></span>  
  <a id="logoutLink" style="display:none;" onclick="logout()">로그아웃</a>  
  <div class="sync-status" id="syncStatus" style="display:none;"></div>  
@@ -7881,6 +7878,9 @@ function manualRefreshBtnHtml_(){
  return '';
 }  
 document.title = '북서울 영업일보';
+function calcTabHtml_(autoRight){
+ return '<div class="tab" id="calcTopBtn" title="계산기" aria-label="계산기" role="button" onclick="if(window.openCalculator_){openCalculator_();}else{alert(\'calculator.js 파일이 함께 배포되지 않았습니다.\');}" style="padding:8px 12px;' + (autoRight ? ' margin-left:auto !important;' : '') + '"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="4" y="2.5" width="16" height="19" rx="2.5"/><rect x="7" y="5.5" width="10" height="4" rx="1"/><path d="M8 13.5h.01M12 13.5h.01M16 13.5h.01M8 17.5h.01M12 17.5h.01M16 17.5h.01" stroke-width="2.6"/></svg></div>';
+}
 function renderTabs(){
  initYmFilterInputs_();  
  const el = document.getElementById('tabs');  
@@ -7921,7 +7921,7 @@ function renderTabs(){
  onclick="${t.ready ? onclickExpr : ''}">${label}${t.ready?'':' (준비중)'}</div>`;  
  }).join('');  
  const fileBtnHtml_ = (typeof openFileStoreModal_ === 'function') ? '<div class="tab" id="fileStoreTopBtn" title="파일 저장소" onclick="openFileStoreModal_()" style="font-size:13px; padding:8px 10px; line-height:1.2;">📁</div>' : '';
- el.innerHTML = tabsHtml + fileBtnHtml_;  
+ el.innerHTML = tabsHtml + calcTabHtml_(!firstRightFound) + fileBtnHtml_;  
 }  
 // 직무 저장값(서버에 저장된 값) -> 화면 표시용 이름. 저장값은 기존 사용자 데이터와의 호환을 위해 그대로 두고,  
 // 화면에 보이는 이름만 바꾼다. (2026-09-21: 직무명 표기 변경 요청)  
@@ -20680,6 +20680,6 @@ document.addEventListener('mousedown', function(e) {
 })();
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
-<script src="calculator.js?v=20261028b"></script>
+<script src="calculator.js?v=20261028c"></script>
 </body>
 </html>
