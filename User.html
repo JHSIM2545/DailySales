@@ -4183,7 +4183,9 @@ function getTzToday() {
         if (du.length > 42000000) return { success: false, error: '파일이 너무 큽니다. (최대 약 30MB)' };
 
         const list = await Backend._fsLoadRemote(client, owner); // 읽기 실패 시 예외 → 목록을 덮어쓰지 않음
-        const oldIdx = list.findIndex(function(f){ return f.id === payload.id || f.name === payload.name; });
+        const parent = payload.parent || '';
+        if (parent && !list.some(function(f){ return f.type === 'folder' && f.id === parent; })) return { success: false, error: '대상 폴더를 찾을 수 없습니다.' };
+        const oldIdx = list.findIndex(function(f){ return f.type !== 'folder' && (f.id === payload.id || (f.name === payload.name && (f.parent || '') === parent)); });
         const oldId = oldIdx >= 0 ? list[oldIdx].id : null;
         // 덮어쓰기여도 새 id 로 먼저 저장 → 실패해도 기존 파일이 깨지지 않음
         const newId = (oldId && oldId === payload.id) ? (payload.id + '_' + Date.now().toString(36)) : payload.id;
@@ -4196,7 +4198,7 @@ function getTzToday() {
         }
 
         const metaItem = {
-          id: newId, name: payload.name, size: payload.size || '', dataLen: du.length,
+          id: newId, type: 'file', name: payload.name, parent: parent, size: payload.size || '', bytes: Number(payload.bytes) || 0, dataLen: du.length,
           createdDate: payload.createdDate || payload.date || '',
           regDate: payload.regDate || payload.date || '', date: payload.date || payload.regDate || ''
         };
@@ -4228,6 +4230,119 @@ function getTzToday() {
           return { success: false, error: '파일 길이 불일치(' + du.length + '/' + meta.dataLen + '). 삭제 후 다시 업로드해 주세요.' };
         }
         return { success: true, dataUrl: du, name: meta.name };
+      } catch(err) {
+        return { success: false, error: String((err && err.message) || err) };
+      }
+    },
+
+    adminFsOp: async function(token, op) {
+      try {
+        const owner = Backend._fsOwner();
+        if (!owner) return { success: false, error: '로그인 정보를 확인할 수 없습니다.' };
+        const client = getSupabase();
+        if (!client) return { success: false, error: '서버(Supabase)에 연결할 수 없습니다.' };
+        op = op || {};
+        const list = await Backend._fsLoadRemote(client, owner);
+        const byId = function(id){ return list.find(function(f){ return String(f.id) === String(id); }); };
+        const isFolder = function(f){ return !!f && f.type === 'folder'; };
+        const badName = /[\\\/:*?"<>|]/;
+        const parentOk = function(pid){ return !pid || isFolder(byId(pid)); };
+        const sameName = function(name, pid, exId){
+          return list.some(function(f){ return String(f.id) !== String(exId) && (f.parent || '') === (pid || '') && String(f.name).toLowerCase() === String(name).toLowerCase(); });
+        };
+        const uniq = function(name, pid, isDir, copySuffix, exId){
+          if (!sameName(name, pid, exId)) return name;
+          let base = name, ext = '';
+          if (!isDir) { const i = name.lastIndexOf('.'); if (i > 0) { base = name.slice(0, i); ext = name.slice(i); } }
+          if (copySuffix) { const c = base + ' - 복사본' + ext; if (!sameName(c, pid, exId)) return c; base = base + ' - 복사본'; }
+          for (let n = 2; n < 1000; n++) { const c = base + ' (' + n + ')' + ext; if (!sameName(c, pid, exId)) return c; }
+          return name + '_' + Date.now();
+        };
+        const descendants = function(id){
+          const out = [], st = [String(id)];
+          while (st.length) { const c = st.pop(); list.forEach(function(f){ if ((f.parent || '') === c) { out.push(f); st.push(String(f.id)); } }); }
+          return out;
+        };
+        const rid = function(p){ return p + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); };
+        const save = function(l){ return Backend._fsSaveRemote(client, owner, l); };
+
+        if (op.action === 'mkdir') {
+          const name0 = String(op.name || '').trim();
+          if (!name0 || badName.test(name0)) return { success: false, error: '폴더 이름에 \\ / : * ? " < > | 문자는 사용할 수 없습니다.' };
+          const parent = op.parent || '';
+          if (!parentOk(parent)) return { success: false, error: '상위 폴더를 찾을 수 없습니다.' };
+          const name = uniq(name0, parent, true, false, null);
+          const id = rid('dir');
+          list.push({ id: id, type: 'folder', name: name, parent: parent, createdDate: op.date || '', regDate: op.date || '', date: op.date || '' });
+          await save(list);
+          return { success: true, id: id, name: name };
+        }
+        if (op.action === 'rename') {
+          const it = byId(op.id); const name = String(op.name || '').trim();
+          if (!it) return { success: false, error: '항목을 찾을 수 없습니다.' };
+          if (!name || badName.test(name)) return { success: false, error: '이름에 \\ / : * ? " < > | 문자는 사용할 수 없습니다.' };
+          if (sameName(name, it.parent || '', it.id)) return { success: false, error: '같은 이름의 파일 또는 폴더가 이미 있습니다.' };
+          it.name = name;
+          await save(list);
+          return { success: true };
+        }
+        if (op.action === 'move') {
+          const target = op.parent || '';
+          if (!parentOk(target)) return { success: false, error: '대상 폴더를 찾을 수 없습니다.' };
+          const moved = [];
+          for (const id of (op.ids || [])) {
+            const it = byId(id); if (!it) continue;
+            if (isFolder(it) && (String(id) === String(target) || descendants(id).some(function(d){ return String(d.id) === String(target); }))) {
+              return { success: false, error: '폴더를 자기 자신 또는 하위 폴더로 이동할 수 없습니다.' };
+            }
+            if ((it.parent || '') !== target) { it.name = uniq(it.name, target, isFolder(it), false, it.id); it.parent = target; }
+            moved.push(it.id);
+          }
+          await save(list);
+          return { success: true, ids: moved };
+        }
+        if (op.action === 'copy') {
+          const target = op.parent || '';
+          if (!parentOk(target)) return { success: false, error: '대상 폴더를 찾을 수 없습니다.' };
+          for (const id of (op.ids || [])) {
+            const it = byId(id);
+            if (isFolder(it) && (String(id) === String(target) || descendants(id).some(function(d){ return String(d.id) === String(target); }))) {
+              return { success: false, error: '폴더를 자기 자신 또는 하위 폴더로 복사할 수 없습니다.' };
+            }
+          }
+          const written = [], created = [];
+          const copyOne = async function(it, pid, top){
+            const nm = uniq(it.name, pid, isFolder(it), top && (it.parent || '') === (pid || ''), null);
+            if (isFolder(it)) {
+              const nid = rid('dir');
+              list.push({ id: nid, type: 'folder', name: nm, parent: pid, createdDate: it.createdDate || op.date || '', regDate: op.date || '', date: op.date || '' });
+              const kids = list.filter(function(f){ return (f.parent || '') === String(it.id); });
+              for (const k of kids) await copyOne(k, nid, false);
+              return nid;
+            }
+            const du = await Backend._fsReadData(client, it.id);
+            const nid = rid('file');
+            await Backend._fsWriteData(client, nid, du); written.push(nid);
+            list.push(Object.assign({}, it, { id: nid, name: nm, parent: pid, regDate: op.date || it.regDate, date: op.date || it.date }));
+            return nid;
+          };
+          try {
+            for (const id of (op.ids || [])) { const it = byId(id); if (it) created.push(await copyOne(it, target, true)); }
+            await save(list);
+          } catch(e) {
+            for (const w of written) { try { await Backend._fsDeleteData(client, w); } catch(x) {} }
+            return { success: false, error: (e && e.message) || String(e) };
+          }
+          return { success: true, ids: created };
+        }
+        if (op.action === 'delete') {
+          const rm = {};
+          (op.ids || []).forEach(function(id){ const it = byId(id); if (!it) return; rm[String(it.id)] = it; descendants(it.id).forEach(function(d){ rm[String(d.id)] = d; }); });
+          for (const k of Object.keys(rm)) { if (!isFolder(rm[k])) { try { await Backend._fsDeleteData(client, rm[k].id); } catch(e) {} } }
+          await save(list.filter(function(f){ return !rm[String(f.id)]; }));
+          return { success: true };
+        }
+        return { success: false, error: '알 수 없는 작업입니다.' };
       } catch(err) {
         return { success: false, error: String((err && err.message) || err) };
       }

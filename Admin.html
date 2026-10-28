@@ -4189,7 +4189,9 @@ function getTzToday() {
         if (du.length > 42000000) return { success: false, error: '파일이 너무 큽니다. (최대 약 30MB)' };
 
         const list = await Backend._fsLoadRemote(client, owner); // 읽기 실패 시 예외 → 목록을 덮어쓰지 않음
-        const oldIdx = list.findIndex(function(f){ return f.id === payload.id || f.name === payload.name; });
+        const parent = payload.parent || '';
+        if (parent && !list.some(function(f){ return f.type === 'folder' && f.id === parent; })) return { success: false, error: '대상 폴더를 찾을 수 없습니다.' };
+        const oldIdx = list.findIndex(function(f){ return f.type !== 'folder' && (f.id === payload.id || (f.name === payload.name && (f.parent || '') === parent)); });
         const oldId = oldIdx >= 0 ? list[oldIdx].id : null;
         // 덮어쓰기여도 새 id 로 먼저 저장 → 실패해도 기존 파일이 깨지지 않음
         const newId = (oldId && oldId === payload.id) ? (payload.id + '_' + Date.now().toString(36)) : payload.id;
@@ -4202,7 +4204,7 @@ function getTzToday() {
         }
 
         const metaItem = {
-          id: newId, name: payload.name, size: payload.size || '', dataLen: du.length,
+          id: newId, type: 'file', name: payload.name, parent: parent, size: payload.size || '', bytes: Number(payload.bytes) || 0, dataLen: du.length,
           createdDate: payload.createdDate || payload.date || '',
           regDate: payload.regDate || payload.date || '', date: payload.date || payload.regDate || ''
         };
@@ -4234,6 +4236,119 @@ function getTzToday() {
           return { success: false, error: '파일 길이 불일치(' + du.length + '/' + meta.dataLen + '). 삭제 후 다시 업로드해 주세요.' };
         }
         return { success: true, dataUrl: du, name: meta.name };
+      } catch(err) {
+        return { success: false, error: String((err && err.message) || err) };
+      }
+    },
+
+    adminFsOp: async function(token, op) {
+      try {
+        const owner = Backend._fsOwner();
+        if (!owner) return { success: false, error: '로그인 정보를 확인할 수 없습니다.' };
+        const client = getSupabase();
+        if (!client) return { success: false, error: '서버(Supabase)에 연결할 수 없습니다.' };
+        op = op || {};
+        const list = await Backend._fsLoadRemote(client, owner);
+        const byId = function(id){ return list.find(function(f){ return String(f.id) === String(id); }); };
+        const isFolder = function(f){ return !!f && f.type === 'folder'; };
+        const badName = /[\\\/:*?"<>|]/;
+        const parentOk = function(pid){ return !pid || isFolder(byId(pid)); };
+        const sameName = function(name, pid, exId){
+          return list.some(function(f){ return String(f.id) !== String(exId) && (f.parent || '') === (pid || '') && String(f.name).toLowerCase() === String(name).toLowerCase(); });
+        };
+        const uniq = function(name, pid, isDir, copySuffix, exId){
+          if (!sameName(name, pid, exId)) return name;
+          let base = name, ext = '';
+          if (!isDir) { const i = name.lastIndexOf('.'); if (i > 0) { base = name.slice(0, i); ext = name.slice(i); } }
+          if (copySuffix) { const c = base + ' - 복사본' + ext; if (!sameName(c, pid, exId)) return c; base = base + ' - 복사본'; }
+          for (let n = 2; n < 1000; n++) { const c = base + ' (' + n + ')' + ext; if (!sameName(c, pid, exId)) return c; }
+          return name + '_' + Date.now();
+        };
+        const descendants = function(id){
+          const out = [], st = [String(id)];
+          while (st.length) { const c = st.pop(); list.forEach(function(f){ if ((f.parent || '') === c) { out.push(f); st.push(String(f.id)); } }); }
+          return out;
+        };
+        const rid = function(p){ return p + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8); };
+        const save = function(l){ return Backend._fsSaveRemote(client, owner, l); };
+
+        if (op.action === 'mkdir') {
+          const name0 = String(op.name || '').trim();
+          if (!name0 || badName.test(name0)) return { success: false, error: '폴더 이름에 \\ / : * ? " < > | 문자는 사용할 수 없습니다.' };
+          const parent = op.parent || '';
+          if (!parentOk(parent)) return { success: false, error: '상위 폴더를 찾을 수 없습니다.' };
+          const name = uniq(name0, parent, true, false, null);
+          const id = rid('dir');
+          list.push({ id: id, type: 'folder', name: name, parent: parent, createdDate: op.date || '', regDate: op.date || '', date: op.date || '' });
+          await save(list);
+          return { success: true, id: id, name: name };
+        }
+        if (op.action === 'rename') {
+          const it = byId(op.id); const name = String(op.name || '').trim();
+          if (!it) return { success: false, error: '항목을 찾을 수 없습니다.' };
+          if (!name || badName.test(name)) return { success: false, error: '이름에 \\ / : * ? " < > | 문자는 사용할 수 없습니다.' };
+          if (sameName(name, it.parent || '', it.id)) return { success: false, error: '같은 이름의 파일 또는 폴더가 이미 있습니다.' };
+          it.name = name;
+          await save(list);
+          return { success: true };
+        }
+        if (op.action === 'move') {
+          const target = op.parent || '';
+          if (!parentOk(target)) return { success: false, error: '대상 폴더를 찾을 수 없습니다.' };
+          const moved = [];
+          for (const id of (op.ids || [])) {
+            const it = byId(id); if (!it) continue;
+            if (isFolder(it) && (String(id) === String(target) || descendants(id).some(function(d){ return String(d.id) === String(target); }))) {
+              return { success: false, error: '폴더를 자기 자신 또는 하위 폴더로 이동할 수 없습니다.' };
+            }
+            if ((it.parent || '') !== target) { it.name = uniq(it.name, target, isFolder(it), false, it.id); it.parent = target; }
+            moved.push(it.id);
+          }
+          await save(list);
+          return { success: true, ids: moved };
+        }
+        if (op.action === 'copy') {
+          const target = op.parent || '';
+          if (!parentOk(target)) return { success: false, error: '대상 폴더를 찾을 수 없습니다.' };
+          for (const id of (op.ids || [])) {
+            const it = byId(id);
+            if (isFolder(it) && (String(id) === String(target) || descendants(id).some(function(d){ return String(d.id) === String(target); }))) {
+              return { success: false, error: '폴더를 자기 자신 또는 하위 폴더로 복사할 수 없습니다.' };
+            }
+          }
+          const written = [], created = [];
+          const copyOne = async function(it, pid, top){
+            const nm = uniq(it.name, pid, isFolder(it), top && (it.parent || '') === (pid || ''), null);
+            if (isFolder(it)) {
+              const nid = rid('dir');
+              list.push({ id: nid, type: 'folder', name: nm, parent: pid, createdDate: it.createdDate || op.date || '', regDate: op.date || '', date: op.date || '' });
+              const kids = list.filter(function(f){ return (f.parent || '') === String(it.id); });
+              for (const k of kids) await copyOne(k, nid, false);
+              return nid;
+            }
+            const du = await Backend._fsReadData(client, it.id);
+            const nid = rid('file');
+            await Backend._fsWriteData(client, nid, du); written.push(nid);
+            list.push(Object.assign({}, it, { id: nid, name: nm, parent: pid, regDate: op.date || it.regDate, date: op.date || it.date }));
+            return nid;
+          };
+          try {
+            for (const id of (op.ids || [])) { const it = byId(id); if (it) created.push(await copyOne(it, target, true)); }
+            await save(list);
+          } catch(e) {
+            for (const w of written) { try { await Backend._fsDeleteData(client, w); } catch(x) {} }
+            return { success: false, error: (e && e.message) || String(e) };
+          }
+          return { success: true, ids: created };
+        }
+        if (op.action === 'delete') {
+          const rm = {};
+          (op.ids || []).forEach(function(id){ const it = byId(id); if (!it) return; rm[String(it.id)] = it; descendants(it.id).forEach(function(d){ rm[String(d.id)] = d; }); });
+          for (const k of Object.keys(rm)) { if (!isFolder(rm[k])) { try { await Backend._fsDeleteData(client, rm[k].id); } catch(e) {} } }
+          await save(list.filter(function(f){ return !rm[String(f.id)]; }));
+          return { success: true };
+        }
+        return { success: false, error: '알 수 없는 작업입니다.' };
       } catch(err) {
         return { success: false, error: String((err && err.message) || err) };
       }
@@ -6081,36 +6196,92 @@ input[type="checkbox"] {
  </div>  
 </div>  
   
+<style>
+#fileStoreModalOverlay .fs-win{ width:min(1080px,96vw); height:min(700px,92vh); max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; background:#fff; border-radius:8px; box-shadow:0 12px 40px rgba(0,0,0,.35); font-family:'Segoe UI','Malgun Gothic','맑은 고딕',sans-serif; font-size:13px; color:#1a1a1a; position:relative; }
+#fileStoreModalOverlay .fs-title{ display:flex; align-items:center; gap:8px; padding:8px 8px 8px 12px; background:#f3f3f3; border-bottom:1px solid #e0e0e0; flex:none; }
+#fileStoreModalOverlay .fs-title b{ font-weight:600; font-size:13px; flex:1; }
+#fileStoreModalOverlay .fs-x{ width:36px; height:28px; border:0; background:transparent; font-size:16px; cursor:pointer; border-radius:4px; }
+#fileStoreModalOverlay .fs-x:hover{ background:#e81123; color:#fff; }
+#fileStoreModalOverlay .fs-cmd{ display:flex; align-items:center; gap:2px; padding:6px 10px; border-bottom:1px solid #e5e5e5; background:#fff; flex:none; flex-wrap:wrap; }
+#fileStoreModalOverlay .fs-cmd button{ display:inline-flex; align-items:center; gap:6px; border:0; background:transparent; padding:5px 10px; border-radius:4px; font:inherit; cursor:pointer; color:#1a1a1a; white-space:nowrap; }
+#fileStoreModalOverlay .fs-cmd button:hover:not(:disabled){ background:#e9eef5; }
+#fileStoreModalOverlay .fs-cmd button:disabled{ opacity:.38; cursor:default; }
+#fileStoreModalOverlay .fs-sep{ width:1px; height:20px; background:#d9d9d9; margin:0 6px; }
+#fileStoreModalOverlay .fs-addr{ display:flex; align-items:center; gap:6px; padding:6px 10px; flex:none; }
+#fileStoreModalOverlay .fs-nav{ width:30px; height:30px; border:0; background:transparent; border-radius:4px; cursor:pointer; font-size:16px; }
+#fileStoreModalOverlay .fs-nav:hover:not(:disabled){ background:#e9eef5; }
+#fileStoreModalOverlay .fs-nav:disabled{ opacity:.35; cursor:default; }
+#fileStoreModalOverlay .fs-crumb{ flex:1; display:flex; align-items:center; border:1px solid #d0d0d0; border-radius:4px; height:30px; padding:0 4px; overflow:hidden; background:#fff; min-width:0; }
+#fileStoreModalOverlay .fs-crumb span.seg{ padding:3px 6px; border-radius:3px; cursor:pointer; white-space:nowrap; }
+#fileStoreModalOverlay .fs-crumb span.seg:hover{ background:#e5f3ff; }
+#fileStoreModalOverlay .fs-crumb span.arr{ color:#888; font-size:11px; }
+#fileStoreModalOverlay .fs-search{ width:200px; height:30px; border:1px solid #d0d0d0; border-radius:4px; padding:0 8px; font:inherit; }
+#fileStoreModalOverlay .fs-body{ flex:1; display:flex; min-height:0; border-top:1px solid #e5e5e5; }
+#fileStoreModalOverlay .fs-tree{ width:210px; flex:none; overflow:auto; border-right:1px solid #e5e5e5; padding:6px 4px; background:#fff; }
+#fileStoreModalOverlay .fs-tn{ display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:4px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#fileStoreModalOverlay .fs-tn:hover{ background:#e5f3ff; }
+#fileStoreModalOverlay .fs-tn.cur{ background:#cce8ff; }
+#fileStoreModalOverlay .fs-main{ flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
+#fileStoreModalOverlay .fs-head{ display:flex; flex:none; border-bottom:1px solid #e5e5e5; color:#555; user-select:none; }
+#fileStoreModalOverlay .fs-head div{ padding:6px 8px; cursor:pointer; border-right:1px solid #eee; white-space:nowrap; }
+#fileStoreModalOverlay .fs-head div:hover{ background:#e5f3ff; }
+#fileStoreModalOverlay .fs-content{ flex:1; overflow:auto; position:relative; outline:none; user-select:none; }
+#fileStoreModalOverlay .c-name{ flex:1; min-width:160px; } #fileStoreModalOverlay .c-date{ width:170px; flex:none; } #fileStoreModalOverlay .c-type{ width:190px; flex:none; } #fileStoreModalOverlay .c-size{ width:100px; flex:none; text-align:right; }
+#fileStoreModalOverlay .fs-row{ display:flex; align-items:center; padding:0 0; height:28px; border:1px solid transparent; border-radius:3px; margin:0 2px; }
+#fileStoreModalOverlay .fs-row > div{ padding:0 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#fileStoreModalOverlay .fs-row .c-name{ display:flex; align-items:center; gap:8px; }
+#fileStoreModalOverlay .fs-row:hover, #fileStoreModalOverlay .fs-tile:hover{ background:#e5f3ff; }
+#fileStoreModalOverlay .fs-item.sel{ background:#cce8ff !important; border-color:#99d1ff; }
+#fileStoreModalOverlay .fs-item.cut{ opacity:.5; }
+#fileStoreModalOverlay .fs-item.dropt{ background:#cce8ff !important; outline:1px dashed #0078d4; }
+#fileStoreModalOverlay .fs-grid{ display:flex; flex-wrap:wrap; align-content:flex-start; padding:8px; gap:4px; min-height:100%; }
+#fileStoreModalOverlay .fs-tile{ width:104px; padding:6px 4px; border:1px solid transparent; border-radius:3px; text-align:center; }
+#fileStoreModalOverlay .fs-tile .nm{ margin-top:4px; line-height:1.25; max-height:2.5em; overflow:hidden; word-break:break-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+#fileStoreModalOverlay .fs-tile svg{ display:block; margin:0 auto; }
+#fileStoreModalOverlay .fs-empty{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#777; pointer-events:none; }
+#fileStoreModalOverlay .fs-marq{ position:absolute; border:1px solid #0078d4; background:rgba(0,120,212,.2); pointer-events:none; z-index:3; }
+#fileStoreModalOverlay .fs-dropmask{ position:absolute; inset:0; border:2px dashed #0078d4; background:rgba(0,120,212,.08); display:none; align-items:center; justify-content:center; font-size:16px; color:#0063b1; z-index:4; pointer-events:none; }
+#fileStoreModalOverlay .fs-main.drag .fs-dropmask{ display:flex; }
+#fileStoreModalOverlay .fs-status{ display:flex; gap:16px; padding:5px 12px; border-top:1px solid #e5e5e5; background:#fafafa; color:#444; flex:none; }
+#fileStoreModalOverlay .fs-ren{ font:inherit; border:1px solid #0078d4; outline:none; padding:1px 4px; width:100%; box-sizing:border-box; background:#fff; }
+#fileStoreModalOverlay .fs-tile .fs-ren{ text-align:center; }
+.fs-ctx{ position:fixed; z-index:100000; background:#fff; border:1px solid #d0d0d0; border-radius:6px; box-shadow:0 6px 20px rgba(0,0,0,.25); padding:4px; min-width:170px; font:13px 'Segoe UI','Malgun Gothic',sans-serif; }
+.fs-ctx div{ padding:6px 14px; border-radius:4px; cursor:pointer; } .fs-ctx div:hover{ background:#e5f3ff; } .fs-ctx div.dis{ opacity:.38; pointer-events:none; } .fs-ctx hr{ border:0; border-top:1px solid #e5e5e5; margin:4px 2px; }
+</style>
 <div class="modal-overlay" id="fileStoreModalOverlay">
-  <div class="modal" style="width:720px; max-width:96vw; position:relative; padding:24px 28px; border-radius:8px; background:#fff; box-shadow:0 10px 30px rgba(0,0,0,0.25);">
-    <button onclick="fileStoreRefresh_()" title="새로고침" style="position:absolute; top:20px; right:20px; width:28px; height:28px; border-radius:50%; border:1px solid #c7cfd8; background:#fff; color:#555; cursor:pointer; font-size:15px; line-height:1; display:flex; align-items:center; justify-content:center;">↻</button>
-    
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-      <span style="font-size:22px;">📁</span>
-      <h2 style="margin:0; font-size:19px; font-weight:700; color:#111827;">파일 저장소</h2>
+  <div class="modal fs-win" id="fsWin" tabindex="-1">
+    <div class="fs-title"><span id="fsTitleIcon"></span><b>파일 저장소 <span style="font-weight:400;color:#777">(내 파일만 표시됩니다)</span></b><button class="fs-x" onclick="closeFileStoreModal_()" title="닫기">✕</button></div>
+    <div class="fs-cmd">
+      <button onclick="fsNewFolder_()">📁＋ 새 폴더</button>
+      <button onclick="fsUploadClick_()">⬆ 업로드</button>
+      <div class="fs-sep"></div>
+      <button id="fsBtnCut" onclick="fsCutCopy_(true)" title="잘라내기 (Ctrl+X)">✂ 잘라내기</button>
+      <button id="fsBtnCopy" onclick="fsCutCopy_(false)" title="복사 (Ctrl+C)">⧉ 복사</button>
+      <button id="fsBtnPaste" onclick="fsPaste_()" title="붙여넣기 (Ctrl+V)">📋 붙여넣기</button>
+      <button id="fsBtnRename" onclick="fsStartRename_()" title="이름 바꾸기 (F2)">✎ 이름 바꾸기</button>
+      <button id="fsBtnDown" onclick="fsDownloadSel_()">⬇ 다운로드</button>
+      <button id="fsBtnDel" onclick="fsDeleteSel_()" title="삭제 (Delete)">🗑 삭제</button>
+      <div class="fs-sep"></div>
+      <button onclick="fsToggleView_()" id="fsBtnView">▦ 큰 아이콘</button>
+      <button onclick="fsReload_()" title="새로 고침 (F5)">↻</button>
     </div>
-    <div style="color:#6b7280; font-size:13px; margin-bottom:14px;">파일당 최대 5MB까지 업로드할 수 있습니다.</div>
-    
-    <!-- 액션 툴바: 업로드, 선택 다운로드, 선택 삭제 -->
-    <div style="margin-bottom:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <button onclick="fileStoreUploadClick_()" style="padding:6px 14px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #c7cfd8; background:#fff; color:#111827; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-        <span style="font-weight:700; font-size:15px;">+</span> 업로드
-      </button>
-      <button id="fileStoreBtnMultiDownload" disabled onclick="fileStoreMultiDownload_()" style="padding:6px 12px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #3b82f6; background:#fff; color:#2563eb; cursor:pointer; display:inline-flex; align-items:center; gap:4px; opacity:0.4; transition:all 0.2s;">
-        <span style="font-weight:700;">⬇</span> 선택 다운로드
-      </button>
-      <button id="fileStoreBtnMultiDelete" disabled onclick="fileStoreMultiDelete_()" style="padding:6px 12px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #ef4444; background:#fff; color:#dc2626; cursor:pointer; display:inline-flex; align-items:center; gap:4px; opacity:0.4; transition:all 0.2s;">
-        <span>🗑</span> 선택 삭제
-      </button>
-      <input type="file" id="fileStoreInput" multiple style="display:none;" onchange="fileStoreFileSelected_(event)">
+    <div class="fs-addr">
+      <button class="fs-nav" id="fsBack" onclick="fsHistGo_(-1)" title="뒤로 (Alt+←)">←</button>
+      <button class="fs-nav" id="fsFwd" onclick="fsHistGo_(1)" title="앞으로 (Alt+→)">→</button>
+      <button class="fs-nav" id="fsUp" onclick="fsGoUp_()" title="위로 (Alt+↑)">↑</button>
+      <div class="fs-crumb" id="fsCrumb"></div>
+      <input class="fs-search" id="fsSearch" placeholder="파일 저장소 검색" oninput="fsOnSearch_(this.value)">
     </div>
-
-    <!-- 파일 목록 테이블 -->
-    <div id="fileStoreList" style="max-height:420px; overflow-y:auto; border:1px solid #cfd6dc; border-radius:4px;"></div>
-
-    <div class="modal-actions" style="margin-top:16px; display:flex; justify-content:flex-end;">
-      <button onclick="closeFileStoreModal_()" style="padding:7px 24px; font-size:13px; border:1px solid #c7cfd8; background:#fff; color:#374151; border-radius:4px; cursor:pointer;">닫기</button>
+    <div class="fs-body">
+      <div class="fs-tree" id="fsTree"></div>
+      <div class="fs-main" id="fsMain">
+        <div class="fs-head" id="fsHead"></div>
+        <div class="fs-content" id="fsContent" tabindex="0"></div>
+        <div class="fs-dropmask" id="fsDropMask">여기에 파일을 놓아 업로드</div>
+      </div>
     </div>
+    <div class="fs-status"><span id="fsStatL">0개 항목</span><span id="fsStatR"></span></div>
+    <input type="file" id="fileStoreInput" multiple style="display:none;" onchange="fsFileSelected_(event)">
   </div>
 </div>
 
@@ -16819,338 +16990,665 @@ function downloadGridImgPreview_(){
   document.body.removeChild(a);
 }
 
-/* ===================== 파일 저장소 기능 (Supabase 영구 연동: 다중 선택/다운/삭제/중복체크/아이콘) ===================== */
+/* ===================== 파일 저장소 (윈도우 탐색기 방식 UI: 폴더 / 드래그앤드롭 / 다중선택) ===================== */
 let FILE_STORE_CACHED_FILES = [];
-let FILE_STORE_SORT_DESC = true;
+const FS_ = { items: [], cwd: '', sel: new Set(), anchor: null, sortKey: 'name', asc: true, view: 'details',
+  clip: null, hist: [''], hi: 0, query: '', renaming: null, vis: [], busy: false, pendingSingle: null };
 
-function openFileStoreModal_(){
-  const overlay = document.getElementById('fileStoreModalOverlay');
-  if (overlay) {
-    overlay.classList.add('open');
-    fileStoreRefresh_(); // 모달 열자마자 최신 파일 목록 자동 로드!
+/* ---------- 아이콘 (윈도우 파일 아이콘 스타일) ---------- */
+function fsExt_(name){ const m = /\.([^.\\/]+)$/.exec(String(name||'')); return m ? m[1].toLowerCase() : ''; }
+function fsIcon_(it, px){
+  px = px || 20;
+  const open = '<svg width="'+px+'" height="'+px+'" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" style="flex:none">';
+  if (it.type === 'folder') {
+    return open + '<path d="M2 7a2 2 0 0 1 2-2h7.2a2 2 0 0 1 1.5.7L15 8h13a2 2 0 0 1 2 2v1H2z" fill="#E3A21A"/><path d="M2 11h28v15a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z" fill="#FFCA3A"/><path d="M2 11h28v1.6H2z" fill="#FFE18C"/></svg>';
   }
+  const ext = fsExt_(it.name);
+  const page = '<path d="M7 2h11l8 8v19a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" fill="#fff" stroke="#8d97a3" stroke-width="1"/><path d="M18 2v7a1 1 0 0 0 1 1h7z" fill="#dde3ea" stroke="#8d97a3" stroke-width="1" stroke-linejoin="round"/>';
+  const lines = '<path d="M19 14h5M19 17.5h5M19 21h5M10 25h14" stroke="#b9c1ca" stroke-width="1.5"/>';
+  const badge = function(color, txt, fs){ return '<rect x="1.5" y="12" width="17" height="14" rx="2" fill="'+color+'"/><text x="10" y="'+(txt.length>1?22.5:23)+'" font-size="'+(fs||10)+'" font-weight="700" fill="#fff" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif">'+txt+'</text>'; };
+  let body;
+  if (ext==='doc'||ext==='docx'||ext==='rtf') body = lines + badge('#185ABD','W');
+  else if (ext==='xls'||ext==='xlsx'||ext==='xlsm') body = lines + badge('#107C41','X');
+  else if (ext==='csv') body = lines + badge('#107C41','CSV',6.5);
+  else if (ext==='ppt'||ext==='pptx') body = lines + badge('#C43E1C','P');
+  else if (ext==='pdf') body = '<path d="M10 25h14" stroke="#b9c1ca" stroke-width="1.5"/>' + badge('#E2231A','PDF',6.5);
+  else if (ext==='hwp'||ext==='hwpx') body = lines + badge('#1F6FD0','한',9);
+  else if (ext==='txt'||ext==='log'||ext==='md') body = '<path d="M10 14h14M10 17.5h14M10 21h14M10 24.5h9" stroke="#8d97a3" stroke-width="1.5"/>';
+  else if (/^(png|jpe?g|gif|bmp|webp|svg|ico|tiff?|heic)$/.test(ext)) body = '<rect x="9" y="13" width="15" height="13" fill="#bfe3ff"/><path d="M9 26l5-6 3 3 3-4 4 7z" fill="#2e8b57"/><circle cx="20.5" cy="16.8" r="1.7" fill="#ffd54a"/>';
+  else if (/^(zip|rar|7z|tar|gz|alz|egg)$/.test(ext)) body = '<rect x="12" y="10" width="8" height="19" fill="#f2c94c"/><path d="M16 11v17" stroke="#8a6d00" stroke-width="2" stroke-dasharray="1.6 1.6"/>';
+  else if (/^(html?|js|json|css|xml|gs|sql|py|ts|java)$/.test(ext)) body = '<text x="16" y="23" font-size="9" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="Consolas,monospace">&lt;/&gt;</text>';
+  else if (/^(mp3|wav|m4a|flac|aac|ogg)$/.test(ext)) body = '<path d="M13 24V13l9-2v11" fill="none" stroke="#7c3aed" stroke-width="2"/><circle cx="11.5" cy="24" r="2.5" fill="#7c3aed"/><circle cx="20.5" cy="22" r="2.5" fill="#7c3aed"/>';
+  else if (/^(mp4|avi|mov|mkv|wmv|webm)$/.test(ext)) body = '<rect x="8.5" y="13" width="15" height="12" rx="2" fill="#6d28d9"/><path d="M14.5 16l5 3-5 3z" fill="#fff"/>';
+  else if (ext==='exe'||ext==='msi') body = '<rect x="9" y="13" width="14" height="11" fill="#2563eb"/><rect x="9" y="13" width="14" height="3" fill="#1e40af"/>';
+  else body = '<path d="M10 14h14M10 17.5h14M10 21h14M10 24.5h9" stroke="#c4ccd4" stroke-width="1.5"/>';
+  return open + page + body + '</svg>';
+}
+function fsTypeName_(it){
+  if (it.type === 'folder') return '파일 폴더';
+  const e = fsExt_(it.name);
+  const map = { doc:'Microsoft Word 문서', docx:'Microsoft Word 문서', xls:'Microsoft Excel 워크시트', xlsx:'Microsoft Excel 워크시트', xlsm:'Microsoft Excel 매크로 사용 워크시트',
+    csv:'Microsoft Excel 쉼표로 구분된 값 파일', ppt:'Microsoft PowerPoint 프레젠테이션', pptx:'Microsoft PowerPoint 프레젠테이션', pdf:'PDF 문서', txt:'텍스트 문서',
+    hwp:'한글 문서', hwpx:'한글 문서', zip:'압축(ZIP) 폴더', html:'HTML 문서', htm:'HTML 문서', js:'JavaScript 파일', json:'JSON 파일', md:'Markdown 파일' };
+  if (map[e]) return map[e];
+  return e ? e.toUpperCase() + ' 파일' : '파일';
+}
+function fsBytes_(it){
+  if (it.type === 'folder') return 0;
+  if (typeof it.bytes === 'number') return it.bytes;
+  const m = /([\d.]+)\s*(B|KB|MB)/i.exec(it.size || '');
+  if (!m) return 0;
+  return Math.round(parseFloat(m[1]) * ({B:1,KB:1024,MB:1048576}[m[2].toUpperCase()]));
+}
+function fsFmtSize_(it){
+  if (it.type === 'folder') return '';
+  const b = fsBytes_(it);
+  return Math.max(1, Math.ceil(b / 1024)).toLocaleString() + ' KB';
+}
+function fsFmtDate_(s){
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/.exec(String(s||''));
+  if (!m) return s || '';
+  let h = parseInt(m[2],10); const ap = h < 12 ? '오전' : '오후'; h = h % 12; if (h === 0) h = 12;
+  return m[1] + ' ' + ap + ' ' + h + ':' + m[3];
+}
+function fsNow_(){ return fmtFileStoreDateTime_(new Date()); }
+function fmtFileStoreDateTime_(dt) {
+  const d = (dt instanceof Date) ? dt : new Date(dt);
+  if (isNaN(d.getTime())) return '';
+  const p = function(n){ return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
+/* ---------- 데이터 ---------- */
+function fsGet_(id){ return FS_.items.find(function(f){ return String(f.id) === String(id); }); }
+function fsChildren_(pid){ return FS_.items.filter(function(f){ return (f.parent || '') === (pid || ''); }); }
+function fsPath_(id){ const out = []; let cur = id; let guard = 0; while (cur && guard++ < 50) { const it = fsGet_(cur); if (!it) break; out.unshift(it); cur = it.parent || ''; } return out; }
+function fsIsDesc_(id, ancestorId){ let cur = fsGet_(id); let g = 0; while (cur && g++ < 50) { if ((cur.parent || '') === ancestorId) return true; cur = fsGet_(cur.parent); } return false; }
+function fsErr_(res, fallback){ return (res && res.error) || fallback || '알 수 없는 오류'; }
+function fsCall_(fn){ // google.script.run 래퍼 (Promise)
+  const args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function(resolve, reject){
+    const r = google.script.run.withSuccessHandler(resolve).withFailureHandler(function(e){ reject(e); });
+    r[fn].apply(r, [SESSION ? SESSION.token : ''].concat(args));
+  });
+}
+function fsReload_(keepSel){
+  return fsCall_('adminListStoredFiles').then(function(res){
+    FS_.items = ((res && res.files) || []).filter(function(f){ return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html'; });
+    FILE_STORE_CACHED_FILES = FS_.items;
+    if (FS_.cwd && !fsGet_(FS_.cwd)) { FS_.cwd = ''; }
+    if (!keepSel) FS_.sel = new Set(); else FS_.sel.forEach(function(id){ if (!fsGet_(id)) FS_.sel.delete(id); });
+    fsRender_();
+  }).catch(function(err){
+    const c = document.getElementById('fsContent');
+    if (c) c.innerHTML = '<div style="padding:40px;text-align:center;color:#d13438">파일 목록을 불러오지 못했습니다: ' + escHtml(String(err)) + '</div>';
+  });
+}
+function fileStoreRefresh_(){ return fsReload_(); }
+
+/* ---------- 열기/닫기 ---------- */
+function openFileStoreModal_(){
+  const overlay = document.getElementById('fileStoreModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+  document.getElementById('fsTitleIcon').innerHTML = fsIcon_({type:'folder'}, 18);
+  FS_.cwd = ''; FS_.hist = ['']; FS_.hi = 0; FS_.query = ''; FS_.sel = new Set(); FS_.renaming = null;
+  const s = document.getElementById('fsSearch'); if (s) s.value = '';
+  fsBindOnce_();
+  document.getElementById('fsContent').innerHTML = '<div style="padding:40px;color:#777">불러오는 중...</div>';
+  fsReload_();
+  setTimeout(function(){ const c = document.getElementById('fsContent'); if (c) c.focus(); }, 50);
+}
 function closeFileStoreModal_(){
+  fsCloseCtx_();
   const overlay = document.getElementById('fileStoreModalOverlay');
   if (overlay) overlay.classList.remove('open');
 }
+function fsIsOpen_(){ const o = document.getElementById('fileStoreModalOverlay'); return !!(o && o.classList.contains('open')); }
 
-function getFileStoreIcon_(name) {
-  const ext = String(name || '').split('.').pop().toLowerCase();
-  if (ext === 'gs') return '🔧';
-  if (ext === 'html' || ext === 'htm') return '🌐';
-  if (ext === 'js') return '📜';
-  if (ext === 'json') return '📋';
-  if (ext === 'txt') return '📄';
-  if (ext === 'pdf') return '📕';
-  if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return '📊';
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return '🖼️';
-  return '📄';
-}
-
-function fmtFileStoreDateTime_(dt) {
-  if (!dt) return '-';
-  const d = new Date(dt);
-  if (isNaN(d.getTime())) return String(dt);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const min = String(d.getMinutes()).padStart(2, '0');
-  return y + '-' + m + '-' + day + ' ' + h + ':' + min;
-}
-
-function fileStoreRefresh_(){
-  const listEl = document.getElementById('fileStoreList');
-  if (listEl) listEl.innerHTML = '<div class="loading loading-spin" style="padding:40px;"><div class="loading-text">파일 목록을 불러오는 중입니다...</div></div>';
-  
-  google.script.run
-    .withSuccessHandler(function(res){
-      let files = (res && res.files) || [];
-      // 더미 파일 완전 필터링
-      files = files.filter(function(f){
-        return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html';
-      });
-      FILE_STORE_CACHED_FILES = files;
-      renderFileStoreTable_();
-    })
-    .withFailureHandler(function(err){
-      if (listEl) listEl.innerHTML = '<div style="padding:40px; text-align:center; color:#ef4444;">파일 목록을 불러오지 못했습니다: ' + escHtml(String(err)) + '</div>';
-    })
-    .adminListStoredFiles(SESSION ? SESSION.token : '');
-}
-
-function renderFileStoreTable_(){
-  const listEl = document.getElementById('fileStoreList');
-  if (!listEl) return;
-  
-  let files = FILE_STORE_CACHED_FILES.slice();
-  files.sort(function(a, b){
-    const da = a.regDate || a.date || '';
-    const db = b.regDate || b.date || '';
-    return FILE_STORE_SORT_DESC ? db.localeCompare(da) : da.localeCompare(db);
+/* ---------- 렌더 ---------- */
+function fsVisible_(){
+  const q = FS_.query.trim().toLowerCase();
+  let list = q ? FS_.items.filter(function(f){ return String(f.name).toLowerCase().indexOf(q) >= 0; }) : fsChildren_(FS_.cwd);
+  const k = FS_.sortKey, dir = FS_.asc ? 1 : -1;
+  list = list.slice().sort(function(a, b){
+    if ((a.type === 'folder') !== (b.type === 'folder')) return a.type === 'folder' ? -1 : 1;   // 폴더 먼저
+    let r = 0;
+    if (k === 'name') r = String(a.name).localeCompare(String(b.name), 'ko', { numeric: true, sensitivity: 'base' });
+    else if (k === 'date') r = String(a.createdDate || a.date || '').localeCompare(String(b.createdDate || b.date || ''));
+    else if (k === 'type') r = fsTypeName_(a).localeCompare(fsTypeName_(b), 'ko');
+    else if (k === 'size') r = fsBytes_(a) - fsBytes_(b);
+    if (r === 0) r = String(a.name).localeCompare(String(b.name), 'ko', { numeric: true, sensitivity: 'base' });
+    return r * dir;
   });
-
-  if (!files.length) {
-    listEl.innerHTML = '<div class="placeholder" style="padding:40px 20px; color:#888; text-align:center;">저장된 파일이 없습니다.<br><small style="font-size:12px; color:#aaa;">[+ 업로드] 버튼을 눌러 파일을 추가하세요.</small></div>';
-    updateFileStoreActionButtons_();
-    return;
+  return list;
+}
+function fsRender_(){
+  if (!fsIsOpen_()) return;
+  fsRenderCrumb_(); fsRenderTree_(); fsRenderHead_();
+  const box = document.getElementById('fsContent');
+  const list = fsVisible_();
+  FS_.vis = list.map(function(f){ return f.id; });
+  const cutSet = (FS_.clip && FS_.clip.cut) ? FS_.clip.ids : [];
+  const cls = function(it){ return 'fs-item ' + (view === 'details' ? 'fs-row' : 'fs-tile') + (FS_.sel.has(it.id) ? ' sel' : '') + (cutSet.indexOf(it.id) >= 0 ? ' cut' : ''); };
+  const view = FS_.view;
+  const nameHtml = function(it){
+    if (FS_.renaming === it.id) return '<input class="fs-ren" id="fsRenInput" value="' + escHtml(it.name) + '" spellcheck="false">';
+    return '<span class="nm-txt" title="' + escHtml(it.name) + '">' + escHtml(it.name) + '</span>';
+  };
+  let html = '';
+  if (view === 'details') {
+    html = list.map(function(it){
+      return '<div class="' + cls(it) + '" draggable="true" data-id="' + escHtml(it.id) + '" data-type="' + (it.type === 'folder' ? 'folder' : 'file') + '">' +
+        '<div class="c-name">' + fsIcon_(it, 20) + nameHtml(it) + '</div><div class="c-date">' + escHtml(fsFmtDate_(it.createdDate || it.date)) + '</div>' +
+        '<div class="c-type">' + escHtml(fsTypeName_(it)) + '</div><div class="c-size">' + escHtml(fsFmtSize_(it)) + '</div></div>';
+    }).join('');
+    box.innerHTML = '<div style="padding:2px 0;min-height:100%">' + html + '</div>';
+  } else {
+    html = list.map(function(it){
+      return '<div class="' + cls(it) + '" draggable="true" data-id="' + escHtml(it.id) + '" data-type="' + (it.type === 'folder' ? 'folder' : 'file') + '">' +
+        fsIcon_(it, 56) + '<div class="nm">' + nameHtml(it) + '</div></div>';
+    }).join('');
+    box.innerHTML = '<div class="fs-grid">' + html + '</div>';
   }
+  if (!list.length) box.insertAdjacentHTML('beforeend', '<div class="fs-empty">' + (FS_.query ? '검색 결과가 없습니다.' : '이 폴더는 비어 있습니다.') + '</div>');
+  document.getElementById('fsBtnView').textContent = view === 'details' ? '▦ 큰 아이콘' : '☰ 자세히';
+  fsUpdateStatus_();
+  if (FS_.renaming) {
+    const inp = document.getElementById('fsRenInput');
+    if (inp) {
+      inp.focus();
+      const it = fsGet_(FS_.renaming);
+      const dot = (it && it.type !== 'folder') ? inp.value.lastIndexOf('.') : -1;
+      inp.setSelectionRange(0, dot > 0 ? dot : inp.value.length);
+    }
+  }
+}
+function fsRenderHead_(){
+  const h = document.getElementById('fsHead');
+  if (FS_.view !== 'details') { h.style.display = 'none'; return; }
+  h.style.display = 'flex';
+  const arrow = function(k){ return FS_.sortKey === k ? (FS_.asc ? ' ▲' : ' ▼') : ''; };
+  h.innerHTML = '<div class="c-name" data-k="name">이름' + arrow('name') + '</div><div class="c-date" data-k="date">수정한 날짜' + arrow('date') +
+    '</div><div class="c-type" data-k="type">유형' + arrow('type') + '</div><div class="c-size" data-k="size" style="text-align:right">크기' + arrow('size') + '</div>';
+}
+function fsRenderCrumb_(){
+  const c = document.getElementById('fsCrumb');
+  let html = '<span class="seg" data-drop-id="" data-go="">' + fsIcon_({type:'folder'}, 16).replace('style="flex:none"', 'style="vertical-align:-3px"') + ' 내 파일 저장소</span>';
+  if (FS_.query.trim()) html += '<span class="arr">›</span><span class="seg">검색 결과</span>';
+  else fsPath_(FS_.cwd).forEach(function(f){ html += '<span class="arr">›</span><span class="seg" data-drop-id="' + escHtml(f.id) + '" data-go="' + escHtml(f.id) + '">' + escHtml(f.name) + '</span>'; });
+  c.innerHTML = html;
+  document.getElementById('fsBack').disabled = FS_.hi <= 0;
+  document.getElementById('fsFwd').disabled = FS_.hi >= FS_.hist.length - 1;
+  document.getElementById('fsUp').disabled = !FS_.cwd;
+}
+function fsRenderTree_(){
+  const t = document.getElementById('fsTree');
+  const rec = function(pid, depth){
+    return fsChildren_(pid).filter(function(f){ return f.type === 'folder'; })
+      .sort(function(a, b){ return String(a.name).localeCompare(String(b.name), 'ko', { numeric: true }); })
+      .map(function(f){
+        return '<div class="fs-tn' + (FS_.cwd === f.id ? ' cur' : '') + '" style="padding-left:' + (8 + depth * 14) + 'px" data-go="' + escHtml(f.id) + '" data-drop-id="' + escHtml(f.id) + '">' +
+          fsIcon_(f, 16) + '<span style="overflow:hidden;text-overflow:ellipsis">' + escHtml(f.name) + '</span></div>' + rec(f.id, depth + 1);
+      }).join('');
+  };
+  t.innerHTML = '<div class="fs-tn' + (FS_.cwd === '' ? ' cur' : '') + '" data-go="" data-drop-id="">' + fsIcon_({type:'folder'}, 16) + '<b style="font-weight:600">내 파일 저장소</b></div>' + rec('', 1);
+}
+function fsPaintSel_(){
+  document.querySelectorAll('#fsContent .fs-item').forEach(function(el){ el.classList.toggle('sel', FS_.sel.has(el.getAttribute('data-id'))); });
+  fsUpdateStatus_();
+}
+function fsUpdateStatus_(){
+  const n = FS_.vis.length, s = FS_.sel.size;
+  document.getElementById('fsStatL').textContent = n + '개 항목';
+  let right = '';
+  if (s) {
+    const its = Array.from(FS_.sel).map(fsGet_).filter(Boolean);
+    const tot = its.reduce(function(a, f){ return a + fsBytes_(f); }, 0);
+    right = s + '개 항목 선택함' + (tot ? '  ' + (tot < 1048576 ? Math.ceil(tot / 1024).toLocaleString() + ' KB' : (tot / 1048576).toFixed(1) + ' MB') : '');
+  }
+  document.getElementById('fsStatR').textContent = right;
+  const hasSel = s > 0, onlyFiles = hasSel && Array.from(FS_.sel).some(function(id){ const f = fsGet_(id); return f && f.type !== 'folder'; });
+  const dis = function(id, v){ const b = document.getElementById(id); if (b) b.disabled = !!v; };
+  dis('fsBtnCut', !hasSel); dis('fsBtnCopy', !hasSel); dis('fsBtnDel', !hasSel); dis('fsBtnRename', s !== 1); dis('fsBtnDown', !onlyFiles);
+  dis('fsBtnPaste', !FS_.clip || !FS_.clip.ids.length);
+}
+function fsSetSel_(ids, anchor){
+  FS_.sel = new Set(ids);
+  if (anchor !== undefined) FS_.anchor = anchor;
+  fsPaintSel_();
+}
 
-  let html = '<table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">' +
-    '<thead>' +
-      '<tr style="background:#102a45; color:#ffffff; user-select:none;">' +
-        '<th style="padding:10px 10px; width:38px; text-align:center;"><input type="checkbox" id="fileStoreSelectAll" onchange="fileStoreToggleAll_(this.checked)" style="cursor:pointer;"></th>' +
-        '<th style="padding:10px 12px; font-weight:700;">파일명</th>' +
-        '<th style="padding:10px 10px; width:85px; text-align:center; font-weight:700;">용량</th>' +
-        '<th style="padding:10px 12px; width:135px; text-align:center; font-weight:700;">생성일시</th>' +
-        '<th style="padding:10px 12px; width:145px; text-align:center; font-weight:700; cursor:pointer;" onclick="fileStoreToggleSort_()">' +
-          '등록일시 ' + (FILE_STORE_SORT_DESC ? '▼' : '▲') +
-        '</th>' +
-        '<th style="padding:10px 10px; width:95px; text-align:center; font-weight:700;"></th>' +
-      '</tr>' +
-    '</thead>' +
-    '<tbody>';
+/* ---------- 이동/정렬/보기 ---------- */
+function fsGo_(id, push){
+  FS_.cwd = id || ''; FS_.sel = new Set(); FS_.renaming = null; FS_.anchor = null;
+  if (FS_.query) { FS_.query = ''; const s = document.getElementById('fsSearch'); if (s) s.value = ''; }
+  if (push !== false) { FS_.hist = FS_.hist.slice(0, FS_.hi + 1); FS_.hist.push(FS_.cwd); FS_.hi = FS_.hist.length - 1; }
+  fsRender_();
+  const c = document.getElementById('fsContent'); if (c) { c.scrollTop = 0; c.focus(); }
+}
+function fsHistGo_(d){
+  const ni = FS_.hi + d; if (ni < 0 || ni >= FS_.hist.length) return;
+  FS_.hi = ni; let t = FS_.hist[ni]; if (t && !fsGet_(t)) t = '';
+  fsGo_(t, false);
+}
+function fsGoUp_(){ if (!FS_.cwd) return; const it = fsGet_(FS_.cwd); fsGo_(it ? (it.parent || '') : ''); }
+function fsToggleView_(){ FS_.view = FS_.view === 'details' ? 'icons' : 'details'; fsRender_(); }
+function fsOnSearch_(v){ FS_.query = v; FS_.sel = new Set(); fsRender_(); }
 
-  files.forEach(function(f){
-    const icon = getFileStoreIcon_(f.name);
-    const createdStr = f.createdDate || f.date || '-';
-    const regStr = f.regDate || f.date || '-';
-    html += '<tr style="border-bottom:1px solid #e2e8f0; background:#fff; transition:background 0.15s;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">' +
-      '<td style="padding:8px 10px; text-align:center;"><input type="checkbox" class="file-store-cb" data-id="' + f.id + '" onchange="fileStoreOnCheck_()" style="cursor:pointer;"></td>' +
-      '<td style="padding:8px 12px; word-break:break-all;">' +
-        '<span style="margin-right:8px; font-size:15px; vertical-align:-1px;">' + icon + '</span>' +
-        '<a href="javascript:void(0)" onclick="downloadStoredFile_(\'' + f.id + '\')" style="color:#2563eb; text-decoration:underline; font-weight:500;">' + escHtml(f.name || '파일') + '</a>' +
-      '</td>' +
-      '<td style="padding:8px 10px; text-align:center; color:#111827; font-size:12px;">' + escHtml(f.size || '') + '</td>' +
-      '<td style="padding:8px 12px; text-align:center; color:#111827; font-size:12px;">' + escHtml(createdStr) + '</td>' +
-      '<td style="padding:8px 12px; text-align:center; color:#111827; font-size:12px;">' + escHtml(regStr) + '</td>' +
-      '<td style="padding:8px 10px; text-align:center; white-space:nowrap;">' +
-        '<button title="다운로드" onclick="downloadStoredFile_(\'' + f.id + '\')" style="padding:4px 8px; border:1px solid #3b82f6; background:#fff; color:#2563eb; border-radius:4px; cursor:pointer; font-size:13px; line-height:1; font-weight:700;">⬇</button>' +
-        '<button title="삭제" onclick="deleteStoredFile_(\'' + f.id + '\')" style="padding:4px 8px; border:1px solid #f87171; background:#fff; color:#ef4444; border-radius:4px; cursor:pointer; font-size:13px; line-height:1; margin-left:4px;">🗑</button>' +
-      '</td>' +
-    '</tr>';
+/* ---------- 작업 ---------- */
+function fsBusy_(on, msg){ FS_.busy = on; const l = document.getElementById('fsStatL'); if (on && l) l.textContent = msg || '처리 중...'; }
+function fsOp_(op){
+  return fsCall_('adminFsOp', op).then(function(res){
+    if (!res || res.success === false) throw new Error(fsErr_(res));
+    return res;
   });
-
-  html += '</tbody></table>';
-  listEl.innerHTML = html;
-  updateFileStoreActionButtons_();
 }
-
-function fileStoreToggleSort_(){
-  FILE_STORE_SORT_DESC = !FILE_STORE_SORT_DESC;
-  renderFileStoreTable_();
+function fsNewFolder_(){
+  if (FS_.query) { alert('검색 결과 화면에서는 새 폴더를 만들 수 없습니다.'); return; }
+  fsOp_({ action: 'mkdir', name: '새 폴더', parent: FS_.cwd, date: fsNow_() }).then(function(res){
+    return fsReload_().then(function(){ FS_.sel = new Set([res.id]); FS_.renaming = res.id; fsRender_(); });
+  }).catch(function(e){ alert('폴더를 만들지 못했습니다: ' + (e.message || e)); });
 }
-
-function fileStoreToggleAll_(checked){
-  const cbs = document.querySelectorAll('.file-store-cb');
-  cbs.forEach(function(cb){ cb.checked = checked; });
-  updateFileStoreActionButtons_();
+function fsStartRename_(){
+  if (FS_.sel.size !== 1) return;
+  FS_.renaming = Array.from(FS_.sel)[0]; fsRender_();
 }
-
-function fileStoreOnCheck_(){
-  const cbs = document.querySelectorAll('.file-store-cb');
-  const allCb = document.getElementById('fileStoreSelectAll');
-  if (allCb && cbs.length) {
-    allCb.checked = Array.from(cbs).every(function(cb){ return cb.checked; });
-  }
-  updateFileStoreActionButtons_();
+function fsCommitRename_(save){
+  const id = FS_.renaming; if (!id) return;
+  const inp = document.getElementById('fsRenInput');
+  const val = inp ? inp.value.trim() : '';
+  FS_.renaming = null;
+  const it = fsGet_(id);
+  if (!save || !it || !val || val === it.name) { fsRender_(); return; }
+  fsOp_({ action: 'rename', id: id, name: val }).then(function(){ return fsReload_(true); })
+    .catch(function(e){ alert('이름을 바꾸지 못했습니다: ' + (e.message || e)); fsRender_(); });
 }
-
-function updateFileStoreActionButtons_(){
-  const checked = document.querySelectorAll('.file-store-cb:checked');
-  const count = checked.length;
-  const btnDown = document.getElementById('fileStoreBtnMultiDownload');
-  const btnDel = document.getElementById('fileStoreBtnMultiDelete');
-  
-  if (btnDown) {
-    btnDown.disabled = (count === 0);
-    btnDown.style.opacity = (count === 0) ? '0.4' : '1';
-    btnDown.innerHTML = '<span style="font-weight:700;">⬇</span> 선택 다운로드' + (count > 0 ? ' (' + count + ')' : '');
-  }
-  if (btnDel) {
-    btnDel.disabled = (count === 0);
-    btnDel.style.opacity = (count === 0) ? '0.4' : '1';
-    btnDel.innerHTML = '<span>🗑</span> 선택 삭제' + (count > 0 ? ' (' + count + ')' : '');
-  }
+function fsDeleteSel_(){
+  const ids = Array.from(FS_.sel); if (!ids.length) return;
+  const its = ids.map(fsGet_).filter(Boolean);
+  const hasFolder = its.some(function(f){ return f.type === 'folder'; });
+  const msg = its.length === 1
+    ? '[' + its[0].name + '] ' + (hasFolder ? '폴더와 그 안의 모든 파일을' : '파일을') + ' 삭제하시겠습니까?\n삭제하면 복구할 수 없습니다.'
+    : its.length + '개 항목을 삭제하시겠습니까?' + (hasFolder ? '\n(폴더 안의 파일도 모두 삭제됩니다)' : '') + '\n삭제하면 복구할 수 없습니다.';
+  if (!confirm(msg)) return;
+  fsBusy_(true, '삭제 중...');
+  fsOp_({ action: 'delete', ids: ids }).then(function(){ FS_.sel = new Set(); if (FS_.clip) FS_.clip.ids = FS_.clip.ids.filter(function(i){ return ids.indexOf(i) < 0; }); })
+    .catch(function(e){ alert('삭제 중 오류: ' + (e.message || e)); })
+    .then(function(){ fsBusy_(false); return fsReload_(); });
 }
-
-function fileStoreUploadClick_(){
-  document.getElementById('fileStoreInput')?.click();
+function fsCutCopy_(cut){
+  const ids = Array.from(FS_.sel); if (!ids.length) return;
+  FS_.clip = { ids: ids, cut: !!cut }; fsRender_();
 }
-
-function fileStoreFileSelected_(e){
-  const files = e.target.files;
-  if (!files || !files.length) return;
-
-  const now = new Date();
-  const regDateStr = fmtFileStoreDateTime_(now);
-
-  // 1. 중복 파일명 체크
-  let validFiles = [];
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (file.size > 30 * 1024 * 1024) { alert('[' + file.name + '] 파일이 너무 큽니다. (최대 30MB)'); continue; }
-    const existing = FILE_STORE_CACHED_FILES.find(function(it){ return it.name === file.name; });
-    if (existing) {
-      const replace = confirm('동일한 이름의 파일 [' + file.name + '] 이(가) 이미 존재합니다.\n기존 파일을 덮어쓰시겠습니까?');
-      if (!replace) {
-        continue;
-      }
-    }
-    validFiles.push(file);
-  }
-
-  if (!validFiles.length) {
-    document.getElementById('fileStoreInput').value = '';
-    return;
-  }
-
-  // 순차적 업로드로 동시 실행 경쟁 방지
-  let idx = 0;
-  function uploadNext() {
-    if (idx >= validFiles.length) {
-      fileStoreRefresh_();
-      document.getElementById('fileStoreInput').value = '';
-      return;
-    }
-    const file = validFiles[idx];
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      const lastMod = file.lastModified ? new Date(file.lastModified) : now;
-      const createdDateStr = fmtFileStoreDateTime_(lastMod);
-      const existing = FILE_STORE_CACHED_FILES.find(function(it){ return it.name === file.name; });
-      const targetId = existing ? existing.id : ('file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
-
-      const payload = {
-        id: targetId,
-        name: file.name,
-        size: (file.size < 1024) ? (file.size + ' B') : (file.size < 1048576) ? ((file.size / 1024).toFixed(1) + ' KB') : ((file.size / 1048576).toFixed(1) + ' MB'),
-        createdDate: createdDateStr,
-        regDate: regDateStr,
-        date: regDateStr,
-        dataUrl: evt.target.result
-      };
-
-      google.script.run
-        .withSuccessHandler(function(res){
-          if (res && res.success === false) alert('파일 업로드 실패 [' + file.name + ']: ' + (res.error || '알 수 없는 오류'));
-          idx++;
-          uploadNext();
-        })
-        .withFailureHandler(function(err){
-          alert('파일 업로드 실패 [' + file.name + ']: ' + err);
-          idx++;
-          uploadNext();
-        })
-        .adminUploadStoredFile(SESSION ? SESSION.token : '', payload);
-    };
-    reader.readAsDataURL(file);
-  }
-  uploadNext();
+function fsPaste_(targetId){
+  if (!FS_.clip || !FS_.clip.ids.length) return;
+  const parent = (typeof targetId === 'string') ? targetId : FS_.cwd;
+  const clip = FS_.clip;
+  fsBusy_(true, clip.cut ? '이동 중...' : '복사 중... (파일이 크면 시간이 걸립니다)');
+  fsOp_({ action: clip.cut ? 'move' : 'copy', ids: clip.ids, parent: parent, date: fsNow_() }).then(function(res){
+    if (clip.cut) FS_.clip = null;
+    FS_.sel = new Set(res.ids || []);
+  }).catch(function(e){ alert((clip.cut ? '이동' : '복사') + ' 중 오류: ' + (e.message || e)); })
+    .then(function(){ fsBusy_(false); return fsReload_(true); });
 }
-
+function fsMoveTo_(ids, parent){
+  fsBusy_(true, '이동 중...');
+  fsOp_({ action: 'move', ids: ids, parent: parent || '' }).then(function(res){ FS_.sel = new Set(res.ids || []); })
+    .catch(function(e){ alert('이동 중 오류: ' + (e.message || e)); })
+    .then(function(){ fsBusy_(false); return fsReload_(true); });
+}
 function triggerBrowserDownload_(dataUrl, fileName){
-  // 큰 data URL 을 <a href> 에 직접 넣으면 브라우저가 '전송이 완료되지 않은 파일'로 처리할 수 있어 Blob URL 로 변환
   let url = dataUrl, revoke = false;
   try {
-    const s = String(dataUrl || '');
-    const ci = s.indexOf(',');
+    const s = String(dataUrl || ''); const ci = s.indexOf(',');
     if (s.indexOf('data:') === 0 && ci > 0) {
-      const head = s.slice(5, ci);
-      const body = s.slice(ci + 1);
-      const mime = head.split(';')[0] || 'application/octet-stream';
+      const head = s.slice(5, ci), body = s.slice(ci + 1);
       const raw = /;base64/i.test(head) ? atob(body) : decodeURIComponent(body);
       const bytes = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
-      url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      url = URL.createObjectURL(new Blob([bytes], { type: head.split(';')[0] || 'application/octet-stream' }));
       revoke = true;
     }
-  } catch (e) {
-    console.warn('[triggerBrowserDownload_] blob 변환 실패, data URL 로 대체:', e);
-  }
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName || 'download';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  } catch (e) { console.warn('[triggerBrowserDownload_]', e); }
+  const a = document.createElement('a'); a.href = url; a.download = fileName || 'download';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
   if (revoke) setTimeout(function(){ try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
 }
+function fsDownloadOne_(id){
+  const f = fsGet_(id); if (!f || f.type === 'folder') return Promise.resolve();
+  fsBusy_(true, '[' + f.name + '] 불러오는 중...');
+  return fsCall_('adminGetStoredFile', id).then(function(res){
+    if (res && res.success && res.dataUrl) triggerBrowserDownload_(res.dataUrl, f.name);
+    else alert('파일 데이터를 불러오지 못했습니다: ' + fsErr_(res, '데이터 없음'));
+  }).catch(function(e){ alert('파일 다운로드 오류: ' + e); }).then(function(){ fsBusy_(false); fsUpdateStatus_(); });
+}
+function fsDownloadSel_(){
+  const files = Array.from(FS_.sel).map(fsGet_).filter(function(f){ return f && f.type !== 'folder'; });
+  if (!files.length) { alert('다운로드할 파일을 선택하세요. (폴더는 다운로드할 수 없습니다)'); return; }
+  files.reduce(function(p, f){ return p.then(function(){ return fsDownloadOne_(f.id); }).then(function(){ return new Promise(function(r){ setTimeout(r, 300); }); }); }, Promise.resolve());
+}
+function fsOpenItem_(id){
+  const it = fsGet_(id); if (!it) return;
+  if (it.type === 'folder') fsGo_(it.id); else fsDownloadOne_(it.id);
+}
 
-function downloadStoredFile_(id){
-  const f = FILE_STORE_CACHED_FILES.find(function(it){ return String(it.id) === String(id); });
-  if (!f) { alert('다운로드할 파일 정보를 찾을 수 없습니다.'); return; }
-  
-  // 1. 이미 캐시에 dataUrl이 존재하는 경우 즉시 다운로드
-  if (f.dataUrl) {
-    triggerBrowserDownload_(f.dataUrl, f.name);
-    return;
+/* ---------- 업로드 (파일 선택 / 드래그앤드롭 / 폴더 드롭) ---------- */
+function fsUploadClick_(){ document.getElementById('fileStoreInput')?.click(); }
+function fsFileSelected_(e){
+  const files = Array.prototype.map.call(e.target.files || [], function(f){ return { file: f, path: [] }; });
+  e.target.value = '';
+  if (files.length) fsUploadList_(files, FS_.cwd, []);
+}
+function fsWalkEntry_(entry, path, out){
+  if (entry.isFile) {
+    return new Promise(function(res){ entry.file(function(f){ out.files.push({ file: f, path: path }); res(); }, function(){ res(); }); });
   }
-
-  // 2. dataUrl이 없는 경우 서버(Supabase)에서 실시간으로 데이터 조회 후 다운로드
-  setLoadingCursor(true);
-  google.script.run
-    .withSuccessHandler(function(res){
-      setLoadingCursor(false);
-      if (res && res.success && res.dataUrl) {
-        f.dataUrl = res.dataUrl; // 다음 다운로드를 위해 캐시 보존
-        triggerBrowserDownload_(res.dataUrl, f.name);
-      } else {
-        alert('파일 데이터를 불러오지 못했습니다: ' + ((res && res.error) || '데이터 없음'));
-      }
-    })
-    .withFailureHandler(function(err){
-      setLoadingCursor(false);
-      alert('파일 다운로드 오류: ' + err);
-    })
-    .adminGetStoredFile(SESSION ? SESSION.token : '', id);
+  const np = path.concat(entry.name);
+  out.dirs.push(np);
+  const reader = entry.createReader();
+  const readAll = function(){
+    return new Promise(function(res){ reader.readEntries(function(arr){ res(arr); }, function(){ res([]); }); }).then(function(arr){
+      if (!arr.length) return;
+      return arr.reduce(function(p, en){ return p.then(function(){ return fsWalkEntry_(en, np, out); }); }, Promise.resolve()).then(readAll);
+    });
+  };
+  return readAll();
+}
+function fsDropUpload_(dt, targetParent){
+  const entries = [];
+  if (dt.items && dt.items.length && dt.items[0].webkitGetAsEntry) {
+    for (let i = 0; i < dt.items.length; i++) { if (dt.items[i].kind === 'file') { const en = dt.items[i].webkitGetAsEntry(); if (en) entries.push(en); } }
+  }
+  const plain = Array.prototype.map.call(dt.files || [], function(f){ return { file: f, path: [] }; });
+  if (!entries.length) { if (plain.length) fsUploadList_(plain, targetParent, []); return; }
+  const out = { files: [], dirs: [] };
+  fsBusy_(true, '폴더 구조를 읽는 중...');
+  entries.reduce(function(p, en){ return p.then(function(){ return fsWalkEntry_(en, [], out); }); }, Promise.resolve())
+    .then(function(){ fsUploadList_(out.files, targetParent, out.dirs); })
+    .catch(function(e){ fsBusy_(false); alert('드롭한 항목을 읽지 못했습니다: ' + e); });
+}
+async function fsUploadList_(list, baseParent, dirs){
+  if (FS_.busyUpload) { alert('이미 업로드가 진행 중입니다. 완료 후 다시 시도해 주세요.'); return; }
+  FS_.busyUpload = true;
+  const LIMIT = 30 * 1024 * 1024, errors = [];
+  const folderCache = {};
+  const ensureFolder = async function(path){
+    let parent = baseParent || '';
+    for (let i = 0; i < path.length; i++) {
+      const key = parent + '/' + path[i];
+      if (folderCache[key]) { parent = folderCache[key]; continue; }
+      const ex = FS_.items.find(function(f){ return f.type === 'folder' && (f.parent || '') === parent && f.name === path[i]; });
+      if (ex) { folderCache[key] = ex.id; parent = ex.id; continue; }
+      const res = await fsOp_({ action: 'mkdir', name: path[i], parent: parent, date: fsNow_(), exact: true });
+      folderCache[key] = res.id; FS_.items.push({ id: res.id, type: 'folder', name: res.name, parent: parent });
+      parent = res.id;
+    }
+    return parent;
+  };
+  try {
+    for (const d of (dirs || [])) await ensureFolder(d);          // 빈 폴더도 생성
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i], file = it.file;
+      fsBusy_(true, '업로드 중 (' + (i + 1) + '/' + list.length + ') ' + file.name);
+      if (file.size > LIMIT) { errors.push(file.name + ': 30MB 초과'); continue; }
+      let parent;
+      try { parent = await ensureFolder(it.path); } catch (e) { errors.push(file.name + ': 폴더 생성 실패 (' + (e.message || e) + ')'); continue; }
+      const existing = FS_.items.find(function(f){ return f.type !== 'folder' && (f.parent || '') === parent && f.name === file.name; });
+      if (existing && !confirm('이 위치에 [' + file.name + '] 파일이 이미 있습니다.\n기존 파일을 덮어쓰시겠습니까?')) continue;
+      const du = await new Promise(function(res, rej){ const fr = new FileReader(); fr.onload = function(){ res(fr.result); }; fr.onerror = function(){ rej(new Error('읽기 실패')); }; fr.readAsDataURL(file); }).catch(function(e){ errors.push(file.name + ': ' + e.message); return null; });
+      if (du == null) continue;
+      const payload = {
+        id: existing ? existing.id : ('file_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)),
+        name: file.name, parent: parent, bytes: file.size,
+        size: (file.size < 1024) ? (file.size + ' B') : (file.size < 1048576) ? ((file.size / 1024).toFixed(1) + ' KB') : ((file.size / 1048576).toFixed(1) + ' MB'),
+        createdDate: fmtFileStoreDateTime_(file.lastModified ? new Date(file.lastModified) : new Date()),
+        regDate: fsNow_(), date: fsNow_(), dataUrl: du
+      };
+      try {
+        const res = await fsCall_('adminUploadStoredFile', payload);
+        if (res && res.success === false) errors.push(file.name + ': ' + fsErr_(res));
+        else if (existing) { existing.id = res.id || existing.id; }
+      } catch (e) { errors.push(file.name + ': ' + e); }
+    }
+  } catch (e) { errors.push(String(e.message || e)); }
+  FS_.busyUpload = false; fsBusy_(false);
+  await fsReload_(true);
+  if (errors.length) alert('일부 항목을 업로드하지 못했습니다.\n\n' + errors.join('\n'));
 }
 
-function deleteStoredFile_(id){
-  const f = FILE_STORE_CACHED_FILES.find(function(it){ return String(it.id) === String(id); });
-  const name = f ? f.name : '이 파일';
-  if (!confirm('정말 [' + name + '] 파일을 삭제하시겠습니까?')) return;
-  google.script.run
-    .withSuccessHandler(function(){ fileStoreRefresh_(); })
-    .withFailureHandler(function(err){ alert('파일 삭제 오류: ' + err); })
-    .adminDeleteStoredFile(SESSION ? SESSION.token : '', id);
-}
-
-function fileStoreMultiDownload_(){
-  const checked = Array.from(document.querySelectorAll('.file-store-cb:checked'));
-  if (!checked.length) { alert('다운로드할 파일을 선택하세요.'); return; }
-  
-  checked.forEach(function(cb, index){
-    setTimeout(function(){
-      downloadStoredFile_(cb.getAttribute('data-id'));
-    }, index * 250);
+/* ---------- 컨텍스트 메뉴 ---------- */
+function fsCloseCtx_(){ document.querySelectorAll('.fs-ctx').forEach(function(e){ e.remove(); }); }
+function fsShowCtx_(x, y, items){
+  fsCloseCtx_();
+  const m = document.createElement('div'); m.className = 'fs-ctx';
+  m.innerHTML = items.map(function(it, i){ return it === '-' ? '<hr>' : '<div class="' + (it.dis ? 'dis' : '') + '" data-i="' + i + '">' + it.label + '</div>'; }).join('');
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.min(x, window.innerWidth - r.width - 4) + 'px'; m.style.top = Math.min(y, window.innerHeight - r.height - 4) + 'px';
+  m.addEventListener('click', function(e){
+    const d = e.target.closest('[data-i]'); if (!d) return;
+    const it = items[Number(d.getAttribute('data-i'))]; fsCloseCtx_(); if (it && it.fn) it.fn();
   });
+  m.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 }
 
-function fileStoreMultiDelete_(){
-  const checked = Array.from(document.querySelectorAll('.file-store-cb:checked'));
-  if (!checked.length) { alert('삭제할 파일을 선택하세요.'); return; }
-  if (!confirm('선택한 ' + checked.length + '개의 파일을 모두 삭제하시겠습니까?')) return;
+/* ---------- 이벤트 (한 번만 바인딩) ---------- */
+let FS_BOUND_ = false;
+function fsBindOnce_(){
+  if (FS_BOUND_) return; FS_BOUND_ = true;
+  const box = document.getElementById('fsContent');
+  const main = document.getElementById('fsMain');
+  const win = document.getElementById('fsWin');
 
-  const ids = checked.map(function(cb){ return cb.getAttribute('data-id'); });
-  let done = 0;
-  ids.forEach(function(id){
-    google.script.run
-      .withSuccessHandler(function(){
-        done++;
-        if (done === ids.length) {
-          fileStoreRefresh_();
+  // 헤더 정렬
+  document.getElementById('fsHead').addEventListener('click', function(e){
+    const d = e.target.closest('[data-k]'); if (!d) return;
+    const k = d.getAttribute('data-k');
+    if (FS_.sortKey === k) FS_.asc = !FS_.asc; else { FS_.sortKey = k; FS_.asc = true; }
+    fsRender_();
+  });
+  // 주소창 / 트리 이동
+  const goHandler = function(e){ const d = e.target.closest('[data-go]'); if (d) fsGo_(d.getAttribute('data-go')); };
+  document.getElementById('fsCrumb').addEventListener('click', goHandler);
+  document.getElementById('fsTree').addEventListener('click', goHandler);
+
+  // 선택 (마우스)
+  box.addEventListener('mousedown', function(e){
+    if (e.button === 2 && !e.target.closest('.fs-item')) return;
+    if (e.target.id === 'fsRenInput') return;
+    if (FS_.renaming) fsCommitRename_(true);
+    fsCloseCtx_();
+    const row = e.target.closest('.fs-item');
+    const id = row ? row.getAttribute('data-id') : null;
+    if (row) {
+      if (e.button === 2) { if (!FS_.sel.has(id)) fsSetSel_([id], id); return; }
+      if (e.shiftKey && FS_.anchor) {
+        const a = FS_.vis.indexOf(FS_.anchor), b = FS_.vis.indexOf(id);
+        if (a >= 0 && b >= 0) { const lo = Math.min(a, b), hi = Math.max(a, b); const ids = FS_.vis.slice(lo, hi + 1); fsSetSel_(e.ctrlKey || e.metaKey ? Array.from(FS_.sel).concat(ids) : ids); }
+      } else if (e.ctrlKey || e.metaKey) {
+        const s = new Set(FS_.sel); if (s.has(id)) s.delete(id); else s.add(id); fsSetSel_(Array.from(s), id);
+      } else if (!FS_.sel.has(id)) fsSetSel_([id], id);
+      else FS_.pendingSingle = id;     // 이미 선택된 항목: 드래그 여부 확인 후 click 에서 단일 선택
+      return;
+    }
+    // 빈 영역: 마퀴(드래그) 선택
+    if (e.button !== 0) return;
+    if (e.offsetX > box.clientWidth) return;                         // 스크롤바 클릭 제외
+    const base = (e.ctrlKey || e.metaKey) ? new Set(FS_.sel) : new Set();
+    if (!(e.ctrlKey || e.metaKey)) fsSetSel_([], null);
+    const rect0 = box.getBoundingClientRect();
+    const sx = e.clientX - rect0.left + box.scrollLeft, sy = e.clientY - rect0.top + box.scrollTop;
+    const mq = document.createElement('div'); mq.className = 'fs-marq'; box.appendChild(mq);
+    let moved = false;
+    const move = function(ev){
+      const r = box.getBoundingClientRect();
+      const cx = ev.clientX - r.left + box.scrollLeft, cy = ev.clientY - r.top + box.scrollTop;
+      const x1 = Math.min(sx, cx), y1 = Math.min(sy, cy), x2 = Math.max(sx, cx), y2 = Math.max(sy, cy);
+      if (!moved && (x2 - x1 > 3 || y2 - y1 > 3)) moved = true;
+      mq.style.left = x1 + 'px'; mq.style.top = y1 + 'px'; mq.style.width = (x2 - x1) + 'px'; mq.style.height = (y2 - y1) + 'px';
+      const hit = new Set(base);
+      box.querySelectorAll('.fs-item').forEach(function(el){
+        const b = el.getBoundingClientRect();
+        const ex1 = b.left - r.left + box.scrollLeft, ey1 = b.top - r.top + box.scrollTop, ex2 = ex1 + b.width, ey2 = ey1 + b.height;
+        if (ex1 < x2 && ex2 > x1 && ey1 < y2 && ey2 > y1) hit.add(el.getAttribute('data-id'));
+      });
+      FS_.sel = hit; fsPaintSel_();
+      if (ev.clientY > r.bottom - 20) box.scrollTop += 12; else if (ev.clientY < r.top + 20) box.scrollTop -= 12;
+    };
+    const up = function(){ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); mq.remove(); };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    e.preventDefault(); box.focus();
+  });
+  box.addEventListener('click', function(e){
+    const row = e.target.closest('.fs-item');
+    if (row && FS_.pendingSingle) {
+      const id = row.getAttribute('data-id');
+      if (FS_.pendingSingle === id && !e.ctrlKey && !e.shiftKey) {
+        const was = FS_.sel.size === 1;           // 이미 단독 선택 상태에서 이름을 다시 클릭하면 이름 바꾸기 (윈도우 동작)
+        fsSetSel_([id], id);
+        if (was && e.target.closest('.nm-txt')) {
+          FS_.renameTimer = setTimeout(function(){ if (FS_.sel.size === 1 && FS_.sel.has(id)) fsStartRename_(); }, 600);
         }
-      })
-      .withFailureHandler(function(){
-        done++;
-        if (done === ids.length) {
-          fileStoreRefresh_();
-        }
-      })
-      .adminDeleteStoredFile(SESSION ? SESSION.token : '', id);
+      }
+    }
+    FS_.pendingSingle = null;
+  });
+  box.addEventListener('dblclick', function(e){
+    if (FS_.renameTimer) { clearTimeout(FS_.renameTimer); FS_.renameTimer = null; }
+    const row = e.target.closest('.fs-item'); if (!row || e.target.id === 'fsRenInput') return;
+    fsOpenItem_(row.getAttribute('data-id'));
+  });
+  box.addEventListener('contextmenu', function(e){
+    e.preventDefault(); if (FS_.renaming) return;
+    const row = e.target.closest('.fs-item');
+    const one = FS_.sel.size === 1 ? fsGet_(Array.from(FS_.sel)[0]) : null;
+    const canPaste = !!(FS_.clip && FS_.clip.ids.length);
+    if (row) {
+      const folderOnly = Array.from(FS_.sel).every(function(i){ const f = fsGet_(i); return f && f.type === 'folder'; });
+      fsShowCtx_(e.clientX, e.clientY, [
+        { label: one && one.type === 'folder' ? '열기' : (one ? '다운로드' : '다운로드'), dis: !one && folderOnly, fn: function(){ if (one) fsOpenItem_(one.id); else fsDownloadSel_(); } },
+        '-',
+        { label: '잘라내기', fn: function(){ fsCutCopy_(true); } },
+        { label: '복사', fn: function(){ fsCutCopy_(false); } },
+        { label: '붙여넣기 (이 폴더 안으로)', dis: !(canPaste && one && one.type === 'folder'), fn: function(){ fsPaste_(one.id); } },
+        '-',
+        { label: '이름 바꾸기', dis: FS_.sel.size !== 1, fn: fsStartRename_ },
+        { label: '삭제', fn: fsDeleteSel_ }
+      ]);
+    } else {
+      fsSetSel_([], null);
+      fsShowCtx_(e.clientX, e.clientY, [
+        { label: '새 폴더', fn: fsNewFolder_ },
+        { label: '업로드', fn: fsUploadClick_ },
+        { label: '붙여넣기', dis: !canPaste, fn: function(){ fsPaste_(); } },
+        '-',
+        { label: FS_.view === 'details' ? '큰 아이콘으로 보기' : '자세히 보기', fn: fsToggleView_ },
+        { label: '새로 고침', fn: function(){ fsReload_(); } }
+      ]);
+    }
+  });
+  document.addEventListener('mousedown', function(e){ if (!e.target.closest('.fs-ctx')) fsCloseCtx_(); });
+  // 이름 바꾸기 입력창
+  box.addEventListener('keydown', function(e){
+    if (e.target.id === 'fsRenInput') {
+      if (e.key === 'Enter') { e.preventDefault(); fsCommitRename_(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fsCommitRename_(false); box.focus(); }
+      e.stopPropagation();
+    }
+  });
+  box.addEventListener('focusout', function(e){ if (e.target.id === 'fsRenInput' && FS_.renaming) setTimeout(function(){ if (FS_.renaming) fsCommitRename_(true); }, 0); });
+
+  // 드래그: 내부 이동 + 외부 파일 업로드
+  const dropTargetOf = function(e){
+    const d = e.target.closest('[data-drop-id]'); if (d) return { el: d, id: d.getAttribute('data-drop-id') };
+    const r = e.target.closest('.fs-item[data-type=folder]'); if (r) return { el: r, id: r.getAttribute('data-id') };
+    return null;
+  };
+  const clearDrop = function(){ win.querySelectorAll('.dropt').forEach(function(x){ x.classList.remove('dropt'); }); main.classList.remove('drag'); };
+  win.addEventListener('dragstart', function(e){
+    const row = e.target.closest ? e.target.closest('.fs-item') : null;
+    if (!row) return;
+    const id = row.getAttribute('data-id');
+    if (!FS_.sel.has(id)) fsSetSel_([id], id);
+    FS_.pendingSingle = null;
+    FS_.dragIds = Array.from(FS_.sel);
+    e.dataTransfer.setData('application/x-fs-ids', JSON.stringify(FS_.dragIds));
+    e.dataTransfer.setData('text/plain', FS_.dragIds.length + '개 항목');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  win.addEventListener('dragend', function(){ FS_.dragIds = null; clearDrop(); });
+  win.addEventListener('dragover', function(e){
+    const types = Array.from(e.dataTransfer.types || []);
+    const internal = types.indexOf('application/x-fs-ids') >= 0, ext = types.indexOf('Files') >= 0;
+    if (!internal && !ext) return;
+    e.preventDefault(); clearDrop();
+    const t = dropTargetOf(e);
+    if (internal) {
+      e.dataTransfer.dropEffect = 'move';
+      if (t && !(FS_.dragIds || []).some(function(i){ return i === t.id; })) t.el.classList.add('dropt');
+    } else {
+      e.dataTransfer.dropEffect = 'copy';
+      if (t) t.el.classList.add('dropt'); else if (e.target.closest('#fsMain')) main.classList.add('drag');
+    }
+  });
+  win.addEventListener('dragleave', function(e){ if (!win.contains(e.relatedTarget)) clearDrop(); });
+  win.addEventListener('drop', function(e){
+    const types = Array.from(e.dataTransfer.types || []);
+    const internal = types.indexOf('application/x-fs-ids') >= 0, ext = types.indexOf('Files') >= 0;
+    if (!internal && !ext) return;
+    e.preventDefault(); const t = dropTargetOf(e); clearDrop();
+    if (internal) {
+      const ids = FS_.dragIds || []; FS_.dragIds = null;
+      if (!t || !ids.length) return;
+      if (ids.indexOf(t.id) >= 0) return;
+      fsMoveTo_(ids, t.id);
+    } else {
+      fsDropUpload_(e.dataTransfer, t ? t.id : FS_.cwd);
+    }
+  });
+
+  // 키보드
+  document.addEventListener('keydown', function(e){
+    if (!fsIsOpen_()) return;
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (e.target.id === 'fsRenInput') return;
+    if (tag === 'input' || tag === 'textarea') { if (e.key === 'Escape' && e.target.id === 'fsSearch') { e.target.value = ''; fsOnSearch_(''); box.focus(); } return; }
+    if (document.querySelector('.fs-ctx') && e.key === 'Escape') { fsCloseCtx_(); return; }
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key;
+    if (ctrl && (k === 'a' || k === 'A')) { e.preventDefault(); fsSetSel_(FS_.vis, FS_.vis[0]); }
+    else if (ctrl && (k === 'x' || k === 'X')) { e.preventDefault(); fsCutCopy_(true); }
+    else if (ctrl && (k === 'c' || k === 'C')) { e.preventDefault(); fsCutCopy_(false); }
+    else if (ctrl && (k === 'v' || k === 'V')) { e.preventDefault(); fsPaste_(); }
+    else if (ctrl && e.shiftKey && (k === 'n' || k === 'N')) { e.preventDefault(); fsNewFolder_(); }
+    else if (k === 'Delete') { e.preventDefault(); fsDeleteSel_(); }
+    else if (k === 'F2') { e.preventDefault(); fsStartRename_(); }
+    else if (k === 'F5') { e.preventDefault(); fsReload_(); }
+    else if (k === 'Enter') { e.preventDefault(); if (FS_.sel.size === 1) fsOpenItem_(Array.from(FS_.sel)[0]); else if (FS_.sel.size > 1) fsDownloadSel_(); }
+    else if (k === 'Backspace' || (e.altKey && k === 'ArrowUp')) { e.preventDefault(); fsGoUp_(); }
+    else if (e.altKey && k === 'ArrowLeft') { e.preventDefault(); fsHistGo_(-1); }
+    else if (e.altKey && k === 'ArrowRight') { e.preventDefault(); fsHistGo_(1); }
+    else if (k === 'Escape') { if (FS_.sel.size) fsSetSel_([], null); else closeFileStoreModal_(); }
+    else if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(k) >= 0) {
+      e.preventDefault(); if (!FS_.vis.length) return;
+      let cols = 1;
+      if (FS_.view === 'icons') { const t = box.querySelector('.fs-tile'); if (t) cols = Math.max(1, Math.floor((box.clientWidth - 16) / (t.offsetWidth + 4))); }
+      let cur = FS_.vis.indexOf(FS_.anchor); const last = FS_.sel.size ? Array.from(FS_.sel).pop() : null;
+      let focusIdx = last ? FS_.vis.indexOf(last) : -1; if (FS_.focus !== undefined && FS_.sel.has(FS_.focus)) focusIdx = FS_.vis.indexOf(FS_.focus);
+      let ni;
+      if (k === 'Home') ni = 0; else if (k === 'End') ni = FS_.vis.length - 1;
+      else if (focusIdx < 0) ni = 0;
+      else if (k === 'ArrowDown') ni = focusIdx + cols; else if (k === 'ArrowUp') ni = focusIdx - cols;
+      else if (k === 'ArrowRight') ni = focusIdx + (FS_.view === 'icons' ? 1 : 0); else ni = focusIdx - (FS_.view === 'icons' ? 1 : 0);
+      ni = Math.max(0, Math.min(FS_.vis.length - 1, ni));
+      const nid = FS_.vis[ni]; FS_.focus = nid;
+      if (e.shiftKey) {
+        if (cur < 0) cur = ni;
+        const lo = Math.min(cur, ni), hi = Math.max(cur, ni); fsSetSel_(FS_.vis.slice(lo, hi + 1));
+      } else fsSetSel_([nid], nid);
+      const el = box.querySelector('.fs-item[data-id="' + nid.replace(/"/g, '') + '"]'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+    }
   });
 }
 
