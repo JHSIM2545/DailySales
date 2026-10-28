@@ -150,6 +150,19 @@
       '.px-ov{position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;font-family:inherit;color:#1f2937;}',
       '.px-ov *{box-sizing:border-box;}',
       '.px-box{background:#fff;border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.35);max-width:96vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;}',
+      '.px-box{position:relative;min-width:360px;min-height:220px;}',
+      '.px-rh{position:absolute;z-index:8;touch-action:none;}',
+      '.px-rh.r{right:-3px;top:0;bottom:12px;width:9px;cursor:ew-resize;}',
+      '.px-rh.b{left:0;right:12px;bottom:-3px;height:9px;cursor:ns-resize;}',
+      '.px-rh.rb{right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 52%,rgba(0,0,0,.4) 53%,rgba(0,0,0,.4) 60%,transparent 61%,transparent 70%,rgba(0,0,0,.4) 71%,rgba(0,0,0,.4) 78%,transparent 79%);}',
+      '.px-box.px-max .px-rh{display:none;}',
+      '.px-box.px-max{position:fixed !important;left:0 !important;top:0 !important;right:0 !important;bottom:0 !important;width:auto !important;height:auto !important;max-width:none !important;max-height:none !important;border-radius:0;resize:none;}',
+      '.px-hd{cursor:move;user-select:none;}',
+      '.px-hd .px-x{cursor:pointer;}',
+      '.px-bd.px-fill{display:flex;flex-direction:column;overflow:hidden;}',
+      '.px-bd.px-fill>.px-edwrap{flex:1;min-height:0;display:flex;flex-direction:column;}',
+      '.px-edbox{flex:1;min-height:160px;position:relative;overflow:hidden;}',
+      '.px-edbox>.px-ed{position:absolute;left:0;top:0;right:0;bottom:0;min-height:0;overflow:auto;}',
       '.px-hd{display:flex;align-items:center;gap:8px;padding:11px 16px;background:var(--px-head,#1c2f4a);color:#fff;}',
       '.px-hd b{font-size:16px;}',
       '.px-hd .sp,.px-bar .sp{flex:1;}',
@@ -253,7 +266,7 @@
     ov.style.setProperty('--px-head', themeColor());
     var box = h('div', 'px-box');
     box.style.width = (opt.w || 720) + 'px';
-    var hd = h('div', 'px-hd', '<b></b><span class="sp"></span><button class="px-x" type="button" title="닫기">✕</button>');
+    var hd = h('div', 'px-hd', '<b></b><span class="sp"></span><button class="px-x" type="button" data-a="max" title="전체화면 / 원래 크기">⛶</button><button class="px-x" type="button" data-a="cls" title="닫기">✕</button>');
     hd.querySelector('b').textContent = opt.title || '';
     var bd = h('div', 'px-bd');
     box.appendChild(hd); box.appendChild(bd);
@@ -266,7 +279,53 @@
       if (ov.parentNode) ov.parentNode.removeChild(ov);
       if (opt.onClose) opt.onClose();
     };
-    hd.querySelector('.px-x').addEventListener('click', m.close);
+    hd.querySelector('[data-a=cls]').addEventListener('click', m.close);
+
+    /* 이동 · 전체화면 · 크기 조절 */
+    function detach() {                               // 가운데 정렬 상태 -> 자유 위치(fixed)
+      if (box.getAttribute('data-free')) return;
+      var r = box.getBoundingClientRect();
+      box.setAttribute('data-free', '1');
+      box.style.position = 'fixed'; box.style.left = r.left + 'px'; box.style.top = r.top + 'px';
+      box.style.width = r.width + 'px'; box.style.height = r.height + 'px';
+      box.style.maxWidth = 'none'; box.style.maxHeight = 'none';
+    }
+    function toggleMax() { detach(); box.classList.toggle('px-max'); }
+    hd.querySelector('[data-a=max]').addEventListener('click', toggleMax);
+    hd.addEventListener('dblclick', function (e) { if (!e.target.closest('button')) toggleMax(); });
+    var dr = null;
+    hd.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button') || box.classList.contains('px-max')) return;
+      detach();
+      dr = { sx: e.clientX, sy: e.clientY, l: parseFloat(box.style.left) || 0, t: parseFloat(box.style.top) || 0 };
+      hd.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    hd.addEventListener('pointermove', function (e) {
+      if (!dr) return;
+      var w = box.offsetWidth, vw = window.innerWidth, vh = window.innerHeight;
+      var l = Math.min(Math.max(dr.l + e.clientX - dr.sx, 80 - w), vw - 80);
+      var t = Math.min(Math.max(dr.t + e.clientY - dr.sy, 0), vh - 40);
+      box.style.left = l + 'px'; box.style.top = t + 'px';
+    });
+    function endDr() { dr = null; }
+    hd.addEventListener('pointerup', endDr); hd.addEventListener('pointercancel', endDr);
+    ['r', 'b', 'rb'].forEach(function (k) {                       // 크기 조절 손잡이 (오른쪽 / 아래 / 모서리)
+      var hdl = h('div', 'px-rh ' + k); box.appendChild(hdl);
+      var st = null;
+      hdl.addEventListener('pointerdown', function (e) {
+        detach();
+        st = { sx: e.clientX, sy: e.clientY, w: box.offsetWidth, h: box.offsetHeight };
+        hdl.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation();
+      });
+      hdl.addEventListener('pointermove', function (e) {
+        if (!st) return;
+        var l = parseFloat(box.style.left) || 0, t = parseFloat(box.style.top) || 0;
+        if (k !== 'b') box.style.width = Math.min(Math.max(360, st.w + e.clientX - st.sx), Math.max(360, window.innerWidth - l)) + 'px';
+        if (k !== 'r') box.style.height = Math.min(Math.max(220, st.h + e.clientY - st.sy), Math.max(220, window.innerHeight - t)) + 'px';
+      });
+      function endR() { st = null; }
+      hdl.addEventListener('pointerup', endR); hdl.addEventListener('pointercancel', endR);
+    });
     return m;
   }
   function bindZoom() { /* 그림 클릭 확대 기능 없음 */ }
@@ -484,7 +543,7 @@
     var ov = h('div', 'px-imgov', '<span class="px-imgdel" title="그림 삭제">✕ 삭제</span><span class="px-imgrs" title="끌어서 크기 조절"></span>');
     function placeOv() {
       if (!selImg || !selImg.isConnected || !ed.contains(selImg)) { selImg = null; ov.style.display = 'none'; return; }
-      var r = selImg.getBoundingClientRect(), w = wrap.getBoundingClientRect();
+      var r = selImg.getBoundingClientRect(), w = ed.parentNode ? ed.parentNode.getBoundingClientRect() : wrap.getBoundingClientRect();
       ov.style.display = 'block';
       ov.style.left = (r.left - w.left) + 'px'; ov.style.top = (r.top - w.top) + 'px';
       ov.style.width = r.width + 'px'; ov.style.height = r.height + 'px';
@@ -551,7 +610,9 @@
       if (fs && fs.length) { e.preventDefault(); addFiles(fs); }
     });
 
-    wrap.appendChild(tbs); wrap.appendChild(ed); wrap.appendChild(ov); wrap.appendChild(fi);
+    var edbox = h('div', 'px-edbox'); edbox.appendChild(ed); edbox.appendChild(ov);
+    wrap.appendChild(tbs); wrap.appendChild(edbox); wrap.appendChild(fi);
+    ed.addEventListener('scroll', placeOv);
     return {
       el: wrap, node: ed,
       getHtml: function () { return sanitize(ed.innerHTML).replace(/^(<br>|\s)+|(<br>|\s)+$/g, ''); },
@@ -565,12 +626,13 @@
   window.openBoard_ = function () {
     if (!me()) { alert('로그인 후 이용해 주세요.'); return; }
     var m = modal({ title: '게시판', w: 980 });
-    m.box.style.height = '90vh';
+    m.box.style.height = '92vh'; m.box.style.width = Math.min(1180, window.innerWidth - 20) + 'px';
     var body = m.body;
     var page = 0, PER = 20, query = '';
     function fail(e) { body.innerHTML = '<div class="px-err">' + esc(errMsg(e)) + '</div>'; }
 
     function showList() {
+      body.className = 'px-bd';
       body.innerHTML = '<div class="px-load">불러오는 중…</div>';
       Promise.all([
         db().from('portal_posts').select('id,title,author,created_at,updated_at').order('id', { ascending: false }).limit(1000),
@@ -610,6 +672,7 @@
     }
 
     function showPost(id) {
+      body.className = 'px-bd';
       body.innerHTML = '<div class="px-load">불러오는 중…</div>';
       Promise.all([
         db().from('portal_posts').select('*').eq('id', id).maybeSingle(),
@@ -672,14 +735,14 @@
     }
 
     function showEdit(p) {
-      body.innerHTML = '<div class="px-bar"><b style="font-size:16px">' + (p ? '게시물 수정' : '새 글 쓰기') + '</b></div>' +
-        '<input class="px-in" id="pxTi" maxlength="150" placeholder="제목" style="margin-bottom:10px">';
+      body.className = 'px-bd px-fill';
+      body.innerHTML = '<div class="px-bar" id="pxEbar"><b style="font-size:16px">' + (p ? '게시물 수정' : '새 글 쓰기') + '</b><span class="sp"></span>' +
+        '<button class="px-b" type="button" id="pxEc">취소</button><button class="px-b pri" type="button" id="pxEs">저장</button></div>' +
+        '<input class="px-in" id="pxTi" maxlength="150" placeholder="제목" style="margin-bottom:10px;flex:none">';
+      var bar = body.querySelector('#pxEbar');
       body.querySelector('#pxTi').value = p ? p.title : '';
       var ed = makeEditor(p ? p.body_html : '');
       body.appendChild(ed.el);
-      var bar = h('div', 'px-bar', '<span class="sp"></span><button class="px-b" type="button" id="pxEc">취소</button><button class="px-b pri" type="button" id="pxEs">저장</button>');
-      bar.style.marginTop = '12px';
-      body.appendChild(bar);
       bar.querySelector('#pxEc').addEventListener('click', function () { if (p) showPost(p.id); else showList(); });
       bar.querySelector('#pxEs').addEventListener('click', function () {
         var title = body.querySelector('#pxTi').value.trim();
@@ -768,7 +831,7 @@
       return;
     }
     var m = modal({ title: '공지사항 관리', w: 860 });
-    m.box.style.height = '88vh';
+    m.box.style.height = '92vh'; m.box.style.width = Math.min(1180, window.innerWidth - 20) + 'px';
     var body = m.body;
     function fail(e) { body.innerHTML = '<div class="px-err">' + esc(errMsg(e)) + '</div>'; }
     function plain(n) {
@@ -778,6 +841,7 @@
       return t ? t.slice(0, 40) : (d.querySelector('img') ? '(그림 공지)' : '(내용 없음)');
     }
     function showList() {
+      body.className = 'px-bd';
       body.innerHTML = '<div class="px-load">불러오는 중…</div>';
       db().from('portal_notices').select('id,title,body_html,published,created_by,created_at,updated_at').order('id', { ascending: false }).then(function (r) {
         if (r.error) throw r.error;
@@ -813,15 +877,15 @@
       }).catch(fail);
     }
     function showEdit(n) {
-      body.innerHTML = '<div class="px-bar"><b style="font-size:16px">' + (n ? '공지사항 수정' : '새 공지사항') + '</b></div>' +
-        '<input class="px-in" id="pxNt" maxlength="150" placeholder="제목 (선택)" style="margin-bottom:10px">';
+      body.className = 'px-bd px-fill';
+      body.innerHTML = '<div class="px-bar" id="pxNbar"><b style="font-size:16px">' + (n ? '공지사항 수정' : '새 공지사항') + '</b><span class="sp"></span>' +
+        '<label style="font-size:14px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="pxNp"> 저장 후 바로 게시</label>' +
+        '<button class="px-b" type="button" id="pxNc">취소</button><button class="px-b pri" type="button" id="pxNs">저장</button></div>' +
+        '<input class="px-in" id="pxNt" maxlength="150" placeholder="제목 (선택)" style="margin-bottom:10px;flex:none">';
+      var bar = body.querySelector('#pxNbar');
       body.querySelector('#pxNt').value = n ? n.title : '';
       var ed = makeEditor(n ? n.body_html : '');
       body.appendChild(ed.el);
-      var bar = h('div', 'px-bar', '<label style="font-size:14px;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="pxNp"> 저장 후 바로 게시</label><span class="sp"></span>' +
-        '<button class="px-b" type="button" id="pxNc">취소</button><button class="px-b pri" type="button" id="pxNs">저장</button>');
-      bar.style.marginTop = '12px';
-      body.appendChild(bar);
       bar.querySelector('#pxNp').checked = n ? !!n.published : true;
       bar.querySelector('#pxNc').addEventListener('click', showList);
       bar.querySelector('#pxNs').addEventListener('click', function () {
