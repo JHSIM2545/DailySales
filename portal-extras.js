@@ -666,6 +666,115 @@
     };
   }
 
+  /* ------------------------------------------------------------ 게시판 첨부파일 (모든 형식) */
+  var ATT_MAX_BYTES = 30 * 1024 * 1024;
+  function fmtSize(n) { n = Number(n) || 0; return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; }
+  function attMetaKey(postId) { return 'POST_FILES_' + postId; }
+  function attLoad(postId) {
+    return db().from('system_settings').select('setting_value').eq('setting_key', attMetaKey(postId)).maybeSingle().then(function (r) {
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.setting_value) return [];
+      try { var l = JSON.parse(r.data.setting_value); return Array.isArray(l) ? l : []; } catch (e) { return []; }
+    });
+  }
+  function attLoadCounts() {
+    return db().from('system_settings').select('setting_key,setting_value').like('setting_key', 'POST_FILES\\_%').then(function (r) {
+      var m = {};
+      if (r.error) return m;
+      (r.data || []).forEach(function (row) {
+        try { var l = JSON.parse(row.setting_value); if (l && l.length) m[row.setting_key.replace('POST_FILES_', '')] = l.length; } catch (e) { /* noop */ }
+      });
+      return m;
+    }, function () { return {}; });
+  }
+  function attDeleteData(id) {
+    return db().from('system_settings').delete().eq('setting_key', 'FILE_DATA_' + id).then(function () {
+      return db().from('system_settings').delete().like('setting_key', 'FILE_DATA_' + id + '\\_\\_%');
+    });
+  }
+  function attSaveMeta(postId, list) {
+    var q = list.length
+      ? db().from('system_settings').upsert({ setting_key: attMetaKey(postId), setting_value: JSON.stringify(list) })
+      : db().from('system_settings').delete().eq('setting_key', attMetaKey(postId));
+    return q.then(function (r) { if (r.error) throw r.error; });
+  }
+  async function attWriteData(id, du) {
+    var CH = 400000, parts = [];
+    for (var p = 0; p < du.length; p += CH) parts.push(du.slice(p, p + CH));
+    if (parts.length <= 1) {
+      var r0 = await db().from('system_settings').upsert({ setting_key: 'FILE_DATA_' + id, setting_value: du });
+      if (r0.error) throw r0.error;
+      return;
+    }
+    for (var i = 0; i < parts.length; i += 4) {
+      var batch = parts.slice(i, i + 4).map(function (pt, j) {
+        return db().from('system_settings').upsert({ setting_key: 'FILE_DATA_' + id + '__' + (i + j), setting_value: pt });
+      });
+      var rs = await Promise.all(batch);
+      for (var k = 0; k < rs.length; k++) if (rs[k].error) throw rs[k].error;
+    }
+    var rm = await db().from('system_settings').upsert({ setting_key: 'FILE_DATA_' + id, setting_value: '__CHUNKED__:' + parts.length + ':' + du.length });
+    if (rm.error) throw rm.error;
+  }
+  async function attReadData(id) {
+    var r = await db().from('system_settings').select('setting_value').eq('setting_key', 'FILE_DATA_' + id).maybeSingle();
+    if (r.error) throw r.error;
+    if (!r.data || r.data.setting_value == null) throw new Error('첨부파일 본문이 없습니다.');
+    var sv = String(r.data.setting_value);
+    if (sv.indexOf('__CHUNKED__:') !== 0) return sv;
+    var f = sv.split(':'), n = Number(f[1]) || 0, expLen = Number(f[2]) || 0, got = new Array(n);
+    for (var i = 0; i < n; i += 10) {
+      var keys = []; for (var k = i; k < Math.min(n, i + 10); k++) keys.push('FILE_DATA_' + id + '__' + k);
+      var rr = await db().from('system_settings').select('setting_key,setting_value').in('setting_key', keys);
+      if (rr.error) throw rr.error;
+      (rr.data || []).forEach(function (row) { got[Number(row.setting_key.split('__').pop())] = row.setting_value; });
+    }
+    for (var q = 0; q < n; q++) if (got[q] == null) throw new Error('첨부파일 조각 ' + (q + 1) + '/' + n + ' 이(가) 없습니다.');
+    var acc = got.join('');
+    if (expLen && acc.length !== expLen) throw new Error('첨부파일 길이 불일치(' + acc.length + '/' + expLen + ')');
+    return acc;
+  }
+  function readAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result || '')); };
+      fr.onerror = function () { reject(new Error('파일을 읽지 못했습니다: ' + file.name)); };
+      fr.readAsDataURL(file);
+    });
+  }
+  function downloadDataUrl(du, name) {
+    var url = du, revoke = false;
+    try {
+      var ci = du.indexOf(',');
+      if (du.indexOf('data:') === 0 && ci > 0) {
+        var head = du.slice(5, ci), body = du.slice(ci + 1);
+        var raw = /;base64/i.test(head) ? atob(body) : decodeURIComponent(body);
+        var bytes = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+        url = URL.createObjectURL(new Blob([bytes], { type: head.split(';')[0] || 'application/octet-stream' }));
+        revoke = true;
+      }
+    } catch (e) { /* data URL 그대로 사용 */ }
+    var a = document.createElement('a'); a.href = url; a.download = name || 'download';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    if (revoke) setTimeout(function () { try { URL.revokeObjectURL(url); } catch (e) { /* noop */ } }, 60000);
+  }
+  function attDownload(meta, btn) {
+    var old = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '불러오는 중…'; }
+    return attReadData(meta.id).then(function (du) {
+      if (meta.dataLen && du.length !== Number(meta.dataLen)) throw new Error('파일 길이 불일치');
+      downloadDataUrl(du, meta.name);
+    }).catch(function (e) { alert('첨부파일 다운로드 실패 [' + meta.name + ']: ' + ((e && e.message) || e)); })
+      .then(function () { if (btn) { btn.disabled = false; btn.textContent = old; } });
+  }
+  function attListHtml(list) {
+    return list.map(function (a, i) {
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span>📎</span><button type="button" class="px-b sm" data-att="' + i + '" style="max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+        esc(a.name) + '</button><span style="font-size:12px;color:#6b7280">' + fmtSize(a.size) + '</span></div>';
+    }).join('');
+  }
+
   /* ------------------------------------------------------------ 게시판 */
   function canEditBy(author) { return isMaster() || (!!author && author === me()); }
 
@@ -682,10 +791,12 @@
       body.innerHTML = '<div class="px-load">불러오는 중…</div>';
       Promise.all([
         db().from('portal_posts').select('id,title,author,created_at,updated_at').order('id', { ascending: false }).limit(1000),
-        db().from('portal_comments').select('post_id').limit(30000)
+        db().from('portal_comments').select('post_id').limit(30000),
+        attLoadCounts()
       ]).then(function (rs) {
         if (rs[0].error) throw rs[0].error;
         if (rs[1].error) throw rs[1].error;
+        var attCnt = rs[2] || {};
         var posts = rs[0].data || [], cnt = {};
         (rs[1].data || []).forEach(function (c) { cnt[c.post_id] = (cnt[c.post_id] || 0) + 1; });
         var q = query.trim().toLowerCase();
@@ -696,7 +807,7 @@
         if (page >= pages) page = pages - 1;
         var rows = view.slice(page * PER, page * PER + PER).map(function (p) {
           return '<tr class="cl" data-id="' + p.id + '"><td style="width:70px">' + p._no + '</td><td class="l">' + esc(p.title) +
-            (cnt[p.id] ? '<span class="px-cnt">[' + cnt[p.id] + ']</span>' : '') + '</td><td style="width:110px">' + esc(p.author) +
+            (attCnt[p.id] ? ' <span title="첨부파일 ' + attCnt[p.id] + '개">📎</span>' : '') + (cnt[p.id] ? '<span class="px-cnt">[' + cnt[p.id] + ']</span>' : '') + '</td><td style="width:110px">' + esc(p.author) +
             '</td><td style="width:140px">' + fmtDate(p.created_at) + '</td></tr>';
         }).join('') || '<tr><td colspan="4" style="padding:30px;color:#6b7280">게시물이 없습니다.</td></tr>';
         body.innerHTML = '<div class="px-bar"><input class="px-in" id="pxBq" placeholder="제목/작성자 검색" style="max-width:260px" value="' + esc(query) + '">' +
@@ -722,10 +833,12 @@
       body.innerHTML = '<div class="px-load">불러오는 중…</div>';
       Promise.all([
         db().from('portal_posts').select('*').eq('id', id).maybeSingle(),
-        db().from('portal_comments').select('*').eq('post_id', id).order('id')
+        db().from('portal_comments').select('*').eq('post_id', id).order('id'),
+        attLoad(id).catch(function () { return []; })
       ]).then(function (rs) {
         if (rs[0].error) throw rs[0].error;
         if (rs[1].error) throw rs[1].error;
+        var atts = rs[2] || [];
         var p = rs[0].data;
         if (!p) { alert('삭제되었거나 존재하지 않는 게시물입니다.'); showList(); return; }
         var cs = rs[1].data || [];
@@ -736,12 +849,16 @@
           '<h2 style="margin:0;font-size:20px">' + esc(p.title) + '</h2>' +
           '<div class="px-meta">' + esc(p.author) + ' · ' + fmtDate(p.created_at) + (edited ? ' (수정 ' + fmtDate(p.updated_at) + ')' : '') + '</div>' +
           '<div class="px-content"></div>' +
+          (atts.length ? '<div class="px-files" style="margin-top:12px;padding:10px 12px;border:1px solid #d9dee5;border-radius:6px;background:#f8fafc"><b style="font-size:13px">첨부파일 ' + atts.length + '개</b>' + attListHtml(atts) + '</div>' : '') +
           '<div class="px-cm"><h4>댓글 ' + cs.length + '</h4><div id="pxCl"></div>' +
           '<textarea class="px-in" id="pxCt" rows="3" maxlength="2000" placeholder="댓글을 입력하세요"></textarea>' +
           '<div style="text-align:right;margin-top:6px"><button class="px-b pri" id="pxCa" type="button">댓글 등록</button></div></div>';
         var ct = body.querySelector('.px-content');
         ct.innerHTML = sanitize(p.body_html); applyFonts(ct);
         bindZoom(ct);
+        Array.prototype.forEach.call(body.querySelectorAll('[data-att]'), function (b) {
+          b.addEventListener('click', function () { attDownload(atts[Number(b.getAttribute('data-att'))], b); });
+        });
         var cl = body.querySelector('#pxCl');
         cs.forEach(function (c) {
           var d = h('div', 'px-c');
@@ -764,7 +881,12 @@
         if (bd) bd.addEventListener('click', function () {
           if (!canEditBy(p.author)) return;
           if (!confirm('게시물과 댓글을 모두 삭제할까요?')) return;
-          db().from('portal_posts').delete().eq('id', id).then(function (r) {
+          attLoad(id).catch(function () { return []; }).then(function (al) {
+            return Promise.all(al.map(function (a) { return attDeleteData(a.id).catch(function () { /* noop */ }); }))
+              .then(function () { return al.length ? attSaveMeta(id, []).catch(function () { /* noop */ }) : null; });
+          }).then(function () {
+            return db().from('portal_posts').delete().eq('id', id);
+          }).then(function (r) {
             if (r.error) { alert(errMsg(r.error)); return; }
             showList();
           });
@@ -789,6 +911,39 @@
       body.querySelector('#pxTi').value = p ? p.title : '';
       var ed = makeEditor(p ? p.body_html : '');
       body.appendChild(ed.el);
+      /* ---- 파일 첨부 (모든 형식) ---- */
+      var attBox = h('div'); attBox.style.cssText = 'flex:none;margin:0 0 10px;padding:8px 10px;border:1px dashed #b8c2cc;border-radius:6px;background:#fafbfc';
+      attBox.innerHTML = '<div style="display:flex;align-items:center;gap:8px"><button type="button" class="px-b sm" id="pxAadd">📎 파일 첨부</button>' +
+        '<span style="font-size:12px;color:#6b7280">모든 형식 가능 · 파일당 최대 30MB</span></div><div id="pxAlist"></div>';
+      var afi = h('input'); afi.type = 'file'; afi.multiple = true; afi.style.display = 'none'; attBox.appendChild(afi);
+      body.insertBefore(attBox, ed.el);
+      var existingAtt = [], removedAtt = [], newFiles = [];
+      function renderAtt() {
+        var box = attBox.querySelector('#pxAlist');
+        var html = existingAtt.map(function (a, i) {
+          return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span>📎</span><span>' + esc(a.name) + '</span><span style="font-size:12px;color:#6b7280">' + fmtSize(a.size) +
+            '</span><button type="button" class="px-b sm danger" data-rm-old="' + i + '">제거</button></div>';
+        }).join('') + newFiles.map(function (f, i) {
+          return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span>🆕</span><span>' + esc(f.name) + '</span><span style="font-size:12px;color:#6b7280">' + fmtSize(f.size) +
+            '</span><button type="button" class="px-b sm danger" data-rm-new="' + i + '">제거</button></div>';
+        }).join('');
+        box.innerHTML = html;
+        Array.prototype.forEach.call(box.querySelectorAll('[data-rm-old]'), function (b) {
+          b.addEventListener('click', function () { removedAtt.push(existingAtt.splice(Number(b.getAttribute('data-rm-old')), 1)[0]); renderAtt(); });
+        });
+        Array.prototype.forEach.call(box.querySelectorAll('[data-rm-new]'), function (b) {
+          b.addEventListener('click', function () { newFiles.splice(Number(b.getAttribute('data-rm-new')), 1); renderAtt(); });
+        });
+      }
+      attBox.querySelector('#pxAadd').addEventListener('click', function () { afi.click(); });
+      afi.addEventListener('change', function () {
+        Array.prototype.forEach.call(afi.files || [], function (f) {
+          if (f.size > ATT_MAX_BYTES) { alert('[' + f.name + '] 파일이 너무 큽니다. (최대 30MB)'); return; }
+          newFiles.push(f);
+        });
+        afi.value = ''; renderAtt();
+      });
+      if (p) attLoad(p.id).then(function (l) { existingAtt = l; renderAtt(); }).catch(function () { /* 첨부 없음 */ });
       bar.querySelector('#pxEc').addEventListener('click', function () { if (p) showPost(p.id); else showList(); });
       bar.querySelector('#pxEs').addEventListener('click', function () {
         var title = body.querySelector('#pxTi').value.trim();
@@ -806,9 +961,30 @@
           req = db().from('portal_posts').insert({ title: title, body_html: html, author: me() }).select('id').single();
         }
         req.then(function (r) {
-          btn.disabled = false;
-          if (r.error) { alert(errMsg(r.error)); return; }
-          showPost(r.data ? r.data.id : (p && p.id));
+          if (r.error) { btn.disabled = false; alert(errMsg(r.error)); return; }
+          var postId = r.data ? r.data.id : (p && p.id);
+          if (!newFiles.length && !removedAtt.length) { btn.disabled = false; showPost(postId); return; }
+          var finalList = existingAtt.slice(), failed = [];
+          var seq = Promise.resolve();
+          newFiles.forEach(function (f, i) {
+            seq = seq.then(function () {
+              btn.textContent = '첨부 업로드 ' + (i + 1) + '/' + newFiles.length;
+              return readAsDataUrl(f).then(function (du) {
+                var fid = 'att_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                return attWriteData(fid, du).then(function () {
+                  finalList.push({ id: fid, name: f.name, size: f.size, dataLen: du.length });
+                }, function (e) { attDeleteData(fid).catch(function () { /* noop */ }); throw e; });
+              }).catch(function (e) { failed.push(f.name + ' (' + ((e && e.message) || e) + ')'); });
+            });
+          });
+          seq.then(function () { return attSaveMeta(postId, finalList); })
+            .then(function () { return Promise.all(removedAtt.map(function (a) { return attDeleteData(a.id).catch(function () { /* noop */ }); })); })
+            .catch(function (e) { failed.push('첨부 목록 저장 실패: ' + ((e && e.message) || e)); })
+            .then(function () {
+              btn.disabled = false; btn.textContent = '저장';
+              if (failed.length) alert('게시물은 저장되었으나 일부 첨부파일을 저장하지 못했습니다.\n' + failed.join('\n'));
+              showPost(postId);
+            });
         });
       });
     }

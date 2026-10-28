@@ -4195,7 +4195,7 @@ function getTzToday() {
                 const ri_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id + '__' + i_, setting_value: parts_[i_] });
                 if (ri_.error) throw ri_.error;
               }
-              const rm_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: '__CHUNKED__:' + parts_.length });
+              const rm_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: '__CHUNKED__:' + parts_.length + ':' + du_.length });
               if (rm_.error) throw rm_.error;
             }
           } catch(e) {
@@ -4304,6 +4304,11 @@ function getTzToday() {
                   const rc_ = await client.from('system_settings').select('setting_value').eq('setting_key', 'FILE_DATA_' + id + '__' + i_).maybeSingle();
                   if (rc_.error || !rc_.data || rc_.data.setting_value == null) { okc_ = false; break; }
                   acc_ += rc_.data.setting_value;
+                }
+                const expLen_ = Number(sv_.split(':')[2]) || 0;
+                if (okc_ && expLen_ && acc_.length !== expLen_) {
+                  lastErr_ = '조각 병합 길이 불일치(' + acc_.length + '/' + expLen_ + ') - 업로드가 중간에 끊겼거나 덮어쓰기 중 오류가 발생했습니다.';
+                  okc_ = false;
                 }
                 if (okc_) return { success: true, dataUrl: acc_ };
               } else {

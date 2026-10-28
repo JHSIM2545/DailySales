@@ -4201,7 +4201,7 @@ function getTzToday() {
                 const ri_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id + '__' + i_, setting_value: parts_[i_] });
                 if (ri_.error) throw ri_.error;
               }
-              const rm_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: '__CHUNKED__:' + parts_.length });
+              const rm_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: '__CHUNKED__:' + parts_.length + ':' + du_.length });
               if (rm_.error) throw rm_.error;
             }
           } catch(e) {
@@ -4310,6 +4310,11 @@ function getTzToday() {
                   const rc_ = await client.from('system_settings').select('setting_value').eq('setting_key', 'FILE_DATA_' + id + '__' + i_).maybeSingle();
                   if (rc_.error || !rc_.data || rc_.data.setting_value == null) { okc_ = false; break; }
                   acc_ += rc_.data.setting_value;
+                }
+                const expLen_ = Number(sv_.split(':')[2]) || 0;
+                if (okc_ && expLen_ && acc_.length !== expLen_) {
+                  lastErr_ = '조각 병합 길이 불일치(' + acc_.length + '/' + expLen_ + ') - 업로드가 중간에 끊겼거나 덮어쓰기 중 오류가 발생했습니다.';
+                  okc_ = false;
                 }
                 if (okc_) return { success: true, dataUrl: acc_ };
               } else {
@@ -17196,12 +17201,31 @@ function fileStoreFileSelected_(e){
 }
 
 function triggerBrowserDownload_(dataUrl, fileName){
+  // 큰 data URL 을 <a href> 에 직접 넣으면 브라우저가 '전송이 완료되지 않은 파일'로 처리할 수 있어 Blob URL 로 변환
+  let url = dataUrl, revoke = false;
+  try {
+    const s = String(dataUrl || '');
+    const ci = s.indexOf(',');
+    if (s.indexOf('data:') === 0 && ci > 0) {
+      const head = s.slice(5, ci);
+      const body = s.slice(ci + 1);
+      const mime = head.split(';')[0] || 'application/octet-stream';
+      const raw = /;base64/i.test(head) ? atob(body) : decodeURIComponent(body);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      revoke = true;
+    }
+  } catch (e) {
+    console.warn('[triggerBrowserDownload_] blob 변환 실패, data URL 로 대체:', e);
+  }
   const a = document.createElement('a');
-  a.href = dataUrl;
+  a.href = url;
   a.download = fileName || 'download';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  if (revoke) setTimeout(function(){ try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
 }
 
 function downloadStoredFile_(id){
