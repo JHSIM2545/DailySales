@@ -4095,313 +4095,163 @@ function getTzToday() {
     },
 
         // 17. 파일 저장소 관리 (Supabase system_settings 기반 영구 공유 저장소)
-    adminListStoredFiles: async function(token) {
-      try {
-        const client = getSupabase();
-        let remoteFiles = null;
-        if (client) {
-          try {
-            const { data, error } = await client
-              .from('system_settings')
-              .select('setting_value')
-              .eq('setting_key', 'ADMIN_STORED_FILES')
-              .maybeSingle();
-            if (!error && data && data.setting_value) {
-              remoteFiles = JSON.parse(data.setting_value);
-            }
-          } catch(e) {
-            console.warn('[adminListStoredFiles] supabase read error:', e);
-          }
-        }
-
-        let localFiles = [];
-        try {
-          localFiles = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
-        } catch(e) {}
-
-        // Supabase에 데이터가 있으면 Supabase 목록 우선 반영 및 로컬 캐시 동기화
-        if (remoteFiles !== null && Array.isArray(remoteFiles)) {
-          // 더미 파일 제외
-          const cleanRemote = remoteFiles.filter(function(f){
-            return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html';
-          });
-          // 로컬 캐시의 dataUrl 보존
-          const merged = cleanRemote.map(function(rf){
-            const lf = localFiles.find(function(l){ return l.id === rf.id; });
-            if (lf && lf.dataUrl && !rf.dataUrl) {
-              return Object.assign({}, rf, { dataUrl: lf.dataUrl });
-            }
-            return rf;
-          });
-          try { localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(merged)); } catch(e) {}
-          return { success: true, files: merged };
-        }
-
-        // Supabase에 아직 데이터가 없고 로컬에 실제 업로드된 파일이 있다면 마이그레이션 저장
-        const realLocalFiles = localFiles.filter(function(f){
-          return f && f.name && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html';
-        });
-
-        if (client && realLocalFiles.length > 0) {
-          try {
-            const metaList = realLocalFiles.map(function(f){
-              return {
-                id: f.id,
-                name: f.name,
-                size: f.size || '',
-                createdDate: f.createdDate || f.date || '',
-                regDate: f.regDate || f.date || '',
-                date: f.date || f.regDate || ''
-              };
-            });
-            await client.from('system_settings').upsert({
-              setting_key: 'ADMIN_STORED_FILES',
-              setting_value: JSON.stringify(metaList)
-            });
-            for (let i = 0; i < realLocalFiles.length; i++) {
-              const rf = realLocalFiles[i];
-              if (rf.dataUrl) {
-                await client.from('system_settings').upsert({
-                  setting_key: 'FILE_DATA_' + rf.id,
-                  setting_value: rf.dataUrl
-                });
-              }
-            }
-          } catch(e) {
-            console.warn('[adminListStoredFiles] migration error:', e);
-          }
-          return { success: true, files: realLocalFiles };
-        }
-
-        return { success: true, files: realLocalFiles };
-      } catch(err) {
-        return { success: true, files: [] };
+    // ===== 파일 저장소 (사용자별 분리 저장) =====
+    // 목록: system_settings.USER_FILES_{사용자키} / 본문: FILE_DATA_{파일id}(+ __n 조각)
+    _fsOwner: function() {
+      let s = null;
+      try { s = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : null; } catch(e) {}
+      if (!s) { try { s = JSON.parse(sessionStorage.getItem('s1_admin_session_v1') || sessionStorage.getItem('s1_session_v1') || 'null'); } catch(e) {} }
+      const k = s ? String(s.phone || s.id || s.name || '') : '';
+      return k.replace(/[^0-9A-Za-z가-힣_-]/g, '');
+    },
+    _fsLoadRemote: async function(client, owner) {
+      const { data, error } = await client.from('system_settings').select('setting_value')
+        .eq('setting_key', 'USER_FILES_' + owner).maybeSingle();
+      if (error) throw error;
+      if (data && data.setting_value) {
+        const l = JSON.parse(data.setting_value);
+        return Array.isArray(l) ? l : [];
       }
+      return [];
+    },
+    _fsSaveRemote: async function(client, owner, list) {
+      const r = await client.from('system_settings').upsert({ setting_key: 'USER_FILES_' + owner, setting_value: JSON.stringify(list) });
+      if (r.error) throw r.error;
+      try { localStorage.setItem('USER_FILES_' + owner, JSON.stringify(list)); } catch(e) {}
+    },
+    _fsDeleteData: async function(client, id) {
+      await client.from('system_settings').delete().eq('setting_key', 'FILE_DATA_' + id);
+      await client.from('system_settings').delete().like('setting_key', 'FILE_DATA_' + id + '\\_\\_%');
+    },
+    // 대용량 본문을 400KB 조각으로 나눠 저장 (마지막에 마커 기록 → 중간 실패 시 깨진 파일이 보이지 않음)
+    _fsWriteData: async function(client, id, du) {
+      const CH = 400000, parts = [];
+      for (let p = 0; p < du.length; p += CH) parts.push(du.slice(p, p + CH));
+      if (parts.length <= 1) {
+        const r0 = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + id, setting_value: du });
+        if (r0.error) throw r0.error;
+        return;
+      }
+      for (let i = 0; i < parts.length; i += 4) {
+        const batch = parts.slice(i, i + 4).map(function(pt, j) {
+          return client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + id + '__' + (i + j), setting_value: pt });
+        });
+        const rs = await Promise.all(batch);
+        for (const r of rs) if (r.error) throw r.error;
+      }
+      const rm = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + id, setting_value: '__CHUNKED__:' + parts.length + ':' + du.length });
+      if (rm.error) throw rm.error;
+    },
+    _fsReadData: async function(client, id) {
+      const { data, error } = await client.from('system_settings').select('setting_value').eq('setting_key', 'FILE_DATA_' + id).maybeSingle();
+      if (error) throw error;
+      if (!data || data.setting_value == null) throw new Error('파일 본문이 없습니다. 삭제 후 다시 업로드해 주세요.');
+      const sv = String(data.setting_value);
+      if (sv.indexOf('__CHUNKED__:') !== 0) return sv;
+      const f = sv.split(':'), n = Number(f[1]) || 0, expLen = Number(f[2]) || 0;
+      const got = new Array(n);
+      for (let i = 0; i < n; i += 10) {
+        const keys = []; for (let k = i; k < Math.min(n, i + 10); k++) keys.push('FILE_DATA_' + id + '__' + k);
+        const r = await client.from('system_settings').select('setting_key,setting_value').in('setting_key', keys);
+        if (r.error) throw r.error;
+        (r.data || []).forEach(function(row) { got[Number(row.setting_key.split('__').pop())] = row.setting_value; });
+      }
+      for (let k = 0; k < n; k++) if (got[k] == null) throw new Error('파일 조각 ' + (k + 1) + '/' + n + ' 이(가) 없습니다. 삭제 후 다시 업로드해 주세요.');
+      const acc = got.join('');
+      if (expLen && acc.length !== expLen) throw new Error('파일 길이 불일치(' + acc.length + '/' + expLen + '). 삭제 후 다시 업로드해 주세요.');
+      return acc;
+    },
+
+    adminListStoredFiles: async function(token) {
+      const owner = Backend._fsOwner();
+      if (!owner) return { success: false, error: '로그인 정보를 확인할 수 없습니다.', files: [] };
+      const client = getSupabase();
+      let list = null;
+      if (client) {
+        try { list = await Backend._fsLoadRemote(client, owner); } catch(e) { console.warn('[adminListStoredFiles]', e); }
+      }
+      if (list === null) {
+        try { list = JSON.parse(localStorage.getItem('USER_FILES_' + owner) || '[]'); } catch(e) { list = []; }
+      } else {
+        try { localStorage.setItem('USER_FILES_' + owner, JSON.stringify(list)); } catch(e) {}
+      }
+      return { success: true, files: list.filter(function(f){ return f && f.id && f.name; }) };
     },
 
     adminUploadStoredFile: async function(token, payload) {
       try {
-        if (!payload || !payload.id || !payload.name) {
-          return { success: false, error: '유효하지 않은 파일 데이터입니다.' };
-        }
+        if (!payload || !payload.id || !payload.name) return { success: false, error: '유효하지 않은 파일 데이터입니다.' };
+        const owner = Backend._fsOwner();
+        if (!owner) return { success: false, error: '로그인 정보를 확인할 수 없습니다.' };
         const client = getSupabase();
+        if (!client) return { success: false, error: '서버(Supabase)에 연결할 수 없습니다.' };
+        const du = String(payload.dataUrl || '');
+        if (du.length > 42000000) return { success: false, error: '파일이 너무 큽니다. (최대 약 30MB)' };
 
-        // 1. 대용량 파일 데이터 본문(dataUrl)은 독립 키로 안전하게 분리 저장
-        if (client && payload.dataUrl) {
-          try {
-            const CH_ = 400000; // 한 행당 약 400KB로 분할 저장 (대용량 파일 저장 실패 방지)
-            const du_ = String(payload.dataUrl);
-            const parts_ = [];
-            for (let p_ = 0; p_ < du_.length; p_ += CH_) parts_.push(du_.slice(p_, p_ + CH_));
-            if (parts_.length <= 1) {
-              const r0_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: du_ });
-              if (r0_.error) throw r0_.error;
-            } else {
-              for (let i_ = 0; i_ < parts_.length; i_++) {
-                const ri_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id + '__' + i_, setting_value: parts_[i_] });
-                if (ri_.error) throw ri_.error;
-              }
-              const rm_ = await client.from('system_settings').upsert({ setting_key: 'FILE_DATA_' + payload.id, setting_value: '__CHUNKED__:' + parts_.length + ':' + du_.length });
-              if (rm_.error) throw rm_.error;
-            }
-          } catch(e) {
-            console.warn('[adminUploadStoredFile] file data upsert error:', e);
-            return { success: false, error: '파일 본문 저장 실패: ' + ((e && e.message) || e) };
-          }
-        }
+        const list = await Backend._fsLoadRemote(client, owner); // 읽기 실패 시 예외 → 목록을 덮어쓰지 않음
+        const oldIdx = list.findIndex(function(f){ return f.id === payload.id || f.name === payload.name; });
+        const oldId = oldIdx >= 0 ? list[oldIdx].id : null;
+        // 덮어쓰기여도 새 id 로 먼저 저장 → 실패해도 기존 파일이 깨지지 않음
+        const newId = (oldId && oldId === payload.id) ? (payload.id + '_' + Date.now().toString(36)) : payload.id;
 
-        // 2. 현재 저장된 파일 메타데이터 목록 로드
-        let list = [];
-        if (client) {
-          try {
-            const { data } = await client
-              .from('system_settings')
-              .select('setting_value')
-              .eq('setting_key', 'ADMIN_STORED_FILES')
-              .maybeSingle();
-            if (data && data.setting_value) {
-              list = JSON.parse(data.setting_value);
-            }
-          } catch(e) {}
-        }
-        if (!list || !list.length) {
-          try {
-            list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
-          } catch(e) {}
-        }
-
-        // 더미 파일 정리
-        list = list.filter(function(f){
-          return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html';
-        });
-
-        // 3. 파일 메타데이터 생성 및 병합 (동일 파일명/id는 덮어쓰기)
-        const metaItem = {
-          id: payload.id,
-          name: payload.name,
-          size: payload.size || '',
-          createdDate: payload.createdDate || payload.date || '',
-          regDate: payload.regDate || payload.date || '',
-          date: payload.date || payload.regDate || ''
-        };
-
-        const existingIdx = list.findIndex(function(f){
-          return f.id === payload.id || f.name === payload.name;
-        });
-        if (existingIdx >= 0) {
-          list[existingIdx] = metaItem;
-        } else {
-          list.push(metaItem);
-        }
-
-        // 4. 로컬 스토리지 캐시 동기화 (dataUrl 포함)
         try {
-          const localList = list.map(function(item){
-            if (item.id === payload.id) {
-              return Object.assign({}, item, { dataUrl: payload.dataUrl });
-            }
-            return item;
-          });
-          localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(localList));
-        } catch(e) {}
-
-        // 5. Supabase에 전체 메타데이터 목록 영구 반영
-        if (client) {
-          await client.from('system_settings').upsert({
-            setting_key: 'ADMIN_STORED_FILES',
-            setting_value: JSON.stringify(list)
-          });
+          await Backend._fsWriteData(client, newId, du);
+        } catch(e) {
+          try { await Backend._fsDeleteData(client, newId); } catch(x) {}
+          return { success: false, error: '파일 본문 저장 실패: ' + ((e && e.message) || e) };
         }
 
-        return { success: true };
+        const metaItem = {
+          id: newId, name: payload.name, size: payload.size || '', dataLen: du.length,
+          createdDate: payload.createdDate || payload.date || '',
+          regDate: payload.regDate || payload.date || '', date: payload.date || payload.regDate || ''
+        };
+        if (oldIdx >= 0) list[oldIdx] = metaItem; else list.push(metaItem);
+        try {
+          await Backend._fsSaveRemote(client, owner, list);
+        } catch(e) {
+          try { await Backend._fsDeleteData(client, newId); } catch(x) {}
+          return { success: false, error: '파일 목록 저장 실패: ' + ((e && e.message) || e) };
+        }
+        if (oldId && oldId !== newId) { try { await Backend._fsDeleteData(client, oldId); } catch(e) {} }
+        return { success: true, id: newId };
       } catch(err) {
-        return { success: false, error: String(err) };
+        return { success: false, error: String((err && err.message) || err) };
       }
     },
 
-        adminGetStoredFile: async function(token, id) {
+    adminGetStoredFile: async function(token, id) {
       try {
-        // 1. 로컬 캐시에서 먼저 빠른 조회
-        try {
-          const localList = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
-          const found = localList.find(function(f){ return f.id === id; });
-          if (found && found.dataUrl) {
-            return { success: true, dataUrl: found.dataUrl, name: found.name };
-          }
-        } catch(e) {}
-
+        const owner = Backend._fsOwner();
+        if (!owner) return { success: false, error: '로그인 정보를 확인할 수 없습니다.' };
         const client = getSupabase();
-        let lastErr_ = '';
-        if (client) {
-          // 2. Supabase에서 개별 파일 데이터 본문 조회 (FILE_DATA_{id})
-          try {
-            const { data, error } = await client
-              .from('system_settings')
-              .select('setting_value')
-              .eq('setting_key', 'FILE_DATA_' + id)
-              .maybeSingle();
-            if (error) lastErr_ = error.message || String(error);
-            if (!error && data && data.setting_value) {
-              const sv_ = String(data.setting_value);
-              if (sv_.indexOf('__CHUNKED__:') === 0) {
-                const n_ = Number(sv_.split(':')[1]) || 0;
-                let acc_ = '', okc_ = n_ > 0;
-                for (let i_ = 0; i_ < n_; i_++) {
-                  const rc_ = await client.from('system_settings').select('setting_value').eq('setting_key', 'FILE_DATA_' + id + '__' + i_).maybeSingle();
-                  if (rc_.error || !rc_.data || rc_.data.setting_value == null) { okc_ = false; break; }
-                  acc_ += rc_.data.setting_value;
-                }
-                const expLen_ = Number(sv_.split(':')[2]) || 0;
-                if (okc_ && expLen_ && acc_.length !== expLen_) {
-                  lastErr_ = '조각 병합 길이 불일치(' + acc_.length + '/' + expLen_ + ') - 업로드가 중간에 끊겼거나 덮어쓰기 중 오류가 발생했습니다.';
-                  okc_ = false;
-                }
-                if (okc_) return { success: true, dataUrl: acc_ };
-              } else {
-                return { success: true, dataUrl: sv_ };
-              }
-            }
-          } catch(e) {}
-
-          // 3. 만약 이전 방식으로 ADMIN_STORED_FILES에 dataUrl이 함께 들어있던 경우를 위한 폴백
-          try {
-            const { data } = await client
-              .from('system_settings')
-              .select('setting_value')
-              .eq('setting_key', 'ADMIN_STORED_FILES')
-              .maybeSingle();
-            if (data && data.setting_value) {
-              const list = JSON.parse(data.setting_value);
-              const found = list.find(function(f){ return f.id === id; });
-              if (found && found.dataUrl) {
-                return { success: true, dataUrl: found.dataUrl, name: found.name };
-              }
-            }
-          } catch(e) {}
+        if (!client) return { success: false, error: '서버(Supabase)에 연결할 수 없습니다.' };
+        const list = await Backend._fsLoadRemote(client, owner);
+        const meta = list.find(function(f){ return String(f.id) === String(id); });
+        if (!meta) return { success: false, error: '본인이 등록한 파일만 열 수 있습니다.' };
+        const du = await Backend._fsReadData(client, id);
+        if (meta.dataLen && du.length !== Number(meta.dataLen)) {
+          return { success: false, error: '파일 길이 불일치(' + du.length + '/' + meta.dataLen + '). 삭제 후 다시 업로드해 주세요.' };
         }
-        return { success: false, error: '파일 데이터를 찾을 수 없습니다. 업로드 시 본문 저장이 되지 않았을 수 있으니 삭제 후 다시 업로드해 주세요.' + (lastErr_ ? ' (DB: ' + lastErr_ + ')' : '') };
+        return { success: true, dataUrl: du, name: meta.name };
       } catch(err) {
-        return { success: false, error: String(err) };
+        return { success: false, error: String((err && err.message) || err) };
       }
     },
 
     adminDeleteStoredFile: async function(token, id) {
       try {
+        const owner = Backend._fsOwner();
+        if (!owner) return { success: false, error: '로그인 정보를 확인할 수 없습니다.' };
         const client = getSupabase();
-
-        // 1. Supabase 개별 파일 데이터 본문 삭제
-        if (client) {
-          try {
-            await client
-              .from('system_settings')
-              .delete()
-              .eq('setting_key', 'FILE_DATA_' + id);
-            await client
-              .from('system_settings')
-              .delete()
-              .like('setting_key', 'FILE_DATA_' + id + '\\_\\_%');
-          } catch(e) {}
-        }
-
-        // 2. 파일 메타데이터 목록 로드
-        let list = [];
-        if (client) {
-          try {
-            const { data } = await client
-              .from('system_settings')
-              .select('setting_value')
-              .eq('setting_key', 'ADMIN_STORED_FILES')
-              .maybeSingle();
-            if (data && data.setting_value) {
-              list = JSON.parse(data.setting_value);
-            }
-          } catch(e) {}
-        }
-        if (!list || !list.length) {
-          try {
-            list = JSON.parse(localStorage.getItem('ADMIN_STORED_FILES') || '[]');
-          } catch(e) {}
-        }
-
-        // 삭제 대상 제외
-        list = list.filter(function(f){ return f && f.id !== id; });
-
-        // 3. 로컬 스토리지 갱신
-        try {
-          localStorage.setItem('ADMIN_STORED_FILES', JSON.stringify(list));
-        } catch(e) {}
-
-        // 4. Supabase 메타데이터 목록 갱신
-        if (client) {
-          await client.from('system_settings').upsert({
-            setting_key: 'ADMIN_STORED_FILES',
-            setting_value: JSON.stringify(list)
-          });
-        }
-
+        if (!client) return { success: false, error: '서버(Supabase)에 연결할 수 없습니다.' };
+        const list = await Backend._fsLoadRemote(client, owner);
+        if (!list.some(function(f){ return String(f.id) === String(id); })) return { success: false, error: '본인이 등록한 파일만 삭제할 수 있습니다.' };
+        await Backend._fsDeleteData(client, id);
+        await Backend._fsSaveRemote(client, owner, list.filter(function(f){ return String(f.id) !== String(id); }));
         return { success: true };
       } catch(err) {
-        return { success: false, error: String(err) };
+        return { success: false, error: String((err && err.message) || err) };
       }
     }
   };
@@ -6252,7 +6102,7 @@ input[type="checkbox"] {
       <button id="fileStoreBtnMultiDelete" disabled onclick="fileStoreMultiDelete_()" style="padding:6px 12px; font-size:13px; font-weight:600; border-radius:4px; border:1px solid #ef4444; background:#fff; color:#dc2626; cursor:pointer; display:inline-flex; align-items:center; gap:4px; opacity:0.4; transition:all 0.2s;">
         <span>🗑</span> 선택 삭제
       </button>
-      <input type="file" id="fileStoreInput" accept=".txt,.html,.htm,.gs,.js,.json,.xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,*.*" multiple style="display:none;" onchange="fileStoreFileSelected_(event)">
+      <input type="file" id="fileStoreInput" multiple style="display:none;" onchange="fileStoreFileSelected_(event)">
     </div>
 
     <!-- 파일 목록 테이블 -->
@@ -17141,6 +16991,7 @@ function fileStoreFileSelected_(e){
   let validFiles = [];
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    if (file.size > 30 * 1024 * 1024) { alert('[' + file.name + '] 파일이 너무 큽니다. (최대 30MB)'); continue; }
     const existing = FILE_STORE_CACHED_FILES.find(function(it){ return it.name === file.name; });
     if (existing) {
       const replace = confirm('동일한 이름의 파일 [' + file.name + '] 이(가) 이미 존재합니다.\n기존 파일을 덮어쓰시겠습니까?');
@@ -20705,6 +20556,6 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261028c"></script>
-<script src="portal-extras.js?v=20261028g"></script>
+<script src="portal-extras.js?v=20261029a"></script>
 </body>
 </html>
