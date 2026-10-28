@@ -93,7 +93,7 @@
     var out = [];
     String(st || '').split(';').forEach(function (d) {
       var i = d.indexOf(':'); if (i < 0) return;
-      var k = d.slice(0, i).trim().toLowerCase(), v = d.slice(i + 1).trim();
+      var k = d.slice(0, i).trim().toLowerCase(), v = d.slice(i + 1).trim().replace(/\s*!important\s*$/i, '');
       if (STYLE_OK[k] && STYLE_OK[k](v)) out.push(k + ':' + v);
     });
     return out.join(';');
@@ -131,6 +131,14 @@
       while (c.attributes.length) c.removeAttribute(c.attributes[0].name);
       Object.keys(keep).forEach(function (k) { c.setAttribute(k, keep[k]); });
       if (t !== 'IMG') cleanNode(c);
+    });
+  }
+  /* 포털 전체에 `* {font-family ... !important}` 가 걸려 있어 글꼴이 무시되므로, 지정 글꼴을 인라인 !important 로 다시 지정 */
+  function applyFonts(root) {
+    if (!root || !root.querySelectorAll) return;
+    Array.prototype.forEach.call(root.querySelectorAll('[style*="font-family"]'), function (e) {
+      var v = e.style.getPropertyValue('font-family');
+      if (v && e.style.getPropertyPriority('font-family') !== 'important') e.style.setProperty('font-family', v, 'important');
     });
   }
   function sanitize(html) {
@@ -178,11 +186,12 @@
       '.px-b.sm{padding:3px 9px;font-size:12px;}',
       '.px-in{width:100%;border:1px solid #c3ccd8;border-radius:7px;padding:8px 10px;font-size:14px;font-family:inherit;}',
       '.px-tbl{width:100%;border-collapse:collapse;font-size:14px;}',
-      '.px-tbl th{background:#eef1f5;border-bottom:2px solid #cfd6df;padding:8px;text-align:center;font-size:13px;}',
-      '.px-tbl td{border-bottom:1px solid #e3e8ee;padding:8px;text-align:center;}',
-      '.px-tbl td.l{text-align:left;}',
+      '.px-tbl thead th{background:#eef1f5 !important;color:#1f2937 !important;border:0;border-bottom:2px solid #cfd6df;padding:9px 8px;text-align:center;font-size:13.5px;font-weight:700;}',
+      '.px-tbl thead th.l{text-align:left !important;padding-left:14px;}',
+      '.px-tbl tbody td{border:0;border-bottom:1px solid #e3e8ee;padding:10px 8px;text-align:center;color:#1f2937;background:transparent;font-size:14px;}',
+      '.px-tbl tbody td.l{text-align:left !important;padding-left:14px;font-size:15px;font-weight:600;}',
       '.px-tbl tbody tr.cl{cursor:pointer;}',
-      '.px-tbl tbody tr.cl:hover{background:#f3f7fc;}',
+      '.px-tbl tbody tr.cl:hover td{background:#f3f7fc;}',
       '.px-cnt{color:#c2410c;font-weight:700;margin-left:5px;font-size:12px;}',
       '.px-meta{color:#6b7280;font-size:13px;margin:4px 0 14px;}',
       '.px-content{border-top:1px solid #dfe5ec;border-bottom:1px solid #dfe5ec;padding:14px 4px;min-height:80px;line-height:1.6;font-size:14px;word-break:break-word;overflow-wrap:anywhere;}',
@@ -200,7 +209,7 @@
       '.px-tb .g:last-child{border-right:0;}',
       '.px-tb button{min-width:30px;height:28px;border:0;background:none;border-radius:5px;cursor:pointer;color:#1f2937;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-family:inherit;}',
       '.px-tb button:hover{background:#dfe6ef;}',
-      '.px-tb select{height:28px;border:1px solid #d5dbe3;background:#fff;border-radius:5px;font-size:13px;font-family:inherit;max-width:110px;}',
+      '.px-tb select{height:28px;border:1px solid #d5dbe3;background:#fff;border-radius:5px;font-size:13px;font-family:inherit;max-width:140px;}',
       '.px-tb .clr{position:relative;}',
       '.px-tb .clr i{position:absolute;left:7px;right:7px;bottom:3px;height:3px;background:#000;}',
       '.px-tb .clr input{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}',
@@ -369,6 +378,21 @@
     img: svgIc('<rect x="2" y="3" width="12" height="10" rx="1.2"/><circle cx="5.6" cy="6.4" r="1.1"/><path d="M2.5 12l3.6-3.4 2.6 2.4 2-1.6 3.3 2.8"/>')
   };
 
+  var localFonts = null;
+  try { localFonts = JSON.parse(localStorage.getItem('px_local_fonts_v1') || 'null'); } catch (e) { localFonts = null; }
+  function canLocalFonts() { return typeof window.queryLocalFonts === 'function'; }
+  function fontList() { return FONTS.concat((localFonts || []).filter(function (f) { return FONTS.indexOf(f) < 0; })); }
+  function loadLocalFonts() {
+    if (!canLocalFonts()) return Promise.reject(new Error('이 브라우저는 PC 글꼴 목록 접근을 지원하지 않습니다.'));
+    return window.queryLocalFonts().then(function (arr) {
+      var set = {};
+      arr.forEach(function (f) { if (f.family) set[f.family] = 1; });
+      localFonts = Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+      try { localStorage.setItem('px_local_fonts_v1', JSON.stringify(localFonts)); } catch (e) { /* noop */ }
+      return localFonts.length;
+    });
+  }
+
   function makeEditor(initialHtml) {
     var wrap = h('div', 'px-edwrap'); wrap.style.position = 'relative';
     var tbs = h('div', 'px-tbs');
@@ -378,7 +402,8 @@
     var ed = h('div', 'px-ed');
     ed.contentEditable = 'true';
     ed.setAttribute('data-ph', '내용을 입력하세요. 그림은 [그림] 버튼, 붙여넣기(Ctrl+V), 끌어놓기로 넣을 수 있습니다.');
-    ed.innerHTML = sanitize(initialHtml || '');
+    ed.innerHTML = sanitize(initialHtml || ''); applyFonts(ed);
+    ed.setAttribute('lang', 'ko');
     var fi = h('input'); fi.type = 'file'; fi.accept = 'image/*'; fi.multiple = true; fi.style.display = 'none';
     var range = null, selImg = null;
 
@@ -401,6 +426,7 @@
       restore();
       try { document.execCommand('styleWithCSS', false, !noCss); } catch (e) { /* noop */ }
       try { document.execCommand(cmd, false, val == null ? null : val); } catch (e) { /* noop */ }
+      applyFonts(ed);
       onSel();
     }
 
@@ -429,7 +455,27 @@
       g.appendChild(b);
     }
     var g1 = group();
-    dd(g1, '글꼴', '글꼴', FONTS.map(function (f) { return [f, f]; }), function (v) { exec('fontName', v); });
+    var fsel = h('select'); fsel.title = '글꼴 (내 PC에 설치된 글꼴 사용 가능)'; g1.appendChild(fsel);
+    function fillFonts() {
+      fsel.innerHTML = '<option value="">글꼴</option>';
+      if (canLocalFonts() && !localFonts) fsel.innerHTML += '<option value="__local__">💻 내 PC 글꼴 불러오기…</option>';
+      fontList().forEach(function (f) {
+        var o = document.createElement('option'); o.value = f; o.textContent = f;
+        o.style.setProperty('font-family', '"' + f.replace(/"/g, '') + '", sans-serif', 'important');
+        fsel.appendChild(o);
+      });
+    }
+    fillFonts();
+    fsel.addEventListener('change', function () {
+      var v = fsel.value; fsel.selectedIndex = 0;
+      if (!v) return;
+      if (v === '__local__') {
+        loadLocalFonts().then(function (n) { fillFonts(); alert('내 PC에 설치된 글꼴 ' + n + '개를 불러왔습니다. 글꼴 목록에서 선택하세요.'); })
+          .catch(function (e) { alert('글꼴을 불러오지 못했습니다.\n(브라우저의 글꼴 접근 권한을 허용해야 하며, Chrome/Edge 에서만 지원됩니다)\n' + ((e && e.message) || '')); });
+        return;
+      }
+      exec('fontName', v);
+    });
     dd(g1, '글자 크기', '크기', SIZES.map(function (n) { return [n, n + 'px']; }), function (v) {
       exec('fontSize', '7', true);                                      // font size=7 → px 지정 span 으로 치환
       Array.prototype.forEach.call(ed.querySelectorAll('font[size="7"]'), function (f) {
@@ -577,7 +623,7 @@
       if (selImg && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); removeSelImg(); return; }
       if (selImg && e.key.length === 1 && !e.ctrlKey && !e.metaKey) { selImg = null; placeOv(); }
     });
-    ed.addEventListener('input', placeOv);
+    ed.addEventListener('input', function () { applyFonts(ed); placeOv(); });
     window.addEventListener('resize', placeOv);
 
     /* ---- 그림 넣기: 파일 / 붙여넣기 / 끌어놓기 */
@@ -655,7 +701,7 @@
         }).join('') || '<tr><td colspan="4" style="padding:30px;color:#6b7280">게시물이 없습니다.</td></tr>';
         body.innerHTML = '<div class="px-bar"><input class="px-in" id="pxBq" placeholder="제목/작성자 검색" style="max-width:260px" value="' + esc(query) + '">' +
           '<button class="px-b" id="pxBs" type="button">검색</button><span class="sp"></span><button class="px-b pri" id="pxBw" type="button">✎ 글쓰기</button></div>' +
-          '<table class="px-tbl"><thead><tr><th>번호</th><th>제목</th><th>작성자</th><th>작성일</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+          '<table class="px-tbl"><thead><tr><th>번호</th><th class="l">제목</th><th>작성자</th><th>작성일</th></tr></thead><tbody>' + rows + '</tbody></table>' +
           '<div class="px-bar" style="justify-content:center;margin:12px 0 0"><button class="px-b sm" id="pxBp" type="button"' + (page <= 0 ? ' disabled' : '') + '>◀</button>' +
           '<span style="font-size:13px">' + (page + 1) + ' / ' + pages + '</span><button class="px-b sm" id="pxBn" type="button"' + (page >= pages - 1 ? ' disabled' : '') + '>▶</button></div>';
         var qi = body.querySelector('#pxBq');
@@ -694,7 +740,7 @@
           '<textarea class="px-in" id="pxCt" rows="3" maxlength="2000" placeholder="댓글을 입력하세요"></textarea>' +
           '<div style="text-align:right;margin-top:6px"><button class="px-b pri" id="pxCa" type="button">댓글 등록</button></div></div>';
         var ct = body.querySelector('.px-content');
-        ct.innerHTML = sanitize(p.body_html);
+        ct.innerHTML = sanitize(p.body_html); applyFonts(ct);
         bindZoom(ct);
         var cl = body.querySelector('#pxCl');
         cs.forEach(function (c) {
@@ -786,7 +832,7 @@
   }
   function fillNoticeCards(root, list) {
     var cs = root.querySelectorAll('.px-content');
-    list.forEach(function (n, i) { cs[i].innerHTML = sanitize(n.body_html); bindZoom(cs[i]); });
+    list.forEach(function (n, i) { cs[i].innerHTML = sanitize(n.body_html); applyFonts(cs[i]); });
   }
   /* auto=true : 일보를 열 때 자동 팝업(오늘 다시 보지않기 지원) */
   function showNoticePopup(list, auto) {
@@ -1157,6 +1203,61 @@
     document.addEventListener('keydown', escKey, true);
   };
 
+  /* ------------------------------------------------------------ 입력창 한글 우선 (계약번호 입력창만 영문 우선) */
+  var CHO = 'rRseEfaqQtTdwWczxvg', JUNG = ['k', 'o', 'i', 'O', 'j', 'p', 'u', 'P', 'h', 'hk', 'ho', 'hl', 'y', 'n', 'nj', 'np', 'nl', 'b', 'm', 'ml', 'l'];
+  var JONG = ['', 'r', 'R', 'rt', 's', 'sw', 'sg', 'e', 'f', 'fr', 'fa', 'fq', 'ft', 'fx', 'fv', 'fg', 'a', 'q', 'qt', 't', 'T', 'd', 'w', 'c', 'z', 'x', 'v', 'g'];
+  var COMPAT = { 'ㄱ': 'r', 'ㄲ': 'R', 'ㄴ': 's', 'ㄷ': 'e', 'ㄸ': 'E', 'ㄹ': 'f', 'ㅁ': 'a', 'ㅂ': 'q', 'ㅃ': 'Q', 'ㅅ': 't', 'ㅆ': 'T', 'ㅇ': 'd', 'ㅈ': 'w', 'ㅉ': 'W', 'ㅊ': 'c', 'ㅋ': 'z', 'ㅌ': 'x', 'ㅍ': 'v', 'ㅎ': 'g',
+    'ㅏ': 'k', 'ㅐ': 'o', 'ㅑ': 'i', 'ㅒ': 'O', 'ㅓ': 'j', 'ㅔ': 'p', 'ㅕ': 'u', 'ㅖ': 'P', 'ㅗ': 'h', 'ㅛ': 'y', 'ㅜ': 'n', 'ㅠ': 'b', 'ㅡ': 'm', 'ㅣ': 'l' };
+  function hangulToKeys(str) {                         // 한글 두벌식 자판 → 영문 키 (예: 'ㅜ123' → 'N123')
+    return String(str).replace(/[ㄱ-ㆎ가-힣]/g, function (ch) {
+      var c = ch.charCodeAt(0), r;
+      if (c >= 0xAC00) { var n = c - 0xAC00; r = CHO[Math.floor(n / 588)] + JUNG[Math.floor((n % 588) / 28)] + JONG[n % 28]; }
+      else r = COMPAT[ch] || '';
+      return r.toUpperCase();
+    });
+  }
+  function isContractField(el) {
+    var id = String(el.id || '') + ' ' + String(el.name || '');
+    if (/SearchBox/i.test(id)) return false;                                // 검색창은 한글 우선
+    if (/계약번호|contract/i.test(id)) return true;
+    var lab = el.previousElementSibling;
+    if (!lab && el.parentNode) lab = el.parentNode.querySelector('label');
+    return !!(lab && lab.tagName === 'LABEL' && /^\s*계약번호\s*:?\s*$/.test(lab.textContent || ''));
+  }
+  function fixContractValue(e) {
+    var el = e.target;
+    setTimeout(function () {
+      if (!el.value || !/[ㄱ-ㆎ가-힣]/.test(el.value)) return;
+      el.value = hangulToKeys(el.value);
+      try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (x) { /* noop */ }
+    }, 0);
+  }
+  function prepInput(el) {
+    if (el.__pxIme) return;
+    el.__pxIme = 1;
+    if (el.tagName === 'INPUT') {
+      var t = String(el.getAttribute('type') || 'text').toLowerCase();
+      if (t !== 'text' && t !== 'search') return;
+    }
+    if (isContractField(el)) {
+      el.setAttribute('lang', 'en');
+      el.style.setProperty('ime-mode', 'disabled');
+      el.addEventListener('compositionend', fixContractValue);
+      el.addEventListener('change', fixContractValue);
+    } else {
+      el.setAttribute('lang', 'ko');
+      el.style.setProperty('ime-mode', 'active');
+    }
+  }
+  function scanInputs() {
+    try { Array.prototype.forEach.call(document.querySelectorAll('input,textarea'), prepInput); } catch (e) { /* noop */ }
+  }
+  var scanTimer = null;
+  try {
+    new MutationObserver(function () { clearTimeout(scanTimer); scanTimer = setTimeout(scanInputs, 150); }).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) { /* noop */ }
+  setTimeout(scanInputs, 200);
+
   /* ------------------------------------------------------------ 로그인 감지: 공지 팝업 · 메모 표시 */
   var lastUser = '';
   function tick() {
@@ -1175,5 +1276,5 @@
   }
   setInterval(tick, 1200);
   setTimeout(tick, 300);
-  window.__px = { sanitize: sanitize, checkNotices: checkNotices, loadMemos: loadMemos, newMemo: newMemo, isMaster: isMaster, tick: tick };
+  window.__px = { hangulToKeys: hangulToKeys, isContractField: isContractField, scanInputs: scanInputs, sanitize: sanitize, checkNotices: checkNotices, loadMemos: loadMemos, newMemo: newMemo, isMaster: isMaster, tick: tick };
 })();
