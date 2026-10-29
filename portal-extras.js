@@ -1501,6 +1501,99 @@
   } catch (e) { /* noop */ }
   setTimeout(scanInputs, 200);
 
+  /* ------------------------------------------------------------ 종합대시보드 항목 이미지 캡처 (팝업 + 복사) */
+  var CAP_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg>';
+  function loadH2C(cb) {
+    if (window.html2canvas) { cb(true); return; }
+    var n = 0;
+    if (!document.getElementById('pxH2cScript')) {
+      var s = document.createElement('script'); s.id = 'pxH2cScript';
+      s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+      document.head.appendChild(s);
+    }
+    var iv = setInterval(function () { n++; if (window.html2canvas) { clearInterval(iv); cb(true); } else if (n > 60) { clearInterval(iv); cb(false); } }, 150);
+  }
+  function capTitle(el) {
+    var t = el.getAttribute('data-cap-title');
+    if (t) return t;
+    var sp = el.querySelector('span');
+    return ((sp && sp.textContent) || '대시보드').replace(/\s+/g, ' ').trim();
+  }
+  function capRun(el) {
+    var title = capTitle(el);
+    loadH2C(function (ok) {
+      if (!ok) { alert('이미지 라이브러리를 불러오지 못했습니다. 네트워크를 확인해 주세요.'); return; }
+      window.html2canvas(el, {
+        backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false,
+        onclone: function (doc) { var a = doc.querySelectorAll('.pxcap-btn'); for (var i = 0; i < a.length; i++) a[i].style.display = 'none'; }
+      }).then(function (cv) { capShow(cv, title); }).catch(function (e) { alert('이미지 생성 실패: ' + (e && e.message || e)); });
+    });
+  }
+  function capShow(cv, title) {
+    var url = cv.toDataURL('image/png');
+    var m = modal({ title: '🖼 ' + title + ' - 이미지', w: Math.min(980, Math.max(520, Math.round(cv.width / 2) + 60)) });
+    m.body.innerHTML = '<div style="max-height:62vh;overflow:auto;border:1px solid #e2e6ea;background:#f7f8fa;padding:8px;text-align:center;"><img alt="" style="max-width:100%;display:block;margin:0 auto;background:#fff;"></div>' +
+      '<div class="pxcap-msg" style="font-size:12px;color:#475569;margin:8px 0 0;min-height:16px;">[이미지 복사] 후 메일 본문에 Ctrl+V 로 붙여넣으세요.</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;"><button type="button" data-a="close">닫기</button><button type="button" data-a="save">PNG 저장</button><button type="button" data-a="copy" style="background:#2563eb;color:#fff;border:1px solid #1d4ed8;border-radius:4px;padding:6px 14px;font-weight:700;cursor:pointer;">이미지 복사</button></div>';
+    m.body.querySelector('img').src = url;
+    var msg = m.body.querySelector('.pxcap-msg');
+    function say(t, bad) { msg.textContent = t; msg.style.color = bad ? '#dc2626' : '#15803d'; }
+    m.body.querySelector('[data-a=close]').onclick = function () { m.close(); };
+    m.body.querySelector('[data-a=save]').onclick = function () {
+      var a = document.createElement('a'); a.href = url;
+      a.download = title.replace(/[\\\/:*?"<>|\s]+/g, '_') + '.png'; document.body.appendChild(a); a.click(); a.remove();
+    };
+    m.body.querySelector('[data-a=copy]').onclick = function () {
+      cv.toBlob(function (blob) {
+        if (!blob) { say('이미지 변환 실패', true); return; }
+        try {
+          if (!navigator.clipboard || !window.ClipboardItem) throw new Error('unsupported');
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(function () { say('✔ 클립보드에 복사되었습니다. 메일에 Ctrl+V 로 붙여넣으세요.'); }, function () { say('복사 권한이 없습니다. 이미지를 우클릭하여 "이미지 복사"를 사용하세요.', true); });
+        } catch (e) { say('이 브라우저는 자동 복사를 지원하지 않습니다. 이미지를 우클릭 → "이미지 복사"를 사용하세요.', true); }
+      }, 'image/png');
+    };
+  }
+  function capMkBtn(target) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'pxcap-btn'; b.title = '이미지로 캡처 (복사/저장)'; b.setAttribute('aria-label', '이미지 캡처');
+    b.innerHTML = CAP_ICON;
+    b.style.cssText = 'margin-left:auto;flex:none;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:1px solid #cbd5e1;border-radius:4px;background:#fff;color:#475569;cursor:pointer;';
+    b.onmouseenter = function () { b.style.background = '#eff6ff'; b.style.color = '#1d4ed8'; };
+    b.onmouseleave = function () { b.style.background = '#fff'; b.style.color = '#475569'; };
+    b.addEventListener('click', function (e) { e.stopPropagation(); e.preventDefault(); capRun(target); });
+    return b;
+  }
+  function capScan() {
+    var dv = document.querySelector('#content .dashboard-view');
+    if (!dv) return;
+    var all = dv.querySelectorAll('div'), i, el, st;
+    for (i = 0; i < all.length; i++) {
+      el = all[i];
+      if (el.getAttribute('data-pxcap')) continue;
+      st = el.getAttribute('style') || '';
+      var hd = el.firstElementChild;
+      /* (a) 1번 섹션 헤더: 부모 전체(제목+4개 카드)를 캡처 */
+      if (/font-size:14px/.test(st) && /font-weight:800/.test(st) && /display:flex/.test(st) && /^\s*🎯\s*1\./.test(el.textContent) && el.parentElement && el.parentElement !== dv) {
+        el.setAttribute('data-pxcap', '1');
+        var sec = el.parentElement;
+        sec.setAttribute('data-cap-title', '1. 북서울지사 영업 현황' + (el.textContent.indexOf('-') > -1 ? ' ' + el.textContent.split(/\s-\s| - /).slice(1).join(' ').replace(/\s+/g, ' ').trim() : ''));
+        el.appendChild(capMkBtn(sec));
+        continue;
+      }
+      /* (b) 개별 카드 */
+      if (/background:\s*#fff/i.test(st) && /border:\s*1px solid #cbd5e1/.test(st) && /border-radius:\s*8px/.test(st) && hd && /display:\s*flex/.test(hd.getAttribute('style') || '')) {
+        el.setAttribute('data-pxcap', '1');
+        hd.appendChild(capMkBtn(el));
+      }
+    }
+  }
+  try {
+    var capTimer = null;
+    new MutationObserver(function () { clearTimeout(capTimer); capTimer = setTimeout(capScan, 200); }).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) { /* noop */ }
+  setTimeout(capScan, 500);
+  window.__pxCap = { scan: capScan };
+
   /* ------------------------------------------------------------ 로그인 감지: 공지 팝업 · 메모 표시 */
   var lastUser = '';
   function tick() {
