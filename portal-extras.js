@@ -1402,7 +1402,9 @@
   /* ------------------------------------------------------------ 부가기능 메뉴 */
   var ICON = '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style="display:block;"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>';
   window.extrasTabHtml_ = function (autoRight) {
-    return '<div class="tab" id="extrasTopBtn" title="부가기능" aria-label="부가기능" role="button" onclick="openExtrasMenu_(event)" style="padding:8px 12px;' +
+    var act = false;
+    try { act = (typeof currentTab !== 'undefined') && (currentTab === 'settings' || currentTab === 'users'); } catch (e) { act = false; }
+    return '<div class="tab' + (act ? ' active' : '') + '" id="extrasTopBtn" title="부가기능" aria-label="부가기능" role="button" onclick="openExtrasMenu_(event)" style="padding:8px 12px;' +
       (autoRight ? ' margin-left:auto !important;' : '') + '">' + ICON + '</div>';
   };
   function closeMenu() {
@@ -1428,8 +1430,10 @@
     items.push(['🧮', '계산기', function () {
       if (window.openCalculator_) window.openCalculator_(); else alert('calculator.js 파일이 함께 배포되지 않았습니다.');
     }]);
+    if (typeof window.extrasMoreItems_ === 'function') { try { window.extrasMoreItems_().forEach(function (x) { items.push(x); }); } catch (e) { /* noop */ } }
     var menu = h('div'); menu.id = 'pxMenu';
     items.forEach(function (it) {
+      if (it === '-') { var hr = h('div'); hr.style.cssText = 'height:1px;background:#e3e8ef;margin:5px 4px;'; menu.appendChild(hr); return; }
       var b = h('button', '', '<span class="ic">' + it[0] + '</span>' + it[1]); b.type = 'button';
       b.addEventListener('click', function () { closeMenu(); it[2](); });
       menu.appendChild(b);
