@@ -1525,7 +1525,8 @@
       if (!ok) { alert('이미지 라이브러리를 불러오지 못했습니다. 네트워크를 확인해 주세요.'); return; }
       window.html2canvas(el, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false,
-        onclone: function (doc) { var a = doc.querySelectorAll('.pxcap-btn'); for (var i = 0; i < a.length; i++) a[i].style.display = 'none'; }
+        onclone: function (doc) { var a = doc.querySelectorAll('.pxcap-btn'), i; for (i = 0; i < a.length; i++) a[i].style.display = 'none';
+          var g = doc.querySelectorAll('[data-cap-title] > div:nth-child(2)'); for (i = 0; i < g.length; i++) { if (g[i].parentNode.getAttribute('data-cap-title').indexOf('1.') === 0) { g[i].style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))'; g[i].parentNode.style.width = '860px'; } } }
       }).then(function (cv) { capShow(cv, title); }).catch(function (e) { alert('이미지 생성 실패: ' + (e && e.message || e)); });
     });
   }
