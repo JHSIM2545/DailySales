@@ -6237,7 +6237,14 @@ input[type="checkbox"] {
 #fileStoreModalOverlay .fs-head div:hover{ background:#d9ebf9; }
 #fileStoreModalOverlay .fs-head .sa{ position:absolute; top:1px; left:50%; width:10px; height:6px; margin-left:-5px; padding:0; border:0; pointer-events:none; }
 #fileStoreModalOverlay .fs-content{ flex:1; overflow:auto; position:relative; outline:none; user-select:none; }
-#fileStoreModalOverlay .c-name{ flex:1; min-width:200px; } #fileStoreModalOverlay .c-date{ width:180px; flex:none; } #fileStoreModalOverlay .c-type{ width:150px; flex:none; } #fileStoreModalOverlay .c-size{ width:100px; flex:none; text-align:right; justify-content:flex-end; }
+#fileStoreModalOverlay .c-name{ width:var(--fsw-name,320px); flex:none; } #fileStoreModalOverlay .c-date{ width:var(--fsw-date,170px); flex:none; } #fileStoreModalOverlay .c-type{ width:var(--fsw-type,150px); flex:none; } #fileStoreModalOverlay .c-size{ width:var(--fsw-size,100px); flex:none; text-align:right; justify-content:flex-end; }
+#fileStoreModalOverlay .fs-head{ overflow:hidden; }
+#fileStoreModalOverlay .fs-head .fs-ch{ position:absolute; right:-4px; top:0; bottom:0; width:9px; cursor:col-resize; z-index:2; display:block; }
+#fileStoreModalOverlay .fs-win, #fileStoreModalOverlay .fs-win *{ -webkit-user-select:none; user-select:none; }
+#fileStoreModalOverlay .fs-win input.fs-ren, #fileStoreModalOverlay .fs-win input.fs-search{ -webkit-user-select:text; user-select:text; }
+#fileStoreModalOverlay{ overscroll-behavior:contain; }
+#fileStoreModalOverlay .fs-content{ overscroll-behavior:contain; }
+#fileStoreModalOverlay .fs-win{ cursor:default; }
 #fileStoreModalOverlay .fs-row{ display:flex; align-items:center; height:22px; border:1px solid transparent; margin:0; }
 #fileStoreModalOverlay .fs-row > div{ padding:0 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; box-sizing:border-box; }
 #fileStoreModalOverlay .fs-row .c-name{ display:flex; align-items:center; gap:7px; padding-left:10px; }
@@ -17103,7 +17110,7 @@ function openFileStoreModal_(){
   const overlay = document.getElementById('fileStoreModalOverlay');
   if (!overlay) return;
   overlay.classList.add('open');
-  fsWinInit_(); fsAutoStart_();
+  fsWinInit_(); fsAutoStart_(); fsLockBody_(); fsApplyCols_();
   document.getElementById('fsTitleIcon').innerHTML = fsIcon_({type:'folder'}, 18);
   FS_.cwd = ''; FS_.hist = ['']; FS_.hi = 0; FS_.query = ''; FS_.sel = new Set(); FS_.renaming = null;
   const s = document.getElementById('fsSearch'); if (s) s.value = '';
@@ -17113,7 +17120,7 @@ function openFileStoreModal_(){
   setTimeout(function(){ const c = document.getElementById('fsContent'); if (c) c.focus(); }, 50);
 }
 function closeFileStoreModal_(){
-  fsCloseCtx_(); fsAutoStop_();
+  fsCloseCtx_(); fsAutoStop_(); fsUnlockBody_();
   const overlay = document.getElementById('fileStoreModalOverlay');
   if (overlay) overlay.classList.remove('open');
 }
@@ -17156,7 +17163,7 @@ function fsRender_(){
         '<div class="c-name">' + fsIcon_(it, 16) + nameHtml(it) + '</div><div class="c-date">' + escHtml(fsFmtDate_(it.createdDate || it.date)) + '</div>' +
         '<div class="c-type">' + escHtml(fsTypeName_(it)) + '</div><div class="c-size">' + escHtml(fsFmtSize_(it)) + '</div></div>';
     }).join('');
-    box.innerHTML = '<div style="padding:2px 0;min-height:100%">' + html + '</div>';
+    box.innerHTML = '<div id="fsRowsWrap" style="padding:2px 0;min-height:100%;min-width:' + fsColTotal_() + 'px">' + html + '</div>';
   } else {
     html = list.map(function(it){
       return '<div class="' + cls(it) + '" draggable="true" data-id="' + escHtml(it.id) + '" data-type="' + (it.type === 'folder' ? 'folder' : 'file') + '">' +
@@ -17185,8 +17192,10 @@ function fsRenderHead_(){
     if (FS_.sortKey !== k) return '';
     return '<svg class="sa" viewBox="0 0 10 6"><path d="' + (FS_.asc ? 'M1 5l4-4 4 4' : 'M1 1l4 4 4-4') + '" fill="none" stroke="#6b7a8c" stroke-width="1.2"/></svg>';
   };
-  h.innerHTML = '<div class="c-name" data-k="name">이름' + arrow('name') + '</div><div class="c-date" data-k="date">수정한 날짜' + arrow('date') +
-    '</div><div class="c-type" data-k="type">유형' + arrow('type') + '</div><div class="c-size" data-k="size">크기' + arrow('size') + '</div>';
+  const ch = function(c){ return '<i class="fs-ch" data-c="' + c + '"></i>'; };
+  h.innerHTML = '<div class="c-name" data-k="name">이름' + arrow('name') + ch('name') + '</div><div class="c-date" data-k="date">수정한 날짜' + arrow('date') + ch('date') +
+    '</div><div class="c-type" data-k="type">유형' + arrow('type') + ch('type') + '</div><div class="c-size" data-k="size">크기' + arrow('size') + ch('size') + '</div>';
+  h.scrollLeft = document.getElementById('fsContent').scrollLeft;
 }
 function fsUserName_(){
   let n = '';
@@ -17538,9 +17547,84 @@ function fsAutoTick_(){
   }).catch(function(){}).then(function(){ FS_.polling = false; });
 }
 
+
+/* ---------- 컬럼 너비 조절 ---------- */
+let FS_COLS_ = { name: 320, date: 170, type: 150, size: 100 };
+try { const sv = JSON.parse(localStorage.getItem('fs_cols_v1') || 'null'); if (sv) ['name','date','type','size'].forEach(function(k){ if (sv[k] >= 50) FS_COLS_[k] = sv[k]; }); } catch (e) {}
+function fsColTotal_(){ return FS_COLS_.name + FS_COLS_.date + FS_COLS_.type + FS_COLS_.size; }
+function fsApplyCols_(){
+  const m = document.getElementById('fsMain'); if (!m) return;
+  ['name','date','type','size'].forEach(function(k){ m.style.setProperty('--fsw-' + k, FS_COLS_[k] + 'px'); });
+  const w = document.getElementById('fsRowsWrap'); if (w) w.style.minWidth = fsColTotal_() + 'px';
+}
+function fsColBind_(){
+  const head = document.getElementById('fsHead'), box = document.getElementById('fsContent');
+  box.addEventListener('scroll', function(){ head.scrollLeft = box.scrollLeft; });
+  head.addEventListener('mousedown', function(e){
+    const hd = e.target.closest('.fs-ch'); if (!hd || e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const k = hd.getAttribute('data-c'), sx = e.clientX, w0 = FS_COLS_[k];
+    const move = function(ev){ FS_COLS_[k] = Math.max(60, Math.min(900, w0 + ev.clientX - sx)); fsApplyCols_(); };
+    const up = function(){
+      document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+      FS_.noSortUntil = Date.now() + 250;
+      try { localStorage.setItem('fs_cols_v1', JSON.stringify(FS_COLS_)); } catch (x) {}
+    };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  });
+  head.addEventListener('dblclick', function(e){        // 경계선 더블클릭: 내용에 맞게 자동 너비
+    const hd = e.target.closest('.fs-ch'); if (!hd) return;
+    const k = hd.getAttribute('data-c');
+    const cells = document.querySelectorAll('#fsContent .fs-row .c-' + k);
+    let mx = 60; cells.forEach(function(c){ mx = Math.max(mx, c.scrollWidth + 24); });
+    FS_COLS_[k] = Math.min(900, mx); fsApplyCols_();
+    try { localStorage.setItem('fs_cols_v1', JSON.stringify(FS_COLS_)); } catch (x) {}
+  });
+}
+
+/* ---------- 팝업이 열려 있는 동안 포커스 고정 / 뒤 화면 스크롤 잠금 ---------- */
+let FS_LOCK_ = null;
+function fsLockBody_(){
+  if (FS_LOCK_) return;
+  FS_LOCK_ = { b: document.body.style.overflow, h: document.documentElement.style.overflow };
+  document.body.style.overflow = 'hidden'; document.documentElement.style.overflow = 'hidden';
+}
+function fsUnlockBody_(){
+  if (!FS_LOCK_) return;
+  document.body.style.overflow = FS_LOCK_.b; document.documentElement.style.overflow = FS_LOCK_.h; FS_LOCK_ = null;
+}
+function fsFocusBindOnce_(){
+  const ov = document.getElementById('fileStoreModalOverlay'), win = document.getElementById('fsWin');
+  // 팝업 바깥(어두운 영역)에서의 휠/터치 스크롤이 뒤 화면으로 전달되지 않게 차단
+  ov.addEventListener('wheel', function(e){
+    const sc = e.target.closest ? e.target.closest('.fs-content') : null;
+    if (!sc) { e.preventDefault(); return; }
+    const atTop = sc.scrollTop <= 0 && e.deltaY < 0, atBot = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1 && e.deltaY > 0;
+    if ((atTop || atBot) && Math.abs(e.deltaX) <= Math.abs(e.deltaY)) e.preventDefault();
+  }, { passive: false });
+  ov.addEventListener('touchmove', function(e){ if (!(e.target.closest && e.target.closest('.fs-content'))) e.preventDefault(); }, { passive: false });
+  // 바깥 클릭으로 포커스가 뒤 화면으로 빠지지 않게 함
+  ov.addEventListener('mousedown', function(e){ if (!win.contains(e.target)) { e.preventDefault(); } });
+  // 포커스가 팝업 밖으로 나가면 즉시 되돌림
+  document.addEventListener('focusin', function(e){
+    if (!fsIsOpen_()) return;
+    if (!ov.contains(e.target)) { const c = document.getElementById('fsContent'); if (c) c.focus({ preventScroll: true }); }
+  }, true);
+  // Tab 키가 뒤 화면으로 넘어가지 않게 팝업 안에서만 순환
+  document.addEventListener('keydown', function(e){
+    if (!fsIsOpen_() || e.key !== 'Tab') return;
+    const f = Array.prototype.filter.call(win.querySelectorAll('button:not(:disabled), input:not([type=file]), #fsContent'), function(x){ return x.offsetParent !== null; });
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault();
+    f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus({ preventScroll: true });
+  }, true);
+}
+
 let FS_BOUND_ = false;
 function fsBindOnce_(){
   if (FS_BOUND_) return; FS_BOUND_ = true;
+  fsColBind_(); fsFocusBindOnce_();
   fsWinBind_();
   const box = document.getElementById('fsContent');
   const main = document.getElementById('fsMain');
@@ -17548,6 +17632,7 @@ function fsBindOnce_(){
 
   // 헤더 정렬
   document.getElementById('fsHead').addEventListener('click', function(e){
+    if (e.target.closest('.fs-ch') || Date.now() < (FS_.noSortUntil || 0)) return;
     const d = e.target.closest('[data-k]'); if (!d) return;
     const k = d.getAttribute('data-k');
     if (FS_.sortKey === k) FS_.asc = !FS_.asc; else { FS_.sortKey = k; FS_.asc = true; }
