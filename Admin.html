@@ -6199,7 +6199,7 @@ input[type="checkbox"] {
 <style>
 #fileStoreModalOverlay .fs-win{ position:absolute; margin:0; }
 #fileStoreModalOverlay .fs-title{ cursor:move; user-select:none; }
-#fileStoreModalOverlay .fs-title button{ cursor:pointer; }
+#fileStoreModalOverlay .fs-title button{ cursor:default; }
 #fileStoreModalOverlay .fs-rz{ position:absolute; z-index:6; }
 #fileStoreModalOverlay .fs-rz[data-d=n]{ top:0; left:10px; right:10px; height:5px; cursor:n-resize; }
 #fileStoreModalOverlay .fs-rz[data-d=s]{ bottom:0; left:10px; right:10px; height:5px; cursor:s-resize; }
@@ -6210,10 +6210,14 @@ input[type="checkbox"] {
 #fileStoreModalOverlay .fs-rz[data-d=sw]{ bottom:0; left:0; width:10px; height:10px; cursor:sw-resize; }
 #fileStoreModalOverlay .fs-rz[data-d=se]{ bottom:0; right:0; width:14px; height:14px; cursor:se-resize; }
 #fileStoreModalOverlay .fs-win{ width:min(1000px,96vw); height:min(680px,92vh); max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; background:#fff; border-radius:6px; box-shadow:0 12px 40px rgba(0,0,0,.35); font-family:'Segoe UI','Malgun Gothic','맑은 고딕',sans-serif; font-size:12px; color:#000; }
-#fileStoreModalOverlay .fs-title{ display:flex; align-items:center; gap:8px; padding:6px 6px 6px 10px; background:#fff; border-bottom:1px solid #e5e5e5; flex:none; }
+#fileStoreModalOverlay .fs-title{ display:flex; align-items:center; gap:0; padding:0 0 0 10px; min-height:32px; background:#fff; border-bottom:1px solid #e5e5e5; flex:none; }
 #fileStoreModalOverlay .fs-title b{ font-weight:400; font-size:12px; flex:1; }
-#fileStoreModalOverlay .fs-x{ width:40px; height:26px; border:0; background:transparent; font-size:14px; cursor:pointer; }
-#fileStoreModalOverlay .fs-x:hover{ background:#e81123; color:#fff; }
+#fileStoreModalOverlay .fs-x{ width:46px; align-self:stretch; border:0; background:transparent; cursor:default; display:flex; align-items:center; justify-content:center; padding:0; color:#000; outline:none; }
+#fileStoreModalOverlay .fs-x svg{ display:block; pointer-events:none; }
+#fileStoreModalOverlay .fs-x:hover{ background:#e5e5e5; }
+#fileStoreModalOverlay .fs-x.fs-close:hover{ background:#e81123; color:#fff; }
+#fileStoreModalOverlay .fs-win.fsmax{ border-radius:0; }
+#fileStoreModalOverlay .fs-win.fsmax .fs-rz{ display:none; }
 #fileStoreModalOverlay .fs-cmd{ display:flex; align-items:center; gap:0; padding:4px 6px; border-bottom:1px solid #e5e5e5; background:#f5f6f7; flex:none; flex-wrap:wrap; }
 #fileStoreModalOverlay .fs-cmd button{ display:inline-flex; align-items:center; gap:5px; border:1px solid transparent; background:transparent; padding:3px 9px; font:inherit; cursor:pointer; color:#000; white-space:nowrap; }
 #fileStoreModalOverlay .fs-cmd button:hover:not(:disabled){ background:#e5f3ff; border-color:#cce8ff; }
@@ -6268,7 +6272,7 @@ input[type="checkbox"] {
 </style>
 <div class="modal-overlay" id="fileStoreModalOverlay">
   <div class="modal fs-win" id="fsWin" tabindex="-1">
-    <div class="fs-title"><span id="fsTitleIcon"></span><b>파일 저장소 <span style="color:#777">(내 파일만 표시됩니다)</span></b><button class="fs-x" onclick="closeFileStoreModal_()" title="닫기">✕</button></div>
+    <div class="fs-title"><span id="fsTitleIcon"></span><b>파일 저장소 <span style="color:#777">(내 파일만 표시됩니다)</span></b><button class="fs-x" id="fsMax" onclick="fsToggleMax_()" title="최대화" aria-label="최대화"></button><button class="fs-x fs-close" id="fsClose" onclick="closeFileStoreModal_()" title="닫기" aria-label="닫기"></button></div>
     <div class="fs-cmd">
       <button onclick="fsNewFolder_()">📁 새 폴더</button>
       <button onclick="fsUploadClick_()">⬆ 업로드</button>
@@ -17485,6 +17489,7 @@ function fsWinApply_(){
   w.style.left = FS_WIN_.x + 'px'; w.style.top = FS_WIN_.y + 'px'; w.style.width = FS_WIN_.w + 'px'; w.style.height = FS_WIN_.h + 'px';
 }
 function fsWinInit_(){
+  FS_.max = false; { const w0 = document.getElementById('fsWin'); if (w0) w0.classList.remove('fsmax'); } fsCapIcons_();
   let g = null;
   try { g = JSON.parse(localStorage.getItem('fs_win_v1') || 'null'); } catch (e) {}
   const vw = window.innerWidth, vh = window.innerHeight;
@@ -17498,6 +17503,7 @@ function fsWinBind_(){
   win.addEventListener('mousedown', function(e){
     if (e.button !== 0) return;
     const rz = e.target.closest('.fs-rz'), ti = e.target.closest('.fs-title');
+    if (FS_.max) return;
     if (!rz && !(ti && !e.target.closest('button'))) return;
     e.preventDefault();
     const dir = rz ? rz.getAttribute('data-d') : 'move';
@@ -17520,7 +17526,12 @@ function fsWinBind_(){
     };
     document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
   });
-  window.addEventListener('resize', function(){ if (fsIsOpen_() && FS_WIN_) { FS_WIN_ = fsWinClamp_(FS_WIN_); fsWinApply_(); } });
+  window.addEventListener('resize', function(){
+    if (!fsIsOpen_() || !FS_WIN_) return;
+    if (FS_.max) { FS_WIN_ = { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }; fsWinApply_(); return; }
+    FS_WIN_ = fsWinClamp_(FS_WIN_); fsWinApply_();
+  });
+  win.addEventListener('dblclick', function(e){ if (e.target.closest('.fs-title') && !e.target.closest('button')) fsToggleMax_(); });
 }
 
 /* ---------- 팝업이 열려 있는 동안 주기적 새로 고침 (변경이 있을 때만 다시 그림) ---------- */
@@ -17619,6 +17630,22 @@ function fsFocusBindOnce_(){
     e.preventDefault();
     f[(i + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus({ preventScroll: true });
   }, true);
+}
+
+
+/* ---------- 윈도우 캡션 버튼 (최대화 / 복원 / 닫기) ---------- */
+const FS_CAP_MAX_ = '<svg width="10" height="10" viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor"/></svg>';
+const FS_CAP_RST_ = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M2.5 2.5V.5h7v7h-2" fill="none" stroke="currentColor"/><rect x=".5" y="2.5" width="7" height="7" fill="none" stroke="currentColor"/></svg>';
+function fsCapIcons_(){
+  const b = document.getElementById('fsMax'); if (!b) return;
+  b.innerHTML = FS_.max ? FS_CAP_RST_ : FS_CAP_MAX_; b.title = FS_.max ? '이전 크기로 복원' : '최대화';
+  const c = document.getElementById('fsClose'); if (c && !c.firstChild) c.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M0 0L10 10M10 0L0 10" fill="none" stroke="currentColor"/></svg>';
+}
+function fsToggleMax_(){
+  const win = document.getElementById('fsWin');
+  if (!FS_.max) { FS_.prevWin = Object.assign({}, FS_WIN_); FS_.max = true; FS_WIN_ = { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }; }
+  else { FS_.max = false; FS_WIN_ = FS_.prevWin || FS_WIN_; }
+  win.classList.toggle('fsmax', FS_.max); fsWinApply_(); fsCapIcons_();
 }
 
 let FS_BOUND_ = false;
@@ -21244,6 +21271,6 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261028c"></script>
-<script src="portal-extras.js?v=20261029a"></script>
+<script src="portal-extras.js?v=20261029b"></script>
 </body>
 </html>
