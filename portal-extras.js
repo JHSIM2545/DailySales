@@ -1581,6 +1581,7 @@
         continue;
       }
       /* (b) 개별 카드 */
+      if (el.closest('[data-cap-title]')) { el.setAttribute('data-pxcap', '1'); continue; }
       if (/background:\s*#fff/i.test(st) && /border:\s*1px solid #cbd5e1/.test(st) && /border-radius:\s*8px/.test(st) && hd && /display:\s*flex/.test(hd.getAttribute('style') || '')) {
         el.setAttribute('data-pxcap', '1');
         hd.appendChild(capMkBtn(el));
