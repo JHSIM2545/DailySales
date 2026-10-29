@@ -1677,7 +1677,6 @@
     var dv = document.querySelector('#content .dashboard-view');
     if (!dv || dv === animLast || dv.getAttribute('data-pxanim')) return;
     dv.setAttribute('data-pxanim', '1'); animLast = dv;
-    try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* noop */ }
     requestAnimationFrame(function () { try { animGraphs(dv); animCount(dv); } catch (e) { /* noop */ } });
   }
   try {

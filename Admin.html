@@ -9139,7 +9139,7 @@ function renderDashboard(){
       rowToday: netTodayRow_ || null, rowEnd: lastRow_
     };
   } catch (e) { window.DASH_REPORT_CTX_ = null; console.warn('보고서 컨텍스트 생성 실패', e); }
-  document.getElementById('content').innerHTML = html;  
+  document.getElementById('content').innerHTML = html; try { if (window.__pxAnim) setTimeout(window.__pxAnim.scan, 0); } catch (e) {}  
 }
 
 
@@ -20984,6 +20984,6 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261028c"></script>
-<script src="portal-extras.js?v=20261030e"></script>
+<script src="portal-extras.js?v=20261030f"></script>
 </body>
 </html>
