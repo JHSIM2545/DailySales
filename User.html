@@ -15578,7 +15578,19 @@ document.addEventListener('mousedown', function(e) {
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261028c"></script>
 <style>
-#fileStoreModalOverlay .fs-win{ width:min(1000px,96vw); height:min(680px,92vh); max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; background:#fff; border-radius:6px; box-shadow:0 12px 40px rgba(0,0,0,.35); font-family:'Segoe UI','Malgun Gothic','맑은 고딕',sans-serif; font-size:12px; color:#000; position:relative; }
+#fileStoreModalOverlay .fs-win{ position:absolute; margin:0; }
+#fileStoreModalOverlay .fs-title{ cursor:move; user-select:none; }
+#fileStoreModalOverlay .fs-title button{ cursor:pointer; }
+#fileStoreModalOverlay .fs-rz{ position:absolute; z-index:6; }
+#fileStoreModalOverlay .fs-rz[data-d=n]{ top:0; left:10px; right:10px; height:5px; cursor:n-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=s]{ bottom:0; left:10px; right:10px; height:5px; cursor:s-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=e]{ right:0; top:10px; bottom:10px; width:5px; cursor:e-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=w]{ left:0; top:10px; bottom:10px; width:5px; cursor:w-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=nw]{ top:0; left:0; width:10px; height:10px; cursor:nw-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=ne]{ top:0; right:0; width:10px; height:10px; cursor:ne-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=sw]{ bottom:0; left:0; width:10px; height:10px; cursor:sw-resize; }
+#fileStoreModalOverlay .fs-rz[data-d=se]{ bottom:0; right:0; width:14px; height:14px; cursor:se-resize; }
+#fileStoreModalOverlay .fs-win{ width:min(1000px,96vw); height:min(680px,92vh); max-height:none; padding:0; overflow:hidden; display:flex; flex-direction:column; background:#fff; border-radius:6px; box-shadow:0 12px 40px rgba(0,0,0,.35); font-family:'Segoe UI','Malgun Gothic','맑은 고딕',sans-serif; font-size:12px; color:#000; }
 #fileStoreModalOverlay .fs-title{ display:flex; align-items:center; gap:8px; padding:6px 6px 6px 10px; background:#fff; border-bottom:1px solid #e5e5e5; flex:none; }
 #fileStoreModalOverlay .fs-title b{ font-weight:400; font-size:12px; flex:1; }
 #fileStoreModalOverlay .fs-x{ width:40px; height:26px; border:0; background:transparent; font-size:14px; cursor:pointer; }
@@ -15662,6 +15674,7 @@ document.addEventListener('mousedown', function(e) {
     </div>
     <div class="fs-status"><span id="fsStatL">0개 항목</span><span id="fsStatR"></span></div>
     <input type="file" id="fileStoreInput" multiple style="display:none;" onchange="fsFileSelected_(event)">
+    <div class="fs-rz" data-d="n"></div><div class="fs-rz" data-d="s"></div><div class="fs-rz" data-d="e"></div><div class="fs-rz" data-d="w"></div><div class="fs-rz" data-d="nw"></div><div class="fs-rz" data-d="ne"></div><div class="fs-rz" data-d="sw"></div><div class="fs-rz" data-d="se"></div>
   </div>
 </div>
 
@@ -15751,7 +15764,7 @@ function fsCall_(fn){ // google.script.run 래퍼 (Promise)
 function fsReload_(keepSel){
   return fsCall_('adminListStoredFiles').then(function(res){
     FS_.items = ((res && res.files) || []).filter(function(f){ return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html'; });
-    FILE_STORE_CACHED_FILES = FS_.items;
+    FILE_STORE_CACHED_FILES = FS_.items; FS_.sig = fsSig_(FS_.items);
     if (FS_.cwd && !fsGet_(FS_.cwd)) { FS_.cwd = ''; }
     if (!keepSel) FS_.sel = new Set(); else FS_.sel.forEach(function(id){ if (!fsGet_(id)) FS_.sel.delete(id); });
     fsRender_();
@@ -15767,6 +15780,7 @@ function openFileStoreModal_(){
   const overlay = document.getElementById('fileStoreModalOverlay');
   if (!overlay) return;
   overlay.classList.add('open');
+  fsWinInit_(); fsAutoStart_();
   document.getElementById('fsTitleIcon').innerHTML = fsIcon_({type:'folder'}, 18);
   FS_.cwd = ''; FS_.hist = ['']; FS_.hi = 0; FS_.query = ''; FS_.sel = new Set(); FS_.renaming = null;
   const s = document.getElementById('fsSearch'); if (s) s.value = '';
@@ -15776,7 +15790,7 @@ function openFileStoreModal_(){
   setTimeout(function(){ const c = document.getElementById('fsContent'); if (c) c.focus(); }, 50);
 }
 function closeFileStoreModal_(){
-  fsCloseCtx_();
+  fsCloseCtx_(); fsAutoStop_();
   const overlay = document.getElementById('fileStoreModalOverlay');
   if (overlay) overlay.classList.remove('open');
 }
@@ -16124,9 +16138,87 @@ function fsShowCtx_(x, y, items){
 }
 
 /* ---------- 이벤트 (한 번만 바인딩) ---------- */
+
+/* ---------- 팝업 창: 이동 / 크기 조절 ---------- */
+let FS_WIN_ = null;
+const FS_MINW_ = 560, FS_MINH_ = 340;
+function fsWinClamp_(g){
+  const vw = window.innerWidth, vh = window.innerHeight;
+  g.w = Math.max(FS_MINW_, Math.min(g.w, vw)); g.h = Math.max(FS_MINH_, Math.min(g.h, vh));
+  g.x = Math.max(120 - g.w, Math.min(g.x, vw - 120)); g.y = Math.max(0, Math.min(g.y, vh - 40));
+  return g;
+}
+function fsWinApply_(){
+  const w = document.getElementById('fsWin'); if (!w || !FS_WIN_) return;
+  w.style.left = FS_WIN_.x + 'px'; w.style.top = FS_WIN_.y + 'px'; w.style.width = FS_WIN_.w + 'px'; w.style.height = FS_WIN_.h + 'px';
+}
+function fsWinInit_(){
+  let g = null;
+  try { g = JSON.parse(localStorage.getItem('fs_win_v1') || 'null'); } catch (e) {}
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (!g || !g.w || !g.h) g = { w: Math.min(1000, vw * 0.96), h: Math.min(680, vh * 0.92) };
+  g.w = Math.max(FS_MINW_, Math.min(g.w, vw)); g.h = Math.max(FS_MINH_, Math.min(g.h, vh));
+  if (typeof g.x !== 'number' || typeof g.y !== 'number') { g.x = (vw - g.w) / 2; g.y = (vh - g.h) / 2; }
+  FS_WIN_ = fsWinClamp_(g); fsWinApply_();
+}
+function fsWinBind_(){
+  const win = document.getElementById('fsWin');
+  win.addEventListener('mousedown', function(e){
+    if (e.button !== 0) return;
+    const rz = e.target.closest('.fs-rz'), ti = e.target.closest('.fs-title');
+    if (!rz && !(ti && !e.target.closest('button'))) return;
+    e.preventDefault();
+    const dir = rz ? rz.getAttribute('data-d') : 'move';
+    const sx = e.clientX, sy = e.clientY, g0 = Object.assign({}, FS_WIN_);
+    const move = function(ev){
+      const dx = ev.clientX - sx, dy = ev.clientY - sy, g = Object.assign({}, g0);
+      if (dir === 'move') { g.x = g0.x + dx; g.y = g0.y + dy; }
+      else {
+        if (dir.indexOf('e') >= 0) g.w = Math.max(FS_MINW_, g0.w + dx);
+        if (dir.indexOf('s') >= 0) g.h = Math.max(FS_MINH_, g0.h + dy);
+        if (dir.indexOf('w') >= 0) { const nw = Math.max(FS_MINW_, g0.w - dx); g.x = g0.x + (g0.w - nw); g.w = nw; }
+        if (dir.indexOf('n') >= 0) { const nh = Math.max(FS_MINH_, g0.h - dy); g.y = g0.y + (g0.h - nh); g.h = nh; }
+      }
+      if (g.y < 0) { if (dir === 'move') g.y = 0; else if (dir.indexOf('n') >= 0) { g.h += g.y; g.y = 0; } }
+      FS_WIN_ = (dir === 'move') ? fsWinClamp_(g) : g; fsWinApply_();
+    };
+    const up = function(){
+      document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+      try { localStorage.setItem('fs_win_v1', JSON.stringify(FS_WIN_)); } catch (e) {}
+    };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  });
+  window.addEventListener('resize', function(){ if (fsIsOpen_() && FS_WIN_) { FS_WIN_ = fsWinClamp_(FS_WIN_); fsWinApply_(); } });
+}
+
+/* ---------- 팝업이 열려 있는 동안 주기적 새로 고침 (변경이 있을 때만 다시 그림) ---------- */
+let FS_TIMER_ = null;
+const FS_REFRESH_MS_ = 10000;
+function fsSig_(items){ return JSON.stringify((items || []).map(function(f){ return [f.id, f.name, f.parent || '', f.type || '', f.bytes || f.size || '', f.createdDate || '']; })); }
+function fsAutoStart_(){ fsAutoStop_(); FS_TIMER_ = setInterval(fsAutoTick_, FS_REFRESH_MS_); }
+function fsAutoStop_(){ if (FS_TIMER_) { clearInterval(FS_TIMER_); FS_TIMER_ = null; } }
+function fsAutoTick_(){
+  if (!fsIsOpen_()) { fsAutoStop_(); return; }
+  if (document.hidden || FS_.busy || FS_.busyUpload || FS_.renaming || FS_.dragIds || FS_.marquee || FS_.polling || document.querySelector('.fs-ctx')) return;
+  FS_.polling = true;
+  fsCall_('adminListStoredFiles').then(function(res){
+    if (!res || !res.success) return;
+    if (FS_.busy || FS_.busyUpload || FS_.renaming || FS_.dragIds || FS_.marquee) return;
+    const items = (res.files || []).filter(function(f){ return f && f.id !== 'f_code_gs' && f.id !== 'f_index_html' && f.id !== 'f_admin_html'; });
+    const sig = fsSig_(items);
+    if (sig === FS_.sig) return;
+    FS_.items = items; FS_.sig = sig; FILE_STORE_CACHED_FILES = items;
+    if (FS_.cwd && !fsGet_(FS_.cwd)) FS_.cwd = '';
+    FS_.sel.forEach(function(id){ if (!fsGet_(id)) FS_.sel.delete(id); });
+    const box = document.getElementById('fsContent'), st = box ? box.scrollTop : 0;
+    fsRender_(); if (box) box.scrollTop = st;
+  }).catch(function(){}).then(function(){ FS_.polling = false; });
+}
+
 let FS_BOUND_ = false;
 function fsBindOnce_(){
   if (FS_BOUND_) return; FS_BOUND_ = true;
+  fsWinBind_();
   const box = document.getElementById('fsContent');
   const main = document.getElementById('fsMain');
   const win = document.getElementById('fsWin');
@@ -16169,7 +16261,7 @@ function fsBindOnce_(){
     if (!(e.ctrlKey || e.metaKey)) fsSetSel_([], null);
     const rect0 = box.getBoundingClientRect();
     const sx = e.clientX - rect0.left + box.scrollLeft, sy = e.clientY - rect0.top + box.scrollTop;
-    const mq = document.createElement('div'); mq.className = 'fs-marq'; box.appendChild(mq);
+    const mq = document.createElement('div'); mq.className = 'fs-marq'; box.appendChild(mq); FS_.marquee = true;
     let moved = false;
     const move = function(ev){
       const r = box.getBoundingClientRect();
@@ -16186,7 +16278,7 @@ function fsBindOnce_(){
       FS_.sel = hit; fsPaintSel_();
       if (ev.clientY > r.bottom - 20) box.scrollTop += 12; else if (ev.clientY < r.top + 20) box.scrollTop -= 12;
     };
-    const up = function(){ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); mq.remove(); };
+    const up = function(){ document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); mq.remove(); FS_.marquee = false; };
     document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
     e.preventDefault(); box.focus();
   });
