@@ -7811,15 +7811,16 @@ function dashPriceCancelSectionsHtml_(d){
     let items = list.slice(0, 5).map(function(x){ return { name: x.name, amount: Number(x.amount) || 0, count: x.count || 0 }; });
     if (list.length > 5) { const rest = list.slice(5); items.push({ name: '기타', amount: rest.reduce(function(a, x){ return a + (Number(x.amount) || 0); }, 0), count: rest.reduce(function(a, x){ return a + (x.count || 0); }, 0) }); }
     let acc = 0;
+    const C_ = 2 * Math.PI * 27.5;
     const stops = items.map(function(it, i){
-      const a0 = acc / tot * 100; acc += it.amount; const a1 = acc / tot * 100;
-      return pal[i % pal.length] + ' ' + a0.toFixed(2) + '% ' + a1.toFixed(2) + '%';
-    }).join(', ');
+      const a0 = acc / tot; acc += it.amount; const a1 = acc / tot;
+      return '<circle cx="37" cy="37" r="27.5" fill="none" stroke="' + pal[i % pal.length] + '" stroke-width="19" stroke-dasharray="' + ((a1 - a0) * C_).toFixed(3) + ' ' + C_.toFixed(3) + '" stroke-dashoffset="' + (-a0 * C_).toFixed(3) + '" transform="rotate(-90 37 37)"/>';
+    }).join('');
     const legend = items.map(function(it, i){
       return '<div style="display:flex; align-items:center; gap:5px; font-size:11px; line-height:1.5;"><span style="width:9px; height:9px; border-radius:2px; background:' + pal[i % pal.length] + '; flex:none;"></span><span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(it.name) + '">' + esc(it.name) + '</span><b>' + Math.round(it.amount / tot * 100) + '%</b><span style="color:#64748b;">(' + it.count + '건)</span></div>';
     }).join('');
     return '<div>' + head_ + '<div style="display:flex; align-items:center; gap:10px;">' +
-      '<div style="width:74px; height:74px; border-radius:50%; flex:none; background:conic-gradient(' + stops + '); position:relative;" title="' + title + '"><div style="position:absolute; inset:19px; background:#ffffff; border-radius:50%;"></div></div>' +
+      '<div style="width:74px; height:74px; flex:none;" title="' + title + '"><svg width="74" height="74" viewBox="0 0 74 74" xmlns="http://www.w3.org/2000/svg">' + stops + '</svg></div>' +
       '<div style="flex:1; min-width:0;">' + legend + '</div></div></div>';
   }
   // ---------- 3. 인상·인하 ----------
@@ -16313,6 +16314,6 @@ function fsBindOnce_(){
 
 
 </script>
-<script src="portal-extras.js?v=20261030c"></script>
+<script src="portal-extras.js?v=20261030d"></script>
 </body>
 </html>
