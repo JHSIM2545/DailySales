@@ -1618,7 +1618,7 @@
       }
     }
     if (!jobs.length) return;
-    var DUR = 1200, t0 = null;
+    var DUR = 2000, t0 = null;
     function fmt(tok, v) {
       var dec = (tok.split('.')[1] || '').length, comma = tok.indexOf(',') > -1;
       var s = Math.abs(v).toFixed(dec);
@@ -1652,7 +1652,7 @@
       el = bars[i]; st = el.getAttribute('style') || '';
       m = /(?:^|;)\s*width:\s*([\d.]+)%/.exec(st);
       if (!m || !(/height:\s*100%/.test(st) || el.classList.contains('comp-bar-fill')) || el.tagName === 'TABLE') continue;
-      el.animate([{ width: '0%' }, { width: m[1] + '%' }], { duration: 1000, delay: Math.min(i * 30, 400), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      el.animate([{ width: '0%' }, { width: m[1] + '%' }], { duration: 1600, delay: Math.min(i * 40, 600), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     }
     /* 누적 막대 / 도넛 */
     var all = root.querySelectorAll('div,svg'), C;
@@ -1662,13 +1662,13 @@
         var cs = el.querySelectorAll('circle[stroke-dasharray]');
         for (var c = 0; c < cs.length; c++) {
           var da = cs[c].getAttribute('stroke-dasharray').split(' ');
-          cs[c].animate([{ strokeDasharray: '0 ' + da[1] }, { strokeDasharray: da[0] + ' ' + da[1] }], { duration: 1100, delay: c * 80, easing: 'ease-out', fill: 'backwards' });
+          cs[c].animate([{ strokeDasharray: '0 ' + da[1] }, { strokeDasharray: da[0] + ' ' + da[1] }], { duration: 1800, delay: c * 120, easing: 'ease-out', fill: 'backwards' });
         }
         continue;
       }
       st = el.getAttribute('style') || '';
       if (/display:\s*flex/.test(st) && /overflow:\s*hidden/.test(st) && /(?:^|;)\s*height:\s*\d+px/.test(st) && el.children.length > 1 && parseInt(/height:\s*(\d+)px/.exec(st)[1], 10) <= 32) {
-        el.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 1000, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+        el.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 1600, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
       }
     }
   }
