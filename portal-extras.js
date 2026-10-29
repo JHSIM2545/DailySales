@@ -1596,6 +1596,96 @@
   setTimeout(capScan, 500);
   window.__pxCap = { scan: capScan };
 
+  /* ------------------------------------------------------------ 종합대시보드 애니메이션 (그래프 그려지기 · 숫자 카운트업) */
+  var ANIM_NUM = /-?\d[\d,]*(?:\.\d+)?/g;
+  function animCount(root) {
+    var els = root.querySelectorAll('div,span,b');
+    var done = [], i, j, el, st, fs, fw, w, n, t;
+    var jobs = [];
+    for (i = 0; i < els.length; i++) {
+      el = els[i]; st = el.getAttribute('style') || '';
+      fs = /font-size:\s*([\d.]+)px/.exec(st); fw = /font-weight:\s*(\d+)/.exec(st);
+      if (!fs || !fw || parseFloat(fs[1]) < 18 || parseInt(fw[1], 10) < 800) continue;
+      if (el.closest('.pxcap-btn')) continue;
+      w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+      while ((n = w.nextNode())) {
+        if (done.indexOf(n) > -1) continue;
+        t = n.nodeValue;
+        var toks = t.match(ANIM_NUM);
+        if (!toks) continue;
+        done.push(n);
+        jobs.push({ node: n, text: t, toks: toks });
+      }
+    }
+    if (!jobs.length) return;
+    var DUR = 1200, t0 = null;
+    function fmt(tok, v) {
+      var dec = (tok.split('.')[1] || '').length, comma = tok.indexOf(',') > -1;
+      var s = Math.abs(v).toFixed(dec);
+      if (comma) { var p = s.split('.'); p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ','); s = p.join('.'); }
+      return (v < 0 ? '-' : '') + s;
+    }
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var k = Math.min(1, (ts - t0) / DUR), e = 1 - Math.pow(1 - k, 3), a, b, idx;
+      for (a = 0; a < jobs.length; a++) {
+        var jb = jobs[a];
+        if (!jb.node.parentNode) continue;
+        if (k >= 1) { jb.node.nodeValue = jb.text; continue; }
+        idx = 0;
+        jb.node.nodeValue = jb.text.replace(ANIM_NUM, function (tok) {
+          var target = parseFloat(tok.replace(/,/g, ''));
+          return fmt(tok, target * e);
+        });
+      }
+      if (k < 1) requestAnimationFrame(frame);
+    }
+    for (j = 0; j < jobs.length; j++) jobs[j].node.nodeValue = jobs[j].text.replace(ANIM_NUM, function (tok) { return fmt(tok, 0); });
+    requestAnimationFrame(frame);
+  }
+  function animGraphs(root) {
+    if (!root.animate) return;
+    var i, el, st, m;
+    /* 가로 막대(너비 %) */
+    var bars = root.querySelectorAll('[style*="width"]');
+    for (i = 0; i < bars.length; i++) {
+      el = bars[i]; st = el.getAttribute('style') || '';
+      m = /(?:^|;)\s*width:\s*([\d.]+)%/.exec(st);
+      if (!m || !(/height:\s*100%/.test(st) || el.classList.contains('comp-bar-fill')) || el.tagName === 'TABLE') continue;
+      el.animate([{ width: '0%' }, { width: m[1] + '%' }], { duration: 1000, delay: Math.min(i * 30, 400), easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+    }
+    /* 누적 막대 / 도넛 */
+    var all = root.querySelectorAll('div,svg'), C;
+    for (i = 0; i < all.length; i++) {
+      el = all[i];
+      if (el.tagName === 'svg' || el.tagName === 'SVG') {
+        var cs = el.querySelectorAll('circle[stroke-dasharray]');
+        for (var c = 0; c < cs.length; c++) {
+          var da = cs[c].getAttribute('stroke-dasharray').split(' ');
+          cs[c].animate([{ strokeDasharray: '0 ' + da[1] }, { strokeDasharray: da[0] + ' ' + da[1] }], { duration: 1100, delay: c * 80, easing: 'ease-out', fill: 'backwards' });
+        }
+        continue;
+      }
+      st = el.getAttribute('style') || '';
+      if (/display:\s*flex/.test(st) && /overflow:\s*hidden/.test(st) && /(?:^|;)\s*height:\s*\d+px/.test(st) && el.children.length > 1 && parseInt(/height:\s*(\d+)px/.exec(st)[1], 10) <= 32) {
+        el.animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 1000, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
+      }
+    }
+  }
+  var animLast = null;
+  function animScan() {
+    var dv = document.querySelector('#content .dashboard-view');
+    if (!dv || dv === animLast || dv.getAttribute('data-pxanim')) return;
+    dv.setAttribute('data-pxanim', '1'); animLast = dv;
+    try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* noop */ }
+    requestAnimationFrame(function () { try { animGraphs(dv); animCount(dv); } catch (e) { /* noop */ } });
+  }
+  try {
+    var animTimer = null;
+    new MutationObserver(function () { clearTimeout(animTimer); animTimer = setTimeout(animScan, 120); }).observe(document.documentElement, { childList: true, subtree: true });
+  } catch (e) { /* noop */ }
+  window.__pxAnim = { scan: animScan };
+
   /* ------------------------------------------------------------ 로그인 감지: 공지 팝업 · 메모 표시 */
   var lastUser = '';
   function tick() {
