@@ -3589,30 +3589,8 @@ function getTzToday() {
       return { success: true, lists: lists, defaults: defaults };
     },
 
-    getTaPortalUrl: async function(token) {
-      const client = getSupabase();
-      const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'TA_PORTAL_URL').maybeSingle();
-      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/TA-Manager/';
-      return { success: true, url: u };
-    },
 
-    saveTaPortalUrl: async function(token, url) {
-      const client = getSupabase();
-      await client.from('system_settings').upsert({ setting_key: 'TA_PORTAL_URL', setting_value: url });
-      return { success: true };
-    },
-    getIntroPortalUrl: async function(token) {
-      const client = getSupabase();
-      const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'INTRO_PORTAL_URL').maybeSingle();
-      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/Lead-app/';
-      return { success: true, url: u };
-    },
 
-    saveIntroPortalUrl: async function(token, url) {
-      const client = getSupabase();
-      await client.from('system_settings').upsert({ setting_key: 'INTRO_PORTAL_URL', setting_value: url });
-      return { success: true };
-    },
 
 
     // 14. 접수함 큐
@@ -7916,8 +7894,6 @@ const TABS = [
  { key: 'product_daily', label: '상품일보', ready: true },  
  { key: 'sales_status', label: '영업현황', ready: true },
  { key: 'daily_report', label: '일일실적보고', ready: true, admin: true },  
- { key: 'ta_portal', label: 'TA', ready: true, external: true, alignRight: true, taGate: true },  
- { key: 'intro_portal', label: '소개', ready: true, external: true, alignRight: true, introGate: true },  
  { key: 'register_hub', label: '', icon: 'data:image/png;base64,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', title: '자동등록', ready: true, alignRight: true },
  { key: 'settings', label: '⚙️', title: '설정', ready: true, master: true, alignRight: true, hideInTabBar: true }  
 ];  
@@ -7938,8 +7914,6 @@ function renderTabs(){
    if (t.hideInTabBar) return false;   // 설정은 부가기능(더보기) 메뉴 하단으로 이동
    if (t.master && (!SESSION || (!SESSION.isMaster && !SESSION.isAdmin && !SESSION.isMainMaster && SESSION.role !== '메인마스터' && SESSION.role !== '서브마스터'))) return false;
    if (t.admin && (!SESSION || (!SESSION.isAdmin && !SESSION.isMaster && !SESSION.isMainMaster && SESSION.role !== '메인마스터' && SESSION.role !== '서브마스터'))) return false;
-   if (t.taGate && !taPortalVisible_()) return false;
-   if (t.introGate && !introPortalVisible_()) return false;
    return true;
  });  
  let firstRightFound = false;  
@@ -7947,9 +7921,7 @@ function renderTabs(){
    const isMainMaster = SESSION && (SESSION.isMainMaster || SESSION.role === '메인마스터');  
    const label = t.icon ? ('<img src="' + t.icon + '" alt="" style="width:20px; height:20px; vertical-align:middle;">') : ((t.labelMainMaster && isMainMaster) ? t.labelMainMaster : t.label);  
    let onclickExpr;
-   if (t.key === 'ta_portal') onclickExpr = 'openTaPortal_()';
-   else if (t.key === 'intro_portal') onclickExpr = 'openIntroPortal_()';
-   else onclickExpr = `selectTab('${t.key}')`;  
+   onclickExpr = `selectTab('${t.key}')`;  
 
    const isSettings = t.key === 'settings';  
    let extraStyles = [];
@@ -7962,8 +7934,6 @@ function renderTabs(){
    }
    if (isSettings) {
      extraStyles.push('font-size:16px; padding:8px 16px;');
-   } else if (t.key === 'ta_portal' || t.key === 'intro_portal') {
-     extraStyles.push('font-weight:700; background:#ded4d7;');
    }
    const styleAttr = extraStyles.length ? ` style="${extraStyles.join(' ')}"` : '';  
    const titleAttr = t.title ? ` title="${t.title}"` : '';  
@@ -8000,219 +7970,14 @@ function isCsManager_(job, role, name){
 
 function jobLabel_(job){ return JOB_DISPLAY_LABELS_[job] || job || ''; }  
 
-// "TA 관리 포털" 연결 버튼: 컨설턴트(영업) 또는 지사관리자가 아니면 아예 안 보이게 숨김
-function taPortalVisible_(){
-  if (!SESSION) return false;
-  const job = (SESSION.job || '').trim();
-  const role = (SESSION.role || '').trim();
-  const name = (SESSION.name || '').trim();
-  // 메인마스터(지사장)는 항상 노출
-  if (SESSION.isMainMaster || role === '메인마스터' || name === '심정환') return true;
-  // 지사관리자 직무
-  if (job === '지사관리자' || job.includes('지사관리자')) return true;
-  // 컨설턴트(영업) 직무
-  if (job === '컨설턴트(영업)' || job === '컨설턴트' || job.includes('컨설턴트')) return true;
-  return false;
-}
 
-// "소개영업 포털" 연결 버튼: 지사 본사 인력(본사스탭, 본사관리자, Staff, 매니저)은 소개 버튼까지 비노출
-function introPortalVisible_(){
-  if (!SESSION) return false;
-  const job = (SESSION.job || '').trim();
-  const role = (SESSION.role || '').trim();
-  const name = (SESSION.name || '').trim();
-  // 메인마스터(지사장)는 항상 노출
-  if (SESSION.isMainMaster || role === '메인마스터' || name === '심정환') return true;
-  // 본사 인력 (Staff(지원), 매니저(관리자), 본사스탭, 본사관리자 등)은 소개 버튼까지 비노출
-  if (job.includes('본사') || job.includes('Staff') || job.includes('매니저')) return false;
-  return true;
-}  
 // TA 관리 포털 URL은 처음 클릭할 때 한 번만 서버에서 받아와 캐시해 둔다(설정에서 저장하면 즉시 갱신됨).  
-let TA_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/TA-Manager/';  
-function detectDeviceType_(){  
- const ua = navigator.userAgent || '';  
- return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';  
-}  
-/** win: window.open()으로 미리 열어둔(동기적으로 열어야 팝업 차단을 피할 수 있음) 빈 창.  
- * URL이 준비되면 그 창의 위치만 옮긴다. win이 없으면(팝업이 차단됐던 경우) 새로 열어본다. */  
-function openTaPortalWithUrl_(baseUrl, win){  
-  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/TA-Manager/';  
-  if (url.indexOf('script.google.com') !== -1) {  
-    url = 'https://jhsim2545.github.io/TA-Manager/';  
-  }  
 
-  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);  
-  const userName = (sess && sess.name) ? sess.name : '지사장';  
-  const userPhone = (sess && sess.phone) ? sess.phone : '01027042545';  
-  const userJob = (sess && sess.job) ? sess.job : '컨설턴트';  
-  const isMaster = (sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master'));  
-  const userRole = isMaster ? 'master' : 'user';  
 
-  // TA 관리 포털 규격 세션 데이터 생성 및 브라우저 세션 스토리지에 동기화
-  const taSessionData = {  
-    phone: userPhone,  
-    name: userName,  
-    job: userJob,  
-    role: userRole,  
-    screen: isMaster ? 'master' : userName,  
-    modal: null,  
-    savedAt: Date.now()  
-  };  
 
-  const taUserData = {  
-    phone: userPhone,  
-    name: userName,  
-    job: userJob,  
-    role: userRole  
-  };  
 
-  try {  
-    sessionStorage.setItem('S1_TA_PORTAL_AUTH_SESSION', JSON.stringify(taSessionData));  
-    sessionStorage.setItem('s1_user', JSON.stringify(taUserData));  
-    localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);  
-    localStorage.setItem('S1_TA_SSO_SESSION', JSON.stringify(taSessionData));  
-  } catch(e) {  
-    console.warn('[TA SSO] 세션 저장 실패:', e);  
-  }  
 
-  recordLoginPortal_('TA 관리');
-  if (typeof logUserAction_ === 'function') {  
-    logUserAction_('TA 포털 이동', '외부연동', '', { desc: userName + ' TA 관리 포털 바로가기 접속' });  
-  }  
 
-  // SSO URL 파라미터 조합
-  const sep = url.indexOf('?') === -1 ? '?' : '&';  
-  const devType = (typeof detectDeviceType_ === 'function' ? detectDeviceType_() : 'pc');  
-
-  const ssoParams = [  
-    'sso=1',  
-    'name=' + encodeURIComponent(userName),  
-    'phone=' + encodeURIComponent(userPhone),  
-    'job=' + encodeURIComponent(userJob),  
-    'role=' + encodeURIComponent(userRole),  
-    'master=' + (isMaster ? '1' : '0'),  
-    'agent=' + encodeURIComponent(userName),  
-    'device=' + devType,  
-    (isMaster ? 'view=dashboard' : '')  
-  ].filter(Boolean).join('&');  
-
-  const finalUrl = url.replace(/\/+$/, '') + '/' + sep + ssoParams;  
-
-  if (win && !win.closed) {   
-    win.location.href = finalUrl;   
-  } else {   
-    window.open(finalUrl, '_blank');   
-  }  
-}  
-
-function openTaPortal_(){  
-  if (!taPortalVisible_()) { alert('TA 관리 포털 접근 권한이 없습니다.\n(컨설턴트 및 지사관리자 전용)'); return; }
-  const win = window.open('', '_blank');  
-  getTaPortalUrl_(function(url){
-    openTaPortalWithUrl_(url, win);
-  });
-}  
-
-function getTaPortalUrl_(callback){
-  if (TA_PORTAL_BASE_URL_) { callback(TA_PORTAL_BASE_URL_); return; }
-  google.script.run
-    .withSuccessHandler(function(res){
-      const u = (res && res.success && res.url) ? res.url : 'https://jhsim2545.github.io/TA-Manager/';
-      TA_PORTAL_BASE_URL_ = u;
-      callback(u);
-    })
-    .withFailureHandler(function(){
-      callback('https://jhsim2545.github.io/TA-Manager/');
-    })
-    .getTaPortalUrl(SESSION ? SESSION.token : '');
-}
-
-function openIntroPortal_(){  
-  if (!introPortalVisible_()) { alert('소개영업 포털 접근 권한이 없습니다.\n(지사 인력 전용)'); return; }
-  getIntroPortalUrl_(function(url){
-    openIntroPortalWithUrl_(url);
-  });
-}  
-
-let INTRO_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/Lead-app/';
-
-function getIntroPortalUrl_(callback){
-  if (INTRO_PORTAL_BASE_URL_) { callback(INTRO_PORTAL_BASE_URL_); return; }
-  google.script.run
-    .withSuccessHandler(function(res){
-      const u = (res && res.success && res.url) ? res.url : 'https://jhsim2545.github.io/Lead-app/';
-      INTRO_PORTAL_BASE_URL_ = u;
-      callback(u);
-    })
-    .withFailureHandler(function(){
-      callback('https://jhsim2545.github.io/Lead-app/');
-    })
-    .getIntroPortalUrl(SESSION ? SESSION.token : '');
-}
-
-function openIntroPortalWithUrl_(baseUrl){
-  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/Lead-app/';
-  if (url.indexOf('script.google.com') !== -1 || url.indexOf('Lead-app_index.html') !== -1) {
-    url = 'https://jhsim2545.github.io/Lead-app/';
-  }
-
-  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);
-  const userName = (sess && sess.name) ? sess.name : '지사장';
-  const userPhone = (sess && sess.phone) ? sess.phone.replace(/[^0-9]/g, '') : '01027042545';
-  const userJob = (sess && sess.job) ? sess.job : '컨설턴트';
-  const isMaster = !!(sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master' || userName === '심정환' || (userJob && userJob.includes('지사관리자'))));
-  const userRole = isMaster ? 'master' : 'user';
-
-  const introSessionData = {
-    phone: userPhone,
-    name: userName,
-    job: isMaster ? '지사관리자' : userJob,
-    role: userRole,
-    isMaster: isMaster,
-    savedAt: Date.now()
-  };
-
-  try {
-    sessionStorage.setItem('S1_LEAD_PORTAL_AUTH_SESSION', JSON.stringify(introSessionData));
-    localStorage.setItem('S1_LEAD_PORTAL_AUTH_SESSION', JSON.stringify(introSessionData));
-    localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);
-  } catch(e) {}
-
-  recordLoginPortal_('소개영업');
-  if (typeof logUserAction_ === 'function') {
-    logUserAction_('소개 포털 이동', '외부연동', '', { desc: userName + ' 소개 포털 바로가기 접속' });
-  }
-
-  let ssoToken = '';
-  try {
-    ssoToken = btoa(unescape(encodeURIComponent(JSON.stringify(introSessionData))));
-  } catch(e) {}
-
-  const sep = url.indexOf('?') === -1 ? '?' : '&';
-  const ssoParams = [
-    'sso=1',
-    'sso_token=' + encodeURIComponent(ssoToken),
-    'name=' + encodeURIComponent(userName),
-    'phone=' + encodeURIComponent(userPhone),
-    'job=' + encodeURIComponent(isMaster ? '지사관리자' : userJob),
-    'role=' + encodeURIComponent(userRole),
-    'master=' + (isMaster ? '1' : '0'),
-    'agent=' + encodeURIComponent(userName),
-    'ts=' + Date.now()
-  ].join('&');
-
-  const fullUrl = url + sep + ssoParams;
-
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-  if (isMobile) {
-    window.location.href = fullUrl;
-  } else {
-    const w = window.open(fullUrl, '_blank');
-    if (!w || w.closed || typeof w.closed === 'undefined') {
-      window.location.href = fullUrl;
-    }
-  }
-}  
 
 /* ===================== 종합 대시보드 ===================== */  
 let DASH_YM = (window.getDashBasisDate_ ? window.getDashBasisDate_() : todayStr()).slice(0,7);  
@@ -9830,21 +9595,6 @@ function settingsCategorySectionHtml_(category, label){
   
 function renderSettingsTab_(){  
  const cards = SETTINGS_CATEGORY_ORDER_.map(function(cat){ return settingsCategorySectionHtml_(cat, SETTINGS_CATEGORY_LABELS_[cat]); }).join('');  
- const IN_ = 'autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" type="text" placeholder="https://..." style="flex:1; min-width:0; padding:5px 8px; border:1px solid #c7cfd8; border-radius:4px;"';
- const taPortalCard = '<div class="chart-card settings-portal-card" style="min-width:0;">' +
- '<div class="chart-card-title"><span>연계 포털 링크</span></div>' +
- '<div style="font-size:11px; color:#666; margin-bottom:3px;">TA 관리 포털</div>' +
- '<div style="display:flex; gap:6px; margin-bottom:10px;">' +
- '<input ' + IN_ + ' id="settings_ta_portal_url" value="' + escAttr(TA_PORTAL_URL_ || '') + '">' +
- '<button onclick="saveTaPortalUrlSetting_()">저장</button>' +
- '</div>' +
- '<div style="font-size:11px; color:#666; margin-bottom:3px;">소개영업 포털</div>' +
- '<div style="display:flex; gap:6px;">' +
- '<input ' + IN_ + ' id="settings_intro_portal_url" value="' + escAttr(INTRO_PORTAL_URL_ || '') + '">' +
- '<button onclick="saveIntroPortalUrlSetting_()">저장</button>' +
- '</div>' +
- '</div>';
- const introPortalCard = '';
  const subTab = (typeof SETTINGS_SUBTAB_ !== 'undefined' && SETTINGS_SUBTAB_ === 'targets') ? 'targets' : 'lists';
  const tabBar = settingsSubTabBarHtml_(subTab);
  let body;
@@ -9852,7 +9602,7 @@ function renderSettingsTab_(){
    body = '<div class="dash-head"><h2>기초 목록값 관리</h2>' +
      '<span id="settings_autosave_status" style="font-size:12px; color:#6b7280;">변경하면 자동 저장됩니다</span>' +
      '</div>' +
-     '<div class="settings-grid4">' + taPortalCard + introPortalCard + cards + '</div>';
+     '<div class="settings-grid4">' + cards + '</div>';
  } else {
    body = '<div class="dash-head" style="display:flex; align-items:center; gap:10px;"><h2 style="margin:0;">월별 목표/계획 관리</h2>' +
      '<button onclick="shiftTargetMonth(-1)">◀</button>' +
@@ -9904,60 +9654,8 @@ function settingsSwitchSub_(key){
   if (currentTab !== 'settings') { selectTab('settings'); return; }
   renderSettingsTab_();
 }
-let TA_PORTAL_URL_ = '';  
-function loadTaPortalUrlForSettings_(){  
- google.script.run  
- .withSuccessHandler(function(res){  
- TA_PORTAL_URL_ = (res && res.success) ? (res.url || '') : '';  
- const el = document.getElementById('settings_ta_portal_url');  
- if (el) el.value = TA_PORTAL_URL_;  
- })  
- .withFailureHandler(function(){ /* 조회 실패 시 빈 값으로 둠 — 저장 시 다시 시도 가능 */ })  
- .getTaPortalUrl(SESSION.token);  
-}  
 
-let INTRO_PORTAL_URL_ = '';  
-function loadIntroPortalUrlForSettings_(){  
- google.script.run  
- .withSuccessHandler(function(res){  
-   INTRO_PORTAL_URL_ = (res && res.success) ? (res.url || '') : '';  
-   const el = document.getElementById('settings_intro_portal_url');  
-   if (el) el.value = INTRO_PORTAL_URL_;  
- })  
- .withFailureHandler(function(){})  
- .getIntroPortalUrl(SESSION ? SESSION.token : '');  
-}  
-function saveIntroPortalUrlSetting_(){  
- const el = document.getElementById('settings_intro_portal_url');  
- const url = (el.value || '').trim();  
- setLoadingCursor(true);  
- google.script.run  
- .withSuccessHandler(function(res){  
-   setLoadingCursor(false);  
-   if (!res || !res.success) { alert('저장 실패: ' + ((res && res.error) || '알 수 없는 오류')); return; }  
-   INTRO_PORTAL_URL_ = url;  
-   INTRO_PORTAL_BASE_URL_ = url;  
-   alert('저장되었습니다.');  
- })  
- .withFailureHandler(function(err){ setLoadingCursor(false); alert('저장 실패: ' + String(err)); })  
- .saveIntroPortalUrl(SESSION ? SESSION.token : '', url);  
-}  
 
-function saveTaPortalUrlSetting_(){  
- const el = document.getElementById('settings_ta_portal_url');  
- const url = (el.value || '').trim();  
- setLoadingCursor(true);  
- google.script.run  
- .withSuccessHandler(function(res){  
- setLoadingCursor(false);  
- if (!res || !res.success) { alert('저장 실패: ' + ((res && res.error) || '알 수 없는 오류')); return; }  
- TA_PORTAL_URL_ = url;  
- TA_PORTAL_BASE_URL_ = url; // "TA 관리 포털" 메뉴를 다시 조회하지 않고 방금 저장한 값을 바로 쓰도록 갱신  
- alert('저장되었습니다.');  
- })  
- .withFailureHandler(function(err){ setLoadingCursor(false); alert('저장 실패: ' + String(err)); })  
- .saveTaPortalUrl(SESSION.token, url);  
-}  
   
 function settingsMoveItem_(category, idx, dir){  
  const arr = SETTINGS_LISTS[category];  
@@ -10419,7 +10117,7 @@ function selectTab(key){
  else if (key === 'ai_report') { showHubToolbar_('ai_report'); loadAutoRegisterTab_(); }  
  else if (key === 'users') { selectUserMgmtView(USERMGMT_VIEW || 'info'); }  
  else if (key === 'daily_report') { loadDailyReport(); }  
- else if (key === 'settings') { if (prevTab_ !== 'users') SETTINGS_SUBTAB_ = 'lists'; loadEditableLists_(); loadTaPortalUrlForSettings_(); loadIntroPortalUrlForSettings_(); }  
+ else if (key === 'settings') { if (prevTab_ !== 'users') SETTINGS_SUBTAB_ = 'lists'; loadEditableLists_(); }  
  else document.getElementById('content').innerHTML =  
  `<div class="placeholder"><h2>준비 중입니다</h2><p>"${TABS.find(t=>t.key===key).label}" 시트 필드 정의 완료 후 동일한 방식으로 탭이 활성화됩니다.</p></div>`;  
 }  

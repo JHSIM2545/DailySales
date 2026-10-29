@@ -3583,30 +3583,8 @@ function getTzToday() {
       return { success: true, lists: lists, defaults: defaults };
     },
 
-    getTaPortalUrl: async function(token) {
-      const client = getSupabase();
-      const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'TA_PORTAL_URL').maybeSingle();
-      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/TA-Manager/';
-      return { success: true, url: u };
-    },
 
-    saveTaPortalUrl: async function(token, url) {
-      const client = getSupabase();
-      await client.from('system_settings').upsert({ setting_key: 'TA_PORTAL_URL', setting_value: url });
-      return { success: true };
-    },
-    getIntroPortalUrl: async function(token) {
-      const client = getSupabase();
-      const { data } = await client.from('system_settings').select('setting_value').eq('setting_key', 'INTRO_PORTAL_URL').maybeSingle();
-      const u = (data && data.setting_value && !data.setting_value.includes('script.google.com')) ? data.setting_value : 'https://jhsim2545.github.io/Lead-app/';
-      return { success: true, url: u };
-    },
 
-    saveIntroPortalUrl: async function(token, url) {
-      const client = getSupabase();
-      await client.from('system_settings').upsert({ setting_key: 'INTRO_PORTAL_URL', setting_value: url });
-      return { success: true };
-    },
 
 
     // 14. 접수함 큐
@@ -7327,8 +7305,6 @@ const TABS = [
  { key: 'product_daily', label: '상품일보', ready: true },  
  { key: 'sales_status', label: '영업현황', ready: true },  
  { key: 'daily_report', label: '일일실적보고', ready: true },  
- { key: 'ta_portal', label: 'TA', ready: true, external: true, alignRight: true, taGate: true },
- { key: 'intro_portal', label: '소개', ready: true, external: true, alignRight: true, introGate: true }  
 ];  
   
 /* ===================== 자동계산 ===================== */  
@@ -7368,24 +7344,17 @@ function renderTabs(){
  const el = document.getElementById('tabs');  
  if (!el) return;
  const visible = TABS.filter(t => {
-   if (t.taGate && !taPortalVisible_()) return false;
-   if (t.introGate && !introPortalVisible_()) return false;
    return true;
  });  
  let firstRightFound = false;  
  const tabsHtml_ = visible.map(t => {  
    let onclickExpr;
-   if (t.key === 'ta_portal') onclickExpr = 'openTaPortal_()';
-   else if (t.key === 'intro_portal') onclickExpr = 'openIntroPortal_()';
-   else onclickExpr = `selectTab('${t.key}')`;  
+   onclickExpr = `selectTab('${t.key}')`;  
 
    let extraStyles = [];
    if (t.alignRight && !firstRightFound) {
      extraStyles.push('margin-left:auto !important;');
      firstRightFound = true;
-   }
-   if (t.key === 'ta_portal' || t.key === 'intro_portal') {
-     extraStyles.push('font-weight:700; background:#ded4d7;');
    }
    const styleAttr = extraStyles.length ? ` style="${extraStyles.join(' ')}"` : '';  
    return `<div class="tab ${t.key===currentTab?'active':''} ${t.ready?'':'disabled'}"${styleAttr}  
@@ -7466,219 +7435,14 @@ function isCsManager_(job, role, name){
 
 function jobLabel_(job){ return JOB_DISPLAY_LABELS_[job] || job || ''; }  
 
-// "TA 관리 포털" 연결 버튼: 컨설턴트(영업) 또는 지사관리자가 아니면 아예 안 보이게 숨김
-function taPortalVisible_(){
-  if (!SESSION) return false;
-  const job = (SESSION.job || '').trim();
-  const role = (SESSION.role || '').trim();
-  const name = (SESSION.name || '').trim();
-  // 메인마스터(지사장)는 항상 노출
-  if (SESSION.isMainMaster || role === '메인마스터' || name === '심정환') return true;
-  // 지사관리자 직무
-  if (job === '지사관리자' || job.includes('지사관리자')) return true;
-  // 컨설턴트(영업) 직무
-  if (job === '컨설턴트(영업)' || job === '컨설턴트' || job.includes('컨설턴트')) return true;
-  return false;
-}
 
-// "소개영업 포털" 연결 버튼: 지사 본사 인력(본사스탭, 본사관리자, Staff, 매니저)은 소개 버튼까지 비노출
-function introPortalVisible_(){
-  if (!SESSION) return false;
-  const job = (SESSION.job || '').trim();
-  const role = (SESSION.role || '').trim();
-  const name = (SESSION.name || '').trim();
-  // 메인마스터(지사장)는 항상 노출
-  if (SESSION.isMainMaster || role === '메인마스터' || name === '심정환') return true;
-  // 본사 인력 (Staff(지원), 매니저(관리자), 본사스탭, 본사관리자 등)은 소개 버튼까지 비노출
-  if (job.includes('본사') || job.includes('Staff') || job.includes('매니저')) return false;
-  return true;
-}  
 // TA 관리 포털 URL은 처음 클릭할 때 한 번만 서버에서 받아와 캐시해 둔다(설정에서 저장하면 즉시 갱신됨).  
-let TA_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/TA-Manager/';  
-function detectDeviceType_(){  
- const ua = navigator.userAgent || '';  
- return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Mobile' : 'pc';  
-}  
-/** win: window.open()으로 미리 열어둔(동기적으로 열어야 팝업 차단을 피할 수 있음) 빈 창.  
- * URL이 준비되면 그 창의 위치만 옮긴다. win이 없으면(팝업이 차단됐던 경우) 새로 열어본다. */  
-function openTaPortalWithUrl_(baseUrl, win){  
-  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/TA-Manager/';  
-  if (url.indexOf('script.google.com') !== -1) {  
-    url = 'https://jhsim2545.github.io/TA-Manager/';  
-  }  
 
-  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);  
-  const userName = (sess && sess.name) ? sess.name : '지사장';  
-  const userPhone = (sess && sess.phone) ? sess.phone : '01027042545';  
-  const userJob = (sess && sess.job) ? sess.job : '컨설턴트';  
-  const isMaster = (sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master'));  
-  const userRole = isMaster ? 'master' : 'user';  
 
-  // TA 관리 포털 규격 세션 데이터 생성 및 브라우저 세션 스토리지에 동기화
-  const taSessionData = {  
-    phone: userPhone,  
-    name: userName,  
-    job: userJob,  
-    role: userRole,  
-    screen: isMaster ? 'master' : userName,  
-    modal: null,  
-    savedAt: Date.now()  
-  };  
 
-  const taUserData = {  
-    phone: userPhone,  
-    name: userName,  
-    job: userJob,  
-    role: userRole  
-  };  
 
-  try {  
-    sessionStorage.setItem('S1_TA_PORTAL_AUTH_SESSION', JSON.stringify(taSessionData));  
-    sessionStorage.setItem('s1_user', JSON.stringify(taUserData));  
-    localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);  
-    localStorage.setItem('S1_TA_SSO_SESSION', JSON.stringify(taSessionData));  
-  } catch(e) {  
-    console.warn('[TA SSO] 세션 저장 실패:', e);  
-  }  
 
-  recordLoginPortal_('TA 관리');
-  if (typeof logUserAction_ === 'function') {  
-    logUserAction_('TA 포털 이동', '외부연동', '', { desc: userName + ' TA 관리 포털 바로가기 접속' });  
-  }  
 
-  // SSO URL 파라미터 조합
-  const sep = url.indexOf('?') === -1 ? '?' : '&';  
-  const devType = (typeof detectDeviceType_ === 'function' ? detectDeviceType_() : 'pc');  
-
-  const ssoParams = [  
-    'sso=1',  
-    'name=' + encodeURIComponent(userName),  
-    'phone=' + encodeURIComponent(userPhone),  
-    'job=' + encodeURIComponent(userJob),  
-    'role=' + encodeURIComponent(userRole),  
-    'master=' + (isMaster ? '1' : '0'),  
-    'agent=' + encodeURIComponent(userName),  
-    'device=' + devType,  
-    (isMaster ? 'view=dashboard' : '')  
-  ].filter(Boolean).join('&');  
-
-  const finalUrl = url.replace(/\/+$/, '') + '/' + sep + ssoParams;  
-
-  if (win && !win.closed) {   
-    win.location.href = finalUrl;   
-  } else {   
-    window.open(finalUrl, '_blank');   
-  }  
-}  
-
-function openTaPortal_(){  
-  if (!taPortalVisible_()) { alert('TA 관리 포털 접근 권한이 없습니다.\n(컨설턴트 및 지사관리자 전용)'); return; }
-  const win = window.open('', '_blank');  
-  getTaPortalUrl_(function(url){
-    openTaPortalWithUrl_(url, win);
-  });
-}  
-
-function getTaPortalUrl_(callback){
-  if (TA_PORTAL_BASE_URL_) { callback(TA_PORTAL_BASE_URL_); return; }
-  google.script.run
-    .withSuccessHandler(function(res){
-      const u = (res && res.success && res.url) ? res.url : 'https://jhsim2545.github.io/TA-Manager/';
-      TA_PORTAL_BASE_URL_ = u;
-      callback(u);
-    })
-    .withFailureHandler(function(){
-      callback('https://jhsim2545.github.io/TA-Manager/');
-    })
-    .getTaPortalUrl(SESSION ? SESSION.token : '');
-}
-
-function openIntroPortal_(){  
-  if (!introPortalVisible_()) { alert('소개영업 포털 접근 권한이 없습니다.\n(지사 인력 전용)'); return; }
-  getIntroPortalUrl_(function(url){
-    openIntroPortalWithUrl_(url);
-  });
-}  
-
-let INTRO_PORTAL_BASE_URL_ = 'https://jhsim2545.github.io/Lead-app/';
-
-function getIntroPortalUrl_(callback){
-  if (INTRO_PORTAL_BASE_URL_) { callback(INTRO_PORTAL_BASE_URL_); return; }
-  google.script.run
-    .withSuccessHandler(function(res){
-      const u = (res && res.success && res.url) ? res.url : 'https://jhsim2545.github.io/Lead-app/';
-      INTRO_PORTAL_BASE_URL_ = u;
-      callback(u);
-    })
-    .withFailureHandler(function(){
-      callback('https://jhsim2545.github.io/Lead-app/');
-    })
-    .getIntroPortalUrl(SESSION ? SESSION.token : '');
-}
-
-function openIntroPortalWithUrl_(baseUrl){
-  let url = String(baseUrl || '').trim() || 'https://jhsim2545.github.io/Lead-app/';
-  if (url.indexOf('script.google.com') !== -1 || url.indexOf('Lead-app_index.html') !== -1) {
-    url = 'https://jhsim2545.github.io/Lead-app/';
-  }
-
-  const sess = (typeof SESSION !== 'undefined' && SESSION) ? SESSION : (typeof getSession_ === 'function' ? getSession_() : null);
-  const userName = (sess && sess.name) ? sess.name : '지사장';
-  const userPhone = (sess && sess.phone) ? sess.phone.replace(/[^0-9]/g, '') : '01027042545';
-  const userJob = (sess && sess.job) ? sess.job : '컨설턴트';
-  const isMaster = !!(sess && (sess.isMainMaster || sess.isMaster || sess.isAdmin || sess.role === '메인마스터' || sess.role === '서브마스터' || sess.role === 'master' || userName === '심정환' || (userJob && userJob.includes('지사관리자'))));
-  const userRole = isMaster ? 'master' : 'user';
-
-  const introSessionData = {
-    phone: userPhone,
-    name: userName,
-    job: isMaster ? '지사관리자' : userJob,
-    role: userRole,
-    isMaster: isMaster,
-    savedAt: Date.now()
-  };
-
-  try {
-    sessionStorage.setItem('S1_LEAD_PORTAL_AUTH_SESSION', JSON.stringify(introSessionData));
-    localStorage.setItem('S1_LEAD_PORTAL_AUTH_SESSION', JSON.stringify(introSessionData));
-    localStorage.setItem('S1_LAST_LOGIN_PHONE', userPhone);
-  } catch(e) {}
-
-  recordLoginPortal_('소개영업');
-  if (typeof logUserAction_ === 'function') {
-    logUserAction_('소개 포털 이동', '외부연동', '', { desc: userName + ' 소개 포털 바로가기 접속' });
-  }
-
-  let ssoToken = '';
-  try {
-    ssoToken = btoa(unescape(encodeURIComponent(JSON.stringify(introSessionData))));
-  } catch(e) {}
-
-  const sep = url.indexOf('?') === -1 ? '?' : '&';
-  const ssoParams = [
-    'sso=1',
-    'sso_token=' + encodeURIComponent(ssoToken),
-    'name=' + encodeURIComponent(userName),
-    'phone=' + encodeURIComponent(userPhone),
-    'job=' + encodeURIComponent(isMaster ? '지사관리자' : userJob),
-    'role=' + encodeURIComponent(userRole),
-    'master=' + (isMaster ? '1' : '0'),
-    'agent=' + encodeURIComponent(userName),
-    'ts=' + Date.now()
-  ].join('&');
-
-  const fullUrl = url + sep + ssoParams;
-
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-  if (isMobile) {
-    window.location.href = fullUrl;
-  } else {
-    const w = window.open(fullUrl, '_blank');
-    if (!w || w.closed || typeof w.closed === 'undefined') {
-      window.location.href = fullUrl;
-    }
-  }
-}  
 
 /* ===================== 종합 대시보드 ===================== */  
 let DASH_YM = (window.getDashBasisDate_ ? window.getDashBasisDate_() : todayStr()).slice(0,7);  
