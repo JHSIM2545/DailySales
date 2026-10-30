@@ -281,7 +281,7 @@
         '<tr class="row-ratio"><th>전년 대비 증감률</th>' + cols.map(function (c) { return '<td class="num"' + clr(c.g, c.k) + '>' + (c.g == null ? '–' : sgn(c.g) + (c.g * 100).toFixed(1) + '%') + '</td>'; }).join('') + '</tr>' +
         '</tbody></table>' +
         '<div style="font-size:11.5px; color:#64748b; margin-top:6px; line-height:1.6;">전년 값은 ' + py + '년 ' + m + '월 전체(월말) 기준이고, ' + y + '년은 위 영업현황 집계표와 같은 월말 기준 실적입니다. 출처: 서울사업팀 누계 실적 현황 엑셀(' + py + '년 시트, 북서울 행).<br>' +
-        '※ 수주는 엑셀의 \'계약\' 항목과 대응시킨 값(대응 여부 미확인), 알람+휴엔은 일반과 휴엔 합산, 단위는 원본에 표기가 없어 천원으로 추정했습니다. 유지감소는 증감이 음수일수록 양호합니다.</div>';
+        '※ 수주는 엑셀의 \'계약\' 항목과 대응시킨 값(대응 여부 미확인), 알람+휴엔은 일반과 휴엔 합산, 단위는 원본에 표기가 없어 천원으로 추정했습니다. 유지감소는 증감이 음수일수록 양호하며, 유지감소 전년 달성률은 2 − 실적/목표 추정식입니다.</div>';
       cur.innerHTML = wrap(h);
     }).catch(function (e) {
       var cur = document.getElementById('statusYoyBox'); if (!cur || cur.dataset.stamp !== stamp) return;
