@@ -201,6 +201,95 @@
     toggleCmp: function () { S.cmp = !S.cmp; render(); },
     sort: function (k) { if (S.sort === k) S.dir *= -1; else { S.sort = k; S.dir = k === 'n' ? 1 : -1; } render(); }
   };
+
+  /* ===================== 영업현황 화면 - 전년동기 비교 =====================
+   * 영업현황(sales_status) 탭의 [전년동기 비교] 버튼. 선택한 년월(statusYearMonth)의 북서울지사 실적을
+   * 전년 같은 월(seoul_perf_history, 북서울 행)과 비교한다.
+   *  - 상품 매핑: 일반알람=일반 / 알람+휴엔=일반+휴엔 합산 / 정보보안=디지털
+   *  - 지표 매핑: 수주=엑셀 '계약'(대응 관계 미확인), 개시, 유지감소, 유지증가
+   *  - 전년 값은 그 달 전체(월말) 값이다. 올해 실적은 영업현황 집계표와 같은 월말 기준(STATUS_ACTUAL_END)을 쓴다.
+   */
+  var YOY_ON = false, YOY_CACHE = {};
+  var YOY_PRODS = { '일반알람': ['일반'], '알람+휴엔': ['일반', '휴엔'], '정보보안': ['디지털'] };
+  var YOY_METRICS = [['수주', '계약', '목표_수주금액'], ['개시', '개시', '목표_개시금액'], ['유지감소', '유지감소', '목표_유지감소'], ['유지증가', '유지증가', '목표_유지증가']];
+
+  function yoyFetch(py, m, prods) {
+    var key = py + '|' + m + '|' + prods.join(',');
+    if (YOY_CACHE[key]) return Promise.resolve(YOY_CACHE[key]);
+    var c;
+    try { c = getClient(); } catch (e) { return Promise.reject(e); }
+    return c.from(TABLE).select('product,metric,target,actual').eq('year', py).eq('month', m).eq('branch', MINE).in('product', prods).then(function (r) {
+      if (r.error) throw new Error(r.error.message);
+      var out = {};
+      (r.data || []).forEach(function (x) {
+        var o = out[x.metric] = out[x.metric] || { t: null, a: null };
+        if (x.target != null) o.t = (o.t || 0) + Number(x.target);
+        if (x.actual != null) o.a = (o.a || 0) + Number(x.actual);
+      });
+      if (!Object.keys(out).length) throw new Error('전년 동월 과거실적 데이터가 없습니다.');
+      YOY_CACHE[key] = out; return out;
+    });
+  }
+
+  function yoyBtnStyle() {
+    return 'padding:4px 12px; border-radius:4px; cursor:pointer; font-size:13px; font-weight:700; ' +
+      (YOY_ON ? 'background:#1e3a8a; color:#fff; border:1px solid #172554;' : 'background:#f4f6f8; color:#1e3a8a; border:1px solid #c7cfd8;');
+  }
+
+  function yoyRender() {
+    var head = document.querySelector('.status-wrap .status-head'); if (!head) return;
+    var btn = document.getElementById('statusYoyBtn');
+    if (!btn) {
+      btn = document.createElement('button'); btn.id = 'statusYoyBtn'; btn.type = 'button'; btn.textContent = '전년동기 비교';
+      btn.onclick = function () { YOY_ON = !YOY_ON; yoyRender(); };
+      head.appendChild(btn);
+    }
+    btn.style.cssText = yoyBtnStyle();
+    var box = document.getElementById('statusYoyBox');
+    if (!YOY_ON) { if (box) box.remove(); return; }
+    if (!box) { box = document.createElement('div'); box.id = 'statusYoyBox'; head.insertAdjacentElement('afterend', box); }
+    var parts = String(window.statusYearMonth || '').split('-').map(Number), y = parts[0], m = parts[1];
+    var prods = YOY_PRODS[window.statusProductFilter] || ['일반'];
+    var py = y - 1;
+    var wrap = function (inner) { return '<div class="status-target" style="margin-bottom:12px; background:#f8fafc;">' + inner + '</div>'; };
+    if (py < 2023) { box.innerHTML = wrap('<div class="status-target-title">전년동기 비교</div><div style="padding:8px 4px; color:#64748b;">과거실적은 2023년부터 있어 ' + y + '년은 전년 비교 대상이 없습니다.</div>'); return; }
+    box.innerHTML = wrap('<div style="padding:10px; color:#64748b;">전년 동월 과거실적을 불러오는 중입니다...</div>');
+    var stamp = y + '-' + m + '|' + window.statusProductFilter;
+    box.dataset.stamp = stamp;
+    yoyFetch(py, m, prods).then(function (prev) {
+      var cur = document.getElementById('statusYoyBox'); if (!cur || cur.dataset.stamp !== stamp) return;
+      var T = window.STATUS_TARGET || {}, A = window.STATUS_ACTUAL_END || window.STATUS_ACTUAL || {};
+      var K = typeof fmtK === 'function' ? fmtK : function (v) { return Math.round(Number(v) || 0).toLocaleString('ko-KR'); };
+      var cellS = 'text-align:right !important; text-align-last:right !important; padding-right:0.7em !important;';
+      var R = function (cells) { return cells.map(function (c) { return '<td class="num" style="' + cellS + '">' + c + '</td>'; }).join(''); };
+      var cols = YOY_METRICS.map(function (d) {
+        var p = prev[d[1]] || { t: null, a: null };
+        var ta = Number(T[d[2]]) || 0, a = Number(A[d[0]]) || 0;
+        var diff = p.a != null ? a - p.a : null, g = (p.a != null && p.a !== 0) ? a / p.a - 1 : null;
+        return { k: d[0], ta: ta, a: a, pt: p.t, pa: p.a, pr: rate(d[1], p.t, p.a), diff: diff, g: g };
+      });
+      var clr = function (v, k) { if (v == null || v === 0) return ''; var good = k === '유지감소' ? v < 0 : v > 0; return ' style="' + cellS + 'color:' + (good ? '#15803d' : '#dc2626') + ';"'; };
+      var n = function (v) { return v == null ? '–' : K(v); };
+      var h = '<div class="status-target-title" style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;"><span>' + y + '.' + m + '월 vs ' + py + '.' + m + '월 전년동기 비교 · 북서울 · ' + esc(window.statusProductFilter) + '</span><span style="font-weight:600; font-size:0.85em;">(단위: 천원 추정)</span></div>' +
+        '<table class="status-summary status-summary-full"><thead><tr><th style="text-align:center !important;">구분</th>' + cols.map(function (c) { return '<th style="text-align:center !important;">' + c.k + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        '<tr class="row-target"><th>' + y + ' 목표</th>' + R(cols.map(function (c) { return n(c.ta); })) + '</tr>' +
+        '<tr class="row-actual"><th>' + y + ' 실적</th>' + R(cols.map(function (c) { return n(c.a); })) + '</tr>' +
+        '<tr class="row-target"><th>' + py + ' 목표</th>' + R(cols.map(function (c) { return n(c.pt); })) + '</tr>' +
+        '<tr class="row-actual"><th>' + py + ' 실적</th>' + R(cols.map(function (c) { return n(c.pa); })) + '</tr>' +
+        '<tr class="row-ratio"><th>' + py + ' 달성률</th>' + R(cols.map(function (c) { return pct(c.pr); })) + '</tr>' +
+        '<tr class="row-diff"><th>전년 대비 증감</th>' + cols.map(function (c) { return '<td class="num"' + clr(c.diff, c.k) + '>' + (c.diff == null ? '–' : sgn(c.diff) + K(c.diff)) + '</td>'; }).join('') + '</tr>' +
+        '<tr class="row-ratio"><th>전년 대비 증감률</th>' + cols.map(function (c) { return '<td class="num"' + clr(c.g, c.k) + '>' + (c.g == null ? '–' : sgn(c.g) + (c.g * 100).toFixed(1) + '%') + '</td>'; }).join('') + '</tr>' +
+        '</tbody></table>' +
+        '<div style="font-size:11.5px; color:#64748b; margin-top:6px; line-height:1.6;">전년 값은 ' + py + '년 ' + m + '월 전체(월말) 기준이고, ' + y + '년은 위 영업현황 집계표와 같은 월말 기준 실적입니다. 출처: 서울사업팀 누계 실적 현황 엑셀(' + py + '년 시트, 북서울 행).<br>' +
+        '※ 수주는 엑셀의 \'계약\' 항목과 대응시킨 값(대응 여부 미확인), 알람+휴엔은 일반과 휴엔 합산, 단위는 원본에 표기가 없어 천원으로 추정했습니다. 유지감소는 증감이 음수일수록 양호합니다.</div>';
+      cur.innerHTML = wrap(h);
+    }).catch(function (e) {
+      var cur = document.getElementById('statusYoyBox'); if (!cur || cur.dataset.stamp !== stamp) return;
+      cur.innerHTML = wrap('<div class="status-target-title">전년동기 비교</div><div style="padding:8px 4px; color:#dc2626;">' + esc(e.message || e) + '</div>');
+    });
+  }
+  window.statusYoyAfterRender_ = yoyRender;
+
   window.renderPastPerfView_ = render;
   window.dashShowPastPerfView_ = function () {
     DASH_VIEW_ = 'past_perf';

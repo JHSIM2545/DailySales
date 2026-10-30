@@ -12174,6 +12174,7 @@ function renderSalesStatus(){
   
    html += '</tbody></table></div></div>';  
  document.getElementById('content').innerHTML = html;  
+  if (window.statusYoyAfterRender_) { try { statusYoyAfterRender_(); } catch (e) { console.warn('[전년동기 비교]', e); } }
  fitTwoRowStickyHeader_('.status-wrap .grid-wrap table');  
  fitGridWrapToViewport_();  
  if (typeof scrollSalesStatusToToday_ === 'function') scrollSalesStatusToToday_();  
@@ -16316,7 +16317,7 @@ function fsBindOnce_(){
 
 
 </script>
-<script src="past-perf.js?v=20261030a"></script>
+<script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>
 </body>
 </html>

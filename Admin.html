@@ -10049,6 +10049,7 @@ function renderSalesStatus(){
   html += '</tbody></table></div></div>';
   const c = document.getElementById('content');
   if (c) c.innerHTML = html;
+  if (window.statusYoyAfterRender_) { try { statusYoyAfterRender_(); } catch (e) { console.warn('[전년동기 비교]', e); } }
   if (typeof fitTwoRowStickyHeader_ === 'function') fitTwoRowStickyHeader_('.status-wrap .grid-wrap table');
   if (typeof fitGridWrapToViewport_ === 'function') fitGridWrapToViewport_();
   if (typeof scrollSalesStatusToToday_ === 'function') scrollSalesStatusToToday_();
@@ -20986,7 +20987,7 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261028c"></script>
-<script src="past-perf.js?v=20261030a"></script>
+<script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>
 </body>
 </html>
