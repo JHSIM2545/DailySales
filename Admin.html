@@ -8802,7 +8802,14 @@ function renderDashboard(){
   } else {
     let s2 = `${m}월 ${isCurMonth ? '현재까지 ' : ''}유지증가는 <strong style="color:${netAmt < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(netAmt)}천원</strong>(목표 ${sgnK_(netTgt)}천원 대비 ${netPct}%)입니다. 해약 ${cancelCntOv}건(${fmtK(cancelAmtK)}천원), 단가인상 ${fmtK(priceUpK)}천원, 단가인하 ${fmtK(priceDownK)}천원이 반영되었습니다.`;
     if (projNet !== null) s2 += ` 영업현황 ${m}월말 기준(일보에 기록된 개시·해약·단가변동을 모두 반영) 유지증가 전망은 <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원</strong>${projNetPct !== null ? '(목표 대비 ' + projNetPct + '%)' : ''}입니다.`;
-    if (netAmt < 0 || (projNet !== null && netTgt > 0 && projNet < netTgt) || (projNet === null && netTgt > 0 && netPct < workRatio)) s2 += ' 목표 대비 부족하므로 <strong>설치공사가 필요 없는 유증 상품</strong>과 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>에 집중해야 합니다.';
+    if (netAmt < 0 || (projNet !== null && netTgt > 0 && projNet < netTgt) || (projNet === null && netTgt > 0 && netPct < workRatio)) {
+      s2 += ' 목표 대비 부족합니다.';
+      // 남은 영업일에 따라 처방을 달리한다: 설치공사(최소 3영업일) 기간을 확보할 수 있으면 당월 개시 가능 안건 수주 집중, 못 하면 공사 불필요 상품
+      const leftDays_ = Math.max(0, totDays - elDays);
+      if (!isCurMonth) s2 += ' <strong>CS·기술사원 합동 단가인상·해약 방어</strong>로 유지증가를 보완하세요.';
+      else if (leftDays_ > 3) s2 += ` 남은 영업일이 ${leftDays_}일로 공사기간(최소 3영업일)을 확보할 수 있으므로, <strong>당월 개시 가능한 안건 수주에 집중</strong>하고 공사 일정을 앞당겨 당월 개시로 연결하세요. 아울러 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>를 병행합니다.`;
+      else s2 += ` 남은 영업일이 ${leftDays_}일뿐이라 지금 수주해서는 공사기간(최소 3영업일)을 확보하기 어려우므로, <strong>설치공사가 필요 없는 유증 상품</strong>과 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>에 집중하세요.`;
+    }
     aiTask2 = s2;
   }
 

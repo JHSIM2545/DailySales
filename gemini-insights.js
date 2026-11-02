@@ -82,7 +82,7 @@
     var bm = ['amt', 'tgt', 'pct', 'rank', 'avg', 'gap', 'end', 'endPct'];
     return {
       y: c.y, m: c.m, isCurMonth: !!c.isCurMonth, isPastMonth: !!c.isPastMonth, isFutureMonth: !!c.isFutureMonth,
-      elDays: c.elDays, totDays: c.totDays, workRatio: c.workRatio, bizTotal: c.bizTotal || 0,
+      elDays: c.elDays, totDays: c.totDays, leftDays: Math.max(0, num(c.totDays) - num(c.elDays)), workRatio: c.workRatio, bizTotal: c.bizTotal || 0,
       ord: pick(c.ord, bm), start: pick(c.start, bm), net: pick(c.net, bm),
       safety: c.safety ? pick(c.safety, ['ordAmt', 'ordTgt', 'ordPct', 'saleAmt', 'saleTgt', 'salePct']) : null,
       cancel: pick(c.cancel, ['cnt', 'amt']), priceUpK: num(c.priceUpK), priceDownK: num(c.priceDownK),
