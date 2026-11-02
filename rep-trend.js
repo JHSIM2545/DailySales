@@ -111,7 +111,7 @@
   // ---------------- 차트 (그룹 막대, 인라인 SVG) ----------------
   function chartSvg(data, key, title, W0) {
     var names = Object.keys(data.reps);
-    var W = W0 || 640, H = 230, L = 38, R = 8, T = 30, B = 40;
+    var W = W0 || 640, H = 168, L = 38, R = 8, T = 22, B = 22;
     var max = 0;
     names.forEach(function (n) { data.reps[n][key].forEach(function (v) { if (v > max) max = v; }); });
     if (max <= 0) return '<div style="color:#64748b;font-size:12px;padding:10px 0;">' + esc(title) + ': 표시할 실적이 없습니다.</div>';
@@ -120,8 +120,8 @@
     var pw = W - L - R, ph = H - T - B, gw = pw / names.length, bw = Math.min(22, (gw - 14) / 4);
     var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(title) + '" style="display:block;width:100%;max-width:440px;font-family:inherit;">';
     s += '<text x="' + L + '" y="14" font-size="12" font-weight="700" fill="#0f172a">' + esc(title) + ' (천원)</text>';
-    for (var g = 0; g <= 4; g++) {
-      var gv = top * g / 4, gy = T + ph - ph * g / 4;
+    for (var g = 0; g <= 2; g++) {
+      var gv = top * g / 2, gy = T + ph - ph * g / 2;
       s += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + gy + '" y2="' + gy + '" stroke="#e2e8f0" stroke-width="1"/>' +
         '<text x="' + (L - 4) + '" y="' + (gy + 3) + '" font-size="9" text-anchor="end" fill="#64748b">' + fmt(gv) + '</text>';
     }
@@ -135,11 +135,12 @@
       });
       s += '<text x="' + (L + gw * ri + gw / 2) + '" y="' + (H - B + 14) + '" font-size="11" font-weight="700" text-anchor="middle" fill="#0f172a">' + esc(n) + '</text>';
     });
-    // 범례
+    // 범례 (제목 줄 오른쪽)
+    var lx0 = W - R - 4 * 66;
     data.months.forEach(function (mo, i) {
       if (!hasData(data, i)) return;
-      var lx = L + i * 82;
-      s += '<rect x="' + lx + '" y="' + (H - 12) + '" width="10" height="10" rx="2" fill="' + COLORS[i] + '"/><text x="' + (lx + 14) + '" y="' + (H - 3) + '" font-size="10" fill="#334155">' + esc(label(mo)) + '</text>';
+      var lx = lx0 + i * 66;
+      s += '<rect x="' + lx + '" y="5" width="9" height="9" rx="2" fill="' + COLORS[i] + '"/><text x="' + (lx + 12) + '" y="13" font-size="9" fill="#334155">' + esc(mo.m + '월' + (mo.cur ? '·당월' : '')) + '</text>';
     });
     return s + '</svg>';
   }
@@ -153,7 +154,7 @@
         arr.map(function (v, i) { return '<td class="n" style="text-align:right;' + (i === 3 ? 'font-weight:800;' : '') + '">' + (hasData(data, i) ? fmt(v) : '-') + '</td>'; }).join('') +
         '<td style="color:' + st.tcol + ';font-weight:700;text-align:center;white-space:nowrap;">' + esc(st.trend) + '</td></tr>';
     }
-    var h = '<table class="ai-data-table" style="font-size:12px;width:100%;"><thead><tr><th>' + esc(title) + ' (천원)</th>' +
+    var h = '<table class="ai-data-table" style="font-size:11.5px;width:100%;"><thead><tr><th>' + esc(title) + ' (천원)</th>' +
       data.months.map(function (mo) { return '<th>' + esc(label(mo)) + '</th>'; }).join('') + '<th>추세</th></tr></thead><tbody>';
     names.forEach(function (n) { h += row(n, data.reps[n][key], false); });
     return h + row('지사 합계', data.total[key], true) + '</tbody></table>';
@@ -161,8 +162,8 @@
 
   // 차트(왼쪽) + 표(오른쪽) 한 줄
   function pairHtml(data, key, title, c, W, minw) {
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(' + minw + 'px,1fr));gap:12px;align-items:center;margin-bottom:10px;">' +
-      '<div>' + chartSvg(data, key, '컨설턴트별 ' + title + ' 추이', W) + '</div><div style="overflow-x:auto;">' + tableOne(data, key, title, c) + '</div></div>';
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(' + minw + 'px,1fr));gap:12px;align-items:center;margin-bottom:6px;">' +
+      '<div>' + chartSvg(data, key, title + ' 추이', W) + '</div><div style="overflow-x:auto;">' + tableOne(data, key, title, c) + '</div></div>';
   }
 
   function noteText(data, c) {
