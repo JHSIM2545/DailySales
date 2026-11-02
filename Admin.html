@@ -9090,25 +9090,25 @@ function renderDashboard(){
         <!-- 과제 1 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #f59e0b;">
           <div style="font-weight:800; color:#b45309; margin-bottom:4px;">1. 타 지사 대비 수주 가속 과제 (서울사업팀 16개 지사 대조)</div>
-          ${aiTask1}
+          <div class="gm-task" data-i="0">${aiTask1}</div>
         </div>
 
         <!-- 과제 2 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #dc2626;">
           <div style="font-weight:800; color:#dc2626; margin-bottom:4px;">2. 유증 달성 특수 과제 (단기 무공사 상품 및 전원 인상 총력)</div>
-          ${aiTask2}
+          <div class="gm-task" data-i="1">${aiTask2}</div>
         </div>
 
         <!-- 과제 3 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #2563eb;">
           <div style="font-weight:800; color:#1e40af; margin-bottom:4px;">3. 안전상품 전략영업 협업 강화 과제</div>
-          ${aiTask3}
+          <div class="gm-task" data-i="2">${aiTask3}</div>
         </div>
 
         <!-- 과제 4 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #0d9488;">
           <div style="font-weight:800; color:#0f766e; margin-bottom:4px;">4. 블루스캔·휴엔·디지털 무실적 탈출 TF 활동 제안</div>
-          ${aiTask4}
+          <div class="gm-task" data-i="3">${aiTask4}</div>
         </div>
 
       </div>
@@ -20177,6 +20177,7 @@ function buildAllChaptersAiReport_(d, ym, cat, rep){
   const html = `
     <div class="ai-report-all-chapters" style="font-family:'Malgun Gothic','맑은 고딕','Noto Sans CJK KR',sans-serif; word-break:keep-all;">
       ${coverHtml}
+      <div id="gmReportBox"></div>
 
       <div class="rpt-chapter-block" id="rpt_chapter_1">
         ${chapterDivider(1, '제1장. 종합 경영진 전략 보고서', '사업팀 16개 지사 벤치마크 연계 분석, 4대 비율 진단 및 지사 성장 로드맵')}
@@ -20275,7 +20276,7 @@ function buildStrategyDoc_(c){
   const vNet = (c.isCurMonth && c.rowEnd) ? (Number(c.rowEnd.누계유지증가) || 0) : c.net.amt;
   const pNet = c.net.tgt ? r1(vNet / c.net.tgt * 100) : 0;
   const lossAll = A(c.cancel.amt) + A(c.priceDownK);
-  const sumLines = [];
+  let sumLines = [];
   const refP = c.isCurMonth ? c.workRatio : 100;
   /* 지표별 개별 판정: 2=양호(목표 달성/상위권) 1=보통 0=미흡 */
   const lvl = function (o) {
@@ -20326,6 +20327,7 @@ function buildStrategyDoc_(c){
     else if (lo === 2 && ls === 2) sumLines.push('현재 흐름을 유지하며 해약 방어에 집중할 시기입니다.');
     else sumLines.push('부족한 부문을 보완하며 목표 달성에 집중할 시기입니다.');
   }
+  if (c.gemini && c.gemini.cover_summary && c.gemini.cover_summary.length) sumLines = c.gemini.cover_summary.slice(0, 3);
   const toc = ['월간 영업 현황 및 현황분석', '핵심 문제점 및 원인 점검', '수주 현황 및 개시일정·소요일 분석', '상품군별 &amp; 컨설턴트별 당월 종합 성과표', '인상·인하·해약 및 유지증감 분석', m + '월말 실적 전망 및 분석', '북서울지사 4대 전략 실행 과제', '현장 인력 실천 수칙'];
   const wd = (function () { try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); } })().replace(/-/g, '.');  // 작성일자는 PDF를 만드는 오늘 날짜
   const cover = '<div class="pg cover">'
@@ -20337,7 +20339,7 @@ function buildStrategyDoc_(c){
     + '<div class="cv-d">' + esc(wd) + '</div>'
     + '<div class="cv-sum">' + sumLines.map(function (t) { return '<div>' + esc(t) + '</div>'; }).join('') + '</div>'
     + '<div class="cv-toc">' + toc.map(function (t, i) { return '<div>' + (i + 1) + '. ' + t + '</div>'; }).join('') + '</div>'
-    + '<div class="cv-org">에스원 서울사업팀 북서울지사</div></div>';
+    + '<div class="cv-org">에스원 서울사업팀 북서울지사' + (c.gemini ? ' · 분석 문구 Google Gemini 작성 (수치는 일보 DB 기준)' : '') + '</div></div>';
 
   /* ───── Chapter 01·02 현황 ───── */
   add(band('CHAPTER 01 · 02', '1. 월간 영업 현황 및 현황분석', '기준: ' + esc(modeTxt)), true);
@@ -20345,6 +20347,7 @@ function buildStrategyDoc_(c){
   const badge = function(t){ return '<span class="bdg" style="color:' + t.col + ';background:' + t.bg + '">' + t.t + '</span>'; };
   let intro = y + '년 ' + m + '월 ' + (c.isCurMonth ? ('현재(' + c.elDays + '영업일 경과, 영업일 진척률 ' + c.workRatio + '%)') : (c.isPastMonth ? '최종 마감 기준' : '집계 전')) + ', 북서울지사의 수주 달성률은 ' + c.ord.pct + '%, 개시 ' + c.start.pct + '%, 유지증가 ' + S(c.net.amt) + '천원(목표 대비 ' + c.net.pct + '%)입니다.';
   if (c.safety) intro += ' 안전상품은 수주 ' + c.safety.ordPct + '%, 확정 매출 ' + c.safety.salePct + '% 수준입니다.';
+  if (c.gemini && c.gemini.status_intro) intro = c.gemini.status_intro;
   add('<div class="blk"><h3 class="s">1.1 4대 핵심 지표 영업 현황' + (hasBiz ? ' 및 서울사업팀 ' + nb + '개 지사 벤치마크' : '') + '</h3><p>' + esc(intro) + '</p>'
     + '<div class="kpi">'
     + '<div class="card"><div class="ch"><b>(1) 수주진척도</b>' + badge(tO) + '</div><div class="kv">' + K(c.ord.amt) + '천원 <small>(' + c.ord.pct + '%)</small></div><div class="kt">목표 ' + K(c.ord.tgt) + '천원<br>' + rankLine(c.ord) + '</div></div>'
@@ -20364,6 +20367,7 @@ function buildStrategyDoc_(c){
   a2 = '<b>② 해약·단가변동과 유지증가:</b> 개시 ' + K(c.start.amt) + '천원에 대해 해약 ' + c.cancel.cnt + '건(-' + K(A(c.cancel.amt)) + '천원), 단가인하 -' + K(A(c.priceDownK)) + '천원, 단가인상 +' + K(A(c.priceUpK)) + '천원이 반영되어 유지증가는 ' + S(c.net.amt) + '천원입니다.' + (lossK > c.start.amt ? ' 해약·인하 합계(' + K(lossK) + '천원)가 개시 실적을 웃돌고 있습니다.' : '');
   if (c.safety) { const dd = r1(c.safety.ordPct - c.safety.salePct); a3 = '<b>③ 안전상품 수주와 매출:</b> 수주 ' + K(c.safety.ordAmt) + '천원(' + c.safety.ordPct + '%) 대비 확정 매출 ' + K(c.safety.saleAmt) + '천원(' + c.safety.salePct + '%)으로, ' + (dd > 0 ? ('매출 전환이 수주보다 ' + dd + '%p 뒤처져 있습니다. 시공·검수 일정 관리가 필요합니다.') : '매출 전환이 수주 속도를 따라가고 있습니다.'); }
   else a3 = '<b>③ 안전상품:</b> 상품일보 집계 데이터가 아직 없습니다.';
+  if (c.gemini && c.gemini.analysis && c.gemini.analysis.length >= 3) { a1 = '<b>①</b> ' + esc(c.gemini.analysis[0]); a2 = '<b>②</b> ' + esc(c.gemini.analysis[1]); a3 = '<b>③</b> ' + esc(c.gemini.analysis[2]); }
   add('<div class="blk"><h3 class="s">1.2 현황 분석</h3><p>' + a1 + '</p><p>' + a2 + '</p><p>' + a3 + '</p></div>');
 
   /* ───── Chapter 03·04 문제점 ───── */
@@ -20587,6 +20591,7 @@ async function downloadAllChaptersPdf_(){
   } catch (e) { console.warn('PDF 전 데이터 최신화 실패(기존 데이터 사용)', e); }
   const c = window.DASH_REPORT_CTX_;
   if (!c) { alert('대시보드 데이터를 먼저 불러온 뒤 다시 시도하세요.'); return; }
+  try { if (window.salesAiInsight_ && !c.gemini) { const gi_ = await window.salesAiInsight_(c, { timeout: 40000 }); if (gi_) { c.gemini = gi_; c.tasks = gi_.tasks.map(window.salesAiToHtml_); } } } catch (e) { console.warn('Gemini 분석 생략(기본 분석으로 PDF 생성)', e); }
   const fname = '북서울지사_영업현황 보고서_' + (function () {   // 예: 북서울지사_영업현황 보고서_261013 (PDF 생성일 기준, 한국시간)
     try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, ''); }
     catch (e) { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
@@ -20987,6 +20992,7 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261102b"></script>
+<script src="gemini-insights.js?v=20261103a"></script>
 <script src="flag-sync.js?v=20261102b"></script>
 <script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>
