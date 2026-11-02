@@ -12675,7 +12675,7 @@ function orderCellClass(row, field, val, allRows){
  else if (field === '유형') cls += ' regtype-col';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
- if (['개시일','기산일'].indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
+ if (ORDER_DATE_FIELDS.indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
  else if (sortState.key === field) cls += ' sort-col';  
  return cls.trim();  
 }  
@@ -13150,7 +13150,7 @@ function cancelCellClass(field, val, allRows){
  else if (field === '해약유형') cls += ' canceltype-col';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
- if (['접수일','확정일'].indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
+ if (CANCEL_DATE_FIELDS.indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
  else if (cancelSortState.key === field) cls += ' sort-col';  
  return cls.trim();  
 }  
@@ -13644,7 +13644,7 @@ function fieldCellHtmlPrice(row, field, allRows){
  if (PRICE_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
- if (field === '기산일' && String(val) === todayStr()) cls += ' today-hl';  
+ if (PRICE_DATE_FIELDS.indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
  else if (priceSortState.key === field) cls += ' sort-col';  
  const titleAttr = (field === '계약처명' || field === '비고' || field === '사유') ? ` title="${escAttr(val)}"` : '';  
  return `<td class="${cls.trim()}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
@@ -14047,7 +14047,7 @@ function fieldCellHtmlRestart(row, field, allRows){
  else if (['현상태','공사담당'].indexOf(field) !== -1) cls += ' narrow';  
  if (field === '그로스' && String(val) === '법인') cls += ' gross-corp';  
  if (field === '상품') cls += productCellClass_(val);  
- if (field === '재개시일' && String(val) === todayStr()) cls += ' today-hl';  
+ if (RESTART_DATE_FIELDS.indexOf(field) !== -1 && String(val) === todayStr()) cls += ' today-hl';  
  else if (restartSortState.key === field) cls += ' sort-col';  
  const titleAttr = (field === '계약처명' || field === '비고') ? ` title="${escAttr(val)}"` : '';  
  return `<td class="${cls.trim()}" style="text-align:${align} !important;"${titleAttr}>${inner}</td>`;  
