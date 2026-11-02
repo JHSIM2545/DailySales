@@ -109,16 +109,16 @@
   }
 
   // ---------------- 차트 (그룹 막대, 인라인 SVG) ----------------
-  function chartSvg(data, key, title) {
+  function chartSvg(data, key, title, W0) {
     var names = Object.keys(data.reps);
-    var W = 640, H = 230, L = 38, R = 8, T = 30, B = 40;
+    var W = W0 || 640, H = 230, L = 38, R = 8, T = 30, B = 40;
     var max = 0;
     names.forEach(function (n) { data.reps[n][key].forEach(function (v) { if (v > max) max = v; }); });
     if (max <= 0) return '<div style="color:#64748b;font-size:12px;padding:10px 0;">' + esc(title) + ': 표시할 실적이 없습니다.</div>';
     var step = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / step) * step;
     if (top / step < 2) top = step * 2;
     var pw = W - L - R, ph = H - T - B, gw = pw / names.length, bw = Math.min(22, (gw - 14) / 4);
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(title) + '" style="display:block;max-width:100%;font-family:inherit;">';
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(title) + '" style="display:block;width:100%;max-width:440px;font-family:inherit;">';
     s += '<text x="' + L + '" y="14" font-size="12" font-weight="700" fill="#0f172a">' + esc(title) + ' (천원)</text>';
     for (var g = 0; g <= 4; g++) {
       var gv = top * g / 4, gy = T + ph - ph * g / 4;
@@ -138,74 +138,31 @@
     // 범례
     data.months.forEach(function (mo, i) {
       if (!hasData(data, i)) return;
-      var lx = L + i * 92;
+      var lx = L + i * 82;
       s += '<rect x="' + lx + '" y="' + (H - 12) + '" width="10" height="10" rx="2" fill="' + COLORS[i] + '"/><text x="' + (lx + 14) + '" y="' + (H - 3) + '" font-size="10" fill="#334155">' + esc(label(mo)) + '</text>';
     });
     return s + '</svg>';
   }
 
-  // ---------------- 표 ----------------
-  function tableHtml(data, c) {
+  // ---------------- 표 (지표 하나씩) ----------------
+  function tableOne(data, key, title, c) {
     var names = Object.keys(data.reps);
-    function head(k) { return data.months.map(function (mo) { return '<th>' + esc(label(mo)) + '</th>'; }).join('') + '<th>추세(3개월)</th>'; }
-    function cells(arr, st) {
-      return arr.map(function (v, i) { return '<td class="n" style="text-align:right;' + (i === 3 ? 'font-weight:800;' : '') + '">' + (hasData(data, i) ? fmt(v) : '-') + '</td>'; }).join('') +
-        '<td style="color:' + st.tcol + ';font-weight:700;text-align:center;white-space:nowrap;">' + esc(st.trend) + '</td>';
+    function row(name, arr, sum) {
+      var st = stat(data, arr, c);
+      return '<tr' + (sum ? ' class="sum" style="background:#eff6ff;font-weight:800;"' : '') + '><td style="font-weight:800;white-space:nowrap;">' + esc(name) + '</td>' +
+        arr.map(function (v, i) { return '<td class="n" style="text-align:right;' + (i === 3 ? 'font-weight:800;' : '') + '">' + (hasData(data, i) ? fmt(v) : '-') + '</td>'; }).join('') +
+        '<td style="color:' + st.tcol + ';font-weight:700;text-align:center;white-space:nowrap;">' + esc(st.trend) + '</td></tr>';
     }
-    var h = '<table class="ai-data-table" style="font-size:11px;width:100%;"><thead><tr><th rowspan="2">컨설턴트</th><th colspan="5">수주 (천원)</th><th colspan="5" style="border-left:2px solid #94a3b8;">개시 (천원)</th></tr><tr>' + head('ord') + head('start').replace('<th>', '<th style="border-left:2px solid #94a3b8;">') + '</tr></thead><tbody>';
-    names.forEach(function (n) {
-      var r = data.reps[n];
-      h += '<tr><td style="font-weight:800;">' + esc(n) + '</td>' + cells(r.ord, stat(data, r.ord, c)) +
-        cells(r.start, stat(data, r.start, c)).replace('<td', '<td style="border-left:2px solid #94a3b8;text-align:right;"') + '</tr>';
-    });
-    var to = data.total;
-    h += '<tr class="sum" style="background:#eff6ff;font-weight:800;"><td>지사 합계</td>' + cells(to.ord, stat(data, to.ord, c)) +
-      cells(to.start, stat(data, to.start, c)).replace('<td', '<td style="border-left:2px solid #94a3b8;text-align:right;"') + '</tr>';
-    return h + '</tbody></table>';
+    var h = '<table class="ai-data-table" style="font-size:12px;width:100%;"><thead><tr><th>' + esc(title) + ' (천원)</th>' +
+      data.months.map(function (mo) { return '<th>' + esc(label(mo)) + '</th>'; }).join('') + '<th>추세</th></tr></thead><tbody>';
+    names.forEach(function (n) { h += row(n, data.reps[n][key], false); });
+    return h + row('지사 합계', data.total[key], true) + '</tbody></table>';
   }
 
-  // ---------------- 분석 문구 (DB 숫자만 사용) ----------------
-  function analysis(data, c) {
-    var out = [], names = Object.keys(data.reps), mo = data.months, wr = Number(c.workRatio) || 0;
-    var okIdx = [0, 1, 2].filter(function (i) { return hasData(data, i); });
-    if (okIdx.length < 2) return ['직전 3개월 중 일보 DB에 입력된 기간이 ' + okIdx.length + '개월뿐이라 추세 분석은 자료가 쌓인 뒤 가능합니다. (일보 DB 최초 수주일: ' + (data.firstYm || '자료 없음') + ')'];
-
-    // 지사 전체
-    var t = data.total, to = t.ord, ts = t.start;
-    var seq = function (arr) { return okIdx.map(function (i) { return mo[i].m + '월 ' + fmt(arr[i]); }).join(' → '); };
-    var tsOrd = stat(data, to, c), tsSt = stat(data, ts, c);
-    var p = '지사 전체 수주는 ' + seq(to) + '천원(' + tsOrd.trend + '), 개시는 ' + seq(ts) + '천원(' + tsSt.trend + ')입니다.';
-    if (tsOrd.avg != null) {
-      var cu = to[3], pr = tsOrd.avg ? Math.round(cu / tsOrd.avg * 100) : null;
-      p += ' ' + mo[3].m + '월 ' + (c.isCurMonth ? '현재까지 ' : '') + '수주 ' + fmt(cu) + '천원은 직전 ' + tsOrd.n + '개월 평균(' + fmt(tsOrd.avg) + '천원)의 ' + (pr == null ? '-' : pr + '%') + '입니다.' +
-        (c.isCurMonth && pr != null ? ' 영업일 진척률 ' + wr + '% 대비 ' + (pr >= wr ? '평균 페이스 이상입니다.' : '평균 페이스에 못 미칩니다.') : '');
-    }
-    out.push(p);
-
-    // 컨설턴트별
-    names.forEach(function (n) {
-      var r = data.reps[n], so = stat(data, r.ord, c), ss = stat(data, r.start, c);
-      if (r.ord.every(function (v) { return v === 0; }) && r.start.every(function (v) { return v === 0; })) { out.push(n + ': 조회 기간 수주·개시 실적이 없습니다.'); return; }
-      var line = n + ': 수주 ' + seq(r.ord) + '천원(' + so.trend + ')';
-      if (so.avg != null) {
-        var pr2 = so.avg ? Math.round(r.ord[3] / so.avg * 100) : null;
-        line += ', ' + mo[3].m + '월 ' + (c.isCurMonth ? '현재 ' : '') + fmt(r.ord[3]) + '천원' + (pr2 != null ? '(3개월 평균의 ' + pr2 + '%' + (c.isCurMonth ? (pr2 >= wr ? ', 진척률 이상' : ', 진척률 미달') : '') + ')' : '');
-      }
-      line += '. 개시 ' + seq(r.start) + '천원(' + ss.trend + ').';
-      if (so.trend.indexOf('하락') === 0) line += ' 3개월 전보다 수주가 줄어든 상태라 가망 안건 점검과 동행 지원이 필요합니다.';
-      else if (so.trend.indexOf('상승') === 0 || so.trend === '신규 상승') line += ' 상승 흐름을 유지하도록 클로징 안건을 우선 지원하세요.';
-      var gap = so.avg != null && ss.avg != null && so.avg > 0 ? Math.round(ss.avg / so.avg * 100) : null;
-      if (gap != null && gap < 60) line += ' 개시가 수주 평균의 ' + gap + '%에 그쳐 수주→개시 전환 일정 점검이 필요합니다.';
-      out.push(line);
-    });
-
-    // 최다/최저
-    var sorted = names.slice().sort(function (a, b) { return sum3(data.reps[b].ord) - sum3(data.reps[a].ord); });
-    function sum3(a) { return okIdx.reduce(function (s, i) { return s + a[i]; }, 0); }
-    if (sorted.length > 1 && sum3(data.reps[sorted[0]].ord) > 0) out.push('직전 ' + okIdx.length + '개월 누적 수주 1위는 ' + sorted[0] + '(' + fmt(sum3(data.reps[sorted[0]].ord)) + '천원)이며, 가장 낮은 컨설턴트는 ' + sorted[sorted.length - 1] + '(' + fmt(sum3(data.reps[sorted[sorted.length - 1]].ord)) + '천원)입니다.');
-
-    out.push('※ 법인 건과 영업동기가 전략영업인 건은 사업팀 전략영업 실적이므로 제외했습니다' + (data.strat && (data.strat.ord || data.strat.start) ? ' (조회 기간 제외분: 수주 ' + fmt(data.strat.ord) + '천원, 개시 ' + fmt(data.strat.start) + '천원)' : '') + '. 개시는 기산일 기준이며' + (c.isCurMonth ? ', 당월은 오늘까지 집계된 누계라 마감 월과 단순 비교할 수 없습니다.' : '입니다.') + (data.firstYm ? ' 일보 DB는 ' + data.firstYm + ' 이후 자료만 있습니다.' : ''));
-    return out;
+  // 차트(왼쪽) + 표(오른쪽) 한 줄
+  function pairHtml(data, key, title, c, W, minw) {
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(' + minw + 'px,1fr));gap:12px;align-items:center;margin-bottom:10px;">' +
+      '<div>' + chartSvg(data, key, '컨설턴트별 ' + title + ' 추이', W) + '</div><div style="overflow-x:auto;">' + tableOne(data, key, title, c) + '</div></div>';
   }
 
   function noteText(data, c) {
@@ -215,18 +172,16 @@
 
   function cardHtml(data, c) {
     if (!data) return '<div style="font-size:12px;color:#64748b;">최근 3개월 실적 추이를 불러오지 못했습니다.</div>';
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">' +
-      '<div>' + chartSvg(data, 'ord', '컨설턴트별 수주 추이') + '</div><div>' + chartSvg(data, 'start', '컨설턴트별 개시 추이') + '</div></div>' +
-      '<div style="margin-top:10px;overflow-x:auto;">' + tableHtml(data, c) + '</div>' +
-      '<div style="margin-top:6px;font-size:11px;color:#64748b;">' + esc(noteText(data, c)) + '</div>';
+    return pairHtml(data, 'ord', '수주', c, 420, 380) + pairHtml(data, 'start', '개시', c, 420, 380) +
+      '<div style="margin-top:2px;font-size:11px;color:#64748b;">' + esc(noteText(data, c)) + '</div>';
   }
 
   function reportParts(data, c) {
     if (!data) return [];
-    return ['<div class="blk"><h3 class="s">4.3 컨설턴트별 최근 3개월 수주·개시 추이 (천원)</h3>' + chartSvg(data, 'ord', '컨설턴트별 수주 추이') + chartSvg(data, 'start', '컨설턴트별 개시 추이') + tableHtml(data, c) + '<p class="note">' + esc(noteText(data, c)) + '</p></div>'];
+    return ['<div class="blk"><h3 class="s">4.3 컨설턴트별 최근 3개월 수주·개시 추이 (천원)</h3>' + pairHtml(data, 'ord', '수주', c, 360, 300) + pairHtml(data, 'start', '개시', c, 360, 300) + '<p class="note">' + esc(noteText(data, c)) + '</p></div>'];
   }
 
-  window.repTrend_ = { load: load, cardHtml: cardHtml, reportParts: reportParts, analysis: analysis };
+  window.repTrend_ = { load: load, cardHtml: cardHtml, reportParts: reportParts };
 
   // ---------------- 화면 슬롯 채우기 ----------------
   function fill(slot) {
