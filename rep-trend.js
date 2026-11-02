@@ -208,23 +208,22 @@
     return out;
   }
 
+  function noteText(data, c) {
+    var st = data.strat || {};
+    return '전략영업·법인 제외' + ((st.ord || st.start) ? '(제외분 수주 ' + fmt(st.ord) + ' · 개시 ' + fmt(st.start) + ')' : '') + ' · 개시는 기산일 기준' + (c.isCurMonth ? ' · 당월은 오늘까지 누계' : '');
+  }
+
   function cardHtml(data, c) {
     if (!data) return '<div style="font-size:12px;color:#64748b;">최근 3개월 실적 추이를 불러오지 못했습니다.</div>';
-    var an = analysis(data, c);
-    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;">' +
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;">' +
       '<div>' + chartSvg(data, 'ord', '컨설턴트별 수주 추이') + '</div><div>' + chartSvg(data, 'start', '컨설턴트별 개시 추이') + '</div></div>' +
       '<div style="margin-top:10px;overflow-x:auto;">' + tableHtml(data, c) + '</div>' +
-      '<div style="margin-top:10px;font-size:12.5px;line-height:1.7;color:#334155;">' + an.map(function (a, i) { return '<p style="margin:0 0 6px;' + (i === an.length - 1 ? 'font-size:11.5px;color:#64748b;' : '') + '">' + esc(a) + '</p>'; }).join('') + '</div>';
+      '<div style="margin-top:6px;font-size:11px;color:#64748b;">' + esc(noteText(data, c)) + '</div>';
   }
 
   function reportParts(data, c) {
     if (!data) return [];
-    var an = analysis(data, c), last = an.length - 1;
-    return [
-      '<div class="blk"><h3 class="s">4.3 컨설턴트별 최근 3개월 실적 추이 — 차트</h3>' + chartSvg(data, 'ord', '컨설턴트별 수주 추이') + chartSvg(data, 'start', '컨설턴트별 개시 추이') + '</div>',
-      '<div class="blk"><h3 class="s">4.4 컨설턴트별 수주·개시 월별 실적 (천원)</h3>' + tableHtml(data, c) + '</div>',
-      '<div class="blk"><h3 class="s">4.5 추이 분석</h3>' + an.map(function (a, i) { return '<p' + (i === last ? ' class="note"' : '') + '>' + esc(a) + '</p>'; }).join('') + '</div>'
-    ];
+    return ['<div class="blk"><h3 class="s">4.3 컨설턴트별 최근 3개월 수주·개시 추이 (천원)</h3>' + chartSvg(data, 'ord', '컨설턴트별 수주 추이') + chartSvg(data, 'start', '컨설턴트별 개시 추이') + tableHtml(data, c) + '<p class="note">' + esc(noteText(data, c)) + '</p></div>'];
   }
 
   window.repTrend_ = { load: load, cardHtml: cardHtml, reportParts: reportParts, analysis: analysis };
