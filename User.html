@@ -6287,7 +6287,7 @@ function toggleAllFlags(scope){
  * 표 안에서 마우스를 누른 채 다른 행까지 끌면 시작~끝 행이 모두 체크(깃발) 선택된다.
  * 시작 행이 이미 선택된 행이면 범위 전체를 해제한다. 그냥 클릭이나 셀 안에서의 글자 입력/선택은 그대로 동작. */
 (function(){
-  if (window.__rowDragSelInit_) return; window.__rowDragSelInit_ = true;
+  if (window.__rowDragSelInit_) return; window.__rowDragSelInit_ = true; return; /* 체크 칸 선택 동작은 flag-sync.js 로 이전 */
   try {
     const stl = document.createElement('style');
     stl.textContent = 'body.row-drag-sel, body.row-drag-sel *{ user-select:none !important; -webkit-user-select:none !important; cursor:row-resize !important; } tr.drag-sel td{ background:#bfdbfe !important; background-color:#bfdbfe !important; }';
@@ -16317,6 +16317,7 @@ function fsBindOnce_(){
 
 
 </script>
+<script src="flag-sync.js?v=20261102a"></script>
 <script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>
 </body>
