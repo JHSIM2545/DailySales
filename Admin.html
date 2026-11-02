@@ -19393,7 +19393,7 @@ function buildExecutiveAiReport_(d, ym, cat, rep){
 ` +
     `1. 공격적 수주 볼륨 확대 & 당월 개시율 극대화로 증가하는 해약 압도
 ` +
-    `2. 마감 시기 공사 일정 한계 극복을 위한 '단가 인상' 중심 유지증가(유증) 집중 견인
+    `2. ${Math.max(0, totDays - elDays) > 3 ? '남은 영업일 내 공사기간을 확보할 수 있는 당월 개시 가능 안건 수주 집중 및 단가 인상·해약 방어 병행으로 유지증가(유증) 견인' : "마감 시기 공사 일정 한계 극복을 위한 설치공사 불필요 상품·'단가 인상' 중심 유지증가(유증) 집중 견인"}
 ` +
     `3. 일반알람 고객 대상 블루스캔·휴엔·디지털 결합 제안 및 무료 테스트 기간 축소
 `;
@@ -20528,7 +20528,9 @@ function buildStrategyDoc_(c){
     const fixedLoss = A(now.누계해약중지) + A(now.누계인하);
     const b1 = '월말 유지증가 전망은 <b>' + S(endNet) + '천원</b>으로 목표 ' + S(c.net.tgt) + '천원 대비 ' + pctOf(endNet, c.net.tgt) + '이며, ' + (shortK > 0 ? ('목표까지 <b>' + K(shortK) + '천원</b>이 부족합니다.') : '목표를 초과 달성하는 수준입니다.');
     const b2 = c.isCurMonth ? ('현재 누계 유지증가 ' + S(nowNet) + '천원에서 월말까지 ' + S(endNet - nowNet) + '천원 변동이 이미 일보에 반영되어 있고, 이 중 개시 예정 잔여액은 ' + K(pend) + '천원입니다. 기발생 해약·인하 합계는 ' + K(fixedLoss) + '천원입니다.') : ('최종 개시 ' + K(Number(re.누계개시) || 0) + '천원, 해약·인하 합계 ' + K(A(re.누계해약중지) + A(re.누계인하)) + '천원이 반영된 결과입니다.');
-    const b3 = shortK > 0 ? ('부족분 ' + K(shortK) + '천원은 일보에 이미 입력된 건만으로는 메워지지 않으므로, 당월 즉시 유지증가로 계상되는 상품과 단가인상으로 보완하는 대책이 필요합니다.') : '현재 일보 기준으로 유지증가 목표는 달성 가능한 수준입니다. 해약 방어와 개시 일정 준수로 유지하세요.';
+    const leftD_ = Math.max(0, (Number(c.totDays) || 0) - (Number(c.elDays) || 0));
+    const b3rx = !c.isCurMonth ? '단가인상과 해약 방어로 부족분을 보완하는 대책이 필요합니다.' : (leftD_ > 3 ? ('남은 영업일이 ' + leftD_ + '일로 공사기간(최소 3영업일)을 확보할 수 있으므로, 당월 개시 가능한 안건의 수주와 공사 일정 앞당김에 집중하고 단가인상·해약 방어를 병행하는 대책이 필요합니다.') : ('남은 영업일이 ' + leftD_ + '일뿐이라 지금 수주해서는 공사기간(최소 3영업일)을 확보하기 어려우므로, 설치공사가 필요 없는 유증 상품과 단가인상으로 보완하는 대책이 필요합니다.'));
+    const b3 = shortK > 0 ? ('부족분 ' + K(shortK) + '천원은 일보에 이미 입력된 건만으로는 메워지지 않습니다. ' + b3rx) : '현재 일보 기준으로 유지증가 목표는 달성 가능한 수준입니다. 해약 방어와 개시 일정 준수로 유지하세요.';
     add('<div class="blk card ' + (shortK > 0 ? 'red' : 'grn') + '"><b>6.3 전망 분석</b><br>1. ' + b1 + '<br>2. ' + b2 + '<br>3. ' + b3 + '<br><span class="sm">※ 전망은 영업현황 월말 누계를 그대로 사용하며, 이후 신규 수주·해약은 반영되지 않습니다.</span></div>');
   }
 
@@ -20549,8 +20551,36 @@ function buildStrategyDoc_(c){
     + '<tr><td><b>현장 기술사원</b></td><td>당월 개시처 시공 우선 배정·단가인상 제안</td><td>계약→기산 ' + leadTxt + '</td></tr>'
     + '<tr><td><b>지사 관리자</b></td><td>전략영업과 안전상품 시공 일정 협의</td><td>유지증가 부족분 ' + K(Math.max(0, c.net.tgt - (c.rowEnd ? Number(c.rowEnd.누계유지증가) || 0 : c.net.amt))) + '천원 보완</td></tr>'
     + '</tbody></table></div>');
-  add('<div class="blk quote"><b>"위기는 현장 속에 답이 있고, 극복은 원팀(One-Team)의 합심에서 시작됩니다."</b><br>지사의 모든 동료가 하나의 목표를 향해 수주를 가속하고, 해약을 철통 방어하며, 단가인상과 즉시 유증 상품으로 ' + m + '월 유지증가 목표를 달성합시다.</div>');
+  add(closingQuote_(c));
   return { cover: cover, items: blocks };
+}
+
+// 리포트 마무리 문구: Gemini 가 쓴 closing 이 있으면 그것을, 없으면 날짜·실적에 따라 달라지는 기본 문구를 쓴다(매번 같은 문구가 나오지 않게).
+function closingQuote_(c) {
+  const esc_ = function (t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; }); };
+  if (c.gemini && c.gemini.closing && String(c.gemini.closing).trim().length >= 10) return '<div class="blk quote">' + esc_(c.gemini.closing).replace(/\n/g, '<br>') + '</div>';
+  const m = c.m, left = Math.max(0, (Number(c.totDays) || 0) - (Number(c.elDays) || 0));
+  const gapO = Math.round(((c.ord && c.ord.tgt) ? (c.ord.tgt - c.ord.amt) : 0));
+  const pool = c.isFutureMonth ? [
+    m + '월 문이 열리기 전, 가망 안건의 개시 가능일부터 점검해 두면 첫 주의 속도가 달라집니다.',
+    '준비한 만큼 출발이 가벼워집니다. ' + m + '월 첫 영업일 전에 안건별 담당과 일정을 한 장으로 정리해 두세요.'
+  ] : !c.isCurMonth ? [
+    m + '월의 숫자는 닫혔지만 배운 점은 다음 달로 이어집니다. 해약 사유와 개시 지연 원인을 지금 한 줄씩 남겨 두세요.',
+    m + '월 마감 결과를 안건 단위로 되짚어 보고, 잘 풀린 방식은 팀 전체의 표준으로 가져갑시다.'
+  ] : left > 3 ? [
+    '남은 영업일 ' + left + '일, 공사 기간을 넉넉히 확보할 수 있는 지금이 당월 개시 안건을 만들 마지막 여유입니다.' + (gapO > 0 ? ' 수주 갭 ' + gapO.toLocaleString() + '천원부터 안건 단위로 쪼개 봅시다.' : ''),
+    '월말에 쫓기지 않으려면 이번 주에 개시일이 잡히는 안건이 몇 건인지부터 세어 보는 것이 순서입니다.',
+    '영업일이 ' + left + '일 남았습니다. 오늘 접촉한 안건 중 공사 일정까지 확정되는 건을 하나라도 더 만드는 것이 이번 달의 승부처입니다.',
+    '수주는 계약서에서 끝나지 않고 기산일에서 완성됩니다. 오늘 수주한 건의 시공 일정을 오늘 함께 확정합시다.',
+    '해약 방어와 신규 개시는 한 팀의 두 손입니다. 오늘 CS와 기술, 영업이 같은 안건 목록을 보고 시작합시다.'
+  ] : [
+    '남은 영업일이 ' + left + '일입니다. 공사 일정이 빠듯한 만큼 이미 잡힌 개시를 놓치지 않고, 공사가 필요 없는 유증과 단가인상을 끝까지 챙깁시다.',
+    '마지막 ' + left + '영업일은 새 안건보다 이미 약속된 개시와 단가인상 회신을 확정하는 데 쓰는 것이 가장 확실합니다.',
+    m + '월 마감까지 ' + left + '일, 개시 예정 건의 기산일 확정과 해약 징후 고객 재접촉이 가장 값진 한 시간입니다.'
+  ];
+  let h = 0; const key = String(c.ym || '') + '|' + String(c.elDays) + '|' + String(Math.round((c.net && c.net.amt) || 0));
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return '<div class="blk quote">' + esc_(pool[h % pool.length]) + '</div>';
 }
 
 const STRATEGY_PRINT_CSS_ = '<style>@page{size:A4;margin:0}html,body{margin:0;padding:0;background:#fff}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}@media print{.pg{break-after:page;page-break-after:always}.pg:last-child{break-after:auto;page-break-after:auto}}</style>';
@@ -20999,7 +21029,7 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261102b"></script>
-<script src="gemini-insights.js?v=20261103a"></script>
+<script src="gemini-insights.js?v=20261103b"></script>
 <script src="flag-sync.js?v=20261102b"></script>
 <script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>

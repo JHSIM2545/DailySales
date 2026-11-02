@@ -103,7 +103,7 @@
   function cacheSet(k, v) { mem[k] = { t: Date.now(), insight: v }; try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), insight: v })); } catch (e) {} }
 
   window.salesAiCached_ = function (c) {
-    try { var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0')); if (strat[ym] === undefined) return null; var o = cacheGet('gm_ins_' + hash(JSON.stringify(payload(c)))); return o ? o : null; } catch (e) { return null; }
+    try { var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0')); if (strat[ym] === undefined) return null; var o = cacheGet('gm_ins2_' + hash(JSON.stringify(payload(c)))); return o ? o : null; } catch (e) { return null; }
   };
 
   window.salesAiInsight_ = function (c, opts) {
@@ -112,7 +112,7 @@
   };
   function run_(c, opts) {
     opts = opts || {};
-    var p = payload(c), body = JSON.stringify(p), k = 'gm_ins_' + hash(body);
+    var p = payload(c), body = JSON.stringify(p), k = 'gm_ins2_' + hash(body);
     var hit = cacheGet(k);
     if (hit) return Promise.resolve(hit.insight);
     if (inflight[k]) return inflight[k];
@@ -125,7 +125,7 @@
       body: JSON.stringify({ phone: ph, data: p }), signal: ctl ? ctl.signal : undefined
     }).then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.insight) throw new Error(j && j.error ? j.error : ('HTTP ' + r.status)); return j.insight; }); })
       .then(function (ins) {
-        ins.tasks = ins.tasks.slice(0, 4); ins.analysis = ins.analysis.slice(0, 3); ins.cover_summary = ins.cover_summary.slice(0, 3);
+        ins.closing = typeof ins.closing === 'string' ? ins.closing.trim() : ''; ins.tasks = ins.tasks.slice(0, 4); ins.analysis = ins.analysis.slice(0, 3); ins.cover_summary = ins.cover_summary.slice(0, 3);
         cacheSet(k, ins); return ins;
       })
       .catch(function (e) { console.warn('[Gemini 분석] 실패 - 기본 분석 사용:', e && e.message); return null; })
