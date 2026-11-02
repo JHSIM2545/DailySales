@@ -9102,7 +9102,7 @@ function renderDashboard(){
 
         <!-- 과제 2 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #dc2626;">
-          <div style="font-weight:800; color:#dc2626; margin-bottom:4px;">2. 유증 달성 특수 과제 (단기 무공사 상품 및 전원 인상 총력)</div>
+          <div style="font-weight:800; color:#dc2626; margin-bottom:4px;">${(!isCurMonth && !isFutureMonth) ? '2. 유지증가(유증) 보완 과제 (단가인상 및 해약 방어)' : ((totDays - elDays) > 3 || isFutureMonth ? '2. 유지증가(유증) 확보 과제 (당월 개시 가능 안건 수주 집중 및 단가인상·해약 방어 병행)' : '2. 유지증가(유증) 마감 과제 (설치공사 불필요 상품 및 단가인상 총력)')}</div>
           <div class="gm-task" data-i="1">${aiTask2}</div>
         </div>
 
