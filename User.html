@@ -8543,6 +8543,15 @@ function renderDashboard(){
         </table>
       </div>
 
+      <!-- 3) 컨설턴트별 최근 3개월 실적 추이 -->
+      <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px;">
+          <span style="font-size:13.5px; font-weight:800; color:#0f172a;">2-(5) 컨설턴트별 최근 3개월 실적 추이 · 분석</span>
+          <span style="font-size:11px; color:#64748b;">전략영업·법인 제외 · 천원</span>
+        </div>
+        <div class="rt-slot"></div>
+      </div>
+
     </div>
 
     ${dashPriceCancelSectionsHtml_(d)}
@@ -14025,6 +14034,12 @@ function buildCoachingAiReport_(d, ym, cat, rep){
       </div>
     </div>
 
+    <!-- 섹션 2-2: 컨설턴트별 최근 3개월 실적 추이 -->
+    <div class="ai-section">
+      <div class="ai-sec-head">2-2. 컨설턴트별 최근 3개월 실적 추이 · 분석 (전략영업·법인 제외)</div>
+      <div class="ai-sec-body"><div class="rt-slot"></div></div>
+    </div>
+
     <!-- 섹션 3: 1:1 맞춤 성장 코칭 가이드 -->
     <div class="ai-section">
       <div class="ai-sec-head">3. 실시간 지표 기반 컨설턴트별 1:1 맞춤 성장 코칭 & 원팀 서포트 가이드</div>
@@ -14804,6 +14819,7 @@ function buildStrategyDoc_(c){
   add('<div class="blk"><h3 class="s">4.2 컨설턴트별 성과분석</h3><table><thead><tr><th>컨설턴트</th><th>수주 실적</th><th>수주주기 (무수주)</th><th>수주단가 (누적)</th><th>영업동기</th></tr></thead><tbody>'
     + c.reps.map(function(r){ return '<tr><td><b>' + esc(r.name) + '</b> <span class="sm">' + esc(r.style) + '</span></td><td class="n">' + K(r.orderAmt) + '천원 (' + r.orderCount + '건)</td><td class="n">' + (r.period > 0 ? r.period + '일' : '-') + (r.zeroDays !== null ? ' <span style="color:' + (r.zeroDays > 2 ? '#dc2626' : '#059669') + '">(' + r.zeroDays + '일)</span>' : '') + '</td><td class="n">' + r.unitAmt + '만 (' + r.cumUnitAmt + '만)</td><td>' + esc(r.motive) + '</td></tr>'; }).join('')
     + '</tbody></table><p class="note">무수주는 마지막 수주 이후 경과한 영업일(주말·공휴일 제외, 당월만)이며, 영업동기는 수주금액 기준 비중입니다.</p>' + repUrgency_() + '</div>');
+  if (c.repTrend) { window.repTrend_.reportParts(c.repTrend, c).forEach(function (h) { add(h); }); }
 
   /* ───── 5. 인상·인하·해약 및 유지증감 ───── */
   add(band('CHAPTER 05 · PRICE &amp; CANCEL', '5. 인상·인하·해약 및 유지증감 분석', c.isCurMonth ? '당월 누계 · 전월 동기 대비' : '월 마감 · 전월 동기 대비'), true);
@@ -14987,6 +15003,7 @@ async function downloadAllChaptersPdf_(){
   const c = window.DASH_REPORT_CTX_;
   if (!c) { alert('대시보드 데이터를 먼저 불러온 뒤 다시 시도하세요.'); return; }
   try { if (window.salesAiInsight_ && !c.gemini) { const gi_ = await window.salesAiInsight_(c, { timeout: 40000 }); if (gi_) { c.gemini = gi_; c.tasks = gi_.tasks.map(window.salesAiToHtml_); } } } catch (e) { console.warn('Gemini 분석 생략(기본 분석으로 PDF 생성)', e); }
+  try { if (window.repTrend_ && !c.repTrend) c.repTrend = await window.repTrend_.load(c); } catch (e) { console.warn('실적 추이 생략', e); }
   const fname = '북서울지사_영업현황 보고서_' + (function () {   // 예: 북서울지사_영업현황 보고서_261013 (PDF 생성일 기준, 한국시간)
     try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, ''); }
     catch (e) { const d = new Date(); return String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0'); }
@@ -16360,6 +16377,7 @@ function fsBindOnce_(){
 
 </script>
 <script src="gemini-insights.js?v=20261103b"></script>
+<script src="rep-trend.js?v=20261103a"></script>
 <script src="flag-sync.js?v=20261102b"></script>
 <script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>
