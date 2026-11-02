@@ -173,8 +173,9 @@
 
   function cardHtml(data, c) {
     if (!data) return '<div style="font-size:12px;color:#64748b;">최근 3개월 실적 추이를 불러오지 못했습니다.</div>';
-    return pairHtml(data, 'ord', '수주', c, 420, 380) + pairHtml(data, 'start', '개시', c, 420, 380) +
-      '<div style="margin-top:2px;font-size:11px;color:#64748b;">' + esc(noteText(data, c)) + '</div>';
+    function col(key, title) { return '<div style="min-width:0;"><div style="overflow-x:auto;">' + chartSvg(data, key, title + ' 추이', 420) + '</div><div style="margin-top:6px;overflow-x:auto;">' + tableOne(data, key, title, c) + '</div></div>'; }
+    return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;align-items:start;">' + col('ord', '수주') + col('start', '개시') + '</div>' +
+      '<div style="margin-top:8px;font-size:11px;color:#64748b;">' + esc(noteText(data, c)) + '</div>';
   }
 
   function reportParts(data, c) {
