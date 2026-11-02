@@ -10,7 +10,8 @@
  *    - 맨 위 깃발(⚑) 머리글: 체크된 행이 하나라도 있으면 모두 해제, 하나도 없을 때만 전체 선택.
  *    - 체크 칸(32px 열)은 어디를 눌러도 토글, 체크 칸에서 아래위로 끌면 범위 선택(시작 행 상태 반대로 적용).
  *    - Shift+클릭: 직전 클릭한 행부터 이번 행까지 범위 선택/해제.
- *    - 일반 칸의 글자 선택/편집은 방해하지 않는다(끌기 선택은 체크 칸에서 시작할 때만).
+ *    - 어느 칸에서 시작해 다른 행까지 끌어도 범위 선택/해제된다(같은 행 안에서의 글자 선택은 그대로).
+ *    - 끄는 동안 선택될 범위는 파란색, 해제될 범위는 빨간색으로 표시(이미 선택된 행 위에서도 보인다).
  */
 (function () {
   'use strict';
@@ -156,7 +157,8 @@
   css.textContent =
     'td.flag-cell{cursor:pointer;} td.flag-cell:hover{background:rgba(37,99,235,.10);}' +
     'body.flag-dragging, body.flag-dragging *{user-select:none !important;-webkit-user-select:none !important;cursor:ns-resize !important;}' +
-    'tr.flag-drag-on td{background:#bfdbfe !important;} tr.flag-drag-off td{background:#fecaca !important;}';
+    'html body tbody tr.flag-drag-on td, html body tbody tr.flag-drag-on td input, html body tbody tr.flag-drag-on td select{background:#93c5fd !important;color:#1e3a8a !important;}' +
+    'html body tbody tr.flag-drag-off td, html body tbody tr.flag-drag-off td input, html body tbody tr.flag-drag-off td select{background:#fca5a5 !important;color:#7f1d1d !important;}';
   document.head.appendChild(css);
 
   var st = null;
@@ -171,16 +173,22 @@
   document.addEventListener('mousedown', function (e) {
     st = null;
     if (e.button !== 0) return;
-    var cell = e.target.closest && e.target.closest('td.flag-cell'); if (!cell) return;
-    var tr = trOf(cell); if (!tr) return;
-    st = { tr: tr, end: tr, moved: false, on: !FLAGGED_SET.has(String(tr.getAttribute('data-id'))), onBox: !!(e.target.closest && e.target.closest('.flag-chk')), shift: e.shiftKey };
+    if (e.ctrlKey || e.metaKey) return;
+    if (e.target.closest && e.target.closest('select, button, a, .col-resizer, th, textarea, .modal, .float-win')) return;
+    var tr = trOf(e.target); if (!tr) return;
+    st = { tr: tr, end: tr, moved: false, on: !FLAGGED_SET.has(String(tr.getAttribute('data-id'))),
+           inFlag: !!(e.target.closest && e.target.closest('td.flag-cell')), onBox: !!(e.target.closest && e.target.closest('.flag-chk')), shift: e.shiftKey };
   }, true);
 
   document.addEventListener('mousemove', function (e) {
     if (!st) return;
     if (!(e.buttons & 1)) { st = null; clearPaint(); document.body.classList.remove('flag-dragging'); return; }
     var over = trOf(document.elementFromPoint(e.clientX, e.clientY));
-    if (!st.moved) { if (!over || over === st.tr) return; st.moved = true; document.body.classList.add('flag-dragging'); }
+    if (!st.moved) {
+      if (!over || over === st.tr) return;
+      st.moved = true; document.body.classList.add('flag-dragging');
+      try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); var sel = window.getSelection && window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); } catch (_) {}
+    }
     e.preventDefault();
     if (over) { st.end = over; clearPaint(); range(st.tr, st.end).forEach(function (t) { t.classList.add(st.on ? 'flag-drag-on' : 'flag-drag-off'); }); }
   }, true);
@@ -196,7 +204,7 @@
       var stop = function (ev) { ev.stopPropagation(); ev.preventDefault(); document.removeEventListener('click', stop, true); };
       document.addEventListener('click', stop, true);
       setTimeout(function () { document.removeEventListener('click', stop, true); }, 0);
-    } else if (!cur.onBox && !cur.shift) {
+    } else if (cur.inFlag && !cur.onBox && !cur.shift) {
       // 체크박스 바깥의 체크 칸 여백을 눌러도 토글(클릭 영역 확대)
       window.toggleFlag(scopeNow(), cur.tr.getAttribute('data-id'));
     }
