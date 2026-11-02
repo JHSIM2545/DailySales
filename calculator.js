@@ -428,7 +428,48 @@
     if (!state.dom) return;
     state.dom.win.classList.remove('open'); state.open = false;
   }
+  /* ------------------------------------------------------------------ 표의 숫자 칸을 누르면 계산기에 자동 입력
+   * 계산기가 떠 있는 동안 용역료·금액·합계 등 숫자 칸을 클릭하면 그 숫자가 입력창에 들어간다.
+   *  - 입력창이 비었거나 방금 계산한 직후면 그 숫자로 새로 시작
+   *  - 끝이 연산자( + − × ÷ ( )면 뒤에 이어 붙이고, 숫자 뒤면 '+' 를 붙여 합계식으로 이어 간다
+   *  - 셀의 편집/포커스 동작은 그대로 두고, 계산기 입력창으로 포커스를 가져오지 않는다. */
+  var NUM_CLS = /(^|\s)(money|money-black|fee|num|amt-up|amt-down)(\s|$)/;
+  function cellNumber(td) {
+    var ctl = td.querySelector('input:not([type=checkbox]):not([type=radio]), select');
+    var raw = ctl ? ctl.value : td.textContent;
+    var t = cleanToken(raw);
+    var m = /^\((\d+\.?\d*)\)$/.exec(t); if (m) t = '-' + m[1];
+    if (!isNum(t) || /%$/.test(t)) return null;
+    var comma = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(String(raw).replace(/[\s ₩원]/g, ''));
+    if (!NUM_CLS.test(td.className || '') && !comma) return null;      // 계약번호 같은 숫자 칸은 제외
+    return t;
+  }
+  function pickInto(t) {
+    var el = state.dom.inp, v = el.value;
+    if (!v.trim() || state.just) el.value = t;
+    else if (/[+\-*\/×÷x(]$/.test(v.trim())) el.value = v.replace(/\s+$/, '') + t;
+    else el.value = v.replace(/\s+$/, '') + (t.charAt(0) === '-' ? '' : '+') + t;
+    state.just = false; setErr(false); update();
+    try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {}
+  }
+  document.addEventListener('click', function (e) {
+    if (!state.open || !state.dom) return;
+    var tg = e.target; if (!tg || !tg.closest) return;
+    if (state.dom.win.contains(tg)) return;     // 계산기 창 자체는 제외
+    var td = tg.closest('td'); if (!td) return;
+    if (!td.closest('.grid-wrap, .status-wrap, .dash-wrap, .modal, table')) return;
+    var t = cellNumber(td); if (t == null) return;
+    pickInto(t);
+    td.classList.add('calc-picked');
+    setTimeout(function () { td.classList.remove('calc-picked'); }, 700);
+  });
+  (function () {
+    var st = document.createElement('style');
+    st.textContent = 'td.calc-picked{outline:2px solid #f59e0b !important;outline-offset:-2px;transition:outline-color .6s;}';
+    document.head.appendChild(st);
+  })();
+
   window.openCalculator_ = function () { if (state.open) closeCalc(); else openCalc(); };    // 버튼으로 열기/닫기 전환
   window.closeCalculator_ = closeCalc;
-  window.__calc = { parse: parse, processPaste: processPaste, lcdText: lcdText, state: state };
+  window.__calc = { cellNumber: cellNumber, pickInto: pickInto, parse: parse, processPaste: processPaste, lcdText: lcdText, state: state };
 })();
