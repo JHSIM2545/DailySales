@@ -37,6 +37,46 @@
   function num(v) { v = Number(v); return isFinite(v) ? v : 0; }
   function pick(o, keys) { var r = {}; if (!o) return null; keys.forEach(function (k) { if (o[k] !== undefined && o[k] !== null) r[k] = o[k]; }); return r; }
 
+  // ---- 전략영업 분리 ----
+  // 영업동기가 '전략영업'인 건은 지사 실적에는 잡히지만 사업팀 전략영업의 실적 영역이므로,
+  // 지사 고유 분석에서는 빼고 그 사실을 문구에 밝힌다. (영업동기는 수주·개시 목록에만 있음)
+  var strat = {};   // ym -> {ordK,startK,items[]} | null(조회 실패)
+  function fetchStrat(c) {
+    var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0'));
+    if (strat[ym] !== undefined) return Promise.resolve(strat[ym]);
+    var u = 'https://gpqlximhoqdybcewdfde.supabase.co/rest/v1/daily_orders?select=contract_date,billing_date,monthly_fee,rep_name,product_name,gross_type&sales_motive=like.*' + encodeURIComponent('전략영업') + '*';
+    return fetch(u, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (rows) {
+        var today = c.todayDs || '';
+        var o = { ordK: 0, startK: 0, items: [] };
+        rows.forEach(function (r) {
+          if (r.gross_type === '법인') return;
+          var k = Math.round((Number(r.monthly_fee) || 0) / 1000);
+          if (r.contract_date && String(r.contract_date).slice(0, 7) === ym) {
+            o.ordK += k; o.items.push({ kind: '수주', date: r.contract_date, amountK: k, product: r.product_name || '', rep: r.rep_name || '' });
+          }
+          if (r.billing_date && String(r.billing_date).slice(0, 7) === ym && (!c.isCurMonth || !today || String(r.billing_date) <= today)) {
+            o.startK += k; o.items.push({ kind: '개시', date: r.billing_date, amountK: k, product: r.product_name || '', rep: r.rep_name || '' });
+          }
+        });
+        return (strat[ym] = o);
+      })
+      .catch(function (e) { console.warn('[Gemini 분석] 전략영업 조회 실패 - 전략영업 분리 없이 분석:', e && e.message); return (strat[ym] = null); });
+  }
+  function stratPayload(c) {
+    var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0'));
+    var s = strat[ym];
+    if (!s) return null;
+    var oa = num(c.ord && c.ord.amt), sa = num(c.start && c.start.amt);
+    return {
+      ordK: s.ordK, startK: s.startK, items: s.items,
+      ordExK: oa - s.ordK, startExK: sa - s.startK,
+      ordExPct: c.ord && c.ord.tgt ? Math.round((oa - s.ordK) / c.ord.tgt * 1000) / 10 : null,
+      startExPct: c.start && c.start.tgt ? Math.round((sa - s.startK) / c.start.tgt * 1000) / 10 : null
+    };
+  }
+
   // 집계 숫자만 추려서 보낸다 (계약처·고객 정보 제외)
   function payload(c) {
     var bm = ['amt', 'tgt', 'pct', 'rank', 'avg', 'gap', 'end', 'endPct'];
@@ -52,7 +92,8 @@
       }),
       prod: (function () { var o = {}; ['tot', 'alarm', 'bscan', 'digi', 'huen'].forEach(function (k) { o[k] = pick((c.prod || {})[k], ['cnt', 'ord', 'start', 'can', 'prc', 'net']); }); return o; })(),
       timing: (c.timing || []).map(function (b) { return pick(b, ['label', 'count', 'pct', 'amountK']); }),
-      timingTotalK: num(c.timingTotalK)
+      timingTotalK: num(c.timingTotalK),
+      strategic: stratPayload(c)
     };
   }
   function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
@@ -62,12 +103,15 @@
   function cacheSet(k, v) { mem[k] = { t: Date.now(), insight: v }; try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), insight: v })); } catch (e) {} }
 
   window.salesAiCached_ = function (c) {
-    try { var o = cacheGet('gm_ins_' + hash(JSON.stringify(payload(c)))); return o ? o : null; } catch (e) { return null; }
+    try { var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0')); if (strat[ym] === undefined) return null; var o = cacheGet('gm_ins_' + hash(JSON.stringify(payload(c)))); return o ? o : null; } catch (e) { return null; }
   };
 
   window.salesAiInsight_ = function (c, opts) {
-    opts = opts || {};
     if (!c) return Promise.resolve(null);
+    return fetchStrat(c).then(function () { return run_(c, opts); });
+  };
+  function run_(c, opts) {
+    opts = opts || {};
     var p = payload(c), body = JSON.stringify(p), k = 'gm_ins_' + hash(body);
     var hit = cacheGet(k);
     if (hit) return Promise.resolve(hit.insight);
@@ -87,7 +131,7 @@
       .catch(function (e) { console.warn('[Gemini 분석] 실패 - 기본 분석 사용:', e && e.message); return null; })
       .then(function (r) { clearTimeout(to); delete inflight[k]; return r; });
     return inflight[k];
-  };
+  }
 
   // ---------------- 화면 반영 ----------------
   var css = document.createElement('style');
