@@ -433,15 +433,27 @@
    *  - 입력창이 비었거나 방금 계산한 직후면 그 숫자로 새로 시작
    *  - 끝이 연산자( + − × ÷ ( )면 뒤에 이어 붙이고, 숫자 뒤면 '+' 를 붙여 합계식으로 이어 간다
    *  - 셀의 편집/포커스 동작은 그대로 두고, 계산기 입력창으로 포커스를 가져오지 않는다. */
-  var NUM_CLS = /(^|\s)(money|money-black|fee|num|amt-up|amt-down)(\s|$)/;
+  // 금액(돈) 칸만 대상: 용역료·現용역료·금액·계약설치비·계약기기비·합계 와 영업현황의 천원 단위 숫자 칸.
+  // 날짜·문자·차량번호·계약번호·건수·% 칸은 제외한다.
+  var MONEY_CLS = /(^|\s)(money|money-black|fee|amt-up|amt-down)(\s|$)/;
+  var MONEY_HEAD = ['용역료', '現용역료', '금액', '계약설치비', '계약기기비', '합계'];
+  function headName(td) {
+    var tb = td.closest('table'), th = tb && tb.tHead; if (!th || th.rows.length !== 1) return '';
+    var c = th.rows[0].cells[td.cellIndex]; return c ? c.textContent.replace(/[\s▲▼↑↓]/g, '') : '';
+  }
+  function isMoneyCell(td) {
+    if (MONEY_CLS.test(td.className || '')) return true;
+    if (/(^|\s)num(\s|$)/.test(td.className || '') && td.closest('.status-wrap')) return true;
+    return MONEY_HEAD.indexOf(headName(td)) !== -1;
+  }
   function cellNumber(td) {
+    if (!isMoneyCell(td)) return null;
     var ctl = td.querySelector('input:not([type=checkbox]):not([type=radio]), select');
     var raw = ctl ? ctl.value : td.textContent;
+    if (/건|%/.test(raw)) return null;
     var t = cleanToken(raw);
     var m = /^\((\d+\.?\d*)\)$/.exec(t); if (m) t = '-' + m[1];
-    if (!isNum(t) || /%$/.test(t)) return null;
-    var comma = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(String(raw).replace(/[\s ₩원]/g, ''));
-    if (!NUM_CLS.test(td.className || '') && !comma) return null;      // 계약번호 같은 숫자 칸은 제외
+    if (!isNum(t)) return null;
     return t;
   }
   function pickInto(t) {
