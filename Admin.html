@@ -434,6 +434,24 @@ function getTzToday() {
   }
   try { window.kstStr_ = kstStr_; } catch (e) {}
 
+  // ---- 상품일보 날짜 헬퍼 (매출예상일: 일 단위 / 기존 월 표기는 해당 월 30일로 통일) ----
+  function pdForecastIso_(val, refDate) {
+    if (!val) return '';
+    const s = String(val).trim();
+    let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    let y = '', mo = '';
+    m = s.match(/(20\d{2})[-./년\s]+(\d{1,2})/);
+    if (m) { y = m[1]; mo = m[2]; }
+    else { m = s.match(/(\d{2})[-./년\s]+(\d{1,2})/); if (m && Number(m[1]) >= 20 && Number(m[1]) <= 45) { y = '20' + m[1]; mo = m[2]; } }
+    if (!y) { m = s.match(/(\d{1,2})\s*월/); if (m) { y = String(refDate || getTzToday()).slice(0, 4); mo = m[1]; } }
+    if (!y || !mo) return '';
+    const mm = Number(mo); if (mm < 1 || mm > 12) return '';
+    const last = new Date(Number(y), mm, 0).getDate();
+    return y + '-' + String(mm).padStart(2, '0') + '-' + String(Math.min(30, last)).padStart(2, '0');
+  }
+  function pdForecastLabel_(iso) { return iso ? (iso.slice(2, 4) + '.' + iso.slice(5, 7) + '월') : ''; }
+
   const Backend = {
     // ==========================================
     // TA 관리 표준 로그인 & 회원가입 (Backend 구현체)
@@ -1471,19 +1489,21 @@ function getTzToday() {
       const { data, error } = await client.from('daily_product_reports').select('*').order('id', { ascending: false });
       if (error) throw error;
 
-      const PRODUCT_DAILY_HEADERS = ['계약번호', '서비스제공처', '보고일', '계약담당자', '매출예상', '계약동기', '계약설치비', '계약기기비', '합계', '구분', '매출여부'];
+      // 마지막 '매출일'(매출 전환일)은 PRODUCT_DAILY_HEADERS 의 12번째 항목이며, 행의 마지막 값은 행 ID 이다.
+      const PRODUCT_DAILY_HEADERS = ['계약번호', '서비스제공처', '보고일', '계약담당자', '매출예상', '계약동기', '계약설치비', '계약기기비', '합계', '구분', '매출여부', '매출일'];
       const rows = (data || []).map(r => [
         r.contract_no || '',
         r.customer_name || '',
         r.report_date || '',
         r.rep_name || '',
-        r.sales_forecast || '',
+        r.forecast_date || pdForecastIso_(r.sales_forecast, r.report_date),
         r.motive || '',
         r.install_fee != null ? Number(r.install_fee) : '',
         r.device_fee != null ? Number(r.device_fee) : '',
         r.total_amount != null ? Number(r.total_amount) : '',
         r.category || '',
         r.sales_status || '미매출',
+        r.sales_date || '',
         String(r.sheet_row_id || r.id)
       ]);
       return { headers: PRODUCT_DAILY_HEADERS, rows: rows };
@@ -1494,19 +1514,25 @@ function getTzToday() {
       const fields = payload.fields || {};
       const instFee = Number(String(fields['계약설치비'] || 0).replace(/[^0-9.-]/g, ''));
       const devFee = Number(String(fields['계약기기비'] || 0).replace(/[^0-9.-]/g, ''));
+      const status = fields['매출여부'] || '미매출';
+      const reportDate = fields['보고일'] || null;
+      const fIso = pdForecastIso_(fields['매출예상'], reportDate);
 
       const record = {
         contract_no: fields['계약번호'] || 'T',
         customer_name: fields['서비스제공처'] || '',
-        report_date: fields['보고일'] || null,
+        report_date: reportDate,
         rep_name: fields['계약담당자'] || '',
-        sales_forecast: fields['매출예상'] || '',
+        forecast_date: fIso || null,
+        sales_forecast: pdForecastLabel_(fIso),   // 기존 월 단위 열(호환용): 'YY.MM월'
         motive: fields['계약동기'] || '',
         install_fee: instFee,
         device_fee: devFee,
         total_amount: instFee + devFee,
         category: fields['구분'] || '지사',
-        sales_status: fields['매출여부'] || '미매출',
+        sales_status: status,
+        // 매출로 전환된 날짜(한국시간). 미매출이면 비운다. 비어 있는 채 매출로 저장되면 DB 트리거가 오늘 날짜를 넣는다.
+        sales_date: status === '매출' ? (String(fields['매출일'] || '').slice(0, 10) || getTzToday()) : null,
         updated_at: new Date().toISOString()
       };
 
@@ -1516,14 +1542,14 @@ function getTzToday() {
         else q = q.eq('sheet_row_id', String(payload.id));
         const { error } = await q;
         if (error) throw error;
-        return { success: true, id: payload.id };
+        return { success: true, id: payload.id, 매출일: record.sales_date || '' };
       } else {
         record.sheet_row_id = 'row_' + Date.now();
         record.created_at = new Date().toISOString();
         const { data, error } = await client.from('daily_product_reports').insert([record]).select();
         if (error) throw error;
         const newId = (data && data[0] && data[0].id) ? String(data[0].id) : record.sheet_row_id;
-        return { success: true, id: newId };
+        return { success: true, id: newId, 매출일: record.sales_date || '' };
       }
     },
 
@@ -2113,24 +2139,32 @@ function getTzToday() {
     },
 
     getSafetyProductSummary: async function(token, yearMonth) {
-      const ym = (yearMonth || '').slice(0, 7) || getTzToday().slice(0, 7);
+      // yearMonth: 'YYYY-MM' 또는 'YYYY-MM-DD'. 날짜가 주어지면 그 날짜 기준 당일/전일누계를 함께 돌려준다(일일실적보고용).
+      const raw = String(yearMonth || '');
+      const ym = raw.slice(0, 7) || getTzToday().slice(0, 7);
+      const ds = /^\d{4}-\d{2}-\d{2}$/.test(raw.slice(0, 10)) ? raw.slice(0, 10) : '';
       const targetRes = await Backend.getSalesTargetSafety(token, ym);
       const cardRes = await Backend.getCardSales(token, ym);
       const client = getSupabase();
-      const y = ym.slice(2, 4);
-      const m = ym.slice(5, 7);
-      const forecastStr = `${y}.${m}월`;
 
       const { data: prodData } = await client.from('daily_product_reports').select('*');
-      let actOrder = 0, actSales = 0;
+      let actOrder = 0, actSales = 0, ordToday = 0, salesToday = 0;
       (prodData || []).forEach(r => {
         if (r.category !== '지사' && r.category !== '법인') return;
-        const rDate = r.report_date || '';
         const amt = Number(r.total_amount) || 0;
-        if (rDate.slice(0, 7) === ym) actOrder += amt;
-        const sf = String(r.sales_forecast || '').trim();
-        if ((sf === forecastStr || sf === ym || sf.includes(`${m}월`)) && r.sales_status === '매출') {
-          actSales += amt;
+        // 수주: 상품일보 보고일(계약일) 기준
+        const rDate = String(r.report_date || '').slice(0, 10);
+        if (rDate.slice(0, 7) === ym && (!ds || rDate <= ds)) {
+          actOrder += amt;
+          if (ds && rDate === ds) ordToday += amt;
+        }
+        // 매출: 매출로 전환된 날짜(sales_date) 기준. 미매출은 집계하지 않는다.
+        if (r.sales_status === '매출') {
+          const sDate = String(r.sales_date || r.forecast_date || '').slice(0, 10);
+          if (sDate.slice(0, 7) === ym && (!ds || sDate <= ds)) {
+            actSales += amt;
+            if (ds && sDate === ds) salesToday += amt;
+          }
         }
       });
       actSales += (cardRes.amount || 0);
@@ -2139,9 +2173,13 @@ function getTzToday() {
       return {
         success: true,
         yearMonth: ym,
+        date: ds,
         목표: { 수주: tgtItem.목표_수주 || 0, 매출: tgtItem.목표_매출 || 0 },
         계획: { 수주: tgtItem.계획_수주 || 0, 매출: tgtItem.계획_매출 || 0 },
-        실적: { 수주: Math.round(actOrder / 1000), 매출: Math.round(actSales / 1000) },
+        실적: {
+          수주: Math.round(actOrder / 1000), 매출: Math.round(actSales / 1000),
+          수주_당일: Math.round(ordToday / 1000), 매출_당일: Math.round(salesToday / 1000)
+        },
         카드매출: cardRes.amount || 0
       };
     },
@@ -6814,7 +6852,7 @@ const COPY_COLUMNS_ = {
   restart: ['계약번호','계약처명','영업담당','담당차량','재개시일','용역료','중지일','공사담당','상품','그로스','비고'],  
   cancel: ['계약번호','계약처명','영업담당','담당차량','접수일','확정일','용역료','상품','그로스','해약유형','사유'],  
   price: ['계약번호','계약처명','영업담당','접수자','담당차량','접수일','기산일','금액','現용역료','인상인하율','사유','상품','그로스','비고'],  
-  productdaily: ['계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부']  
+  productdaily: ['수주월','매출월','계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부']  
 };  
 
 /** 셀 값을 클립보드용 텍스트로 변환: 탭/개행이 섞여 들어가면 열이 밀어지므로 공백으로 치환 */  
@@ -6845,7 +6883,7 @@ function scopeHeadersArr_(scope){
   if (scope === 'cancel') return CANCEL_HEADERS;  
   if (scope === 'price') return PRICE_HEADERS;  
   if (scope === 'restart') return RESTART_HEADERS;  
-  if (scope === 'productdaily') return PRODUCT_DAILY_HEADERS;  
+  if (scope === 'productdaily') return PRODUCT_DAILY_COLS;  
   return [];  
 }  
 
@@ -7490,13 +7528,13 @@ function preloadAllTabsInBackground_(){
  google.script.run.withSuccessHandler(function(res){  
  if (!res || !res.success) { cb(null); return; }  
  const extraKey = 'extraProduct|' + dailyReportDate;  
- const safetyKey = 'safetySummaryDaily|' + dailyReportDate.slice(0, 7);  
+ const safetyKey = 'safetySummaryDaily|' + dailyReportDate;  
  google.script.run.withSuccessHandler(function(res2){  
  if (res2 && res2.success) cacheSet_(extraKey, res2);  
  google.script.run.withSuccessHandler(function(res3){  
  if (res3 && res3.success) cacheSet_(safetyKey, res3);  
  cb(res);  
- }).withFailureHandler(function(){ cb(res); }).getSafetyProductSummary(SESSION.token, dailyReportDate.slice(0, 7));  
+ }).withFailureHandler(function(){ cb(res); }).getSafetyProductSummary(SESSION.token, dailyReportDate);  
  }).withFailureHandler(function(){ cb(res); }).getExtraProductReport(SESSION.token, dailyReportDate);  
  }).withFailureHandler(function(){ cb(null); }).getDailyReportAuto(SESSION.token, dailyReportDate);  
  });  
@@ -14255,8 +14293,30 @@ function submitNewRestartRow(){
 }  
   
 /* ===================== 상품일보 (안전상품 실적 관리) 구현 ===================== */
-const PRODUCT_DAILY_HEADERS = ['계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부'];  
-const PRODUCT_DAILY_AUTO_FIELDS = ['합계'];  
+const PRODUCT_DAILY_HEADERS = ['계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부','매출일'];
+// 화면·내보내기 표시 컬럼: 좌측에 수주월(보고일 월)·매출월(매출일 월) 자동 컬럼
+const PRODUCT_DAILY_COLS = ['수주월','매출월','계약번호','서비스제공처','보고일','계약담당자','매출예상','계약동기','계약설치비','계약기기비','합계','구분','매출여부'];
+const PRODUCT_DAILY_AUTO_FIELDS = ['합계','수주월','매출월'];
+function pdIsoFromYmLike_(val, refDate){
+  const s = String(val==null?'':val).trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const ym = (typeof parseForecastYm_==='function') ? parseForecastYm_(s, refDate) : '';
+  if (!ym) return '';
+  const y = Number(ym.slice(0,4)), m = Number(ym.slice(5,7));
+  const last = new Date(y, m, 0).getDate();
+  return ym + '-' + String(Math.min(30,last)).padStart(2,'0');
+}
+function pdRowToObj_(r){
+  const obj = { id: r[r.length-1] };
+  PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = (r[i]===undefined || r[i]===null) ? '' : r[i]);
+  obj.매출예상 = pdIsoFromYmLike_(obj.매출예상, obj.보고일);
+  obj.매출일 = String(obj.매출일||'').slice(0,10);
+  return obj;
+}
+function pdCacheRowsOk_(c){
+  return !!(c && c.rows && (c.rows.length === 0 || c.rows[0].length === PRODUCT_DAILY_HEADERS.length + 1));
+}  
 const LIST_PRODUCT_DAILY_REP = ['박정훈','박광모','김상훈','최영국','이수열','박광춘','정문재','임영민'];  
 const LIST_PRODUCT_DAILY_MOTIVE = ['신규','변추가','안전상품A/S','기타'];  
 const LIST_PRODUCT_DAILY_GUBUN = ['지사','법인','전략'];  
@@ -14270,11 +14330,15 @@ let productDailySummaryYm = todayStr().slice(0,7);
 let PRODUCT_DAILY_SUMMARY_EXTRA = null;  
 let productDailySummaryIncludeUnconfirmed = false; // 매출 집계에 "미매출" 포함 여부
 
-function computeAutoProductDaily(row){  
-  if (row.계약설치비 === '' && row.계약기기비 === '') return { 합계:'' };  
-  const a = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;  
-  const b = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;  
-  return { 합계: String(a + b) };  
+function computeAutoProductDaily(row){
+  const a = Number(String(row.계약설치비||'0').replace(/[^0-9.-]/g,'')) || 0;
+  const b = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
+  const hasFee = !(row.계약설치비 === '' && row.계약기기비 === '');
+  const 수주월 = String(row.보고일||'').slice(0,7);
+  const done = String(row.매출여부||'').trim() === '매출';
+  // 매출월: 매출일(매출 전환일)의 월. 미매출은 매출일이 없으므로 비워 둔다(매출예상 컬럼 참조)
+  const 매출월 = done ? (String(row.매출일||'').slice(0,7) || String(row.매출예상||'').slice(0,7)) : '';
+  return { 합계: hasFee ? String(a + b) : '', 수주월: 수주월, 매출월: 매출월 };
 }  
 
 function toggleProductDailySummaryUnconfirmed(){  
@@ -14424,11 +14488,14 @@ function productDailySummaryTableHtml_(){
   const ord합계 = ord계 + ord잔략협력;  
   
   const includeUnconfirmed = !!productDailySummaryIncludeUnconfirmed;
-  const saleConfirmedOk = r => includeUnconfirmed || String(r.매출여부||'').trim() !== '미매출';  
-  const sale지사 = sumBy(r => r.구분 === '지사' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r)) + cardSales;  
-  const sale법인 = sumBy(r => r.구분 === '법인' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r));  
+  const saleConfirmedOk = r => includeUnconfirmed || String(r.매출여부||'').trim() !== '미매출';
+  // 매출 집계 기준월: 매출 건은 매출일(전환일) 월, 미매출(포함 시)은 매출예상일 월
+  const saleYm_ = r => (String(r.매출여부||'').trim() === '미매출') ? String(r.매출예상||'').slice(0,7) : (String(r.매출일||'').slice(0,7) || String(r.매출예상||'').slice(0,7));
+  const saleInMonth_ = r => saleYm_(r) === (yearNum + '-' + String(monthNum).padStart(2,'0'));  
+  const sale지사 = sumBy(r => r.구분 === '지사' && saleInMonth_(r) && saleConfirmedOk(r)) + cardSales;  
+  const sale법인 = sumBy(r => r.구분 === '법인' && saleInMonth_(r) && saleConfirmedOk(r));  
   const sale계 = sale지사 + sale법인;  
-  const sale잔략협력 = sumBy(r => r.구분 === '전략' && matchForecastMonth_(r.매출예상, yearNum, monthNum) && saleConfirmedOk(r));  
+  const sale잔략협력 = sumBy(r => r.구분 === '전략' && saleInMonth_(r) && saleConfirmedOk(r));  
   const sale합계 = sale계 + sale잔략협력;  
   
   const summary = PRODUCT_DAILY_SUMMARY_EXTRA || {};  
@@ -14576,13 +14643,10 @@ function onCardSalesChange_(val){
 
 function loadProductDailyData(silent){  
   const cacheKey = 'productDailyData';  
-  const cached = (typeof cacheGet_ === 'function') ? cacheGet_(cacheKey, GRID_CACHE_TTL_MS_) : null;  
+  let cached = (typeof cacheGet_ === 'function') ? cacheGet_(cacheKey, GRID_CACHE_TTL_MS_) : null;
+  if (cached && !pdCacheRowsOk_(cached)) cached = null;  
   if (cached) {  
-    PRODUCT_DAILY_ROWS = cached.rows.map(r => {  
-      const obj = { id: r[r.length-1] };  
-      PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = r[i]);  
-      return obj;  
-    });  
+    PRODUCT_DAILY_ROWS = cached.rows.map(pdRowToObj_);  
     SCOPE_LOADED_.productdaily = true;  
     STALE_SCOPES_.delete('productdaily'); 
     updateManualRefreshBtn_();  
@@ -14598,11 +14662,7 @@ function loadProductDailyData(silent){
       if (!silent) setLoadingCursor(false);  
       if (data && data.error) { if (!silent) showLogin(data.error); return; }  
       if (typeof cacheSet_ === 'function') cacheSet_(cacheKey, data);  
-      PRODUCT_DAILY_ROWS = (data.rows || []).map(r => {  
-        const obj = { id: r[r.length-1] };  
-        PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = r[i]);  
-        return obj;  
-      });  
+      PRODUCT_DAILY_ROWS = (data.rows || []).map(pdRowToObj_);  
       SCOPE_LOADED_.productdaily = true;  
       STALE_SCOPES_.delete('productdaily'); 
       updateManualRefreshBtn_();  
@@ -14693,7 +14753,8 @@ function productDailyCellClass(field, val, allRows){
   else if (field === '서비스제공처') cls = 'name-cell';  
   else if (field === '계약설치비' || field === '계약기기비') cls = 'fee money num';  
   if (PRODUCT_DAILY_DATE_FIELDS.indexOf(field) !== -1) cls += ' datecol';  
-  if (['계약담당자','구분','매출여부'].indexOf(field) !== -1) cls += ' narrow';  
+  if (['계약담당자','구분','매출여부','수주월','매출월'].indexOf(field) !== -1) cls += ' narrow';
+    
   if (field === '구분' && String(val) === '법인') cls += ' gross-corp';  
   if (field === '매출여부' && String(val) === '미매출') cls += ' pc-down';  
   if (productDailySortState.key === field) cls += ' sort-col';  
@@ -14789,11 +14850,7 @@ function fieldCellHtmlProductDaily(row, field, allRows){
   } else if (field === '보고일') {
     inner = dateCellInputHtml('productdaily', row.id, '보고일', val);
   } else if (field === '매출예상') {
-    const fVal = parseForecastYm_(val, row.보고일);
-    inner = `<div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:100%;">` +
-      `<input type="text" class="cell-align-center" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="text-align:center !important; width:100%; height:100%; cursor:pointer; box-sizing:border-box;" value="${escAttr(formatForecastYmDisplay_(val) || val)}" onclick="openMonthPickerForPd_(this)" onchange="onPdForecastTyped_(this, '${row.id}')">` +
-      `<input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; pointer-events:none; z-index:0; border:none; padding:0; margin:0;" value="${fVal}" onchange="onPdMonthPicked_(this, '${row.id}')">` +
-      `</div>`;
+    inner = dateCellInputHtml('productdaily', row.id, '매출예상', val);
   } else {
     inner = `<input type="text" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${escAttr(val)}" onchange="onProductDailyFieldChange('${row.id}','${field}',this.value)">`;
   }
@@ -14812,6 +14869,8 @@ function onProductDailyFieldChange(id, field, value){
     const dev = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
     row.합계 = inst + dev;
   }
+  if (field === '매출여부') row.매출일 = (value === '매출') ? todayStr() : '';  // 매출 전환일 = 전환한 당일
+  if (field === '매출예상' && value) value = row.매출예상 = String(value).slice(0,10);
   row._unsynced = true; row._syncError = false;  
   renderProductDaily();  
   pushSaveProductDaily(row);  
@@ -14871,7 +14930,7 @@ function renderProductDaily(){
     '<span class="count" id="productDailyTopCount">총 ' + rows.length + '건</span>' +
     '</div>';  
   html += '<div class="grid-wrap"><table><thead><tr>' + flagHeaderHtml('productdaily');  
-  PRODUCT_DAILY_HEADERS.forEach(h => html += headerCellProductDaily(h));  
+  PRODUCT_DAILY_COLS.forEach(h => html += headerCellProductDaily(h));  
   html += '<th style="width:60px; min-width:60px; text-align:center;">관리</th>';  
   html += '</tr></thead><tbody>';  
 
@@ -14879,7 +14938,13 @@ function renderProductDaily(){
     const isFlg = FLAGGED_SET.has(row.id);
     const rowCls = ((row._syncError ? 'sync-error' : (row._unsynced ? 'unsynced' : '')) + (isFlg ? ' flagged' : '')).trim();  
     html += `<tr data-id="${row.id}" class="${rowCls}">` + flagCellHtml('productdaily', row.id);  
-    PRODUCT_DAILY_HEADERS.forEach(h => {  
+    PRODUCT_DAILY_COLS.forEach(h => {
+      if (h === '수주월' || h === '매출월') {
+        const mv = row[h] || '';
+        const tip = (h === '매출월') ? (row.매출일 ? '매출일 ' + row.매출일 : '미매출') : ('보고일 ' + (row.보고일||''));
+        html += `<td class="auto narrow${productDailySortState.key === h ? ' sort-col' : ''}" title="${escAttr(tip)}" style="text-align:center !important; font-weight:600; color:${h==='매출월'?'#c2410c':'#1d4ed8'};">${escHtml(mv)}</td>`;
+        return;
+      }
       if (PRODUCT_DAILY_AUTO_FIELDS.includes(h)) {  
         const autoVal = (Number(String(row.계약설치비||0).replace(/[^0-9.-]/g,'')) || 0) + (Number(String(row.계약기기비||0).replace(/[^0-9.-]/g,'')) || 0);
         row.합계 = autoVal;
@@ -14917,26 +14982,20 @@ function buildProductDailyForm(){
   if (!container) return;
   const today = todayStr();
   const ymNow = today.slice(0, 7);
-  const ymFormatted = ymNow.slice(2, 4) + '.' + ymNow.slice(5, 7) + '월';
+  const lastDay = new Date(Number(ymNow.slice(0,4)), Number(ymNow.slice(5,7)), 0).getDate();
+  const defForecast = ymNow + '-' + String(Math.min(30, lastDay)).padStart(2,'0');  // 기본: 당월 30일(말일 보정)
 
   container.innerHTML = `
     <div class="field"><label>계약번호</label><input type="text" id="pdf_계약번호" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="T (미확정 시 T/M 등 1자리)" value="T" onfocus="setTimeout(()=>this.select(),0)"></div>
     <div class="field"><label>서비스제공처</label><input type="text" id="pdf_서비스제공처" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" placeholder="고객사/서비스처 명칭"></div>
     <div class="field"><label>보고일</label><input type="date" id="pdf_보고일" autocomplete="one-time-code" value="${today}"></div>
     <div class="field"><label>계약담당자</label><select id="pdf_계약담당자" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
-    <div class="field">
-      <label>매출예상</label>
-      <div class="datecell-wrap" style="position:relative; display:flex; align-items:center; width:100%; height:32px;">
-        <input type="text" id="pdf_매출예상" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" value="${ymFormatted}" placeholder="예: 26.10월 / 2026-10 (직접 입력 또는 📅 선택)" style="width:100%; height:100%; padding-right:34px; box-sizing:border-box;" onblur="(function(el){ var v=(el.value||'').trim(); if(!v) return; var rd=document.getElementById('pdf_보고일'); var ym=(typeof parseForecastYm_==='function')?parseForecastYm_(v, rd?rd.value:''):''; if(ym){ el.value=ym.slice(2,4)+'.'+ym.slice(5,7)+'월'; } })(this)">
-        <button type="button" class="pd-cal-btn" title="월 선택 (달력)" onclick="openMonthPickerForPd_(this)" style="position:absolute; right:3px; top:50%; transform:translateY(-50%); z-index:3; border:none; background:transparent; cursor:pointer; font-size:15px; line-height:1; padding:2px 4px;">📅</button>
-        <input type="month" class="date-pick-hidden" style="position:absolute; right:0; top:0; width:32px; height:100%; opacity:0; pointer-events:none; z-index:0; border:none; padding:0; margin:0;" value="${ymNow}" onchange="const parts=this.value.split('-'); document.getElementById('pdf_매출예상').value=parts[0].slice(2)+'.'+parts[1]+'월'">
-      </div>
-    </div>
+    <div class="field"><label>매출예상일</label><input type="date" id="pdf_매출예상" autocomplete="one-time-code" value="${defForecast}"></div>
     <div class="field"><label>계약동기</label><select id="pdf_계약동기" autocomplete="one-time-code"><option value="">선택</option>${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
     <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
     <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
     <div class="field"><label>구분</label><select id="pdf_구분" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
-    <div class="field"><label>매출여부</label><select id="pdf_매출여부" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}">${s}</option>`).join('')}</select></div>
+    <div class="field"><label>매출여부</label><select id="pdf_매출여부" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}" ${s==='미매출'?'selected':''}>${s}</option>`).join('')}</select></div>
   `;
 }
 
@@ -14968,7 +15027,8 @@ function submitNewProductDailyRow(){
     계약기기비: devFee,
     합계: instFee + devFee,
     구분: getVal('구분') || '지사',
-    매출여부: getVal('매출여부') || '미매출'
+    매출여부: getVal('매출여부') || '미매출',
+    매출일: ''  // 매출 선택 시 저장 단계에서 오늘(전환일)로 기록
   };
 
   setLoadingCursor(true);
@@ -16147,7 +16207,7 @@ function loadExtraProductReport_(cb){
   
 function loadSafetyProductSummaryForDaily_(cb){  
  const ym = dailyReportDate.slice(0, 7);  
- const cacheKey = 'safetySummaryDaily|' + ym;  
+ const cacheKey = 'safetySummaryDaily|' + dailyReportDate;  // 보고일 기준(당일·누계)  
  const cached = cacheGet_(cacheKey);  
  if (cached) { SAFETY_SUMMARY_DAILY = cached; cb(); return; }  
  google.script.run  
@@ -16156,7 +16216,7 @@ function loadSafetyProductSummaryForDaily_(cb){
  cb();  
  })  
  .withFailureHandler(function(){ SAFETY_SUMMARY_DAILY = null; cb(); })  
- .getSafetyProductSummary(SESSION.token, ym);  
+ .getSafetyProductSummary(SESSION.token, dailyReportDate);  
 }  
   
 function applyDailyReportResult_(res){  
@@ -16272,7 +16332,8 @@ function extraSafetyTableHtml(){
  html += '<div class="grid-wrap" style="height:auto; overflow-x:auto;" data-no-auto-fit="1"><table class="status-summary daily-report-table">';  
  html += '<thead><tr><th style="width:70px;"></th><th>수주</th><th>매출</th></tr></thead><tbody>';  
  html += '<tr><th>목표</th><td class="num">' + fmtK(ordT) + '</td><td class="num">' + fmtK(saleT) + '</td></tr>';  
- html += '<tr class="daily-actual-row"><th>실적</th><td class="num">' + fmtK(ordA) + '</td><td class="num">' + fmtK(saleA) + '</td></tr>';  
+ html += '<tr><th>당일</th><td class="num">' + fmtK(Number(act.수주_당일) || 0) + '</td><td class="num">' + fmtK(Number(act.매출_당일) || 0) + '</td></tr>';
+ html += '<tr class="daily-actual-row"><th>누계</th><td class="num">' + fmtK(ordA) + '</td><td class="num">' + fmtK(saleA) + '</td></tr>';  
  html += '<tr><th>달성률</th><td class="num">' + dailyAchieve(ordA, ordT) + '%</td><td class="num">' + dailyAchieve(saleA, saleT) + '%</td></tr>';  
  html += '</tbody></table></div>';  
  return html;  
@@ -17959,12 +18020,12 @@ function sortedProductDailyRows(){
  list = list.filter(r => {
  const sf_ = ((document.getElementById('salesFilterProductDaily')||{}).value)||'';
  if (sf_ && String(r.매출여부||'').trim() !== sf_) return false;
- const fYm_ = parseForecastYm_(r.매출예상, r.보고일);
+ const fYm_ = (String(r.매출여부||'').trim()==='매출' && r.매출일) ? String(r.매출일).slice(0,7) : parseForecastYm_(r.매출예상, r.보고일);  // 매출 건=매출월, 미매출=매출예상월 기준
  return !fYm_ || fYm_ >= pdYmSel_;
  });
  list = applyColFilters_('productdaily', list);
  const key = productDailySortState.key, dir = productDailySortState.dir === 'asc' ? 1 : -1;  
- const fcKey_ = function(r){ return parseForecastYm_(r.매출예상, r.보고일) || ''; };
+ const fcKey_ = function(r){ return String(r.매출예상||'').slice(0,10) || parseForecastYm_(r.매출예상, r.보고일) || ''; };
  if (key === '매출예상') { list.sort((a,b) => { const x = fcKey_(a), y = fcKey_(b); if (!x && !y) return 0; if (!x) return 1; if (!y) return -1; return x < y ? -dir : (x > y ? dir : 0); }); return list; }
  list.sort((a,b) => {  
  let va = a[key], vb = b[key];  
@@ -18442,13 +18503,7 @@ function ensureProductDailyLoaded_(cb){
     google.script.run
       .withSuccessHandler(function(data){
         if (data && data.rows) {
-          PRODUCT_DAILY_ROWS = (data.rows || []).map(r => {
-            const obj = { id: r[r.length-1] };
-            if (typeof PRODUCT_DAILY_HEADERS !== 'undefined') {
-              PRODUCT_DAILY_HEADERS.forEach((h, i) => obj[h] = r[i]);
-            }
-            return obj;
-          });
+          PRODUCT_DAILY_ROWS = (data.rows || []).map(pdRowToObj_);
           if (typeof SCOPE_LOADED_ !== 'undefined') SCOPE_LOADED_.productdaily = true;
         }
         finish();
