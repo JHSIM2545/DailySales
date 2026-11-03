@@ -109,7 +109,7 @@
   }
 
   // ---------------- 차트 (그룹 막대, 인라인 SVG) ----------------
-  function chartSvg(data, key, title, W0) {
+  function chartSvg(data, key, title, W0, anim) {
     var names = Object.keys(data.reps);
     var W = W0 || 640, H = 168, L = 38, R = 8, T = 22, B = 22;
     var max = 0;
@@ -117,8 +117,8 @@
     if (max <= 0) return '<div style="color:#64748b;font-size:12px;padding:10px 0;">' + esc(title) + ': 표시할 실적이 없습니다.</div>';
     var step = Math.pow(10, Math.floor(Math.log10(max))), top = Math.ceil(max / step) * step;
     if (top / step < 2) top = step * 2;
-    var pw = W - L - R, ph = H - T - B, gw = pw / names.length, bw = Math.min(22, (gw - 14) / 4);
-    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(title) + '" style="display:block;width:100%;max-width:440px;font-family:inherit;">';
+    var pw = W - L - R, ph = H - T - B, gw = pw / names.length, bw = Math.min(anim ? 34 : 22, (gw - 14) / 4);
+    var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(title) + '" style="display:block;width:100%;' + (anim ? '' : 'max-width:440px;') + 'font-family:inherit;">';
     s += '<text x="' + L + '" y="14" font-size="12" font-weight="700" fill="#0f172a">' + esc(title) + ' (천원)</text>';
     for (var g = 0; g <= 2; g++) {
       var gv = top * g / 2, gy = T + ph - ph * g / 2;
@@ -130,8 +130,9 @@
       data.reps[n][key].forEach(function (v, i) {
         if (!hasData(data, i)) return;
         var h = ph * v / top, x = x0 + i * (bw + 2), y = T + ph - h;
-        s += '<rect x="' + x + '" y="' + y + '" width="' + bw + '" height="' + Math.max(h, v > 0 ? 1 : 0) + '" rx="2" fill="' + COLORS[i] + '"/>';
-        if (v > 0) s += '<text x="' + (x + bw / 2) + '" y="' + (y - 3) + '" font-size="8" text-anchor="middle" fill="#334155">' + fmt(v) + '</text>';
+        var dl = (ri * 90 + i * 70);
+        s += '<rect' + (anim ? ' class="rt-bar" style="--d:' + dl + 'ms"' : '') + ' x="' + x + '" y="' + y + '" width="' + bw + '" height="' + Math.max(h, v > 0 ? 1 : 0) + '" rx="2" fill="' + COLORS[i] + '"/>';
+        if (v > 0) s += '<text' + (anim ? ' class="rt-val" style="--d:' + dl + 'ms"' : '') + ' x="' + (x + bw / 2) + '" y="' + (y - 3) + '" font-size="' + (anim ? 9 : 8) + '" text-anchor="middle" fill="#334155">' + fmt(v) + '</text>';
       });
       s += '<text x="' + (L + gw * ri + gw / 2) + '" y="' + (H - B + 14) + '" font-size="11" font-weight="700" text-anchor="middle" fill="#0f172a">' + esc(n) + '</text>';
     });
@@ -173,7 +174,7 @@
 
   function cardHtml(data, c) {
     if (!data) return '<div style="font-size:12px;color:#64748b;">최근 3개월 실적 추이를 불러오지 못했습니다.</div>';
-    function col(key, title) { return '<div style="min-width:0;"><div style="overflow-x:auto;">' + chartSvg(data, key, title + ' 추이', 420) + '</div><div style="margin-top:6px;overflow-x:auto;">' + tableOne(data, key, title, c) + '</div></div>'; }
+    function col(key, title) { return '<div style="min-width:0;"><div style="overflow-x:auto;">' + chartSvg(data, key, title + ' 추이', 560, true) + '</div><div style="margin-top:6px;overflow-x:auto;">' + tableOne(data, key, title, c) + '</div></div>'; }
     return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:16px;align-items:start;">' + col('ord', '수주') + col('start', '개시') + '</div>' +
       '<div style="margin-top:8px;font-size:11px;color:#64748b;">' + esc(noteText(data, c)) + '</div>';
   }
@@ -191,8 +192,21 @@
     var c = window.DASH_REPORT_CTX_;
     if (!c) { slot.innerHTML = ''; return; }
     slot.innerHTML = '<div style="font-size:12px;color:#64748b;">최근 3개월 실적 추이를 불러오는 중…</div>';
-    load(c).then(function (d) { if (document.body.contains(slot)) slot.innerHTML = cardHtml(d, c); });
+    load(c).then(function (d) { if (document.body.contains(slot)) slot.innerHTML = cardHtml(d, c); slot.classList.remove('rt-go'); play(slot); });
   }
+  var css = document.createElement('style');
+  css.textContent = '.rt-bar{transform:scaleY(0);transform-box:fill-box;transform-origin:50% 100%;}' +
+    '.rt-val{opacity:0;}' +
+    '.rt-go .rt-bar{animation:rtGrow .75s cubic-bezier(.2,.8,.2,1) forwards;animation-delay:var(--d,0ms);}' +
+    '.rt-go .rt-val{animation:rtFade .4s ease forwards;animation-delay:calc(var(--d,0ms) + 450ms);}' +
+    '@keyframes rtGrow{from{transform:scaleY(0)}to{transform:scaleY(1)}}@keyframes rtFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}' +
+    '@media (prefers-reduced-motion:reduce){.rt-bar{transform:none;animation:none!important}.rt-val{opacity:1;animation:none!important}}';
+  document.head.appendChild(css);
+  var io = (typeof IntersectionObserver !== 'undefined') ? new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('rt-go'); io.unobserve(e.target); } });
+  }, { threshold: 0.25 }) : null;
+  function play(slot) { if (io) io.observe(slot); else slot.classList.add('rt-go'); }
+
   var pending = false;
   function scan() {
     pending = false;
