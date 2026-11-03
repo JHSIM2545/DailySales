@@ -102,6 +102,9 @@
   function cacheGet(k) { if (mem[k] && Date.now() - mem[k].t < TTL) return mem[k]; try { var o = JSON.parse(localStorage.getItem(k) || 'null'); if (o && Date.now() - o.t < TTL) return o; } catch (e) {} return null; }
   function cacheSet(k, v) { mem[k] = { t: Date.now(), insight: v }; try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), insight: v })); } catch (e) {} }
 
+  // 보고서 등 다른 화면에서 전략영업 제외 수치를 쓰도록 노출: {ordK,startK,ordExK,startExK,ordExPct,startExPct,items} | null
+  window.salesStrategic_ = function (c) { return fetchStrat(c).then(function () { return stratPayload(c); }); };
+
   window.salesAiCached_ = function (c) {
     try { var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0')); if (strat[ym] === undefined) return null; var o = cacheGet('gm_ins2_' + hash(JSON.stringify(payload(c)))); return o ? o : null; } catch (e) { return null; }
   };

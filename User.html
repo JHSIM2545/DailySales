@@ -14673,7 +14673,11 @@ function buildStrategyDoc_(c){
     if (o.pct < refP - 5) return 0;
     return 1;
   };
-  const lo = lvl(c.ord), ls = lvl(c.start);
+  // 영업동기 '전략영업' 건은 사업팀 전략영업 실적이므로, 있으면 지사 고유(제외) 달성률로 평가한다. 사업팀 순위는 전략영업 포함이라 평가에서 쓰지 않는다.
+  const sg = (c.strategic && (c.strategic.ordK > 0 || c.strategic.startK > 0)) ? c.strategic : null;
+  const exO = (sg && sg.ordK > 0) ? { rank: 0, pct: (sg.ordExPct == null ? c.ord.pct : sg.ordExPct) } : null;
+  const exS = (sg && sg.startK > 0) ? { rank: 0, pct: (sg.startExPct == null ? c.start.pct : sg.startExPct) } : null;
+  const lo = lvl(exO || c.ord), ls = lvl(exS || c.start);
   const wdL = ['미흡', '다소 부족', '양호'];
   const prT = function (o) { return o.rank > 0 ? ('사업팀 ' + o.rank + '위' + ((o.rank >= Math.ceil(nb * 0.6) && o.pct >= refP) ? '(진도율은 충족하나 하위권)' : '')) : ('달성률 ' + o.pct + '%'); };
   const weakList = [];
@@ -14686,7 +14690,14 @@ function buildStrategyDoc_(c){
       if (l === 1) return '다소 부족';
       return (hr && o.rank >= Math.ceil(nb * 0.6)) ? '매우 미흡' : '미흡';
     };
-    if (lo === ls) sumLines.push(cur + '수주 ' + prT(c.ord) + ', 개시 ' + prT(c.start) + '로 목표달성이 ' + wdL[lo] + '합니다.');
+    const exTxt = function (label, o, ex, exK, stK, l) {
+      return label + '는 ' + (o.rank > 0 ? '사업팀 ' + o.rank + '위이나 ' : '') + '전략영업 ' + K(stK) + '천원(사업팀 실적)을 제외하면 지사 고유 ' + K(exK) + '천원(달성률 ' + ex.pct + '%)으로 ' + (l === 0 ? '부진' : (l === 1 ? '다소 부족' : '양호')) + '합니다.';
+    };
+    if (exO || exS) {
+      sumLines.push(cur + (exO ? exTxt('수주', c.ord, exO, sg.ordExK, sg.ordK, lo) : '수주는 ' + prT(c.ord) + '로 ' + wdX(c.ord, lo) + '합니다.'));
+      sumLines.push(exS ? exTxt('개시', c.start, exS, sg.startExK, sg.startK, ls) : '개시는 ' + prT(c.start) + '로 ' + wdX(c.start, ls) + '합니다.');
+    }
+    else if (lo === ls) sumLines.push(cur + '수주 ' + prT(c.ord) + ', 개시 ' + prT(c.start) + '로 목표달성이 ' + wdL[lo] + '합니다.');
     else sumLines.push(cur + '수주는 ' + prT(c.ord) + '로 ' + wdX(c.ord, lo) + '하나, 개시는 ' + prT(c.start) + '로 ' + wdX(c.start, ls) + '합니다.');
     if (lo === 0) weakList.push('수주'); if (ls === 0) weakList.push('개시');
     const lossTxt = (lossAll > c.start.amt ? '해약·인하 증가로 ' : '');
@@ -15004,6 +15015,7 @@ async function downloadAllChaptersPdf_(){
   const c = window.DASH_REPORT_CTX_;
   if (!c) { alert('대시보드 데이터를 먼저 불러온 뒤 다시 시도하세요.'); return; }
   try { if (window.salesAiInsight_ && !c.gemini) { const gi_ = await window.salesAiInsight_(c, { timeout: 40000 }); if (gi_) { c.gemini = gi_; c.tasks = gi_.tasks.map(window.salesAiToHtml_); } } } catch (e) { console.warn('Gemini 분석 생략(기본 분석으로 PDF 생성)', e); }
+  try { if (window.salesStrategic_ && c.strategic === undefined) c.strategic = await window.salesStrategic_(c); } catch (e) { c.strategic = null; }
   try { if (window.repTrend_ && !c.repTrend) c.repTrend = await window.repTrend_.load(c); } catch (e) { console.warn('실적 추이 생략', e); }
   const fname = '북서울지사_영업현황 보고서_' + (function () {   // 예: 북서울지사_영업현황 보고서_261013 (PDF 생성일 기준, 한국시간)
     try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: '2-digit', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, ''); }
@@ -16377,7 +16389,7 @@ function fsBindOnce_(){
 
 
 </script>
-<script src="gemini-insights.js?v=20261103b"></script>
+<script src="gemini-insights.js?v=20261103c"></script>
 <script src="rep-trend.js?v=20261103f"></script>
 <script src="flag-sync.js?v=20261102b"></script>
 <script src="past-perf.js?v=20261030b"></script>
