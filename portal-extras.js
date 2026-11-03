@@ -1521,13 +1521,18 @@
   }
   function capRun(el) {
     var title = capTitle(el);
+    window.__pxCapturing = true;
+    try { pxFinishAll(); } catch (e) { /* noop */ }
     loadH2C(function (ok) {
-      if (!ok) { alert('이미지 라이브러리를 불러오지 못했습니다. 네트워크를 확인해 주세요.'); return; }
+      if (!ok) { window.__pxCapturing = false; alert('이미지 라이브러리를 불러오지 못했습니다. 네트워크를 확인해 주세요.'); return; }
+      /* 애니메이션 확정 후 두 프레임 뒤에 캡처 */
+      requestAnimationFrame(function () { requestAnimationFrame(function () {
       window.html2canvas(el, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true, logging: false,
         onclone: function (doc) { var a = doc.querySelectorAll('.pxcap-btn'), i; for (i = 0; i < a.length; i++) a[i].style.display = 'none';
           var g = doc.querySelectorAll('[data-cap-title] > div:nth-child(2)'); for (i = 0; i < g.length; i++) { if (g[i].parentNode.getAttribute('data-cap-title').indexOf('1.') === 0) { g[i].style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))'; g[i].parentNode.style.width = '860px'; } } }
-      }).then(function (cv) { capShow(cv, title); }).catch(function (e) { alert('이미지 생성 실패: ' + (e && e.message || e)); });
+      }).then(function (cv) { window.__pxCapturing = false; capShow(cv, title); }).catch(function (e) { window.__pxCapturing = false; alert('이미지 생성 실패: ' + (e && e.message || e)); });
+      }); });
     });
   }
   function capShow(cv, title) {
@@ -1597,6 +1602,46 @@
   window.__pxCap = { scan: capScan };
 
   /* ------------------------------------------------------------ 종합대시보드 애니메이션 (그래프 그려지기 · 숫자 카운트업) */
+  /* 진행 중인 숫자 카운트업 목록 / 캡처 전에 모든 애니메이션을 최종 상태로 확정 */
+  var PX_RUNS = [];
+  function pxFinishAll() {
+    var i, j, r;
+    for (i = 0; i < PX_RUNS.length; i++) {
+      r = PX_RUNS[i]; r.cancel = true;
+      for (j = 0; j < r.jobs.length; j++) if (r.jobs[j].node.parentNode) r.jobs[j].node.nodeValue = r.jobs[j].text;
+    }
+    PX_RUNS.length = 0;
+    try { (document.getAnimations ? document.getAnimations() : []).forEach(function (a) { try { a.finish(); } catch (e) { /* 무한 반복 등은 무시 */ } }); } catch (e) { /* noop */ }
+    /* 속도계: JS 로 값을 주는 바늘·막대·점·숫자를 최종값으로 */
+    document.querySelectorAll('.sp-needle').forEach(function (n) { n.style.transition = 'none'; n.style.transform = 'rotate(' + n.dataset.deg + 'deg)'; });
+    document.querySelectorAll('.sp-fill').forEach(function (f) { f.style.transition = 'none'; f.style.width = f.dataset.w + '%'; });
+    document.querySelectorAll('.sp-dot').forEach(function (d) { d.style.transition = 'none'; d.style.left = d.dataset.l + '%'; });
+    document.querySelectorAll('.sp-num').forEach(function (e) { var v = parseFloat(e.dataset.v); if (!isNaN(v)) e.textContent = (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%p'; });
+    document.querySelectorAll('.rt-slot.rt-go').forEach(function (e) { e.classList.add('rt-go'); });
+    window.__pxFinal = true;
+  }
+  window.__pxFinishAll = pxFinishAll;
+  /* 어떤 화면의 html2canvas 캡처든, 진행 중인 애니메이션을 최종 상태로 확정한 뒤 캡처 (값이 0으로 찍히는 문제 방지) */
+  (function () {
+    function wrap(orig) {
+      if (!orig || orig.__pxW) return orig;
+      var w = function () {
+        var args = arguments, self = this;
+        window.__pxCapturing = true;
+        try { pxFinishAll(); } catch (e) { /* noop */ }
+        return new Promise(function (res) { requestAnimationFrame(function () { requestAnimationFrame(res); }); })
+          .then(function () { return orig.apply(self, args); })
+          .then(function (r) { window.__pxCapturing = false; return r; }, function (e) { window.__pxCapturing = false; throw e; });
+      };
+      w.__pxW = true;
+      for (var k in orig) { try { w[k] = orig[k]; } catch (e) { /* noop */ } }
+      return w;
+    }
+    var cur = window.html2canvas ? wrap(window.html2canvas) : undefined;
+    try {
+      Object.defineProperty(window, 'html2canvas', { configurable: true, get: function () { return cur; }, set: function (v) { cur = wrap(v); } });
+    } catch (e) { if (cur) window.html2canvas = cur; }
+  })();
   var ANIM_NUM = /-?\d[\d,]*(?:\.\d+)?/g;
   function animCount(root) {
     var els = root.querySelectorAll('div,span,b');
@@ -1618,7 +1663,8 @@
       }
     }
     if (!jobs.length) return;
-    var DUR = 2000, t0 = null;
+    var DUR = 2000, t0 = null, run = { cancel: false, jobs: jobs };
+    PX_RUNS.push(run);
     function fmt(tok, v) {
       var dec = (tok.split('.')[1] || '').length, comma = tok.indexOf(',') > -1;
       var s = Math.abs(v).toFixed(dec);
@@ -1627,6 +1673,7 @@
     }
     function frame(ts) {
       if (t0 === null) t0 = ts;
+      if (run.cancel) return;
       var k = Math.min(1, (ts - t0) / DUR), e = 1 - Math.pow(1 - k, 3), a, b, idx;
       for (a = 0; a < jobs.length; a++) {
         var jb = jobs[a];
@@ -1638,7 +1685,7 @@
           return fmt(tok, target * e);
         });
       }
-      if (k < 1) requestAnimationFrame(frame);
+      if (k < 1) requestAnimationFrame(frame); else run.cancel = true;
     }
     for (j = 0; j < jobs.length; j++) jobs[j].node.nodeValue = jobs[j].text.replace(ANIM_NUM, function (tok) { return fmt(tok, 0); });
     requestAnimationFrame(frame);
@@ -1687,7 +1734,7 @@
   try {
     document.addEventListener('mouseover', function (ev) {
       var t = ev.target, dv = t && t.closest ? t.closest('#content .dashboard-view') : null;
-      if (!dv || t.closest('.sp-slot')) return;
+      if (!dv || t.closest('.sp-slot') || t.closest('.pxcap-btn') || window.__pxCapturing) return;
       var el = t, st;
       while (el && el !== dv) {
         st = el.getAttribute && el.getAttribute('style') || '';
