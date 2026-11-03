@@ -14316,6 +14316,12 @@ function pdIsoFromYmLike_(val, refDate){
   const last = new Date(y, m, 0).getDate();
   return ym + '-' + String(Math.min(30,last)).padStart(2,'0');
 }
+function pdMonthLabel_(ym){  // 'YYYY-MM' -> 당해년은 'M월', 다른 해는 'YY.M월'
+  const s = String(ym||'').slice(0,7);
+  if (!/^\d{4}-\d{2}$/.test(s)) return '';
+  const y = Number(s.slice(0,4)), m = Number(s.slice(5,7));
+  return (y === Number(todayStr().slice(0,4))) ? (m + '월') : (String(y).slice(2) + '.' + m + '월');
+}
 function pdRowToObj_(r){
   const obj = { id: r[r.length-1] };
   PRODUCT_DAILY_HEADERS.forEach((h,i) => obj[h] = (r[i]===undefined || r[i]===null) ? '' : r[i]);
@@ -14345,8 +14351,8 @@ function computeAutoProductDaily(row){
   const hasFee = !(row.계약설치비 === '' && row.계약기기비 === '');
   const 수주월 = String(row.보고일||'').slice(0,7);
   const done = String(row.매출여부||'').trim() === '매출';
-  // 매출월: 매출일(매출 전환일)의 월. 미매출은 매출일이 없으므로 비워 둔다(매출예상 컬럼 참조)
-  const 매출월 = done ? (String(row.매출일||'').slice(0,7) || String(row.매출예상||'').slice(0,7)) : '';
+  // 매출월: 매출예상일의 월(매출로 전환하면 매출예상일이 전환일로 바뀜)
+  const 매출월 = String(row.매출예상||'').slice(0,7);
   return { 합계: hasFee ? String(a + b) : '', 수주월: 수주월, 매출월: 매출월 };
 }  
 
@@ -14878,8 +14884,13 @@ function onProductDailyFieldChange(id, field, value){
     const dev = Number(String(row.계약기기비||'0').replace(/[^0-9.-]/g,'')) || 0;
     row.합계 = inst + dev;
   }
-  if (field === '매출여부') row.매출일 = (value === '매출') ? todayStr() : '';  // 매출 전환일 = 전환한 당일
   if (field === '매출예상' && value) value = row.매출예상 = String(value).slice(0,10);
+  if (field === '매출여부') {
+    // 매출로 전환하면 매출예상일(=매출일)이 오늘로 자동 변경(이후 수동 수정 가능), 미매출로 되돌리면 매출일만 해제
+    if (value === '매출') { row.매출예상 = todayStr(); row.매출일 = todayStr(); }
+    else row.매출일 = '';
+  }
+  if (field === '매출예상' && String(row.매출여부||'') === '매출') row.매출일 = String(row.매출예상||'').slice(0,10);  // 매출 건은 매출예상일을 수동 수정하면 매출일도 따라감
   row._unsynced = true; row._syncError = false;  
   renderProductDaily();  
   pushSaveProductDaily(row);  
@@ -14949,8 +14960,8 @@ function renderProductDaily(){
     html += `<tr data-id="${row.id}" class="${rowCls}">` + flagCellHtml('productdaily', row.id);  
     PRODUCT_DAILY_COLS.forEach(h => {
       if (h === '수주월' || h === '매출월') {
-        const mv = row[h] || '';
-        const tip = (h === '매출월') ? (row.매출일 ? '매출일 ' + row.매출일 : '미매출') : ('보고일 ' + (row.보고일||''));
+        const mv = pdMonthLabel_(row[h]);
+        const tip = (h === '매출월') ? ('매출예상일 ' + (row.매출예상||'') + (row.매출여부 === '매출' ? ' (매출)' : ' (미매출)')) : ('보고일 ' + (row.보고일||''));
         html += `<td class="auto narrow${productDailySortState.key === h ? ' sort-col' : ''}" title="${escAttr(tip)}" style="text-align:center !important; font-weight:600; color:${h==='매출월'?'#c2410c':'#1d4ed8'};">${escHtml(mv)}</td>`;
         return;
       }
@@ -15001,13 +15012,26 @@ function buildProductDailyForm(){
     <div class="field"><label>계약담당자</label><select id="pdf_계약담당자" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_REP.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
     <div class="field"><label>매출예상일</label><input type="date" id="pdf_매출예상" autocomplete="one-time-code" value="${defForecast}"></div>
     <div class="field"><label>계약동기</label><select id="pdf_계약동기" autocomplete="one-time-code"><option value="">선택</option>${LIST_PRODUCT_DAILY_MOTIVE.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
-    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
-    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this)" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>계약설치비</label><input type="text" id="pdf_계약설치비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this); pdfUpdateTotal_()" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>계약기기비</label><input type="text" id="pdf_계약기기비" autocomplete="one-time-code" aria-autocomplete="none" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" inputmode="numeric" style="text-align:right;" oninput="formatMoneyInput(this); pdfUpdateTotal_()" onfocus="setTimeout(()=>this.select(),0)" onclick="this.select()"></div>
+    <div class="field"><label>합계 (자동)</label><input type="text" id="pdf_합계" readonly tabindex="-1" value="0" style="text-align:right; font-weight:700; color:#1d4ed8; background:#f1f5f9;"></div>
     <div class="field"><label>구분</label><select id="pdf_구분" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_GUBUN.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></div>
-    <div class="field"><label>매출여부</label><select id="pdf_매출여부" autocomplete="one-time-code">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}" ${s==='미매출'?'selected':''}>${s}</option>`).join('')}</select></div>
+    <div class="field"><label>매출여부</label><select id="pdf_매출여부" autocomplete="one-time-code" onchange="pdfOnSalesChange_(this.value)">${LIST_PRODUCT_DAILY_SALES.map(s=>`<option value="${s}" ${s==='미매출'?'selected':''}>${s}</option>`).join('')}</select></div>
   `;
 }
 
+function pdfUpdateTotal_(){
+  const a = Number(moneyValue(document.getElementById('pdf_계약설치비') || {value:'0'})) || 0;
+  const b = Number(moneyValue(document.getElementById('pdf_계약기기비') || {value:'0'})) || 0;
+  const el = document.getElementById('pdf_합계');
+  if (el) el.value = commaFmt(a + b);
+}
+function pdfOnSalesChange_(v){
+  // 미매출 -> 매출 전환 시 매출예상일을 오늘로 자동 변경 (이후 수동 수정 가능). 미매출로 되돌리면 당월 30일 기본값
+  const el = document.getElementById('pdf_매출예상'); if (!el) return;
+  if (v === '매출') el.value = todayStr();
+  else { const ym = todayStr().slice(0,7); el.value = ym + '-' + String(Math.min(30, new Date(Number(ym.slice(0,4)), Number(ym.slice(5,7)), 0).getDate())).padStart(2,'0'); }
+}
 function openAddProductDailyModal(){
   buildProductDailyForm();
   const overlay = document.getElementById('productDailyModalOverlay');
@@ -15037,7 +15061,7 @@ function submitNewProductDailyRow(){
     합계: instFee + devFee,
     구분: getVal('구분') || '지사',
     매출여부: getVal('매출여부') || '미매출',
-    매출일: ''  // 매출 선택 시 저장 단계에서 오늘(전환일)로 기록
+    매출일: (getVal('매출여부') === '매출') ? (getVal('매출예상') || todayStr()) : ''  // 매출 건의 매출일 = 매출예상일
   };
 
   setLoadingCursor(true);
@@ -21125,7 +21149,7 @@ document.addEventListener('mousedown', function(e) {
 <script src="calculator.js?v=20261102b"></script>
 <script src="gemini-insights.js?v=20261103c"></script>
 <script src="rep-trend.js?v=20261103f"></script>
-<script src="speedometer.js?v=20261103a"></script>
+<script src="speedometer.js?v=20261103b"></script>
 <script src="flag-sync.js?v=20261102b"></script>
 <script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>

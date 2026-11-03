@@ -344,6 +344,14 @@
     load(c).then(function (d) {
       if (!document.body.contains(slot)) return;
       slot.innerHTML = cardHtml(d, c);
+      // 마우스를 올리면 해당 속도계 카드의 애니메이션을 다시 실행 (진행 중에는 중복 실행 방지)
+      slot.querySelectorAll('.sp-card').forEach(function (cd) {
+        cd.style.cursor = 'pointer';
+        cd.addEventListener('mouseenter', function () {
+          var now = Date.now(); if (cd.__spT && now - cd.__spT < 2200) return;
+          cd.__spT = now; animate(cd);
+        });
+      });
       if (io) io.observe(slot); else animate(slot);
     }).catch(function (e) {
       console.warn('속도계 실패', e);
@@ -352,7 +360,7 @@
   }
   var css = document.createElement('style');
   css.textContent = '.sp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;}' +
-    '.sp-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;min-width:0;}' +
+    '.sp-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;min-width:0;transition:box-shadow .2s,transform .2s;}.sp-card:hover{box-shadow:0 6px 16px rgba(15,23,42,.14);transform:translateY(-2px);}' +
     '.sp-tbl{border-collapse:collapse;font-size:12px;width:100%;}.sp-tbl th,.sp-tbl td{border:1px solid #cbd5e1;padding:4px 8px;text-align:center;white-space:nowrap;}.sp-tbl th{background:#f1f5f9;}';
   document.head.appendChild(css);
   window.speedo_ = { load: load, cardHtml: cardHtml };
