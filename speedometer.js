@@ -179,7 +179,7 @@
     if (!prods) return Promise.resolve({ unsupported: cat });
     var ym = c.ym || (c.y + '-' + pad(c.m)), ck = ym + '|' + cat + '|' + (c.todayDs || '');
     var hit = cache[ck]; if (hit && Date.now() - hit.t < 5 * 60 * 1000) return Promise.resolve(hit.d);
-    var from = addM(ym, -3) + '-01', to = ym + '-31';
+    var from = addM(ym, -3) + '-01', to = ym + '-' + pad(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate());
     var inList = '(' + prods.map(function (p) { return '"' + p + '"'; }).join(',') + ')';
     var q1 = 'biz_team_data?select=report_date,product_type,branches_json,rows_json&product_type=in.' + encodeURIComponent(inList) +
       '&report_date=gte.' + from + '&report_date=lte.' + to + '&order=report_date.asc&limit=2000';
