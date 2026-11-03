@@ -266,12 +266,12 @@
     var span = mx - mn, X = function (v) { return Math.max(0, Math.min(100, (v - mn) / span * 100)); };
     var better = res.m.good > 0 ? res.rCur >= pe.avg : res.rCur <= pe.avg;
     var col = better ? '#16a34a' : '#dc2626';
-    return '<div style="margin-top:9px;"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:#334155;margin-bottom:2px;"><b>타지사 ' + pe.n + '곳 3개월 평균 대비</b><span style="color:' + col + ';font-weight:700;">' + sg(res.peer.gap * 100) + '%p</span></div>' +
+    return '<div style="margin-top:9px;"><div style="display:flex;justify-content:space-between;font-size:11.5px;color:#334155;margin-bottom:2px;"><b>타지사 대비</b><span style="color:' + col + ';font-weight:700;">' + sg(res.peer.gap * 100) + '%p</span></div>' +
       '<div style="position:relative;height:14px;background:#f1f5f9;border-radius:7px;">' +
       '<div title="타지사 최소~최대" style="position:absolute;left:' + X(pe.min).toFixed(1) + '%;width:' + Math.max(1, X(pe.max) - X(pe.min)).toFixed(1) + '%;top:3px;bottom:3px;background:#cbd5e1;border-radius:4px;"></div>' +
       '<div title="타지사 평균" style="position:absolute;left:' + X(pe.avg).toFixed(1) + '%;top:0;bottom:0;width:2px;background:#475569;"></div>' +
       '<div class="sp-dot" data-l="' + X(res.rCur).toFixed(1) + '" title="북서울 현재" style="position:absolute;left:0;top:1px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:' + col + ';border:2px solid #fff;box-shadow:0 0 0 1px ' + col + ';transition:left 1.1s cubic-bezier(.2,.8,.2,1);"></div>' +
-      '</div><div style="font-size:10.5px;color:#64748b;margin-top:2px;">타지사 ' + pc(pe.min) + ' ~ ' + pc(pe.max) + ' (평균 ' + pc(pe.avg) + ') · 북서울 현재 ' + pc(res.rCur) + ' · 이번 달 순위 ' + res.rank + '/' + res.rankN + '</div></div>';
+      '</div><div style="font-size:10.5px;color:#64748b;margin-top:2px;">타지사 평균 ' + pc(pe.avg) + ' · 현재 ' + pc(res.rCur) + ' · 순위 ' + res.rank + '/' + res.rankN + '</div></div>';
   }
   function paceColor(ratio, good) { if (ratio == null) return '#94a3b8'; var ok = good > 0 ? ratio >= 1 : ratio <= 1; var near = good > 0 ? ratio >= 0.85 : ratio <= 1.15; return ok ? '#16a34a' : (near ? '#f59e0b' : '#dc2626'); }
   function card(res, i) {
@@ -283,13 +283,12 @@
       '<span style="font-size:11.5px;font-weight:700;color:#fff;background:' + (early ? '#94a3b8' : vd.col) + ';padding:2px 8px;border-radius:10px;">' + esc(early ? '월초 참고' : vd.t) + '</span></div>';
     h += '<div>' + gauge(res, i) + '</div>';
     h += '<div style="text-align:center;margin-top:-4px;"><div class="sp-num" data-v="' + (res.lead == null ? '' : res.lead.toFixed(2)) + '" style="font-size:24px;font-weight:800;color:' + vd.col + ';">' + leadTxt + '</div>' +
-      '<div style="font-size:11px;color:#64748b;">같은 영업일 과거 3개월 평균 달성률 대비 (현재 ' + pc(res.rCur) + ' vs 평균 ' + pc(res.rAvg) + ')</div></div>';
+      '<div style="font-size:11px;color:#64748b;">평균 ' + pc(res.rAvg) + ' → 현재 ' + pc(res.rCur) + '</div></div>';
     var tl = m.good < 0 ? '목표 소진 속도' : '목표 대비 진도';
     h += bar(tl, res.rCur, res.paceT != null ? res.p : null, paceColor(res.paceT, m.good), '달성 ' + pc(res.rCur) + ' / 진척 ' + pc(res.p__) + ' → ' + (res.paceT == null ? '–' : '<b>' + Math.round(res.paceT * 100) + '%</b>'));
     if (res.rPlan != null) h += bar(m.good < 0 ? '계획 소진 속도' : '계획 대비 진도', res.rPlan, res.p__, paceColor(res.paceP, m.good), '달성 ' + pc(res.rPlan) + ' → <b>' + (res.paceP == null ? '–' : Math.round(res.paceP * 100) + '%') + '</b>');
-    else h += '<div style="margin-top:7px;font-size:11px;color:#94a3b8;">계획 대비: 이번 달 지사 계획 미입력</div>';
     h += peerBar(res);
-    h += '<div style="margin-top:6px;font-size:10.5px;color:#64748b;">실적 ' + fmt(res.act) + ' / 목표 ' + fmt(res.tgt) + ' (천원)' + (res.plan ? ' · 계획 ' + fmt(res.plan) : '') + '</div></div>';
+    h += '<div style="margin-top:6px;font-size:10.5px;color:#64748b;">실적 ' + fmt(res.act) + ' / 목표 ' + fmt(res.tgt) + '' + (res.plan ? ' / 계획 ' + fmt(res.plan) : '') + '</div></div>';
     return h;
   }
   function cardHtml(d, c) {
@@ -297,12 +296,10 @@
     if (d.unsupported) return '<div style="font-size:12px;color:#64748b;">' + esc(d.unsupported) + ' 구분은 속도계 대상이 아닙니다. (일반알람·휴엔·정보보안·알람+휴엔)</div>';
     if (d.err) return '<div style="font-size:12px;color:#64748b;">' + esc(d.err) + '</div>';
     d.metrics.forEach(function (r) { r.p__ = d.p; r.p = d.p; });
-    var baseTxt = d.base.length ? d.base.map(function (b) { return +b.slice(5) + '월'; }).join('·') + ' (' + d.base.length + '개월)' : '없음';
+    var baseTxt = d.base.length ? d.base.map(function (b) { return +b.slice(5) + '월'; }).join('·') : '없음';
     var h = '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px;font-size:12px;color:#334155;">' +
-      '<span><b>' + d.curDs + '</b> 기준 · 영업일 <b>' + d.el + '/' + d.tot + '일 (' + pc(d.p, 0) + ')</b></span>' +
-      '<span>비교 기준월: <b>' + esc(baseTxt) + '</b></span>' +
-      '<span style="color:#64748b;">바늘 = (현재 달성률 − 같은 영업일 과거 3개월 평균 달성률), 가운데 0 · 오른쪽(초록)일수록 평균보다 앞섬, 왼쪽(빨강)일수록 뒤처짐 (눈금 ±30%p, 유지감소는 적을수록 오른쪽)</span></div>';
-    if (!d.base.length) { h += '<div style="padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412;">비교할 과거 월의 월중 스냅샷(월 ' + MIN_POINTS + '건 이상)이 없어 속도계를 그릴 수 없습니다.</div>'; return h; }
+      '<span><b>' + d.curDs + '</b> · 영업일 <b>' + d.el + '/' + d.tot + '</b></span><span>비교 <b>' + esc(baseTxt) + '</b></span></div>';
+    if (!d.base.length) { h += '<div style="padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412;">비교할 과거 자료가 부족합니다.</div>'; return h; }
     h += '<div class="sp-grid">' + d.metrics.map(card).join('') + '</div>';
     // 요약표
     h += '<div style="overflow-x:auto;margin-top:10px;"><table class="sp-tbl"><thead><tr><th>지표</th><th>3개월 평균 대비</th><th>목표 진도</th><th>계획 진도</th><th>타지사 3개월 평균 대비</th><th>이번 달 타지사 순위</th></tr></thead><tbody>';
@@ -312,11 +309,6 @@
         (r.paceP == null ? '–' : Math.round(r.paceP * 100) + '%') + '</td><td>' + (r.peer ? sg(r.peer.gap * 100) + '%p' : '–') + '</td><td>' + r.rank + ' / ' + r.rankN + '위</td></tr>';
     });
     h += '</tbody></table></div>';
-    var notes = ['진도 = 달성률 ÷ 영업일 진척률 (100% = 목표·계획 페이스, 유지감소는 100% 이하가 양호)'];
-    if (d.skipped.length) notes.push(d.skipped.map(function (s) { return +s.ym.slice(5) + '월'; }).join('·') + '은 월중 스냅샷 ' + MIN_POINTS + '건 미만(' + d.skipped.map(function (s) { return s.cnt + '건'; }).join('·') + ')이라 비교에서 제외');
-    if (d.p < 0.15) notes.push('월초(영업일 진척 ' + pc(d.p, 0) + ')라 하루 실적에도 수치가 크게 움직여 해석에 주의');
-    notes.push('출처: 사업팀 지사별 일일 현황(타지사 15곳 동일 기준), 계획=지사 계획(sales_targets_product) · 금액 천원');
-    h += '<div style="margin-top:6px;font-size:10.5px;color:#64748b;line-height:1.6;">' + notes.map(esc).join('<br>') + '</div>';
     return h;
   }
 
@@ -325,12 +317,12 @@
     var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     var needles = slot.querySelectorAll('.sp-needle'), fills = slot.querySelectorAll('.sp-fill'), dots = slot.querySelectorAll('.sp-dot'), nums = slot.querySelectorAll('.sp-num');
     if (reduce) { fills.forEach(function (f) { f.style.width = f.dataset.w + '%'; }); dots.forEach(function (d) { d.style.left = d.dataset.l + '%'; }); return; }
-    needles.forEach(function (n) { n.style.transition = 'none'; n.style.transform = 'rotate(-90deg)'; });
+    needles.forEach(function (n) { n.style.transition = 'none'; n.style.transform = 'rotate(0deg)'; });
     fills.forEach(function (f) { f.style.transition = 'none'; f.style.width = '0'; });
     dots.forEach(function (d) { d.style.transition = 'none'; d.style.left = '0%'; });
     void slot.offsetWidth;
     requestAnimationFrame(function () {
-      needles.forEach(function (n, i) { n.style.transition = 'transform 1.6s cubic-bezier(.2,1.35,.35,1) ' + (i * 120) + 'ms'; n.style.transform = 'rotate(' + n.dataset.deg + 'deg)'; });
+      needles.forEach(function (n, i) { n.style.transition = 'transform 1.5s cubic-bezier(.25,1.6,.4,1) ' + (i * 120) + 'ms'; n.style.transform = 'rotate(' + n.dataset.deg + 'deg)'; });
       fills.forEach(function (f) { f.style.transition = 'width 1.1s cubic-bezier(.2,.8,.2,1) 250ms'; f.style.width = f.dataset.w + '%'; });
       dots.forEach(function (d) { d.style.transition = 'left 1.1s cubic-bezier(.2,.8,.2,1) 250ms'; d.style.left = d.dataset.l + '%'; });
     });

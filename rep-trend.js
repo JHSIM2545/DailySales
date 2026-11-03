@@ -206,6 +206,13 @@
     es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('rt-go'); io.unobserve(e.target); } });
   }, { threshold: 0.25 }) : null;
   function play(slot) { if (io) io.observe(slot); else slot.classList.add('rt-go'); }
+  // 마우스를 올리면 막대 애니메이션 재생
+  document.addEventListener('mouseover', function (ev) {
+    var sl = ev.target && ev.target.closest && ev.target.closest('.rt-slot');
+    if (!sl || !sl.classList.contains('rt-go')) return;
+    var n = Date.now(); if (sl.__rtT && n - sl.__rtT < 1800) return; sl.__rtT = n;
+    sl.classList.remove('rt-go'); void sl.offsetWidth; sl.classList.add('rt-go');
+  });
 
   var pending = false;
   function scan() {

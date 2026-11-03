@@ -1683,6 +1683,24 @@
     var animTimer = null;
     new MutationObserver(function () { clearTimeout(animTimer); animTimer = setTimeout(animScan, 120); }).observe(document.documentElement, { childList: true, subtree: true });
   } catch (e) { /* noop */ }
+  /* 마우스를 올리면 해당 카드의 그래프·숫자 애니메이션을 다시 실행 (속도계는 자체 처리) */
+  try {
+    document.addEventListener('mouseover', function (ev) {
+      var t = ev.target, dv = t && t.closest ? t.closest('#content .dashboard-view') : null;
+      if (!dv || t.closest('.sp-slot')) return;
+      var el = t, st;
+      while (el && el !== dv) {
+        st = el.getAttribute && el.getAttribute('style') || '';
+        if (/background:\s*#fff/i.test(st) && /border:\s*1(?:\.5)?px solid/.test(st) && /border-radius:\s*(?:8|10|12)px/.test(st)) break;
+        el = el.parentElement;
+      }
+      if (!el || el === dv) return;
+      var now = Date.now();
+      if (el.__pxH && now - el.__pxH < 2200) return;
+      el.__pxH = now;
+      try { animGraphs(el); animCount(el); } catch (e) { /* noop */ }
+    });
+  } catch (e) { /* noop */ }
   window.__pxAnim = { scan: animScan };
 
   /* ------------------------------------------------------------ 로그인 감지: 공지 팝업 · 메모 표시 */
