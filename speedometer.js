@@ -22,7 +22,7 @@
   var KEY = 'sb_publishable_xUnGxyLCc5TB5nv4keVQVw__grqGJkP';
   var MINE = '북서울';
   var MIN_POINTS = 4;          // 한 달에 스냅샷이 이 개수 미만이면 비교 기준월에서 제외
-  var RANGE = 5;               // 속도계 눈금 범위 (± 영업일)
+  var RANGE = 30;              // 속도계 눈금 범위 (± %p, 같은 시점 과거 3개월 평균 달성률 대비 차이)
   var HOL = {};
   ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-03-01', '2026-03-02', '2026-05-05', '2026-05-08', '2026-06-06', '2026-08-15', '2026-08-17',
     '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-10-03', '2026-10-05', '2026-10-09', '2026-12-25',
@@ -146,7 +146,7 @@
       var mine = [];
       out.base.forEach(function (bm) { var r = rateAt(snaps, bm, MINE, m.key, p); if (r != null) mine.push({ ym: bm, r: r }); });
       res.mine = mine; res.rAvg = mean(mine.map(function (x) { return x.r; }));
-      if (res.rAvg != null) { res.lead = (rCur - res.rAvg) * tot * m.good; res.diff = (rCur - res.rAvg); }
+      if (res.rAvg != null) { res.lead = (rCur - res.rAvg) * 100 * m.good; res.diff = (rCur - res.rAvg); }
       // 2) 목표·계획 대비 진도
       res.paceT = p > 0 ? rCur / p : null;
       var pl = plan && plan[m.key];
@@ -199,8 +199,21 @@
   }
 
   // ---------- 그리기 ----------
+  function mixc(c1, c2, k) {
+    var f = function (h, i) { return parseInt(h.substr(1 + i * 2, 2), 16); }, o = '#';
+    for (var i = 0; i < 3; i++) { var v = Math.round(f(c1, i) + (f(c2, i) - f(c1, i)) * k); o += (v < 16 ? '0' : '') + v.toString(16); }
+    return o;
+  }
+  // 왼쪽 끝으로 갈수록 깊은 빨강, 오른쪽 끝으로 갈수록 깊은 초록, 가운데는 옅은 회색
+  function colorAt(v) {
+    var k = Math.min(1, Math.abs(v) / RANGE);
+    if (v < 0) return k < 0.25 ? mixc('#e5e7eb', '#f87171', k / 0.25) : mixc('#f87171', '#7f1d1d', (k - 0.25) / 0.75);
+    return k < 0.25 ? mixc('#e5e7eb', '#4ade80', k / 0.25) : mixc('#4ade80', '#14532d', (k - 0.25) / 0.75);
+  }
   function zones() {
-    return [[-RANGE, -2.5, '#dc2626'], [-2.5, -0.5, '#f59e0b'], [-0.5, 0.5, '#94a3b8'], [0.5, 2.5, '#84cc16'], [2.5, RANGE, '#16a34a']];
+    var z = [], n = 60, w = 2 * RANGE / n;
+    for (var i = 0; i < n; i++) { var a = -RANGE + i * w, b = a + w; z.push([a, b + 0.05, colorAt((a + b) / 2)]); }
+    return z;
   }
   var CX = 130, CY = 128, R0 = 100, TH = 20;
   function pt(v, r) { var th = Math.PI * (1 - (v + RANGE) / (2 * RANGE)); return [CX + r * Math.cos(th), CY - r * Math.sin(th)]; }
@@ -213,20 +226,20 @@
     var m = res.m, v = res.lead;
     if (v == null) return { t: '비교 기준 없음', col: '#64748b' };
     var w = v > 0 ? m.up : m.down, a = Math.abs(v);
-    if (a < 0.5) return { t: '3개월 평균 수준', col: '#64748b' };
-    var strong = a >= 2.5 ? '크게 ' : '';
-    return { t: '평균보다 ' + strong + w + (m.good === -1 ? (v > 0 ? ' (양호)' : ' (주의)') : (v > 0 ? '' : '')), col: v > 0 ? '#15803d' : (a >= 2.5 ? '#dc2626' : '#d97706') };
+    if (a < 2) return { t: '3개월 평균 수준', col: '#64748b' };
+    var strong = a >= 10 ? '크게 ' : '';
+    return { t: '평균보다 ' + strong + w + (m.good === -1 ? (v > 0 ? ' (양호)' : ' (주의)') : (v > 0 ? '' : '')), col: v > 0 ? '#15803d' : (a >= 10 ? '#b91c1c' : '#d97706') };
   }
   function gauge(res, idx) {
     var v = res.lead == null ? 0 : Math.max(-RANGE, Math.min(RANGE, res.lead));
     var s = '<svg viewBox="0 0 260 158" width="100%" style="max-width:290px;display:block;margin:0 auto;" role="img" aria-label="' + esc(res.m.label) + ' 속도계">';
     zones().forEach(function (z) { s += '<path d="' + arc(z[0], z[1], R0 - TH, R0) + '" fill="' + z[2] + '" opacity=".92"/>'; });
-    for (var t = -RANGE; t <= RANGE; t++) {
-      var a = pt(t, R0 + 3), b = pt(t, R0 + (t % 5 === 0 || t === 0 ? 10 : 7));
+    for (var t = -RANGE; t <= RANGE; t += 5) {
+      var a = pt(t, R0 + 3), b = pt(t, R0 + (t % 10 === 0 ? 10 : 7));
       s += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="#475569" stroke-width="' + (t === 0 ? 2 : 1) + '"/>';
     }
-    [[-RANGE, '−' + RANGE], [0, '0'], [RANGE, '+' + RANGE]].forEach(function (L) {
-      var q = pt(L[0], R0 + 20); s += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" text-anchor="middle" font-size="10" fill="#475569">' + L[1] + '</text>';
+    [-30, -20, -10, 0, 10, 20, 30].forEach(function (L) {
+      var q = pt(L, R0 + 20); s += '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 4).toFixed(1) + '" text-anchor="middle" font-size="9" fill="#475569">' + (L > 0 ? '+' + L : (L < 0 ? '−' + (-L) : '0')) + '</text>';
     });
     var l1 = pt(-RANGE, R0 - TH - 8), l2 = pt(RANGE, R0 - TH - 8);
     s += '<text x="' + l1[0].toFixed(1) + '" y="' + (l1[1] + 16).toFixed(1) + '" text-anchor="middle" font-size="10" fill="#b91c1c" font-weight="700">' + esc(res.m.good > 0 ? '느림' : '많음') + '</text>';
@@ -265,12 +278,12 @@
     var m = res.m;
     if (res.na) return '<div class="sp-card"><b>' + esc(m.label) + '</b><div style="font-size:12px;color:#64748b;margin-top:6px;">목표 또는 실적 데이터가 없어 계산하지 못했습니다.</div></div>';
     var early = res.p__ != null && res.p__ < 0.15;
-    var vd = verdict(res), leadTxt = res.lead == null ? '–' : sg(res.lead) + '영업일';
+    var vd = verdict(res), leadTxt = res.lead == null ? '–' : sg(res.lead) + '%p';
     var h = '<div class="sp-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><b style="font-size:15px;color:#0f172a;">' + esc(m.label) + '</b>' +
       '<span style="font-size:11.5px;font-weight:700;color:#fff;background:' + (early ? '#94a3b8' : vd.col) + ';padding:2px 8px;border-radius:10px;">' + esc(early ? '월초 참고' : vd.t) + '</span></div>';
-    h += '<div style="' + (early ? 'opacity:.5;' : '') + '">' + gauge(res, i) + '</div>';
+    h += '<div>' + gauge(res, i) + '</div>';
     h += '<div style="text-align:center;margin-top:-4px;"><div class="sp-num" data-v="' + (res.lead == null ? '' : res.lead.toFixed(2)) + '" style="font-size:24px;font-weight:800;color:' + vd.col + ';">' + leadTxt + '</div>' +
-      '<div style="font-size:11px;color:#64748b;">같은 영업일 3개월 평균 대비 (달성률 ' + pc(res.rCur) + ' vs 평균 ' + pc(res.rAvg) + ')</div></div>';
+      '<div style="font-size:11px;color:#64748b;">같은 영업일 과거 3개월 평균 달성률 대비 (현재 ' + pc(res.rCur) + ' vs 평균 ' + pc(res.rAvg) + ')</div></div>';
     var tl = m.good < 0 ? '목표 소진 속도' : '목표 대비 진도';
     h += bar(tl, res.rCur, res.paceT != null ? res.p : null, paceColor(res.paceT, m.good), '달성 ' + pc(res.rCur) + ' / 진척 ' + pc(res.p__) + ' → ' + (res.paceT == null ? '–' : '<b>' + Math.round(res.paceT * 100) + '%</b>'));
     if (res.rPlan != null) h += bar(m.good < 0 ? '계획 소진 속도' : '계획 대비 진도', res.rPlan, res.p__, paceColor(res.paceP, m.good), '달성 ' + pc(res.rPlan) + ' → <b>' + (res.paceP == null ? '–' : Math.round(res.paceP * 100) + '%') + '</b>');
@@ -288,14 +301,14 @@
     var h = '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px;font-size:12px;color:#334155;">' +
       '<span><b>' + d.curDs + '</b> 기준 · 영업일 <b>' + d.el + '/' + d.tot + '일 (' + pc(d.p, 0) + ')</b></span>' +
       '<span>비교 기준월: <b>' + esc(baseTxt) + '</b></span>' +
-      '<span style="color:#64748b;">바늘이 오른쪽일수록 3개월 평균보다 좋은 방향(수주·개시·유지증가는 빠름·많음, 유지감소는 적음)</span></div>';
+      '<span style="color:#64748b;">바늘 = (현재 달성률 − 같은 영업일 과거 3개월 평균 달성률), 가운데 0 · 오른쪽(초록)일수록 평균보다 앞섬, 왼쪽(빨강)일수록 뒤처짐 (눈금 ±30%p, 유지감소는 적을수록 오른쪽)</span></div>';
     if (!d.base.length) { h += '<div style="padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412;">비교할 과거 월의 월중 스냅샷(월 ' + MIN_POINTS + '건 이상)이 없어 속도계를 그릴 수 없습니다.</div>'; return h; }
     h += '<div class="sp-grid">' + d.metrics.map(card).join('') + '</div>';
     // 요약표
     h += '<div style="overflow-x:auto;margin-top:10px;"><table class="sp-tbl"><thead><tr><th>지표</th><th>3개월 평균 대비</th><th>목표 진도</th><th>계획 진도</th><th>타지사 3개월 평균 대비</th><th>이번 달 타지사 순위</th></tr></thead><tbody>';
     d.metrics.forEach(function (r) {
       if (r.na) return;
-      h += '<tr><td><b>' + esc(r.m.label) + '</b></td><td>' + (r.lead == null ? '–' : sg(r.lead) + '영업일') + '</td><td>' + (r.paceT == null ? '–' : Math.round(r.paceT * 100) + '%') + '</td><td>' +
+      h += '<tr><td><b>' + esc(r.m.label) + '</b></td><td>' + (r.lead == null ? '–' : sg(r.lead) + '%p') + '</td><td>' + (r.paceT == null ? '–' : Math.round(r.paceT * 100) + '%') + '</td><td>' +
         (r.paceP == null ? '–' : Math.round(r.paceP * 100) + '%') + '</td><td>' + (r.peer ? sg(r.peer.gap * 100) + '%p' : '–') + '</td><td>' + r.rank + ' / ' + r.rankN + '위</td></tr>';
     });
     h += '</tbody></table></div>';
@@ -327,7 +340,7 @@
       function step(ts) {
         if (t0 == null) t0 = ts + delay; if (ts < t0) { requestAnimationFrame(step); return; }
         var k = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - k, 3), cur = v * e;
-        el.textContent = sg(cur) + '영업일'; if (k < 1) requestAnimationFrame(step); else el.textContent = sg(v) + '영업일';
+        el.textContent = sg(cur) + '%p'; if (k < 1) requestAnimationFrame(step); else el.textContent = sg(v) + '%p';
       }
       requestAnimationFrame(step);
     });
