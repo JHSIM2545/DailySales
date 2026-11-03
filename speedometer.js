@@ -21,7 +21,7 @@
   var BASE = 'https://gpqlximhoqdybcewdfde.supabase.co/rest/v1/';
   var KEY = 'sb_publishable_xUnGxyLCc5TB5nv4keVQVw__grqGJkP';
   var MINE = '북서울';
-  var MIN_POINTS = 4;          // 한 달에 스냅샷이 이 개수 미만이면 비교 기준월에서 제외
+  var MIN_POINTS = 1;          // 한 달에 스냅샷이 이 개수 미만이면 비교 기준월에서 제외
   var RANGE = 30;              // 속도계 눈금 범위 (± %p, 같은 시점 과거 3개월 평균 달성률 대비 차이)
   var HOL = {};
   ['2026-01-01', '2026-02-16', '2026-02-17', '2026-02-18', '2026-03-01', '2026-03-02', '2026-05-05', '2026-05-08', '2026-06-06', '2026-08-15', '2026-08-17',
@@ -131,13 +131,13 @@
     if (!dates.length) return { err: ym + ' 사업팀 일일 현황 스냅샷이 아직 없습니다.' };
     var curDs = dates[dates.length - 1], p = pOf(curDs), tot = biz(ym).total, el = elapsed(curDs);
     // 기준월: 직전 3개월 중 월중 스냅샷이 충분한 달
-    var base = [], skipped = [];
+    var base = [], skipped = [], est = [];
     for (var k = 1; k <= 3; k++) {
       var bm = addM(ym, -k), cnt = snaps[bm] ? Object.keys(snaps[bm]).length : 0;
-      if (cnt >= MIN_POINTS) base.push(bm); else skipped.push({ ym: bm, cnt: cnt });
+      if (cnt >= MIN_POINTS) { base.push(bm); if (cnt < 4) est.push(bm); } else skipped.push({ ym: bm, cnt: cnt });
     }
     var brs = Object.keys(mo[curDs]);
-    var out = { ym: ym, curDs: curDs, p: p, el: el, tot: tot, base: base.reverse(), skipped: skipped, peers: brs.length - 1, metrics: [], cat: c.cat };
+    var out = { ym: ym, curDs: curDs, p: p, el: el, tot: tot, base: base.reverse(), est: est, skipped: skipped, peers: brs.length - 1, metrics: [], cat: c.cat };
     METRICS.forEach(function (m) {
       var q = mo[curDs][MINE] && mo[curDs][MINE][m.key];
       if (!q || !q.ok || !q.t || Math.abs(q.t) < 1) { out.metrics.push({ m: m, na: true }); return; }
@@ -298,7 +298,7 @@
     d.metrics.forEach(function (r) { r.p__ = d.p; r.p = d.p; });
     var baseTxt = d.base.length ? d.base.map(function (b) { return +b.slice(5) + '월'; }).join('·') : '없음';
     var h = '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px;font-size:12px;color:#334155;">' +
-      '<span><b>' + d.curDs + '</b> · 영업일 <b>' + d.el + '/' + d.tot + '</b></span><span>비교 <b>' + esc(baseTxt) + '</b></span></div>';
+      '<span><b>' + d.curDs + '</b> · 영업일 <b>' + d.el + '/' + d.tot + '</b></span><span>비교 <b>' + esc(baseTxt) + '</b></span>' + (d.est && d.est.length ? '<span style="font-size:11px;color:#94a3b8;">' + d.est.map(function (b) { return +b.slice(5) + '월'; }).join('·') + ' 월중 자료 부족 → 월말 실적 기준 선형 추정</span>' : '') + '</div>';
     if (!d.base.length) { h += '<div style="padding:10px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;font-size:12px;color:#9a3412;">비교할 과거 자료가 부족합니다.</div>'; return h; }
     h += '<div class="sp-grid">' + d.metrics.map(card).join('') + '</div>';
     // 요약표
