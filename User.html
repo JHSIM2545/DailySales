@@ -8439,6 +8439,15 @@ function renderDashboard(){
       </div>
     </div>
 
+    <!-- ===================== 1-(2) 영업 속도계 (최근 3개월 동일 영업일 · 목표/계획 · 타지사 비교) ===================== -->
+    <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; margin:0 0 14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px; flex-wrap:wrap; gap:4px;">
+        <span style="font-size:13.5px; font-weight:800; color:#0f172a;">⏱️ 1-(2) 영업 속도계 · 최근 3개월 같은 영업일 대비 수주·개시·유지 속도</span>
+        <span style="font-size:11px; color:#64748b;">지사 전체 · 영업일 진척률 기준 · 천원</span>
+      </div>
+      <div class="sp-slot"></div>
+    </div>
+
     <!-- ===================== 2. 수주 현황 및 개시일정 분석 ===================== -->
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:12px; margin-bottom:14px;">
       
@@ -8641,7 +8650,7 @@ function renderDashboard(){
     const bz_ = function (o) { return { rank: (biz && o && o.myRank > 0) ? o.myRank : 0, avg: (biz && o) ? o.avgVal : null, gap: (biz && o) ? o.gap : null }; };
     const lastRow_ = statusRows_.length ? statusRows_[statusRows_.length - 1] : null;
     window.DASH_REPORT_CTX_ = {
-      y: y, m: m, ym: DASH_YM, isCurMonth: isCurMonth, isPastMonth: isPastMonth, isFutureMonth: isFutureMonth,
+      y: y, m: m, ym: DASH_YM, cat: DASH_CATEGORY, isCurMonth: isCurMonth, isPastMonth: isPastMonth, isFutureMonth: isFutureMonth,
       elDays: elDays, totDays: totDays, workRatio: workRatio, todayDs: todayDs_,
       bizTotal: bizTotal, bizDate: biz ? biz.date : null,
       ord: Object.assign({ amt: ordAmt, tgt: ordTgt, pct: ordPct }, bz_(biz && biz.ord)),
@@ -16445,6 +16454,7 @@ function fsBindOnce_(){
 </script>
 <script src="gemini-insights.js?v=20261103c"></script>
 <script src="rep-trend.js?v=20261103f"></script>
+<script src="speedometer.js?v=20261103a"></script>
 <script src="flag-sync.js?v=20261102b"></script>
 <script src="past-perf.js?v=20261030b"></script>
 <script src="portal-extras.js?v=20261030g"></script>
