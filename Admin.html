@@ -8288,7 +8288,7 @@ function dashGaugeSectionHtml_(title, metricKey, targetTotal, planTotal, actualT
  '<div class="dash-kpi"><div class="lbl">달성률</div><div class="val">' + overallPct + '%</div></div>' +  
  '<div class="dash-kpi"><div class="lbl">워킹데이 진척</div><div class="val">' + wi.elapsedWorkingDays + '/' + wi.totalWorkingDays + '일 (' + expectedPct + '%)</div></div>' +  
  '</div>';  
- html += '<div class="dash-progress">워킹데이 기준 목표 진척률 ' + expectedPct + '% 대비 실제 달성률 ' + overallPct + '% \&rarr; <b>' + paceNote + '</b></div>';  
+ html += '<div class="dash-progress">진척 ' + expectedPct + '% · 달성 ' + overallPct + '% \&rarr; <b>' + paceNote + '</b></div>';  
  html += '<div class="chart-grid"><div class="chart-card"><div class="chart-card-title"><span>' + title + ' (컨설턴트별)</span>' +  
  '<span style="font-weight:normal; color:#888;">목표(개인 합계): ' + fmtK(perRepTargetSum) + (axisMax > 100 ? (' (0~' + axisMax + '% 표시)') : '') + '</span></div>';  
  reps.forEach(function(rep, idx){  
@@ -8347,9 +8347,9 @@ function dashPriceCancelSectionsHtml_(d){
     const fmtP_ = function(v){ return isCnt ? (Number(v) || 0) + '건' : kk(v) + '천원'; };
     cur = Number(cur) || 0; prev = Number(prev) || 0;
     if (!prev && !cur) return '<span style="color:#94a3b8;">전월 동기 -</span>';
-    if (!prev) return '<span style="color:#64748b;">전월 동기 0 → 신규 발생</span>';
+    if (!prev) return '<span style="color:#64748b;">신규</span>';
     const pct = Math.round(((cur - prev) / prev) * 1000) / 10;
-    if (pct === 0) return '<span style="color:#64748b;">전월 동기 대비 0%</span>';
+    if (pct === 0) return '<span style="color:#64748b;">전월 동일</span>';
     const up_ = pct > 0, good = up_ === !!goodWhenUp;
     return '<span style="color:' + (good ? '#059669' : '#dc2626') + '; font-weight:800;">' + (up_ ? '▲ ' : '▼ ') + Math.abs(pct) + '%</span> <span style="color:#64748b;">전월 동기 ' + fmtP_(prev) + ' 대비</span>';
   }
@@ -8434,7 +8434,7 @@ function dashPriceCancelSectionsHtml_(d){
       '</div>';
   }).join('');
   const sec3 = '<div>' +
-    '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('3. 인상·인하 실적 분석', '(단위: 천원 · 전월 동기 대비)') +
+    '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('3. 인상·인하 실적 분석', '(천원)') +
     kpiRow +
     '<div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">' +
       '<div style="flex:1 1 340px; min-width:0;"><div style="font-size:11.5px; font-weight:800; color:#334155; margin-bottom:6px;">컨설턴트별 인상·인하</div>' +
@@ -8486,7 +8486,7 @@ function dashPriceCancelSectionsHtml_(d){
     '<tr style="background:#f1f5f9; font-weight:900;"><td>지사 합계</td><td class="num">' + totCnt + '건</td><td class="num">' + kk(totAmt) + '</td><td class="num">100%</td><td class="num" style="color:#64748b;">' + ((cov.prev || {}).count || 0) + '건 / ' + kk((cov.prev || {}).amount) + '</td>' +
       '<td class="num" style="color:#059669; border-left:2px solid #94a3b8;">+' + sumInc.toLocaleString('ko-KR') + '</td><td class="num" style="color:#dc2626;">−' + Math.abs(sumDec).toLocaleString('ko-KR') + '</td>' +
       '<td class="num" style="color:' + (totNet >= 0 ? '#059669' : '#dc2626') + ';">' + sgn(totNet) + '</td><td class="num">' + (sumDec > 0 ? Math.round(sumInc / sumDec * 100) + '%' : '-') + '</td></tr></tbody></table>';
-  const keepBox = '<div style="margin-top:6px; font-size:12px; font-weight:800; color:' + (totNet >= 0 ? '#047857' : '#b91c1c') + ';">현재 지사 유증 실적 ' + sgn(totNet) + '천원' + (totTgt > 0 ? ' (목표 ' + sgn(totTgt) + '천원 대비 ' + Math.round(totNet / totTgt * 100) + '%)' : '') + ' <span style="font-weight:600; color:#64748b;">· 유증 실적 = 유지증가(개시) − 유지감소</span></div>';
+  const keepBox = '<div style="margin-top:6px; font-size:12px; font-weight:800; color:' + (totNet >= 0 ? '#047857' : '#b91c1c') + ';">현재 지사 유증 실적 ' + sgn(totNet) + '천원' + (totTgt > 0 ? ' (목표 ' + sgn(totTgt) + '천원 대비 ' + Math.round(totNet / totTgt * 100) + '%)' : '') + '</div>';
   const worst = repRows[0] && repRows[0].amount > 0 ? repRows[0] : null;
   const reasonText = cov.byReasonText || [];
   const typeList = cov.byReason || [];
@@ -8495,7 +8495,7 @@ function dashPriceCancelSectionsHtml_(d){
     topLine_(typeList, '주요 유형', '') + '</div>';
 
   const sec4 = '<div>' +
-    '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('4. 해약 분석', '(해약 확정일 기준 · 단위: 천원)') +
+    '<div style="' + card + ' height:100%; box-sizing:border-box;">' + head('4. 해약 분석', '(천원)') +
     '<div style="display:flex; gap:8px; flex-wrap:wrap;">' +
       kpi_('해약 금액', kk(totAmt) + '천원', deltaBadge_(totAmt, (cov.prev || {}).amount, false)) +
       kpi_('해약 건수', totCnt + '건', deltaBadge_(totCnt, (cov.prev || {}).count, false, true)) +
@@ -8616,27 +8616,27 @@ function renderDashboard(){
   const tlSafeSale_ = hasSafety ? tlSafe_(safeSalePct) : '';
 
   const viewModeTitle = isCurMonth
-    ? (Number(todayDs_.slice(5, 7)) + '/' + Number(todayDs_.slice(8, 10)) + '일 마감기준 (' + workRatio + '%)')
-    : (isPastMonth ? (m + '월 최종 실적 마감 기준') : (m + '월 (실적 집계 전)'));
+    ? (Number(todayDs_.slice(5, 7)) + '/' + Number(todayDs_.slice(8, 10)) + '일 마감 (' + workRatio + '%)')
+    : (isPastMonth ? (m + '월 마감') : (m + '월 집계 전'));
   const guidelineHeaderTitle = `${y}년 ${m}월 가이드 라인`;
-  const guidelineBadge = isCurMonth ? '현황·원인·전망·대책 일체형' : (isPastMonth ? '실적 마감 평가' : '차월 선행 점검');
+  const guidelineBadge = isCurMonth ? '현황·대책' : (isPastMonth ? '마감 평가' : '차월 점검');
 
   // ---- 지표 카드 하단 보조 문구 (데이터 기반) ----
   const diffOrd = Math.round((ordPct - workRatio) * 10) / 10;
   let ordSubHtml;
   if (biz) {
     const g = biz.ord.gap;
-    ordSubHtml = `서울사업팀 평균(${biz.ord.avgVal}%) 대비 <strong style="color:${g >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(g)}%p</strong>`;
+    ordSubHtml = `사업팀 평균 대비 <strong style="color:${g >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(g)}%p</strong>`;
   } else if (isFutureMonth) {
-    ordSubHtml = `${m}월 수주 집계 전`;
+    ordSubHtml = '집계 전';
   } else {
-    ordSubHtml = `영업일 진척(${workRatio}%) 대비 <strong style="color:${diffOrd >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffOrd)}%p</strong> (사업팀 데이터 미등록)`;
+    ordSubHtml = `영업일 대비 <strong style="color:${diffOrd >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffOrd)}%p</strong>`;
   }
 
-  const diffStart = Math.round((startPct - workRatio) * 10) / 10;
+    const diffStart = Math.round((startPct - workRatio) * 10) / 10;
   const startSubHtml = isFutureMonth
-    ? `${m}월 개시 집계 전`
-    : `경과일수(${elDays}/${totDays}일, ${workRatio}%) 대비 <strong style="color:${diffStart >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffStart)}%p ${diffStart >= 0 ? '초과' : '미달'}</strong>`;
+    ? '집계 전'
+    : `영업일 대비 <strong style="color:${diffStart >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffStart)}%p</strong>`;
 
   const cancelCntOv = Number((cancel.overall || {}).count) || 0;
   const cancelAmtK = k_((cancel.overall || {}).amount);
@@ -8645,17 +8645,17 @@ function renderDashboard(){
   const projNet = isCurMonth ? netEnd : null; // 영업현황 월말 기준 전망
   const projNetPct = (projNet !== null && netTgt !== 0) ? Math.round((projNet / netTgt) * 1000) / 10 : null;
   const netSubHtml = isFutureMonth
-    ? `${m}월 유지증가 집계 전`
-    : `해약 ${cancelCntOv}건 ${fmtK(cancelAmtK)}천원 | 인상 ${fmtK(priceUpK)}천원 · 인하 ${fmtK(priceDownK)}천원` +
-      (projNet !== null ? ` | ${m}월말 전망(영업현황 월말 기준): <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원${projNetPct !== null ? ' (' + projNetPct + '%)' : ''}</strong>` : '');
+    ? '집계 전'
+    : `해약 ${cancelCntOv}건 ${fmtK(cancelAmtK)} · 인상 ${fmtK(priceUpK)} · 인하 ${fmtK(priceDownK)}` +
+      (projNet !== null ? ` · 월말 <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}</strong>` : '');
 
   let safeSubHtml;
   if (!hasSafety) {
-    safeSubHtml = '상품일보 집계 데이터 없음';
+    safeSubHtml = '자료 없음';
   } else {
     const dO = Math.round((safeOrdPct - workRatio) * 10) / 10;
     const dS = Math.round((safeSalePct - workRatio) * 10) / 10;
-    safeSubHtml = `수주스피드: 영업일(${workRatio}%) 대비 <strong style="color:${dO >= 0 ? '#0d9488' : '#ef4444'};">${dO >= 0 ? '양호' : '미달'}</strong> | 매출: 영업일 대비 <strong style="color:${dS >= 0 ? '#0d9488' : '#ef4444'};">${dS >= 0 ? '양호' : '미달'}</strong>`;
+    safeSubHtml = `수주 <strong style="color:${dO >= 0 ? '#0d9488' : '#ef4444'};">${dO >= 0 ? '양호' : '미달'}</strong> · 매출 <strong style="color:${dS >= 0 ? '#0d9488' : '#ef4444'};">${dS >= 0 ? '양호' : '미달'}</strong>`;
   }
 
   // ==================== 2. 컨설턴트별 수주 실적 (DB 실데이터) ====================
@@ -8819,48 +8819,45 @@ function renderDashboard(){
 
   // 과제 1: 수주 가속
   if (isFutureMonth) {
-    aiTask1 = `${m}월은 아직 수주 집계 전입니다. 목표 ${fmtK(ordTgt)}천원 기준 조기 클로징 대상 가망 안건을 사전 점검하세요.`;
+    aiTask1 = `${m}월 집계 전입니다. 가망 안건을 사전 점검하세요.`;
   } else {
-    let s1 = `${m}월 수주 달성률은 <strong>${ordPct}%</strong>(${fmtK(ordAmt)}천원 / 목표 ${fmtK(ordTgt)}천원)`;
+    let s1 = `수주 <strong>${ordPct}%</strong>(${fmtK(ordAmt)} / ${fmtK(ordTgt)}천원)`;
     if (biz) {
       const g = biz.ord.gap;
-      s1 += `로 서울사업팀 ${bizTotal}개 지사 중 <strong>${biz.ord.myRank}위</strong>이며, 사업팀 평균(${biz.ord.avgVal}%) 대비 <strong style="color:${g >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(g)}%p</strong> ${g >= 0 ? '앞서' : '뒤처져'} 있습니다.`;
+      s1 += `, 사업팀 <strong>${biz.ord.myRank}위</strong> · 평균 대비 <strong style="color:${g >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(g)}%p</strong>.`;
     } else {
-      s1 += `로 영업일 진척률(${workRatio}%) 대비 <strong style="color:${diffOrd >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffOrd)}%p</strong>입니다. (사업팀 벤치마크 미등록)`;
+      s1 += `, 영업일 대비 <strong style="color:${diffOrd >= 0 ? '#0d9488' : '#ef4444'};">${sgn_(diffOrd)}%p</strong>.`;
     }
-    if (topRep && topRep.orderAmt > 0) s1 += ` 컨설턴트 최다 수주는 ${topRep.name}(${fmtK(topRep.orderAmt)}천원, ${topRep.orderCount}건)입니다.`;
-    if (zeroReps.length) s1 += ` 수주 실적이 없는 컨설턴트(<strong>${zeroReps.join('·')}</strong>)는 가망 안건 점검과 동행 영업이 필요합니다.`;
-    else if (diffOrd < 0) s1 += ' 영업일 진척 대비 지연되어 있어 대형 가망 안건의 클로징 가속이 필요합니다.';
+    if (zeroReps.length) s1 += ` 무실적 <strong>${zeroReps.join('·')}</strong>은 동행 영업이 필요합니다.`;
+    else if (diffOrd < 0) s1 += ' 대형 가망 안건의 클로징을 앞당기세요.';
     aiTask1 = s1;
   }
 
   // 과제 2: 유증(유지증가)
   if (isFutureMonth) {
-    aiTask2 = `${m}월 유지증가 목표는 ${sgnK_(netTgt)}천원입니다. 해약 방어와 단가인상 계획을 사전에 수립하세요.`;
+    aiTask2 = `유지증가 목표 ${sgnK_(netTgt)}천원. 해약 방어·단가인상 계획을 세우세요.`;
   } else {
-    let s2 = `${m}월 ${isCurMonth ? '현재까지 ' : ''}유지증가는 <strong style="color:${netAmt < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(netAmt)}천원</strong>(목표 ${sgnK_(netTgt)}천원 대비 ${netPct}%)입니다. 해약 ${cancelCntOv}건(${fmtK(cancelAmtK)}천원), 단가인상 ${fmtK(priceUpK)}천원, 단가인하 ${fmtK(priceDownK)}천원이 반영되었습니다.`;
-    if (projNet !== null) s2 += ` 영업현황 ${m}월말 기준(일보에 기록된 개시·해약·단가변동을 모두 반영) 유지증가 전망은 <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원</strong>${projNetPct !== null ? '(목표 대비 ' + projNetPct + '%)' : ''}입니다.`;
+    let s2 = `유지증가 <strong style="color:${netAmt < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(netAmt)}천원</strong>(목표 대비 ${netPct}%)` +
+      (projNet !== null ? `, 월말 전망 <strong style="color:${projNet < 0 ? '#b91c1c' : '#0f766e'};">${sgnK_(projNet)}천원</strong>.` : '.');
     if (netAmt < 0 || (projNet !== null && netTgt > 0 && projNet < netTgt) || (projNet === null && netTgt > 0 && netPct < workRatio)) {
-      s2 += ' 목표 대비 부족합니다.';
-      // 남은 영업일에 따라 처방을 달리한다: 설치공사(최소 3영업일) 기간을 확보할 수 있으면 당월 개시 가능 안건 수주 집중, 못 하면 공사 불필요 상품
       const leftDays_ = Math.max(0, totDays - elDays);
-      if (!isCurMonth) s2 += ' <strong>CS·기술사원 합동 단가인상·해약 방어</strong>로 유지증가를 보완하세요.';
-      else if (leftDays_ > 3) s2 += ` 남은 영업일이 ${leftDays_}일로 공사기간(최소 3영업일)을 확보할 수 있으므로, <strong>당월 개시 가능한 안건 수주에 집중</strong>하고 공사 일정을 앞당겨 당월 개시로 연결하세요. 아울러 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>를 병행합니다.`;
-      else s2 += ` 남은 영업일이 ${leftDays_}일뿐이라 지금 수주해서는 공사기간(최소 3영업일)을 확보하기 어려우므로, <strong>설치공사가 필요 없는 유증 상품</strong>과 <strong>CS·기술사원 합동 단가인상·해약 방어</strong>에 집중하세요.`;
+      if (!isCurMonth) s2 += ' <strong>CS·기술사원 합동 단가인상·해약 방어</strong>로 보완하세요.';
+      else if (leftDays_ > 3) s2 += ` 남은 ${leftDays_}영업일, <strong>당월 개시 가능 안건 수주</strong>에 집중하고 <strong>합동 단가인상·해약 방어</strong>를 병행하세요.`;
+      else s2 += ` 남은 ${leftDays_}영업일, <strong>공사 불필요 유증 상품</strong>과 <strong>합동 단가인상·해약 방어</strong>에 집중하세요.`;
     }
     aiTask2 = s2;
   }
 
   // 과제 3: 안전상품 (수주 → 매출 전환)
   if (!hasSafety) {
-    aiTask3 = '안전상품 월 목표·실적(상품일보) 데이터가 아직 집계되지 않았습니다. 상품일보와 월별 목표 입력 후 진단이 표시됩니다.';
+    aiTask3 = '안전상품 목표·실적 자료가 없습니다.';
   } else {
     const dO = Math.round((safeOrdPct - workRatio) * 10) / 10;
     const dS = Math.round((safeSalePct - workRatio) * 10) / 10;
     const conv = safeOrdAmt > 0 ? Math.round((safeSaleAmt / safeOrdAmt) * 1000) / 10 : 0;
-    let s3 = `안전상품 수주는 <strong>${fmtK(safeOrdAmt)}천원</strong>(목표 대비 ${safeOrdPct}%), 확정 매출은 <strong>${fmtK(safeSaleAmt)}천원</strong>(${safeSalePct}%)입니다. 영업일 진척(${workRatio}%) 대비 수주는 ${sgn_(dO)}%p, 매출은 ${sgn_(dS)}%p이며 수주 대비 매출 전환율은 ${conv}%입니다.`;
-    if (safeOrdAmt > 0 && dS < 0 && dO >= 0) s3 += ' 수주는 진행되나 매출 전환이 지체되고 있어 <strong>전략영업 부서와의 시공·검수 일정 협의</strong>가 필요합니다.';
-    else if (dO < 0) s3 += ' 수주 자체가 영업일 진척에 못 미쳐 안건 발굴과 전략영업 협업 강화가 필요합니다.';
+    let s3 = `수주 <strong>${fmtK(safeOrdAmt)}천원</strong>(${safeOrdPct}%), 매출 <strong>${fmtK(safeSaleAmt)}천원</strong>(${safeSalePct}%), 전환율 ${conv}%.`;
+    if (safeOrdAmt > 0 && dS < 0 && dO >= 0) s3 += ' 매출 전환이 지체되어 <strong>전략영업과 시공·검수 일정 협의</strong>가 필요합니다.';
+    else if (dO < 0) s3 += ' 안건 발굴과 전략영업 협업을 강화하세요.';
     aiTask3 = s3;
   }
 
@@ -8869,10 +8866,10 @@ function renderDashboard(){
   if (rowBScan.cnt === 0) noPerfProducts.push('블루스캔');
   if (rowHuen.cnt === 0) noPerfProducts.push('휴엔');
   if (rowDigi.cnt === 0) noPerfProducts.push('디지털');
-  let s4 = `블루스캔 ${rowBScan.cnt}건·${fmtK(rowBScan.ord)}천원, 휴엔 ${rowHuen.cnt}건·${fmtK(rowHuen.ord)}천원, 디지털 ${rowDigi.cnt}건·${fmtK(rowDigi.ord)}천원이 집계되었습니다.`;
-  if (isFutureMonth) s4 = `${m}월 상품군별 수주 집계 전입니다.`;
-  else if (noPerfProducts.length) s4 += ` 수주 실적이 없는 상품군(<strong>${noPerfProducts.join('·')}</strong>)은 지사 내 <strong>안건 발굴 ➔ 수주/계약 ➔ 즉시 개시</strong>를 책임 지원하는 전략 TF 점검 대상입니다.`;
-  else s4 += ' 세 상품군 모두 수주가 발생했으므로 일반알람과의 번들 제안 비율을 유지·확대하세요.';
+  let s4 = `블루스캔 ${rowBScan.cnt}건 ${fmtK(rowBScan.ord)} · 휴엔 ${rowHuen.cnt}건 ${fmtK(rowHuen.ord)} · 디지털 ${rowDigi.cnt}건 ${fmtK(rowDigi.ord)}천원.`;
+  if (isFutureMonth) s4 = `${m}월 집계 전입니다.`;
+  else if (noPerfProducts.length) s4 += ` 무실적 <strong>${noPerfProducts.join('·')}</strong>: 안건 발굴 → 수주 → 즉시 개시 TF 점검 대상입니다.`;
+  else s4 += ' 일반알람과의 번들 제안을 유지·확대하세요.';
   aiTask4 = s4;
 
   // ==================== 6. HTML 최종 조립 ====================
@@ -8977,8 +8974,8 @@ function renderDashboard(){
     <!-- ===================== 1-(2) 영업 속도계 (최근 3개월 동일 영업일 · 목표/계획 · 타지사 비교) ===================== -->
     <div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:14px; margin:0 0 14px; box-shadow:0 1px 3px rgba(0,0,0,0.02);">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0f172a; padding-bottom:8px; margin-bottom:10px; flex-wrap:wrap; gap:4px;">
-        <span style="font-size:13.5px; font-weight:800; color:#0f172a;">⏱️ 1-(2) 영업 속도계 · 최근 3개월 같은 영업일 대비 수주·개시·유지 속도</span>
-        <span style="font-size:11px; color:#64748b;">지사 전체 · 영업일 진척률 기준 · 천원</span>
+        <span style="font-size:13.5px; font-weight:800; color:#0f172a;">⏱️ 1-(2) 영업 속도계</span>
+        <span style="font-size:11px; color:#64748b;">최근 3개월 평균 대비</span>
       </div>
       <div class="sp-slot"></div>
     </div>
@@ -9153,25 +9150,25 @@ function renderDashboard(){
         
         <!-- 과제 1 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #f59e0b;">
-          <div style="font-weight:800; color:#b45309; margin-bottom:4px;">1. 타 지사 대비 수주 가속 과제 (서울사업팀 16개 지사 대조)</div>
+          <div style="font-weight:800; color:#b45309; margin-bottom:4px;">1. 수주 가속</div>
           <div class="gm-task" data-i="0">${aiTask1}</div>
         </div>
 
         <!-- 과제 2 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #dc2626;">
-          <div style="font-weight:800; color:#dc2626; margin-bottom:4px;">${(!isCurMonth && !isFutureMonth) ? '2. 유지증가(유증) 보완 과제 (단가인상 및 해약 방어)' : ((totDays - elDays) > 3 || isFutureMonth ? '2. 유지증가(유증) 확보 과제 (당월 개시 가능 안건 수주 집중 및 단가인상·해약 방어 병행)' : '2. 유지증가(유증) 마감 과제 (설치공사 불필요 상품 및 단가인상 총력)')}</div>
+          <div style="font-weight:800; color:#dc2626; margin-bottom:4px;">${(!isCurMonth && !isFutureMonth) ? '2. 유지증가 보완' : ((totDays - elDays) > 3 || isFutureMonth ? '2. 유지증가 확보' : '2. 유지증가 마감')}</div>
           <div class="gm-task" data-i="1">${aiTask2}</div>
         </div>
 
         <!-- 과제 3 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #2563eb;">
-          <div style="font-weight:800; color:#1e40af; margin-bottom:4px;">3. 안전상품 전략영업 협업 강화 과제</div>
+          <div style="font-weight:800; color:#1e40af; margin-bottom:4px;">3. 안전상품 전환</div>
           <div class="gm-task" data-i="2">${aiTask3}</div>
         </div>
 
         <!-- 과제 4 -->
         <div style="background:#f8fafc; padding:12px 14px; border-radius:6px; border:1px solid #e2e8f0; border-left:3px solid #0d9488;">
-          <div style="font-weight:800; color:#0f766e; margin-bottom:4px;">4. 블루스캔·휴엔·디지털 무실적 탈출 TF 활동 제안</div>
+          <div style="font-weight:800; color:#0f766e; margin-bottom:4px;">4. 블루스캔·휴엔·디지털 확대</div>
           <div class="gm-task" data-i="3">${aiTask4}</div>
         </div>
 
@@ -20601,7 +20598,7 @@ function buildStrategyDoc_(c){
       + '<tr class="sum"><td>지사 합계</td><td class="n">' + Cn.cnt + '건</td><td class="n">' + K(Cn.amtK) + '</td><td class="n">100%</td><td class="n">' + Cn.prevCnt + '건 / ' + K(Cn.prevAmtK) + '</td><td class="n">+' + K(Kp.totInc) + '</td><td class="n">−' + K(A(Kp.totDec)) + '</td><td class="n">' + S(kNet) + '</td><td class="n">' + cvTxt({ inc: Kp.totInc, dec: Kp.totDec }) + '</td></tr>'
       + '</tbody></table>'
       + (Cn.byType.length ? ('<p class="note">해약 유형: ' + Cn.byType.map(function(x){ return esc(x.name) + ' ' + x.pct + '% (' + x.cnt + '건)'; }).join(' · ') + '</p>') : '')
-      + '<p class="note">유증 실적 = 유지증가(개시) − 유지감소(해약·인하 − 인상·재개시 반영). 증가/감소 100% 이상이면 해약을 개시로 방어하고 있는 상태입니다.' + (kTgt > 0 ? ' 현재 지사 유증 실적 ' + S(kNet) + '천원은 월 목표 ' + S(kTgt) + '천원의 ' + Math.round(kNet / kTgt * 100) + '%입니다.' : '') + '</p></div>');
+      + '<p class="note">' + (kTgt > 0 ? '지사 유증 실적 ' + S(kNet) + '천원은 월 목표 ' + S(kTgt) + '천원의 ' + Math.round(kNet / kTgt * 100) + '%입니다.' : '') + '</p></div>');
     // 5.4 종합 분석
     const lines = [];
     const minRep = Kp.rows.length ? Kp.rows.slice().sort(function(a, b){ return a.net - b.net; })[0] : null;
@@ -21147,7 +21144,7 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261028b"></script>
 <script src="calculator.js?v=20261102b"></script>
-<script src="gemini-insights.js?v=20261103d"></script>
+<script src="gemini-insights.js?v=20261103e"></script>
 <script src="rep-trend.js?v=20261103g"></script>
 <script src="speedometer.js?v=20261103f"></script>
 <script src="flag-sync.js?v=20261102b"></script>

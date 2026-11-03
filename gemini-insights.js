@@ -100,7 +100,7 @@
 
   // 같은 날(KST)·같은 월·같은 상품구분은 모든 사용자가 같은 분석을 본다 (서버 ai_insight_cache 공유 + 브라우저 보관)
   function kstDay() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
-  function keyOf(c) { return 'gm_ins3_' + (c.ym || (c.y + '-' + String(c.m).padStart(2, '0'))) + '|' + (c.cat || '') + '|' + kstDay(); }
+  function keyOf(c) { return 'gm_ins4_' + (c.ym || (c.y + '-' + String(c.m).padStart(2, '0'))) + '|' + (c.cat || '') + '|' + kstDay(); }
   var mem = {};
   function cacheGet(k) { if (mem[k] && Date.now() - mem[k].t < TTL) return mem[k]; try { var o = JSON.parse(localStorage.getItem(k) || 'null'); if (o && Date.now() - o.t < TTL) return o; } catch (e) {} return null; }
   function cacheSet(k, v) { mem[k] = { t: Date.now(), insight: v }; try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), insight: v })); } catch (e) {} }
