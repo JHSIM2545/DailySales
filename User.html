@@ -14719,7 +14719,7 @@ function buildStrategyDoc_(c){
   const r1 = function(v){ return Math.round(v * 10) / 10; };
   const m = c.m, y = c.y, nb = c.bizTotal || 16;
   const hasBiz = c.ord.rank > 0;
-  const modeTxt = c.isCurMonth ? (c.todayDs.replace(/-/g, '.') + ' 기준 · ' + c.elDays + '/' + c.totDays + '영업일 경과 (' + c.workRatio + '%)') : (c.isPastMonth ? (m + '월 최종 마감 기준') : (m + '월 집계 전'));
+  const modeTxt = c.isCurMonth ? (c.todayDs.replace(/-/g, '.') + ' 기준 · ' + c.elDays + '/' + c.totDays + '영업일 경과') : (c.isPastMonth ? (m + '월 최종 마감 기준') : (m + '월 집계 전'));
   const gapS = function(g){ return (g > 0 ? '+' : '') + g + '%p'; };
   const traf = function(pct, o){
     const ref = (o.avg !== null && o.avg !== undefined && o.rank > 0) ? o.avg : c.workRatio;
@@ -14728,7 +14728,7 @@ function buildStrategyDoc_(c){
   };
   const rankLine = function(o, label){
     if (o.rank > 0) return '서울사업팀 ' + nb + '개 지사 중 <b>' + o.rank + '위</b>' + (o.rank === nb ? ' (최하위)' : '') + '<br>사업팀 평균(' + o.avg + '%) 대비 <b>' + gapS(o.gap) + '</b>';
-    return '영업일 진척률(' + c.workRatio + '%) 대비 <b>' + gapS(r1(o.pct - c.workRatio)) + '</b><br><span style="color:#64748b">사업팀 순위 자료 없음</span>';
+    return '<span style="color:#64748b">사업팀 순위·평균 비교 자료 없음</span>';
   };
   const blocks = [];
   const add = function(html, keep){ blocks.push({ html: html, ch: html.indexOf('<div class="blk band"') === 0 && html.indexOf('8. 현장 인력') < 0 }); };
@@ -14763,7 +14763,7 @@ function buildStrategyDoc_(c){
   const exS = (sg && sg.startK > 0) ? { rank: 0, pct: (sg.startExPct == null ? c.start.pct : sg.startExPct) } : null;
   const lo = lvl(exO || c.ord), ls = lvl(exS || c.start);
   const wdL = ['미흡', '다소 부족', '양호'];
-  const prT = function (o) { return o.rank > 0 ? ('사업팀 ' + o.rank + '위' + ((o.rank >= Math.ceil(nb * 0.6) && o.pct >= refP) ? '(진도율은 충족하나 하위권)' : '')) : ('달성률 ' + o.pct + '%'); };
+  const prT = function (o) { return o.rank > 0 ? ('사업팀 ' + o.rank + '위' + ((o.rank >= Math.ceil(nb * 0.6) && o.pct >= refP) ? '(하위권)' : '')) : ('달성률 ' + o.pct + '%'); };
   const weakList = [];
   if (c.isFutureMonth) sumLines.push(m + '월은 아직 실적 집계 전입니다.');
   else {
@@ -14787,16 +14787,14 @@ function buildStrategyDoc_(c){
     const lossTxt = (lossAll > c.start.amt ? '해약·인하 증가로 ' : '');
     const nl = vNet < 0 ? 0 : (pNet >= (c.isCurMonth ? Math.min(100, c.workRatio) : 100) ? 2 : (pNet >= 80 ? 1 : 0));
     if (nl === 0) weakList.push('유지증가');
-    sumLines.push(lossTxt + '유지증가' + (c.isCurMonth ? ' 전망은 ' : '는 ') + S(vNet) + '천원(목표 대비 ' + pNet + '%)으로 ' + (vNet < 0 ? '매우 부정적입니다.' : (nl === 2 ? (c.isCurMonth ? '영업일 진도를 상회합니다.' : '목표를 달성했습니다.') : (nl === 1 ? '목표에 다소 못 미칩니다.' : '목표에 미달합니다.'))));
+    sumLines.push(lossTxt + '유지증가' + (c.isCurMonth ? ' 전망은 ' : '는 ') + S(vNet) + '천원(목표 대비 ' + pNet + '%)으로 ' + (vNet < 0 ? '매우 부정적입니다.' : (nl === 2 ? (c.isCurMonth ? '목표 수준에 도달할 전망입니다.' : '목표를 달성했습니다.') : (nl === 1 ? '목표에 다소 못 미칩니다.' : '목표에 미달합니다.'))));
     if (c.safety) {
       const so = c.safety.ordPct, ss = c.safety.salePct;
       const sref = refP;
-      let tail;
-      if (so >= sref && ss >= sref) tail = '수주·매출 모두 진도목표를 앞서고 있습니다.';
-      else if (so >= sref) { tail = '수주는 양호하나 매출 전환은 다소 부족합니다.'; }
-      else if (ss >= sref) tail = '매출은 양호하나 수주 확대가 필요합니다.';
-      else { tail = '수주·매출 모두 목표에 미달합니다.'; weakList.push('안전상품'); }
-      sumLines.push('안전상품은 수주 ' + so + '%, 매출 ' + ss + '%로 ' + tail);
+      const sGap = r1(so - ss);
+      const tail = sGap > 0 ? ('수주 대비 매출 확정이 ' + sGap + '%p 낮아 매출 전환 관리가 필요합니다.') : '매출 확정이 수주 수준을 따라가고 있습니다.';
+      if (so < sref && ss < sref) weakList.push('안전상품');
+      sumLines.push('안전상품은 수주 ' + so + '%, 매출 ' + ss + '%입니다. ' + tail);
     }
     if (weakList.length >= 3) sumLines.push('특단의 영업 전략 수립이 필요한 시기입니다.');
     else if (weakList.length) sumLines.push(weakList.join('·') + ' 보완에 집중해야 할 시기입니다.');
@@ -14821,7 +14819,8 @@ function buildStrategyDoc_(c){
   add(band('CHAPTER 01 · 02', '1. 월간 영업 현황 및 현황분석', '기준: ' + esc(modeTxt)), true);
   const tO = traf(c.ord.pct, c.ord), tS = traf(c.start.pct, c.start), tN = traf(c.net.pct, c.net);
   const badge = function(t){ return '<span class="bdg" style="color:' + t.col + ';background:' + t.bg + '">' + t.t + '</span>'; };
-  let intro = y + '년 ' + m + '월 ' + (c.isCurMonth ? ('현재(' + c.elDays + '영업일 경과, 영업일 진척률 ' + c.workRatio + '%)') : (c.isPastMonth ? '최종 마감 기준' : '집계 전')) + ', 북서울지사의 수주 달성률은 ' + c.ord.pct + '%, 개시 ' + c.start.pct + '%, 유지증가 ' + S(c.net.amt) + '천원(목표 대비 ' + c.net.pct + '%)입니다.';
+  const rp_ = function (o) { return (o.rank > 0 && o.gap !== null && o.gap !== undefined) ? ('(사업팀 ' + nb + '개 지사 중 ' + o.rank + '위, 평균 ' + o.avg + '% 대비 ' + gapS(o.gap) + ')') : ''; };
+  let intro = y + '년 ' + m + '월 ' + (c.isCurMonth ? ('현재(' + c.elDays + '영업일 경과)') : (c.isPastMonth ? '최종 마감 기준' : '집계 전')) + ', 북서울지사의 수주 달성률은 ' + c.ord.pct + '%' + rp_(c.ord) + ', 개시 ' + c.start.pct + '%' + rp_(c.start) + ', 유지증가 ' + S(c.net.amt) + '천원(목표 대비 ' + c.net.pct + '%' + ((c.net.rank > 0 && c.net.gap !== null && c.net.gap !== undefined) ? (', 사업팀 ' + c.net.rank + '위, 평균 대비 ' + gapS(c.net.gap)) : '') + ')입니다.';
   if (c.safety) intro += ' 안전상품은 수주 ' + c.safety.ordPct + '%, 확정 매출 ' + c.safety.salePct + '% 수준입니다.';
   if (c.gemini && c.gemini.status_intro) intro = c.gemini.status_intro;
   add('<div class="blk"><h3 class="s">1.1 4대 핵심 지표 영업 현황' + (hasBiz ? ' 및 서울사업팀 ' + nb + '개 지사 벤치마크' : '') + '</h3><p>' + esc(intro) + '</p>'
@@ -14850,10 +14849,10 @@ function buildStrategyDoc_(c){
   add(band('CHAPTER 03 · 04', '2. 핵심 문제점 및 원인 점검', '현황 수치에서 확인되는 문제 영역'), true);
   const P = [];
   const gapO = hasBiz ? c.ord.gap : r1(c.ord.pct - c.workRatio), gapSt = hasBiz ? c.start.gap : r1(c.start.pct - c.workRatio);
-  P.push({ bad: gapO < 0, t: '수주 스피드 ' + (hasBiz ? '서울사업팀 평균 대비 ' : '영업일 진척 대비 ') + gapS(gapO),
-    d: '수주 달성률 ' + c.ord.pct + '%' + (hasBiz ? ' (사업팀 ' + nb + '개 지사 중 ' + c.ord.rank + '위, 평균 ' + c.ord.avg + '%)' : ' (영업일 진척률 ' + c.workRatio + '%)') + '.' + (function(){ const z = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; }); const idle = c.reps.filter(function(r){ return r.zeroDays !== null && r.zeroDays >= 3 && r.orderCount > 0; }).map(function(r){ return r.name + '(' + r.zeroDays + '영업일)'; }); return (z.length ? ' 당월 수주가 없는 컨설턴트: ' + z.join('·') + '.' : '') + (idle.length ? ' 3영업일 이상 무수주: ' + idle.join('·') + '.' : ''); })() });
-  P.push({ bad: gapSt < 0, t: '개시 전환 ' + (c.start.rank > 0 ? ('사업팀 ' + c.start.rank + '위') : ('진척 ' + c.start.pct + '%')),
-    d: '개시 ' + K(c.start.amt) + '천원(달성률 ' + c.start.pct + '%, ' + (hasBiz ? '사업팀 평균 대비 ' + gapS(gapSt) : '영업일 진척 대비 ' + gapS(gapSt)) + '). 당월 수주 중 당월 개시 비중은 ' + curShare + '%입니다.' });
+  P.push({ bad: gapO < 0, t: '수주 스피드 ' + (hasBiz ? ('서울사업팀 ' + c.ord.rank + '위·평균 대비 ' + gapS(gapO)) : '(사업팀 비교 자료 없음)'),
+    d: '수주 달성률 ' + c.ord.pct + '%' + (hasBiz ? ' (사업팀 ' + nb + '개 지사 중 ' + c.ord.rank + '위, 평균 ' + c.ord.avg + '%)' : ' (사업팀 비교 자료 없음)') + '.' + (function(){ const z = c.reps.filter(function(r){ return r.orderCount === 0; }).map(function(r){ return r.name; }); const idle = c.reps.filter(function(r){ return r.zeroDays !== null && r.zeroDays >= 3 && r.orderCount > 0; }).map(function(r){ return r.name + '(' + r.zeroDays + '영업일)'; }); return (z.length ? ' 당월 수주가 없는 컨설턴트: ' + z.join('·') + '.' : '') + (idle.length ? ' 3영업일 이상 무수주: ' + idle.join('·') + '.' : ''); })() });
+  P.push({ bad: gapSt < 0, t: '개시 전환 ' + (c.start.rank > 0 ? ('사업팀 ' + c.start.rank + '위') : ('달성률 ' + c.start.pct + '%')),
+    d: '개시 ' + K(c.start.amt) + '천원(달성률 ' + c.start.pct + '%, ' + (hasBiz ? '사업팀 평균 대비 ' + gapS(gapSt) : '사업팀 비교 자료 없음') + '). 당월 수주 중 당월 개시 비중은 ' + curShare + '%입니다.' });
   P.push({ bad: c.net.amt < 0 || lossK > c.start.amt, t: '해약·인하 방어 (유지증가 ' + S(c.net.amt) + '천원)',
     d: '해약 ' + c.cancel.cnt + '건 -' + K(A(c.cancel.amt)) + '천원, 단가인하 -' + K(A(c.priceDownK)) + '천원, 단가인상 +' + K(A(c.priceUpK)) + '천원. 유지증가 목표 ' + S(c.net.tgt) + '천원 대비 ' + c.net.pct + '%.' });
   const zp = []; if (c.prod.bscan.cnt === 0) zp.push('블루스캔'); if (c.prod.huen.cnt === 0) zp.push('휴엔'); if (c.prod.digi.cnt === 0) zp.push('디지털');
@@ -14896,16 +14895,16 @@ function buildStrategyDoc_(c){
       const amt = Number(r.orderAmt) || 0, tg = Number(r.repTgt) || 0;
       const hasT = tg > 0;
       const pct = hasT ? r1(amt / tg * 100) : null;
-      const base = hasT ? ('수주 ' + K(amt) + '천원(개인 목표 대비 ' + pct + '%, 영업일 진척률 ' + refR + '% 대비 ' + gapS(r1(pct - refR)) + ')') : ('수주 ' + K(amt) + '천원(' + r.orderCount + '건, 지사 컨설턴트 평균 ' + K(Math.round(avgAmt)) + '천원)');
+      const base = hasT ? ('수주 ' + K(amt) + '천원(개인 목표 대비 ' + pct + '%, 지사 컨설턴트 평균 ' + K(Math.round(avgAmt)) + '천원)') : ('수주 ' + K(amt) + '천원(' + r.orderCount + '건, 지사 컨설턴트 평균 ' + K(Math.round(avgAmt)) + '천원)');
       const isCrit = r.orderCount === 0 || amt <= 0 || (hasT ? pct < refR * 0.5 : (avgAmt > 0 && amt < avgAmt * 0.5));
       const isBehind = hasT ? pct < refR : (avgAmt > 0 && amt < avgAmt);
       if (isCrit) crit.push({ n: r.name, t: base, z: r.zeroDays });
       else if (isBehind) behind.push({ n: r.name, t: base });
     });
-    if (!crit.length && !behind.length) return '<p class="note" style="color:#0f766e"><b>컨설턴트별 수주 진도는 영업일 기준을 충족하고 있습니다.</b></p>';
+    if (!crit.length && !behind.length) return '<p class="note" style="color:#0f766e"><b>컨설턴트별 수주 달성 수준이 개인 목표 기준을 충족하고 있습니다.</b></p>';
     let h = '<div class="card red" style="margin-top:6px">';
     if (crit.length) h += '<div><b style="color:#b91c1c">🚨 긴급 점검 대상 (실적 현저히 부족):</b> ' + crit.map(function (x) { return '<b>' + esc(x.n) + '</b> — ' + x.t + (x.z ? ', 무수주 ' + x.z + '영업일째' : ''); }).join('; ') + '. 영업일이 경과할수록 월말 만회가 어려워지므로 <b>즉시 개별 면담과 가망 고객 점검, 이번 주 내 수주 계획 확정</b>이 시급합니다.</div>';
-    if (behind.length) h += '<div style="margin-top:3px"><b style="color:#854d0e">⚠ 영업일 기준 수주 미달:</b> ' + behind.map(function (x) { return '<b>' + esc(x.n) + '</b> — ' + x.t; }).join('; ') + '. 속도 회복을 위한 주간 단위 수주 진도 점검이 필요합니다.</div>';
+    if (behind.length) h += '<div style="margin-top:3px"><b style="color:#854d0e">⚠ 개인 목표 대비 수주 미달:</b> ' + behind.map(function (x) { return '<b>' + esc(x.n) + '</b> — ' + x.t; }).join('; ') + '. 주간 단위 수주 달성 점검이 필요합니다.</div>';
     return h + '</div>';
   };
   add(band('PERFORMANCE MATRIX', '4. 상품군별 &amp; 컨설턴트별 당월 종합 성과표', '당월 실적 기준'), true);
@@ -16473,7 +16472,7 @@ function fsBindOnce_(){
 
 
 </script>
-<script src="gemini-insights.js?v=20261103e"></script>
+<script src="gemini-insights.js?v=20261105a"></script>
 <script src="rep-trend.js?v=20261103g"></script>
 <script src="speedometer.js?v=20261103f"></script>
 <script src="flag-sync.js?v=20261102b"></script>
