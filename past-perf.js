@@ -132,7 +132,7 @@
     var kf = { n: 'n', t: 't', a: 'a', rate: 'r', py: 'py', df: 'df', yoy: 'y' }[sortKey];
     br.sort(function (x, y) { var p = x[kf], q = y[kf]; if (p == null && q == null) return 0; if (p == null) return 1; if (q == null) return -1; return (p > q ? 1 : p < q ? -1 : 0) * S.dir; });
     var cols = [['n', '지사'], ['t', '목표'], ['a', '실적'], ['rate', '달성률']].concat(S.cmp && prev ? [['py', (S.y - 1) + '년 실적'], ['df', '증감']] : [], [['yoy', '전년 동기 대비']]);
-    var th = 'padding:6px 8px; border-bottom:1px solid #cbd5e1; background:#f1f5f9; font-size:12px; color:#475569; white-space:nowrap; cursor:pointer;';
+    var th = 'padding:6px 8px; border-bottom:2px solid #334155; background:#c3d0e4; font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; cursor:pointer;';
     var tb = '<table style="border-collapse:collapse; width:100%; min-width:640px; font-variant-numeric:tabular-nums;"><thead><tr>' + cols.map(function (c) {
       return '<th style="' + th + 'text-align:' + (c[0] === 'n' ? 'left' : 'right') + ';" onclick="__pp.sort(\'' + c[0] + '\')">' + c[1] + (sortKey === c[0] ? (S.dir < 0 ? ' ▼' : ' ▲') : '') + '</th>';
     }).join('') + '</tr></thead><tbody>';
@@ -151,7 +151,7 @@
 
   function rawBody() {
     var i = idx(S.m), per = S.m === 0 ? S.y + '년 연간 누계' : S.y + '년 ' + S.m + '월', ks = PRODS[S.p], cmp = S.cmp && S.y > 2023;
-    var th = 'padding:6px 8px; border-bottom:1px solid #cbd5e1; background:#f1f5f9; font-size:12px; color:#475569; white-space:nowrap; text-align:right;';
+    var th = 'padding:6px 8px; border-bottom:2px solid #334155; background:#c3d0e4; font-size:12px; font-weight:800; color:#0f172a; white-space:nowrap; text-align:right;';
     var td = 'padding:6px 8px; border-bottom:1px solid #e2e8f0; text-align:right; white-space:nowrap;';
     var bl = 'border-left:1px solid #cbd5e1;';
     var h = '<table style="border-collapse:collapse; width:100%; min-width:' + (ks.length * (cmp ? 400 : 260) + 90) + 'px; font-variant-numeric:tabular-nums;"><thead><tr><th rowspan="2" style="' + th + 'text-align:left;">지사</th>' +

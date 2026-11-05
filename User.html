@@ -5578,6 +5578,19 @@ td.prod-col, td.gross-col,
     break-inside: avoid !important;
   }
 }
+
+/* ===== 대시보드 표 제목줄: hover 파란색 하이라이트 제거 + 본문 행과 확실히 구분되는 진한 배경 ===== */
+:root{ --dash-th-bg:#c3d0e4; --dash-th-fg:#0f172a; --dash-th-line:#334155; }
+.dashboard-view thead th:not([style*="background"]),
+.dashboard-view thead th:not([style*="background"]):hover,
+.dashboard-view table.status-summary thead th,
+.dashboard-view table.status-summary thead th:hover,
+.ai-data-table thead th, .ai-data-table thead th:hover, .ai-data-table th, .ai-data-table th:hover,
+.sp-tbl th, .sp-tbl th:hover{
+  background:var(--dash-th-bg) !important; color:var(--dash-th-fg) !important; font-weight:800 !important;
+  border-bottom:2px solid var(--dash-th-line) !important;
+}
+.dashboard-view thead th:hover{ cursor:default; }
 </style>
 </head>  
 <body>  
