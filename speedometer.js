@@ -366,7 +366,7 @@
   var css = document.createElement('style');
   css.textContent = '.sp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;}' +
     '.sp-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;min-width:0;transition:box-shadow .2s,transform .2s;}.sp-card:hover{box-shadow:0 6px 16px rgba(15,23,42,.14);transform:translateY(-2px);}' +
-    '.sp-tbl{border-collapse:collapse;font-size:12px;width:100%;}.sp-tbl th,.sp-tbl td{border:1px solid #cbd5e1;padding:4px 8px;text-align:center;white-space:nowrap;}.sp-tbl th{background:#f1f5f9;}';
+    '.sp-tbl{border-collapse:collapse;font-size:12px;width:100%;}.sp-tbl th,.sp-tbl td{border:1px solid #cbd5e1;padding:4px 8px;text-align:center;white-space:nowrap;}.sp-tbl th{background:#f1f5f9;color:#000 !important;}';
   document.head.appendChild(css);
   window.speedo_ = { load: load, cardHtml: cardHtml };
 
