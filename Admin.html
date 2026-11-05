@@ -9226,7 +9226,8 @@ function renderDashboard(){
       rowToday: netTodayRow_ || null, rowEnd: lastRow_
     };
   } catch (e) { window.DASH_REPORT_CTX_ = null; console.warn('보고서 컨텍스트 생성 실패', e); }
-  document.getElementById('content').innerHTML = html; try { if (window.__pxAnim) setTimeout(window.__pxAnim.scan, 0); } catch (e) {}  
+  document.getElementById('content').innerHTML = html; try { if (window.__pxAnim) setTimeout(window.__pxAnim.scan, 0); } catch (e) {}
+  try { if (window.__gmPregen && window.salesAiPregen_) setTimeout(window.salesAiPregen_, 0); } catch (e) {}  
 }
 
 
@@ -18000,6 +18001,8 @@ function bizTeamSave_(){
       setLoadingCursor(false);
       if (res && res.success) {
         alert(`[${prod}] 사업팀 데이터가 성공적으로 저장되었습니다.`);
+        // 업로드가 반영된 대시보드 숫자로 Gemini 문구를 미리 만들어 둔다(대시보드가 갱신 렌더될 때 salesAiPregen_ 가 실행)
+        try { if (prod === '일반알람') window.__gmPregen = { ym: String(dt).slice(0, 7), date: String(dt).slice(0, 10) }; } catch (e) {}
         if (typeof BIZ_TEAM_STATUS_DATA_ !== 'undefined') BIZ_TEAM_STATUS_DATA_ = null;
         // 사업팀 데이터 등록 즉시 대시보드/영업현황 집계 캐시를 비워 최신 데이터로 다시 계산
         try { if (typeof CLIENT_CACHE_ === 'object') { delete CLIENT_CACHE_['bizTeamStatusLatest_']; } } catch (e) {}
@@ -21223,7 +21226,7 @@ document.addEventListener('mousedown', function(e) {
 </script>
 <script src="school-cctv.js?v=20261105a"></script>
 <script src="calculator.js?v=20261102b"></script>
-<script src="gemini-insights.js?v=20261106b"></script>
+<script src="gemini-insights.js?v=20261106c"></script>
 <script src="rep-trend.js?v=20261103g"></script>
 <script src="speedometer.js?v=20261103f"></script>
 <script src="flag-sync.js?v=20261102b"></script>

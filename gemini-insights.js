@@ -1,9 +1,10 @@
 /**
  * 북서울지사 영업일보 포털 - Gemini 영업 분석 (Admin.html / User.html 공용)
  *
- *  - Gemini 호출은 리포트 버튼(영업분석 리포트 PDF·영업보고 화면)을 누를 때만, 그 시점의 집계 숫자로 한다.
- *    종합대시보드를 열거나 숫자가 바뀐다고 자동 호출하지 않는다. 같은 숫자의 분석이 이미 있으면
- *    「AI 종합 진단 4대 과제」에도 그 문구를 보여주고, 없으면 규칙 기반 문구를 그대로 둔다.
+ *  - Gemini 호출은 ① 사업팀 데이터 업로드 직후(그 숫자로 문구를 미리 만들어 서버 공유 캐시에 저장)와
+ *    ② 리포트 버튼(영업분석 리포트 PDF·영업보고 화면)을 눌렀는데 같은 숫자의 문구가 없을 때만 한다.
+ *    종합대시보드를 열거나 숫자가 바뀐다고 자동 호출하지 않는다. 대시보드의 「AI 종합 진단 4대 과제」는
+ *    같은 숫자로 만들어 둔 문구가 있으면(서버 캐시 조회만) 그것을 보여주고, 없으면 규칙 기반 문구를 그대로 둔다.
  *  - 호출은 Supabase Edge Function `sales-ai` 를 거친다(Gemini 키는 서버에만 있음).
  *  - Gemini 로 보내는 데이터는 대시보드의 '집계 숫자'뿐이다. 고객명·전화번호·계약번호·계약처명은 보내지 않는다.
  *      (컨설턴트 이름과 그 집계 실적은 포함된다.)
@@ -148,6 +149,44 @@
     return inflight[k];
   }
 
+  // 서버 공유 캐시 조회 전용(peek): 같은 숫자의 분석이 이미 만들어져 있을 때만 받아오고, 없으면 Gemini 를 호출하지 않는다.
+  // -> {t, insight} | null
+  function peek_(c) {
+    return fetchStrat(c).then(function () {
+      var p = payload(c), k = keyOf(c, p), hit = cacheGet(k);
+      if (hit) return hit;
+      var ph = phone();
+      if (!ph) return null;
+      return fetch(URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': KEY, 'Authorization': 'Bearer ' + KEY },
+        body: JSON.stringify({ phone: ph, data: p, ym: c.ym || (c.y + '-' + String(c.m).padStart(2, '0')), cat: String(c.cat || '').slice(0, 10) + '_' + dataSig(p), peek: true })
+      }).then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j || !j.insight || !Array.isArray(j.insight.tasks) || j.insight.tasks.length < 4) return null;
+          var ins = j.insight; ins.closing = typeof ins.closing === 'string' ? ins.closing.trim() : ''; ins.tasks = ins.tasks.slice(0, 4); ins.analysis = (ins.analysis || []).slice(0, 3); ins.cover_summary = (ins.cover_summary || []).slice(0, 3);
+          cacheSet(k, ins);
+          return { t: j.at ? Date.parse(j.at) || Date.now() : Date.now(), insight: ins };
+        })
+        .catch(function () { return null; });
+    }).catch(function () { return null; });
+  }
+
+  // 사업팀 데이터 업로드 직후 호출: 업로드가 반영된 대시보드 숫자로 Gemini 문구를 미리 만들어 서버 공유 캐시에 저장한다.
+  //  window.__gmPregen = { ym:'2026-11', date:'2026-11-06' } 는 사업팀 데이터 저장 성공 시 Admin 이 세팅한다.
+  //  화면의 대시보드가 업로드 날짜(이후)의 사업팀 데이터를 반영한 상태일 때만 실행하고, 아니면 다음 대시보드 렌더에서 다시 시도한다.
+  window.salesAiPregen_ = function () {
+    var pend = window.__gmPregen, c = window.DASH_REPORT_CTX_;
+    if (!pend || !c || c.isFutureMonth) return;
+    if (c.ym !== pend.ym) return;
+    if (!c.bizDate || String(c.bizDate).slice(0, 10) < pend.date) return;
+    window.__gmPregen = null;
+    window.salesAiInsight_(c).then(function (ins) {
+      if (!ins || window.DASH_REPORT_CTX_ !== c) return;
+      Array.prototype.forEach.call(document.querySelectorAll('.gm-task'), function (e) { e.dataset.gm = ''; });
+      scan();
+    });
+  };
+
   // ---------------- 화면 반영 ----------------
   var css = document.createElement('style');
   css.textContent = '.gm-status{font-size:12px;color:#64748b;margin:0 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}' +
@@ -178,11 +217,14 @@
       c.tasks = ins.tasks.map(toHtml); c.gemini = ins;
       st.innerHTML = '<b>✨ Gemini 분석</b> 반영 · ' + (stamp ? new Date(stamp).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : now()) + ' 기준 · 숫자는 일보 집계 데이터';
     };
-    // 대시보드는 Gemini 를 직접 부르지 않는다. 리포트 버튼으로 같은 숫자의 분석이 이미 만들어져 있을 때만 그 문구를 보여주고,
-    // 없으면 규칙 기반 문구를 그대로 둔다.
+    // 대시보드는 Gemini 를 직접 부르지 않는다. 사업팀 데이터 업로드(또는 리포트 버튼) 때 같은 숫자로 이미 만들어 둔 분석이
+    // 있으면(브라우저 보관 → 서버 공유 캐시 조회 순) 그 문구를 보여주고, 없으면 규칙 기반 문구를 그대로 둔다.
     var hit = window.salesAiCached_(c);
     if (hit) { done(hit.insight, true, hit.t); return; }
-    st.remove();
+    peek_(c).then(function (h) {
+      if (h && window.DASH_REPORT_CTX_ === c) done(h.insight, true, h.t);
+      else st.remove();
+    });
   }
 
   function fillReportBox(box) {
