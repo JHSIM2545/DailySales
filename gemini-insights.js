@@ -98,9 +98,12 @@
   }
   function hash(s) { var h = 5381; for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 
-  // 같은 날(KST)·같은 월·같은 상품구분은 모든 사용자가 같은 분석을 본다 (서버 ai_insight_cache 공유 + 브라우저 보관)
+  // 같은 날(KST)·같은 월·같은 상품구분이라도 '집계 숫자(payload)'가 같을 때만 같은 분석을 재사용한다.
+  //  (서버 ai_insight_cache 공유 + 브라우저 보관). 하루 중 사업팀 순위·실적이 바뀌면 숫자 해시가 달라져 문구를 새로 만든다.
+  //  서버 캐시 키에는 cat 값이 들어가므로, cat 뒤에 숫자 해시를 붙여 보낸다(서버 수정 없이 동일 효과).
   function kstDay() { return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10); }
-  function keyOf(c) { return 'gm_ins5_' + (c.ym || (c.y + '-' + String(c.m).padStart(2, '0'))) + '|' + (c.cat || '') + '|' + kstDay(); }
+  function dataSig(p) { return hash(JSON.stringify(p)); }
+  function keyOf(c, p) { return 'gm_ins6_' + (c.ym || (c.y + '-' + String(c.m).padStart(2, '0'))) + '|' + (c.cat || '') + '|' + kstDay() + '|' + dataSig(p); }
   var mem = {};
   function cacheGet(k) { if (mem[k] && Date.now() - mem[k].t < TTL) return mem[k]; try { var o = JSON.parse(localStorage.getItem(k) || 'null'); if (o && Date.now() - o.t < TTL) return o; } catch (e) {} return null; }
   function cacheSet(k, v) { mem[k] = { t: Date.now(), insight: v }; try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), insight: v })); } catch (e) {} }
@@ -109,7 +112,11 @@
   window.salesStrategic_ = function (c) { return fetchStrat(c).then(function () { return stratPayload(c); }); };
 
   window.salesAiCached_ = function (c) {
-    try { return cacheGet(keyOf(c)) || null; } catch (e) { return null; }
+    try {
+      var ym = c.ym || (c.y + '-' + String(c.m).padStart(2, '0'));
+      if (strat[ym] === undefined) return null;   // 전략영업 조회 전이면 숫자가 확정되지 않았으므로 캐시를 쓰지 않는다
+      return cacheGet(keyOf(c, payload(c))) || null;
+    } catch (e) { return null; }
   };
 
   window.salesAiInsight_ = function (c, opts) {
@@ -118,7 +125,7 @@
   };
   function run_(c, opts) {
     opts = opts || {};
-    var p = payload(c), k = keyOf(c);
+    var p = payload(c), k = keyOf(c, p);
     var hit = cacheGet(k);
     if (hit) return Promise.resolve(hit.insight);
     if (inflight[k]) return inflight[k];
@@ -128,7 +135,7 @@
     var to = setTimeout(function () { if (ctl) ctl.abort(); }, opts.timeout || 45000);
     inflight[k] = fetch(URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': KEY, 'Authorization': 'Bearer ' + KEY },
-      body: JSON.stringify({ phone: ph, data: p, ym: c.ym || (c.y + '-' + String(c.m).padStart(2, '0')), cat: c.cat || '' }), signal: ctl ? ctl.signal : undefined
+      body: JSON.stringify({ phone: ph, data: p, ym: c.ym || (c.y + '-' + String(c.m).padStart(2, '0')), cat: String(c.cat || '').slice(0, 10) + '_' + dataSig(p) }), signal: ctl ? ctl.signal : undefined
     }).then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.insight) throw new Error(j && j.error ? j.error : ('HTTP ' + r.status)); return j.insight; }); })
       .then(function (ins) {
         ins.closing = typeof ins.closing === 'string' ? ins.closing.trim() : ''; ins.tasks = ins.tasks.slice(0, 4); ins.analysis = ins.analysis.slice(0, 3); ins.cover_summary = ins.cover_summary.slice(0, 3);
