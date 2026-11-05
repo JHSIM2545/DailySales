@@ -1,7 +1,9 @@
 /**
  * 북서울지사 영업일보 포털 - Gemini 영업 분석 (Admin.html / User.html 공용)
  *
- *  - 종합대시보드의 「AI 종합 진단 4대 과제」와 영업분석 리포트(화면·PDF)의 서술 문구를 Gemini 가 작성한다.
+ *  - Gemini 호출은 리포트 버튼(영업분석 리포트 PDF·영업보고 화면)을 누를 때만, 그 시점의 집계 숫자로 한다.
+ *    종합대시보드를 열거나 숫자가 바뀐다고 자동 호출하지 않는다. 같은 숫자의 분석이 이미 있으면
+ *    「AI 종합 진단 4대 과제」에도 그 문구를 보여주고, 없으면 규칙 기반 문구를 그대로 둔다.
  *  - 호출은 Supabase Edge Function `sales-ai` 를 거친다(Gemini 키는 서버에만 있음).
  *  - Gemini 로 보내는 데이터는 대시보드의 '집계 숫자'뿐이다. 고객명·전화번호·계약번호·계약처명은 보내지 않는다.
  *      (컨설턴트 이름과 그 집계 실적은 포함된다.)
@@ -176,10 +178,11 @@
       c.tasks = ins.tasks.map(toHtml); c.gemini = ins;
       st.innerHTML = '<b>✨ Gemini 분석</b> 반영 · ' + (stamp ? new Date(stamp).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : now()) + ' 기준 · 숫자는 일보 집계 데이터';
     };
+    // 대시보드는 Gemini 를 직접 부르지 않는다. 리포트 버튼으로 같은 숫자의 분석이 이미 만들어져 있을 때만 그 문구를 보여주고,
+    // 없으면 규칙 기반 문구를 그대로 둔다.
     var hit = window.salesAiCached_(c);
     if (hit) { done(hit.insight, true, hit.t); return; }
-    st.innerHTML = '<b>✨ Gemini 분석 중…</b> 기본 분석을 먼저 표시합니다.';
-    window.salesAiInsight_(c).then(function (ins) { done(ins, false, null); });
+    st.remove();
   }
 
   function fillReportBox(box) {
