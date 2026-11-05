@@ -2349,6 +2349,15 @@ function getTzToday() {
       const dcPrev = (data && data.doorcam_prev != null && data.doorcam_prev !== '') ? Number(data.doorcam_prev) : 23;
       const dcToday = (data && data.doorcam_today != null && data.doorcam_today !== '') ? Number(data.doorcam_today) : 0;
       const dcCum = dcPrev + dcToday;
+      // 월 누계 = 보고일이 속한 달의 1일 ~ 보고일 전날까지 저장된 '당일' 합 + 보고일 당일. (누계는 월 구분 없이 이어받는 값이라 월별 합계는 별도 계산)
+      let dcMonthPrior = null;
+      try {
+        if (client) {
+          const mStart = ds.slice(0, 7) + '-01';
+          const mr = await client.from('daily_extra_products').select('report_date,doorcam_today').gte('report_date', mStart).lt('report_date', ds);
+          if (!mr.error && Array.isArray(mr.data)) dcMonthPrior = mr.data.reduce(function(s, r){ return s + (Number(r.doorcam_today) || 0); }, 0);
+        }
+      } catch (e) { dcMonthPrior = null; }
 
       return {
         success: true, date: ds,
@@ -2371,7 +2380,9 @@ function getTzToday() {
             목표: dcTarget, 
             전일누계: dcPrev, 
             당일: dcToday,
-            누계: dcCum
+            누계: dcCum,
+            월누계전일: dcMonthPrior,
+            월누계: dcMonthPrior == null ? null : dcMonthPrior + dcToday
           }
         }
       };
@@ -12596,6 +12607,22 @@ lines.push('□ ' + m.label + ' * 목표 ' + fmtK(target) + '천원' + extraLabe
  lines.push('');
  return;
  }
+ if (sec.groupKey === 'AI도어캠') {
+ // 7. AI 도어캠: 당일 / 해당월 누계 / 전체 누계(달성률은 전체 누계 기준)
+ const g = ((EXTRA_PRODUCT_DATA && EXTRA_PRODUCT_DATA.AI도어캠) || {}).판매량 || {};
+ const target = Math.round(Number(g.목표) || 0);
+ const today = Math.round(Number(g.당일) || 0);
+ const cum = Math.round((Number(g.전일누계) || 0) + today);
+ const rate = target ? Math.round((cum / target) * 100) : 0;
+ const monthNo = Number(String(dailyReportDate).split('-')[1]) || 0;
+ const monthCum = (g.월누계 != null && g.월누계 !== '') ? fmtFullReportNum_(Math.round(Number(g.월누계) || 0), '대') + '대' : '조회 실패';
+ lines.push('□ 수주 * 목표 ' + fmtFullReportNum_(target, '대') + '대');
+ lines.push('- 당일 : ' + fmtFullReportNum_(today, '대') + '대');
+ lines.push('- ' + monthNo + '월 누계 : ' + monthCum);
+ lines.push('- 전체 누계 : ' + fmtFullReportNum_(cum, '대') + '대(' + rate + '%)');
+ lines.push('');
+ return;
+ }
  const group = (EXTRA_PRODUCT_DATA && EXTRA_PRODUCT_DATA[sec.groupKey]) || {};  
  sec.metrics.forEach(function(m){  
  const it = group[m.key] || {};  
@@ -12626,6 +12653,19 @@ function buildFullDailyReportHtml_(mode){
  escHtml(m[3]) +  
  '<span style="color:#c0392b; font-weight:700;">' + escHtml(m[4]) + escHtml(m[5]) + '</span>';  
  }  
+ // 6. 초중등 CCTV 법제화: "- 제안 : 8건/260,500천원" → 건수 파랑, 금액 빨강
+ const mc = line.match(/^(- (?:제안|계약) : )(\d[\d,]*건)(\/)(\d[\d,]*천원)$/);
+ if (mc) {
+ return escHtml(mc[1]) +
+ '<span style="color:#1a56db; font-weight:700;">' + escHtml(mc[2]) + '</span>' +
+ escHtml(mc[3]) +
+ '<span style="color:#c0392b; font-weight:700;">' + escHtml(mc[4]) + '</span>';
+ }
+ // 7. AI 도어캠: 당일 파랑, 월/전체 누계 빨강 (다른 상품과 동일한 색 규칙)
+ const md = line.match(/^(- 당일 : )(\d[\d,]*대)$/);
+ if (md) return escHtml(md[1]) + '<span style="color:#1a56db; font-weight:700;">' + escHtml(md[2]) + '</span>';
+ const me = line.match(/^(- (?:\d+월|전체) 누계 : )(.+)$/);
+ if (me) return escHtml(me[1]) + '<span style="color:#c0392b; font-weight:700;">' + escHtml(me[2]) + '</span>';
  return escHtml(line);  
  }).join('\n');  
 }  

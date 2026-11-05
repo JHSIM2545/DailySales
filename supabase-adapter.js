@@ -2041,6 +2041,15 @@
       const dcPrev = (data && data.doorcam_prev != null && data.doorcam_prev !== '') ? Number(data.doorcam_prev) : 23;
       const dcToday = (data && data.doorcam_today != null && data.doorcam_today !== '') ? Number(data.doorcam_today) : 0;
       const dcCum = dcPrev + dcToday;
+      // 월 누계 = 보고일이 속한 달의 1일 ~ 보고일 전날까지 저장된 '당일' 합 + 보고일 당일. (누계는 월 구분 없이 이어받는 값이라 월별 합계는 별도 계산)
+      let dcMonthPrior = null;
+      try {
+        if (client) {
+          const mStart = ds.slice(0, 7) + '-01';
+          const mr = await client.from('daily_extra_products').select('report_date,doorcam_today').gte('report_date', mStart).lt('report_date', ds);
+          if (!mr.error && Array.isArray(mr.data)) dcMonthPrior = mr.data.reduce(function(s, r){ return s + (Number(r.doorcam_today) || 0); }, 0);
+        }
+      } catch (e) { dcMonthPrior = null; }
 
       return {
         success: true, date: ds,
@@ -2063,7 +2072,9 @@
             목표: dcTarget, 
             전일누계: dcPrev, 
             당일: dcToday,
-            누계: dcCum
+            누계: dcCum,
+            월누계전일: dcMonthPrior,
+            월누계: dcMonthPrior == null ? null : dcMonthPrior + dcToday
           }
         }
       };
