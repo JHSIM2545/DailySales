@@ -703,6 +703,33 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
+  /* ------------------------------------------------------------------ 일일실적보고용 집계 (Admin.html / User.html 의 6. 초중등 CCTV 법제화)
+   *  - 대상(당사)  : 경비업체 = '에스원' 학교 수 (집계 화면의 '에스원 고객 학교'와 동일 기준)
+   *  - 제안        : 방문결과가 '견적제출' 또는 '계약예정' 인 건수 + 해당 견적제출금액(천원) 합
+   *  - 계약        : 방문결과가 '계약완료' 인 건수 + 해당 견적제출금액(천원) 합
+   *  ※ 제안/계약 집계 범위도 대상(당사)과 같이 경비업체='에스원' 학교로 한정한다. 전체 학교로 넓히려면 REPORT_SCOPE_GUARD 를 null 로.
+   */
+  var REPORT_SCOPE_GUARD = '에스원';
+  function reportSummarize(rows) {
+    var list = REPORT_SCOPE_GUARD ? rows.filter(function (r) { return r.guard_company === REPORT_SCOPE_GUARD; }) : rows;
+    var out = { scope: REPORT_SCOPE_GUARD || '전체', target: list.length, proposal: { n: 0, amt: 0 }, contract: { n: 0, amt: 0 } };
+    list.forEach(function (r) {
+      var amt = numOrZero(r.quote_amount);
+      if (r.visit_result === '견적제출' || r.visit_result === '계약예정') { out.proposal.n++; out.proposal.amt += amt; }
+      else if (r.visit_result === '계약완료') { out.contract.n++; out.contract.amt += amt; }
+    });
+    return out;
+  }
+  window.getSchoolCctvReportSummary_ = function (cb) {
+    (async function () {
+      try {
+        var res = await db().from(TABLE).select('guard_company,visit_result,quote_amount').range(0, 999);
+        if (res.error) throw res.error;
+        cb(reportSummarize(res.data || []));
+      } catch (e) { cb(null); }
+    })();
+  };
+
   // 테스트/디버그용 내부 노출 (화면 동작에는 영향 없음)
   window.__scc = { state: state, summarize: agg };
 })();

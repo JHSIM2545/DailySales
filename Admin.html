@@ -16182,13 +16182,14 @@ const DAILY_REPORT_SECTIONS = [
  { heading: '3. 블루스캔', product: '블루스캔' },  
  { heading: '4. 디지털', product: '정보보안' }  
 ];  
-/** 통합 TEXT 보고창(직접수정 가능)에 쓰는 확장 섹션: 기존 4개 상품 + 안전상품 + AI도어캠 */  
+/** 통합 TEXT 보고창(직접수정 가능)에 쓰는 확장 섹션: 기존 4개 상품 + 안전상품 + 초중등 CCTV 법제화 + AI도어캠 */  
 const FULL_REPORT_EXTRA_SECTIONS = [  
  { heading: '5. 안전상품 * 목표의 50%', groupKey: '안전상품', metrics: [  
  { key:'수주', label:'수주', unit:'천원' },  
  { key:'매출', label:'매출', unit:'천원' }  
  ] },  
- { heading: '6. AI 도어캠', groupKey: 'AI도어캠', metrics: [  
+ { heading: '6. 초중등 CCTV 법제화', groupKey: '학교CCTV', metrics: [] },
+ { heading: '7. AI 도어캠', groupKey: 'AI도어캠', metrics: [  
  { key:'판매량', label:'수주', unit:'대' }  
  ] }  
 ];  
@@ -16249,6 +16250,15 @@ function loadSafetyProductSummaryForDaily_(cb){
  .getSafetyProductSummary(SESSION.token, dailyReportDate);  
 }  
   
+/** 학교 CCTV 집계(제안/계약)를 보고서용으로 불러온다. 실패해도 보고서 생성은 계속하며, 실패 시 SCHOOL_CCTV_REPORT = null (0으로 오인되지 않도록 본문에 '조회 실패'로 표기). */
+let SCHOOL_CCTV_REPORT = null; // { scope, target, proposal:{n,amt}, contract:{n,amt} }
+function loadSchoolCctvForDaily_(cb){
+ try {
+ if (typeof window.getSchoolCctvReportSummary_ !== 'function') { SCHOOL_CCTV_REPORT = null; cb(); return; }
+ window.getSchoolCctvReportSummary_(function(res){ SCHOOL_CCTV_REPORT = res || null; cb(); });
+ } catch (e) { SCHOOL_CCTV_REPORT = null; cb(); }
+}
+
 function applyDailyReportResult_(res){  
  dailyReportDate = res.date;  
  DAILY_REPORT_DATA = {};  
@@ -16263,7 +16273,7 @@ function loadDailyReport(){
  const cached = cacheGet_(cacheKey);  
  if (cached) {  
  applyDailyReportResult_(cached);  
- loadExtraProductReport_(function(){ loadSafetyProductSummaryForDaily_(function(){ renderDailyReport(); }); });  
+ loadExtraProductReport_(function(){ loadSafetyProductSummaryForDaily_(function(){ loadSchoolCctvForDaily_(function(){ renderDailyReport(); }); }); });  
  return;  
  }  
   
@@ -16275,7 +16285,7 @@ function loadDailyReport(){
  if (!res || !res.success) { setLoadingCursor(false); document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + (res && res.error) + '</div>'; return; }  
  cacheSet_(cacheKey, res);  
  applyDailyReportResult_(res);  
- loadExtraProductReport_(function(){ loadSafetyProductSummaryForDaily_(function(){ setLoadingCursor(false); renderDailyReport(); }); });  
+ loadExtraProductReport_(function(){ loadSafetyProductSummaryForDaily_(function(){ loadSchoolCctvForDaily_(function(){ setLoadingCursor(false); renderDailyReport(); }); }); });  
  })  
  .withFailureHandler(function(err){ setLoadingCursor(false); document.getElementById('content').innerHTML = '<div class="loading">데이터 로드 실패: ' + err + '</div>'; })  
  .getDailyReportAuto(SESSION.token, dailyReportDate);  
@@ -16521,6 +16531,21 @@ lines.push('□ ' + m.label + ' * 목표 ' + fmtK(target) + '천원' + extraLabe
  lines.push('');  
  return;  
  }  
+ if (sec.groupKey === '학교CCTV') {
+ // 초중등 CCTV 법제화: 학교 CCTV 집계 화면 데이터 사용. 제안 = 방문결과 '견적제출'+'계약예정'(건수/견적제출금액 합), 계약 = '계약완료'(건수/견적제출금액 합).
+ const c = SCHOOL_CCTV_REPORT;
+ if (!c) {
+ lines.push('□ 대상(당사) : 조회 실패');
+ lines.push('- 제안 : 집계 조회 실패 (학교 CCTV 화면에서 확인)');
+ lines.push('- 계약 : 집계 조회 실패 (학교 CCTV 화면에서 확인)');
+ } else {
+ lines.push('□ 대상(당사) : ' + fmtK(c.target) + '건');
+ lines.push('- 제안 : ' + fmtK(c.proposal.n) + '건/' + fmtK(c.proposal.amt) + '천원');
+ lines.push('- 계약 : ' + fmtK(c.contract.n) + '건/' + fmtK(c.contract.amt) + '천원');
+ }
+ lines.push('');
+ return;
+ }
  const group = (EXTRA_PRODUCT_DATA && EXTRA_PRODUCT_DATA[sec.groupKey]) || {};  
  sec.metrics.forEach(function(m){  
  const it = group[m.key] || {};  
@@ -21141,7 +21166,7 @@ document.addEventListener('mousedown', function(e) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
-<script src="school-cctv.js?v=20261028b"></script>
+<script src="school-cctv.js?v=20261105a"></script>
 <script src="calculator.js?v=20261102b"></script>
 <script src="gemini-insights.js?v=20261105a"></script>
 <script src="rep-trend.js?v=20261103g"></script>
