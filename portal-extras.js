@@ -1730,7 +1730,7 @@
     var animTimer = null;
     new MutationObserver(function () { clearTimeout(animTimer); animTimer = setTimeout(animScan, 120); }).observe(document.documentElement, { childList: true, subtree: true });
   } catch (e) { /* noop */ }
-  /* 마우스를 올리면 해당 카드의 그래프·숫자 애니메이션을 다시 실행 (속도계는 자체 처리) */
+  /* 마우스를 올리면 해당 카드의 그래프 애니메이션만 다시 실행 (숫자 카운트업 제외, 속도계는 자체 처리) */
   try {
     document.addEventListener('mouseover', function (ev) {
       var t = ev.target, dv = t && t.closest ? t.closest('#content .dashboard-view') : null;
@@ -1745,7 +1745,7 @@
       var now = Date.now();
       if (el.__pxH && now - el.__pxH < 2200) return;
       el.__pxH = now;
-      try { animGraphs(el); animCount(el); } catch (e) { /* noop */ }
+      try { animGraphs(el); } catch (e) { /* noop */ }   // 숫자 카운트업은 처음 표시될 때만 (마우스 올림 시에는 그래프만)
     });
   } catch (e) { /* noop */ }
   window.__pxAnim = { scan: animScan };

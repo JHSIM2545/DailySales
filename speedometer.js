@@ -313,7 +313,7 @@
   }
 
   // ---------- 화면 슬롯 / 애니메이션 ----------
-  function animate(slot) {
+  function animate(slot, noNums) {
     var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     var needles = slot.querySelectorAll('.sp-needle'), fills = slot.querySelectorAll('.sp-fill'), dots = slot.querySelectorAll('.sp-dot'), nums = slot.querySelectorAll('.sp-num');
     if (reduce) { fills.forEach(function (f) { f.style.width = f.dataset.w + '%'; }); dots.forEach(function (d) { d.style.left = d.dataset.l + '%'; }); return; }
@@ -326,7 +326,7 @@
       fills.forEach(function (f) { f.style.transition = 'width 1.1s cubic-bezier(.2,.8,.2,1) 250ms'; f.style.width = f.dataset.w + '%'; });
       dots.forEach(function (d) { d.style.transition = 'left 1.1s cubic-bezier(.2,.8,.2,1) 250ms'; d.style.left = d.dataset.l + '%'; });
     });
-    nums.forEach(function (el, i) {
+    if (!noNums) nums.forEach(function (el, i) {
       var v = parseFloat(el.dataset.v); if (isNaN(v)) return;
       var t0 = null, dur = 1300, delay = i * 120;
       function step(ts) {
@@ -349,12 +349,12 @@
     load(c).then(function (d) {
       if (!document.body.contains(slot)) return;
       slot.innerHTML = cardHtml(d, c);
-      // 마우스를 올리면 해당 속도계 카드의 애니메이션을 다시 실행 (진행 중에는 중복 실행 방지)
+      // 마우스를 올리면 해당 속도계 카드의 게이지·막대 애니메이션만 다시 실행 (숫자 카운트업 제외, 진행 중에는 중복 실행 방지)
       slot.querySelectorAll('.sp-card').forEach(function (cd) {
         cd.style.cursor = 'pointer';
         cd.addEventListener('mouseenter', function () {
           var now = Date.now(); if (cd.__spT && now - cd.__spT < 2200) return;
-          cd.__spT = now; animate(cd);
+          cd.__spT = now; animate(cd, true);
         });
       });
       if (io) io.observe(slot); else animate(slot);
