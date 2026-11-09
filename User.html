@@ -5906,12 +5906,15 @@ td.prod-col, td.gross-col,
 <div class="modal-overlay" id="gridImgPreviewOverlay">  
  <div class="modal" style="width:auto; max-width:92vw;">  
  <h2 id="gridImgPreviewTitle">이미지 미리보기</h2>  
- <div style="text-align:center; max-height:70vh; overflow:auto; border:1px solid #e2e6ea; background:#f7f8fa; padding:8px;">  
- <img id="gridImgPreviewImg" style="max-width:100%; display:block; margin:0 auto;">  
- </div>  
- <div class="modal-actions">  
- <button onclick="closeGridImgPreview_()">닫기</button>  
- <button class="primary" onclick="downloadGridImgPreview_()">PNG로 저장</button>  
+ <div id="gridImgPreviewMsg" style="font-size:13px; font-weight:700; min-height:18px; margin:2px 0 6px;"></div>
+ <div style="text-align:center; max-height:60vh; overflow:auto; -webkit-overflow-scrolling:touch; border:1px solid #e2e6ea; background:#f7f8fa; padding:8px;">
+ <img id="gridImgPreviewImg" alt="캡처 이미지" draggable="false" style="max-width:100%; display:block; margin:0 auto; -webkit-touch-callout:default; -webkit-user-select:auto; user-select:auto; pointer-events:auto;">
+ </div>
+ <div class="modal-actions" style="flex-wrap:wrap;">
+ <button onclick="closeGridImgPreview_()">닫기</button>
+ <button onclick="copyGridImgPreview_()">📋 복사</button>
+ <button onclick="shareGridImgPreview_()">📤 공유</button>
+ <button class="primary" onclick="downloadGridImgPreview_()">PNG로 저장</button>
  </div>  
  </div>  
 </div>  
@@ -13156,29 +13159,104 @@ function exportGridToImage(scope){
   container.innerHTML = tableHtml;
   document.body.appendChild(container);
 
+  // 이미지 결과(Blob)를 Promise 로 만들어 두고, 버튼 클릭 직후(사용자 제스처 유효) 곧바로 클립보드에 넘긴다.
+  let resolveBlob_, rejectBlob_;
+  const blobPromise = new Promise(function(res, rej){ resolveBlob_ = res; rejectBlob_ = rej; });
+  blobPromise.catch(function(){});
+  const clipPromise = copyGridImgToClipboard_(blobPromise);
+  clipPromise.catch(function(){});
+
   ensureImgExportLibReady_(function(){
     html2canvas(container, { backgroundColor: '#ffffff', scale: 2 }).then(function(canvas){
       if (container.parentNode) document.body.removeChild(container);
-      GRID_IMG_PREVIEW_DATAURL_ = canvas.toDataURL('image/png');
       GRID_IMG_PREVIEW_NAME_ = (titleName || 'export').replace(/\s+/g, '_');
-      document.getElementById('gridImgPreviewTitle').innerText = titleName + ' - 선택 ' + flaggedRows.length + '건';
-      document.getElementById('gridImgPreviewImg').src = GRID_IMG_PREVIEW_DATAURL_;
-      document.getElementById('gridImgPreviewOverlay').classList.add('open');
+      canvas.toBlob(function(blob){
+        if (!blob) { rejectBlob_(new Error('blob 생성 실패')); alert('이미지 생성 실패'); return; }
+        resolveBlob_(blob);
+        GRID_IMG_PREVIEW_BLOB_ = blob;
+        if (GRID_IMG_PREVIEW_URL_) { try { URL.revokeObjectURL(GRID_IMG_PREVIEW_URL_); } catch(e){} }
+        GRID_IMG_PREVIEW_URL_ = URL.createObjectURL(blob);
+        GRID_IMG_PREVIEW_DATAURL_ = '';
+        document.getElementById('gridImgPreviewTitle').innerText = titleName + ' - 선택 ' + flaggedRows.length + '건';
+        document.getElementById('gridImgPreviewImg').src = GRID_IMG_PREVIEW_URL_;
+        gridImgMsg_('');
+        document.getElementById('gridImgPreviewOverlay').classList.add('open');
+        clipPromise
+          .then(function(){ gridImgMsg_('✅ 이미지가 클립보드에 복사되었습니다.'); })
+          .catch(function(e){ gridImgMsg_('자동 복사가 되지 않았습니다. "📋 복사" 버튼을 눌러주세요.', true); });
+      }, 'image/png');
     }).catch(function(err){
       if (container.parentNode) document.body.removeChild(container);
+      rejectBlob_(err);
       alert('이미지 생성 실패: ' + err);
     });
   });
 }
+
+let GRID_IMG_PREVIEW_BLOB_ = null;
+let GRID_IMG_PREVIEW_URL_ = '';
+
+function gridImgMsg_(text, isErr){
+  const el = document.getElementById('gridImgPreviewMsg');
+  if (!el) return;
+  el.textContent = text || '';
+  el.style.color = isErr ? '#c00000' : '#1a7f37';
+}
 function closeGridImgPreview_(){ document.getElementById('gridImgPreviewOverlay').classList.remove('open'); }
+function gridImgFileName_(){ return GRID_IMG_PREVIEW_NAME_ + '_' + todayStr() + '.png'; }
+
+/** 이미지를 클립보드에 복사. blobOrPromise 는 Blob 또는 Blob 으로 풀리는 Promise. */
+function copyGridImgToClipboard_(blobOrPromise){
+  try {
+    if (!(navigator.clipboard && navigator.clipboard.write && window.ClipboardItem)) {
+      return Promise.reject(new Error('이 브라우저는 이미지 클립보드 복사를 지원하지 않습니다.'));
+    }
+    return navigator.clipboard.write([ new ClipboardItem({ 'image/png': blobOrPromise }) ]);
+  } catch(e) { return Promise.reject(e); }
+}
+function copyGridImgPreview_(){
+  if (!GRID_IMG_PREVIEW_BLOB_) return;
+  copyGridImgToClipboard_(GRID_IMG_PREVIEW_BLOB_)
+    .then(function(){ gridImgMsg_('✅ 이미지가 클립보드에 복사되었습니다.'); })
+    .catch(function(e){ gridImgMsg_('클립보드 복사 실패: 아래 "공유"로 저장하거나 이미지를 길게 눌러 복사하세요. (' + (e && e.message ? e.message : e) + ')', true); });
+}
+function shareGridImgPreview_(){
+  if (!GRID_IMG_PREVIEW_BLOB_) return;
+  try {
+    const file = new File([GRID_IMG_PREVIEW_BLOB_], gridImgFileName_(), { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: GRID_IMG_PREVIEW_NAME_ }).catch(function(){});
+      return;
+    }
+  } catch(e) {}
+  gridImgMsg_('이 브라우저는 공유를 지원하지 않습니다. "PNG로 저장"을 눌러주세요.', true);
+}
+// "PNG로 저장": data URL 이동 대신 blob URL 다운로드. 폰에서는 공유창(저장) 우선.
 function downloadGridImgPreview_(){
-  if (!GRID_IMG_PREVIEW_DATAURL_) return;
-  const a = document.createElement('a');
-  a.href = GRID_IMG_PREVIEW_DATAURL_;
-  a.download = GRID_IMG_PREVIEW_NAME_ + '_' + todayStr() + '.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if (!GRID_IMG_PREVIEW_BLOB_) return;
+  const isTouch = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+  if (isTouch) {
+    try {
+      const file = new File([GRID_IMG_PREVIEW_BLOB_], gridImgFileName_(), { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: GRID_IMG_PREVIEW_NAME_ }).catch(function(){});
+        return;
+      }
+    } catch(e) {}
+  }
+  try {
+    const url = URL.createObjectURL(GRID_IMG_PREVIEW_BLOB_);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = gridImgFileName_();
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 30000);
+  } catch(e) {
+    gridImgMsg_('저장 실패: 이미지를 길게 눌러 저장하거나 "공유"를 이용해 주세요.', true);
+  }
 }
 
 /* ===================== 영업보고 제출 (일반 사용자: 제출만 가능) ===================== */
