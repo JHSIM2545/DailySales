@@ -2753,7 +2753,7 @@
       return { success: true };
     },
 
-    autoCommitAiInboxItem: async function(token, id) {
+    autoCommitAiInboxItem: async function(token, id, allowDuplicate) {
       const client = getSupabase();
       const sess = getSession_();
       const userName = (sess && sess.name) ? sess.name : '마스터';
@@ -2765,16 +2765,27 @@
       if (!parseRes || !parseRes.success) throw new Error(parseRes ? parseRes.error : '분석 실패');
 
       const f = Object.assign({}, parseRes.fields);
-      const payload = { id: null, fields: f };
+      const payload = allowDuplicate ? { id: null, fields: f, allowDuplicate: true } : { id: null, fields: f };
 
+      let saveRes;
       if (parseRes.type === 'cancel') {
-        await this.saveCancelRow(token, payload);
+        saveRes = await this.saveCancelRow(token, payload);
       } else if (parseRes.type === 'price_change') {
-        await this.savePriceRow(token, payload);
+        saveRes = await this.savePriceRow(token, payload);
       } else if (parseRes.type === 'restart') {
-        await this.saveRestartRow(token, payload);
+        saveRes = await this.saveRestartRow(token, payload);
       } else {
-        await this.saveOrderStartRow(token, payload);
+        saveRes = await this.saveOrderStartRow(token, payload);
+      }
+      /* 저장이 거부된 경우(중복 계약번호 등)에는 접수 건을 '처리완료'로 바꾸지 않고 실패로 돌려준다 */
+      if (!saveRes || saveRes.success === false) {
+        return {
+          success: false,
+          duplicate: !!(saveRes && saveRes.duplicate),
+          type: parseRes.type,
+          company: f['계약처명'] || f['서비스제공처'] || '미확인',
+          error: (saveRes && saveRes.error) || '저장 실패'
+        };
       }
 
       await client.from('inbox_ai_reports').update({

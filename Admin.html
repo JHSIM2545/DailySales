@@ -3692,7 +3692,7 @@ function getTzToday() {
       return { success: true };
     },
 
-    autoCommitAiInboxItem: async function(token, id) {
+    autoCommitAiInboxItem: async function(token, id, allowDuplicate) {
       const client = getSupabase();
       const sess = getSession_();
       const userName = (sess && sess.name) ? sess.name : '마스터';
@@ -3704,16 +3704,27 @@ function getTzToday() {
       if (!parseRes || !parseRes.success) throw new Error(parseRes ? parseRes.error : '분석 실패');
 
       const f = Object.assign({}, parseRes.fields);
-      const payload = { id: null, fields: f };
+      const payload = allowDuplicate ? { id: null, fields: f, allowDuplicate: true } : { id: null, fields: f };
 
+      let saveRes;
       if (parseRes.type === 'cancel') {
-        await this.saveCancelRow(token, payload);
+        saveRes = await this.saveCancelRow(token, payload);
       } else if (parseRes.type === 'price_change') {
-        await this.savePriceRow(token, payload);
+        saveRes = await this.savePriceRow(token, payload);
       } else if (parseRes.type === 'restart') {
-        await this.saveRestartRow(token, payload);
+        saveRes = await this.saveRestartRow(token, payload);
       } else {
-        await this.saveOrderStartRow(token, payload);
+        saveRes = await this.saveOrderStartRow(token, payload);
+      }
+      /* 저장이 거부된 경우(중복 계약번호 등)에는 접수 건을 '처리완료'로 바꾸지 않고 실패로 돌려준다 */
+      if (!saveRes || saveRes.success === false) {
+        return {
+          success: false,
+          duplicate: !!(saveRes && saveRes.duplicate),
+          type: parseRes.type,
+          company: f['계약처명'] || f['서비스제공처'] || '미확인',
+          error: (saveRes && saveRes.error) || '저장 실패'
+        };
       }
 
       await client.from('inbox_ai_reports').update({
@@ -11956,20 +11967,35 @@ function commitAiParsedRow_(){
   }
 
   setLoadingCursor(true);
-  const payload = { id: null, fields: f };
 
-  if (res.type === 'cancel') {
-    google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveCancelRow(SESSION.token, payload);
-  } else if (res.type === 'price_change') {
-    google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).savePriceRow(SESSION.token, payload);
-  } else if (res.type === 'restart') {
-    google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveRestartRow(SESSION.token, payload);
-  } else {
-    google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveOrderStartRow(SESSION.token, payload);
+  function submitRow_(allowDuplicate){
+    const payload = allowDuplicate ? { id: null, fields: f, allowDuplicate: true } : { id: null, fields: f };
+    if (res.type === 'cancel') {
+      google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveCancelRow(SESSION.token, payload);
+    } else if (res.type === 'price_change') {
+      google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).savePriceRow(SESSION.token, payload);
+    } else if (res.type === 'restart') {
+      google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveRestartRow(SESSION.token, payload);
+    } else {
+      google.script.run.withSuccessHandler(handleSuccess).withFailureHandler(handleErr).saveOrderStartRow(SESSION.token, payload);
+    }
   }
+  submitRow_(false);
 
   function handleSuccess(saveRes){
     setLoadingCursor(false);
+    /* 저장이 거부된 경우(중복 계약번호 등)에는 성공 처리하지 않고, 입력 내용을 그대로 둔다 */
+    if (!saveRes || saveRes.success === false) {
+      if (saveRes && saveRes.duplicate) {
+        if (confirm('⚠️ ' + (saveRes.error || '이미 등록된 계약건입니다.') + '\n\n그래도 중복 등록하시겠습니까?')) {
+          setLoadingCursor(true);
+          submitRow_(true);
+        }
+      } else {
+        alert('⚠️ 등록 실패: ' + ((saveRes && saveRes.error) || '알 수 없는 오류'));
+      }
+      return;
+    }
     alert('✓ 성공적으로 ' + (res.type === 'cancel' ? '해약중지' : (res.type === 'price_change' ? '인상인하' : (res.type === 'restart' ? '재개시' : '수주개시'))) + ' 일보에 등록되었습니다!');
     const inp = document.getElementById('aiInputText');
     if (inp) inp.value = '';
@@ -12072,13 +12098,17 @@ function loadPendingAiReports_(){
     .listPendingAiReportMessages(SESSION.token);
 }
 
-function autoRegisterAiInboxItem_(id){
-  if (!confirm('이 카카오톡 수주/영업보고를 분석하여 영업일보에 즉시 자동등록하시겠습니까?')) return;
+function autoRegisterAiInboxItem_(id, allowDuplicate){
+  if (!allowDuplicate && !confirm('이 카카오톡 수주/영업보고를 분석하여 영업일보에 즉시 자동등록하시겠습니까?')) return;
   setLoadingCursor(true);
   google.script.run
     .withSuccessHandler(function(res){
       setLoadingCursor(false);
       if (!res || !res.success) {
+        if (res && res.duplicate) {
+          if (confirm('⚠️ ' + (res.error || '이미 등록된 계약건입니다.') + '\n\n그래도 중복 등록하시겠습니까?')) autoRegisterAiInboxItem_(id, true);
+          return;
+        }
         alert('자동등록 실패: ' + ((res && res.error) || '알 수 없는 오류'));
         return;
       }
@@ -12092,7 +12122,7 @@ function autoRegisterAiInboxItem_(id){
       setLoadingCursor(false);
       alert('자동등록 오류: ' + err);
     })
-    .autoCommitAiInboxItem(SESSION.token, id);
+    .autoCommitAiInboxItem(SESSION.token, id, !!allowDuplicate);
 }
 
 function batchAutoRegisterAiInbox_(){
