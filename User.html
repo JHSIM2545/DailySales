@@ -2142,7 +2142,7 @@ function getTzToday() {
       const client = getSupabase();
 
       const { data: prodData } = await client.from('daily_product_reports').select('*');
-      let actOrder = 0, actSales = 0, ordToday = 0, salesToday = 0;
+      let actOrder = 0, actSales = 0, ordToday = 0, salesToday = 0, salesPendingToday = 0;
       (prodData || []).forEach(r => {
         if (r.category !== '지사' && r.category !== '법인') return;
         const amt = Number(r.total_amount) || 0;
@@ -2152,6 +2152,8 @@ function getTzToday() {
           actOrder += amt;
           if (ds && rDate === ds) ordToday += amt;
         }
+        // 전망보고용: 미매출이지만 매출예상일이 보고일인 건(오늘 매출 예정). 마감 수치(당일/누계)에는 포함하지 않는다.
+        if (ds && r.sales_status !== '매출' && String(r.forecast_date || '').slice(0, 10) === ds) salesPendingToday += amt;
         // 매출: 매출로 전환된 날짜(sales_date) 기준. 미매출은 집계하지 않는다.
         if (r.sales_status === '매출') {
           const sDate = String(r.sales_date || r.forecast_date || '').slice(0, 10);
@@ -2172,7 +2174,8 @@ function getTzToday() {
         계획: { 수주: tgtItem.계획_수주 || 0, 매출: tgtItem.계획_매출 || 0 },
         실적: {
           수주: Math.round(actOrder / 1000), 매출: Math.round(actSales / 1000),
-          수주_당일: Math.round(ordToday / 1000), 매출_당일: Math.round(salesToday / 1000)
+          수주_당일: Math.round(ordToday / 1000), 매출_당일: Math.round(salesToday / 1000),
+          매출_당일예정: Math.round(salesPendingToday / 1000)
         },
         카드매출: cardRes.amount || 0
       };
@@ -12610,8 +12613,10 @@ lines.push('□ ' + m.label + ' * 목표 ' + fmtK(target) + '천원' + extraLabe
  const tgt = s.목표 || {}, act = s.실적 || {};  
  sec.metrics.forEach(function(m){  
  const target = Math.round(Number(tgt[m.key]) || 0);  
- const cum = Math.round(Number(act[m.key]) || 0);  
- const today = Math.round(Number(act[m.key + '_당일']) || 0);  
+ let cum = Math.round(Number(act[m.key]) || 0);  
+ let today = Math.round(Number(act[m.key + '_당일']) || 0);  
+ // 전망보고: 매출예상일이 오늘인 미매출 건을 당일·누계에 포함, 마감보고: 확정 매출만 보고
+ if (mode === '전망' && m.key === '매출') { const pend = Math.round(Number(act.매출_당일예정) || 0); today += pend; cum += pend; }
  const rate = target ? Math.round((cum / target) * 100) : 0;  
  lines.push('□ ' + m.label + ' * 목표 ' + fmtFullReportNum_(target, m.unit) + m.unit);  
  lines.push('- 당일 : ' + fmtFullReportNum_(today, m.unit) + m.unit + ' / 누계 : ' + fmtFullReportNum_(cum, m.unit) + m.unit + '(' + rate + '%)');  
