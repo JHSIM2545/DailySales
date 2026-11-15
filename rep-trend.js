@@ -94,12 +94,17 @@
     var vals = idx.map(function (i) { return arr[i]; });
     var avg = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : null;
     var trend = '자료 부족', tcol = '#64748b';
-    if (vals.length >= 2) {
-      var a = vals[0], b = vals[vals.length - 1];
-      if (a === 0 && b === 0) { trend = '실적 없음'; }
-      else if (a === 0) { trend = '신규 상승'; tcol = '#0f766e'; }
+    // 추세 = 당월(누계) 대비 직전 3개월 평균. 당월이 진행 중이면 평균을 경과일수만큼 일할 환산해 비교
+    if (vals.length >= 1 && hasData(data, 3)) {
+      var base = avg, cur = arr[3];
+      if (c && c.isCurMonth && c.todayDs) {
+        var d = Number(String(c.todayDs).slice(8, 10)), dim = new Date(c.y, c.m, 0).getDate();
+        if (d > 0 && dim > 0) base = avg * Math.min(d, dim) / dim;
+      }
+      if (base === 0 && cur === 0) { trend = '실적 없음'; }
+      else if (base === 0) { trend = '신규 상승'; tcol = '#0f766e'; }
       else {
-        var ch = (b - a) / a * 100;
+        var ch = (cur - base) / base * 100;
         if (ch >= 20) { trend = '상승 +' + Math.round(ch) + '%'; tcol = '#0f766e'; }
         else if (ch <= -20) { trend = '하락 ' + Math.round(ch) + '%'; tcol = '#b91c1c'; }
         else { trend = '횡보 ' + (ch >= 0 ? '+' : '') + Math.round(ch) + '%'; tcol = '#475569'; }
@@ -169,7 +174,7 @@
 
   function noteText(data, c) {
     var st = data.strat || {};
-    return '전략영업·법인 제외' + ((st.ord || st.start) ? '(제외분 수주 ' + fmt(st.ord) + ' · 개시 ' + fmt(st.start) + ')' : '') + ' · 개시는 기산일 기준' + (c.isCurMonth ? ' · 당월은 오늘까지 누계' : '');
+    return '전략영업·법인 제외' + ((st.ord || st.start) ? '(제외분 수주 ' + fmt(st.ord) + ' · 개시 ' + fmt(st.start) + ')' : '') + ' · 개시는 기산일 기준' + (c.isCurMonth ? ' · 당월은 오늘까지 누계' : '') + ' · 추세는 당월 대비 직전 3개월 평균' + (c.isCurMonth ? '(경과일 환산)' : '');
   }
 
   function cardHtml(data, c) {
