@@ -4856,7 +4856,14 @@ table.status-summary.status-summary-full tbody th{ text-align:center !important;
   
  .modal-overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); align-items:center; justify-content:center; z-index:10; }  
  .modal-overlay.open{ display:flex; }  
- .modal{ background:#fff; border-radius:8px; padding:20px 24px; width:640px; max-height:88vh; overflow:auto; }  
+ .modal{ background:#fff; border-radius:8px; padding:20px 24px; width:640px; max-height:88vh; overflow:auto; }
+/* 모바일/태블릿에서 팝업(모달)이 화면 밖으로 잘려 버튼을 못 누르는 문제 보완:
+   보이는 화면 높이(dvh) 안에서 팝업 자체가 스크롤되고, 하단 버튼(확인/닫기/저장)은 항상 보이도록 고정 */
+.modal-overlay{ align-items:flex-start !important; overflow-y:auto; padding:8px; box-sizing:border-box; }
+.modal-overlay > .modal{ margin:auto; max-width:100%; box-sizing:border-box; max-height:calc(100vh - 16px) !important; max-height:calc(100dvh - 16px) !important; overflow-y:auto; }
+.modal-overlay > .modal > .modal-actions{ position:sticky; bottom:-20px; background:#fff; padding:10px 0 4px; z-index:2; }
+#dashImgPreviewOverlay .modal > div:nth-of-type(1), #gridImgPreviewOverlay .modal > div:nth-of-type(1){ max-height:calc(100vh - 190px) !important; max-height:calc(100dvh - 190px) !important; }
+  
  .modal h2{ margin:0 0 14px; font-size:15px; color:#1c2f4a; }  
  .field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; }  
  .field{ display:flex; flex-direction:column; gap:3px; }  
