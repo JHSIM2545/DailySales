@@ -31,10 +31,6 @@ jobs:
           echo "Pages icon not updated in time (continuing)"
       - name: Install Bubblewrap
         run: npm i -g @bubblewrap/cli
-      - name: Configure Bubblewrap
-        run: |
-          mkdir -p ~/.bubblewrap
-          echo "{\"jdkPath\":\"$JAVA_HOME\",\"androidSdkPath\":\"$ANDROID_HOME\"}" > ~/.bubblewrap/config.json
       - name: Signing key (repo secret if set, else new key)
         working-directory: android
         env:
@@ -48,7 +44,8 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'dailysales-pw' }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'dailysales-pw' }}
         run: |
-          yes "" | bubblewrap build --skipPwaValidation
+          yes y | bubblewrap build --skipPwaValidation || true
+          test -f app-release-signed.apk
           ls -la
           keytool -list -v -keystore android.keystore -alias dailysales -storepass "$BUBBLEWRAP_KEYSTORE_PASSWORD" | grep SHA256 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Publish APK to repo (served by Pages)
