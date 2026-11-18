@@ -18,7 +18,10 @@
   "maskableIconUrl": "https://jhsim2545.github.io/DailySales/icons/icon-maskable-512.png",
   "appVersionName": "1.0.0",
   "appVersionCode": 1,
-  "signingKey": { "path": "./android.keystore", "alias": "dailysales" },
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "dailysales"
+  },
   "webManifestUrl": "https://jhsim2545.github.io/DailySales/manifest.webmanifest",
   "fallbackType": "customtabs",
   "features": {},
@@ -26,5 +29,13 @@
   "isMetaQuest": false,
   "shortcuts": [],
   "minSdkVersion": 21,
-  "generatorApp": "bubblewrap-cli"
+  "generatorApp": "bubblewrap-cli",
+  "splashScreenFadeOutDuration": 300,
+  "enableSiteSettingsShortcut": true,
+  "fullScopeUrl": "https://jhsim2545.github.io/DailySales/",
+  "retainedBundles": [],
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "additionalTrustedOrigins": []
 }
