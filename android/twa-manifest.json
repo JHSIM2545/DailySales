@@ -28,7 +28,7 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "shortcuts": [],
-  "minSdkVersion": 21,
+  "minSdkVersion": 24,
   "generatorApp": "bubblewrap-cli",
   "splashScreenFadeOutDuration": 300,
   "enableSiteSettingsShortcut": true,
