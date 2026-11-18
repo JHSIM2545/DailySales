@@ -44,6 +44,7 @@ jobs:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'dailysales-pw' }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'dailysales-pw' }}
         run: |
+          unset ANDROID_SDK_ROOT
           yes y | bubblewrap build --skipPwaValidation || true
           test -f app-release-signed.apk
           ls -la
