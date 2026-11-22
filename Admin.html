@@ -5005,7 +5005,12 @@ table.status-summary.status-summary-full tbody th{ text-align:center !important;
  display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:13px; font-weight:bold;  
  border-radius:8px 8px 0 0; flex-shrink:0; }  
  .float-win-title button{ background:transparent; border:none; color:#fff; font-size:16px; cursor:pointer; line-height:1; padding:0 4px; }  
- .float-win-body{ padding:14px 16px; overflow:auto; flex:1; }  
+ .float-win-body{ padding:14px 16px; overflow:auto; flex:1; }
+ .float-win-monthbar{ display:flex; align-items:center; justify-content:center; gap:6px; padding:7px 12px; background:#f3f6fa; border-bottom:1px solid #dfe5ec; flex-shrink:0; }
+ .float-win-monthbar button{ background:#fff; border:1px solid #c7cfd8; border-radius:5px; padding:3px 9px; font-size:12px; cursor:pointer; }
+ .float-win-monthbar button:hover{ background:#eef2f7; }
+ .float-win-monthbar input[type=month]{ border:1px solid #c7cfd8; border-radius:5px; padding:3px 6px; font-size:13px; }
+ .float-win-monthbar .ym-today{ margin-left:6px; }  
  .settings-chips{ display:flex; flex-wrap:wrap; gap:6px; min-height:30px; }  
  .settings-chip{ display:inline-flex; align-items:center; gap:4px; background:#eef1f4; border:1px solid #c7cfd8; border-radius:14px; padding:3px 10px; font-size:12px; color:#333; }  
  .settings-chip a{ color:#c00000; text-decoration:none; font-weight:bold; cursor:pointer; }  
@@ -6059,6 +6064,12 @@ input[type="checkbox"] {
  <span>📊 영업현황 요약</span>  
  <button title="닫기" onclick="closeSalesStatusPopup_()">✕</button>  
  </div>  
+ <div class="float-win-monthbar">
+ <button type="button" title="이전 달" onclick="shiftSalesStatusPopupMonth_(-1)">◀</button>
+ <input type="month" id="salesStatusPopupMonth" onchange="setSalesStatusPopupMonth_(this.value)">
+ <button type="button" title="다음 달" onclick="shiftSalesStatusPopupMonth_(1)">▶</button>
+ <button type="button" class="ym-today" onclick="resetSalesStatusPopupMonth_()">이번달</button>
+ </div>
  <div class="float-win-body" id="salesStatusPopupBody"></div>  
 </div>  
   
@@ -7505,14 +7516,7 @@ function onDataChanged_(scope){
   // 2. 영업현황 팝업(📊)이 열려있다면 즉시 최신 데이터 다시 받아 팝업 갱신
   const popup = document.getElementById('salesStatusPopupOverlay');
   if (popup && popup.classList.contains('open')) {
-    if (typeof fetchSalesStatusForCurrentMode_ === 'function') {
-      fetchSalesStatusForCurrentMode_(function(res){
-        if (res && res.success) {
-          SALES_STATUS_LATEST_ = res;
-          renderSalesStatusPopupBody_(res);
-        }
-      });
-    }
+    if (typeof refreshSalesStatusPopup_ === 'function') refreshSalesStatusPopup_();
   }
 
   // 3. 백그라운드 사전 갱신(Prewarm) 즉시 실행
@@ -7738,18 +7742,19 @@ function toggleSimMode_(){
  SALES_STATUS_LATEST_ = res;  
  if (!SIM_MODE) cacheSet_('salesStatus|' + statusYearMonth + '|' + statusProductFilter, res);  
  const overlay = document.getElementById('salesStatusPopupOverlay');  
- if (overlay && overlay.classList.contains('open')) renderSalesStatusPopupBody_(res);  
+ if (overlay && overlay.classList.contains('open')) { if (popupYm_() === statusYearMonth) renderSalesStatusPopupBody_(res); else refreshSalesStatusPopup_(); }  
  if (currentTab === 'sales_status') applySalesStatusResult_(res);  
  });  
 }  
 /** 영업현황 수치 조회: 시뮬레이션 모드면 임시 값을 반영해 계산만 다시 돌린 결과(서버 시트에는 아무  
  * 것도 쓰지 않음)를, 아니면 평소처럼 실제 데이터를 그대로 받아온다. */  
-function fetchSalesStatusForCurrentMode_(cb){  
+function fetchSalesStatusForCurrentMode_(cb, ym){
+ const useYm_ = ym || statusYearMonth;  
  if (SIM_MODE) {  
  google.script.run  
  .withSuccessHandler(cb)  
  .withFailureHandler(function(err){ cb({ success: false, error: String(err) }); })  
- .simulateSalesStatus(SESSION.token, statusYearMonth, statusProductFilter, {  
+ .simulateSalesStatus(SESSION.token, useYm_, statusProductFilter, {  
  order: { overrides: SIM_OVERRIDES.order, virtual: SIM_VIRTUAL_ROWS.order },  
  cancel: { overrides: SIM_OVERRIDES.cancel, virtual: SIM_VIRTUAL_ROWS.cancel },  
  price: { overrides: SIM_OVERRIDES.price, virtual: SIM_VIRTUAL_ROWS.price },  
@@ -7760,7 +7765,7 @@ function fetchSalesStatusForCurrentMode_(cb){
  google.script.run  
  .withSuccessHandler(cb)  
  .withFailureHandler(function(err){ cb({ success: false, error: String(err) }); })  
- .getSalesStatus(SESSION.token, statusYearMonth, statusProductFilter);  
+ .getSalesStatus(SESSION.token, useYm_, statusProductFilter);  
 }  
 /** 수주개시/재개시/해약중지/인상인하 화면에서 "영업현황 보기" 버튼을 누르면, 영업현황 화면 전체가  
  * 아니라 상단 합계(목표/실적/달성률) 표만 팝업으로 보여준다. */  
@@ -7773,7 +7778,7 @@ let SALES_STATUS_REFRESH_TIMER_ = null;
 function renderSalesStatusPopupBody_(res){  
  const body = document.getElementById('salesStatusPopupBody');  
  if (!body || !res || !res.success) return;  
- const parts = statusYearMonth.split('-').map(Number), y = parts[0], m = parts[1];  
+ const parts = popupYm_().split('-').map(Number), y = parts[0], m = parts[1];  
  body.innerHTML =  
  (res.simulated ? '<div class="sim-popup-badge">🧪 임시모드 결과 – 실제 데이터가 아닙니다</div>' : '') +  
  '<div class="status-target-title" style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;"><span>' + y + '.' + m + '월 영업현황 집계</span><span style="font-weight:600; font-size:0.85em;">(단위: 천원)</span></div>' +  
@@ -7811,33 +7816,71 @@ function scheduleSalesStatusBackgroundRefresh_(){
  SALES_STATUS_LATEST_ = res;  
  if (!SIM_MODE) cacheSet_('salesStatus|' + statusYearMonth + '|' + statusProductFilter, res);  
  const overlay = document.getElementById('salesStatusPopupOverlay');  
- if (overlay && overlay.classList.contains('open')) renderSalesStatusPopupBody_(res);  
+ if (overlay && overlay.classList.contains('open')) { if (popupYm_() === statusYearMonth) renderSalesStatusPopupBody_(res); else refreshSalesStatusPopup_(); }  
  if (currentTab === 'sales_status') applySalesStatusResult_(res);  
  });  
  }, 500);  
 }  
   
-function showSalesStatusPopup_(){  
- const overlay = document.getElementById('salesStatusPopupOverlay');  
- const body = document.getElementById('salesStatusPopupBody');  
- if (!overlay || !body) return;  
- overlay.classList.add('open');  
- if (SALES_STATUS_LATEST_) {  
- renderSalesStatusPopupBody_(SALES_STATUS_LATEST_); // 미리 계산해둔 값이 있으면 그 자리에서 바로 표시  
- } else {  
- body.innerHTML = '<div class="loading">불러오는 중...</div>';  
- }  
- fetchSalesStatusForCurrentMode_(function(res){  
- if (!res || !res.success) {  
- if (!SALES_STATUS_LATEST_) body.innerHTML = '<div class="loading">조회 실패: ' + ((res && res.error) || '알 수 없는 오류') + '</div>';  
- return;  
- }  
- SALES_STATUS_LATEST_ = res;  
- if (!SIM_MODE) cacheSet_('salesStatus|' + statusYearMonth + '|' + statusProductFilter, res);  
- renderSalesStatusPopupBody_(res);  
- });  
-}  
-function closeSalesStatusPopup_(){ const el = document.getElementById('salesStatusPopupOverlay'); if (el) el.classList.remove('open'); }  
+/** 영업현황 팝업에서 보는 월. null이면 영업현황 화면의 월(statusYearMonth)을 따른다.
+ * 팝업 안에서 월을 바꿔도 영업현황 화면/다른 탭의 월(statusYearMonth)은 바뀌지 않는다. */
+var salesStatusPopupYM_ = null;
+function popupYm_(){ return salesStatusPopupYM_ || statusYearMonth; }
+function syncSalesStatusPopupMonthUI_(){
+ const inp = document.getElementById('salesStatusPopupMonth');
+ if (inp && inp.value !== popupYm_()) inp.value = popupYm_();
+}
+/** 팝업이 열려있을 때, 팝업의 월 기준으로 (실거래/임시모드 구분해서) 다시 조회해 표시 */
+function refreshSalesStatusPopup_(){
+ const overlay = document.getElementById('salesStatusPopupOverlay');
+ const body = document.getElementById('salesStatusPopupBody');
+ if (!overlay || !body || !overlay.classList.contains('open')) return;
+ syncSalesStatusPopupMonthUI_();
+ const ym = popupYm_();
+ fetchSalesStatusForCurrentMode_(function(res){
+ if (ym !== popupYm_()) return; // 조회 도중 다른 달로 바꿨으면 이전 결과는 버린다
+ if (!res || !res.success) { body.innerHTML = '<div class="loading">조회 실패: ' + ((res && res.error) || '알 수 없는 오류') + '</div>'; return; }
+ if (ym === statusYearMonth) SALES_STATUS_LATEST_ = res;
+ if (!SIM_MODE) cacheSet_('salesStatus|' + ym + '|' + statusProductFilter, res);
+ renderSalesStatusPopupBody_(res);
+ }, ym);
+}
+function setSalesStatusPopupMonth_(ym){
+ if (!/^\d{4}-\d{2}$/.test(ym || '')) { syncSalesStatusPopupMonthUI_(); return; }
+ salesStatusPopupYM_ = ym;
+ const body = document.getElementById('salesStatusPopupBody');
+ let shown = false;
+ if (!SIM_MODE) { // 실제 데이터는 이미 조회한 달이면 캐시로 즉시 표시
+ const c = cacheGet_('salesStatus|' + ym + '|' + statusProductFilter);
+ if (c && c.success) { renderSalesStatusPopupBody_(c); shown = true; }
+ } else if (ym === statusYearMonth && SALES_STATUS_LATEST_) { renderSalesStatusPopupBody_(SALES_STATUS_LATEST_); shown = true; }
+ if (!shown && body) body.innerHTML = '<div class="loading">불러오는 중...</div>';
+ refreshSalesStatusPopup_();
+}
+function shiftSalesStatusPopupMonth_(delta){
+ const p = popupYm_().split('-').map(Number);
+ const d = new Date(p[0], p[1] - 1 + delta, 1);
+ setSalesStatusPopupMonth_(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+}
+function resetSalesStatusPopupMonth_(){
+ const d = new Date();
+ setSalesStatusPopupMonth_(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+}
+
+function showSalesStatusPopup_(){
+ const overlay = document.getElementById('salesStatusPopupOverlay');
+ const body = document.getElementById('salesStatusPopupBody');
+ if (!overlay || !body) return;
+ overlay.classList.add('open');
+ syncSalesStatusPopupMonthUI_();
+ if (popupYm_() === statusYearMonth && SALES_STATUS_LATEST_) {
+ renderSalesStatusPopupBody_(SALES_STATUS_LATEST_); // 미리 계산해둔 값이 있으면 그 자리에서 바로 표시
+ } else {
+ body.innerHTML = '<div class="loading">불러오는 중...</div>';
+ }
+ refreshSalesStatusPopup_();
+}
+function closeSalesStatusPopup_(){ salesStatusPopupYM_ = null; const el = document.getElementById('salesStatusPopupOverlay'); if (el) el.classList.remove('open'); }
   
 /** 떠있는 창(.float-win) 제목줄을 마우스로 눌러 끌면 창이 그 위치로 따라 움직인다.  
  * 이벤트를 document에 한 번만 등록해두고 모든 float-win에 공통으로 적용한다. */  
