@@ -10469,6 +10469,24 @@ function edParseFlexibleDate_(val, baseYear) {
   return { str: s, hasExplicitYear: false, year: null, isUnknown: false };
 }
 
+/* [주요 변경 판정] 주요 변경 = 날짜(기산일 등) / 금액 / 담당자. 그 외 변경은 'MINOR'(표시만, 업데이트 불필요)로 구분 */
+const EXCEL_DAILY_PERSON_FIELDS_ = ['영업담당', '공사담당'];
+function edIsMajorField_(f, dateFields, numFields) {
+  return dateFields.includes(f) || numFields.includes(f) || EXCEL_DAILY_PERSON_FIELDS_.includes(f);
+}
+/* diffs 각 항목에 minor 플래그를 달고, 주요 변경이 하나라도 있으면 MODIFIED, 비주요만 있으면 MINOR, 없으면 IDENTICAL 반환 */
+function edClassifyDiffs_(diffs, dateFields, numFields) {
+  const keys = Object.keys(diffs);
+  if (keys.length === 0) return 'IDENTICAL';
+  let major = 0;
+  keys.forEach(k => {
+    const isMajor = edIsMajorField_(k, dateFields, numFields);
+    diffs[k].minor = !isMajor;
+    if (isMajor) major++;
+  });
+  return major > 0 ? 'MODIFIED' : 'MINOR';
+}
+
 function edCleanMoney_(val) {
   if (val === null || val === undefined || val === '') return 0;
   const raw = String(val).trim();
@@ -11063,13 +11081,9 @@ async function analyzeExcelDailyData_() {
           }
         });
 
-        if (Object.keys(diffs).length > 0) {
-          status = 'MODIFIED';
-          selected = true; // 불일치 항목: 디폴트 체크
-        } else {
-          status = 'IDENTICAL';
-          selected = false; // 동일 데이터: 체크 해제
-        }
+        // 주요 변경(날짜/금액/담당자)만 저장 대상. 그 외 변경은 'MINOR'(표시만, 기본 체크 해제)
+        status = edClassifyDiffs_(diffs, dateFields, numFields);
+        selected = (status === 'MODIFIED');
       }
 
       parsedItems.push({
@@ -11178,11 +11192,8 @@ function recalculateRowDiffs_(item) {
     }
   });
 
-  if (Object.keys(item.diffs).length > 0) {
-    item.status = 'MODIFIED';
-  } else {
-    item.status = 'IDENTICAL';
-  }
+  item.status = edClassifyDiffs_(item.diffs, dateFields, numFields);
+  if (item.status !== 'MODIFIED') item.selected = false;
 }
 
 function changeRowDateYear_(rowId, fieldName, targetYear) {
@@ -11221,6 +11232,7 @@ function renderExcelDailyResult_() {
   const newCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'NEW').length;
   const modCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'MODIFIED').length;
   const sameCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'IDENTICAL').length;
+  const minorCount = EXCEL_DAILY_ROWS.filter(r => r.status === 'MINOR').length;
   const yearDiffCount = EXCEL_DAILY_ROWS.filter(r => Object.keys(r.yearDiffs || {}).length > 0).length;
   const selectedCount = EXCEL_DAILY_ROWS.filter(r => r.selected).length;
 
@@ -11233,6 +11245,7 @@ function renderExcelDailyResult_() {
   if (EXCEL_DAILY_FILTER === 'diff') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'MODIFIED');
   else if (EXCEL_DAILY_FILTER === 'new') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'NEW');
   else if (EXCEL_DAILY_FILTER === 'same') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'IDENTICAL');
+  else if (EXCEL_DAILY_FILTER === 'minor') visibleRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'MINOR');
   else if (EXCEL_DAILY_FILTER === 'year_diff') visibleRows = EXCEL_DAILY_ROWS.filter(r => Object.keys(r.yearDiffs || {}).length > 0);
 
   const allVisibleChecked = visibleRows.length > 0 && visibleRows.every(r => r.selected);
@@ -11245,7 +11258,10 @@ function renderExcelDailyResult_() {
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span style="font-weight:700; font-size:15px; color:#1e293b;">📊 분석 결과 (${total}건):</span>
           <span style="background:#fee2e2; color:#dc2626; border:1px solid #fca5a5; padding:3px 10px; border-radius:14px; font-size:12.5px; font-weight:700;">
-            ⚠️ 불일치(수정) ${modCount}건
+            ⚠️ 주요변경(수정) ${modCount}건
+          </span>
+          <span style="background:#fffbeb; color:#92400e; border:1px solid #fcd34d; padding:3px 10px; border-radius:14px; font-size:12.5px; font-weight:700; cursor:pointer;" onclick="filterExcelDailyView_('minor')" title="날짜·금액·담당자 외 변경: 표시만 하고 업데이트하지 않음">
+            📝 기타변경(표시만) ${minorCount}건
           </span>
           ${yearDiffCount > 0 ? `
             <span style="background:#fef2f2; color:#b91c1c; border:1.5px solid #ef4444; padding:3px 10px; border-radius:14px; font-size:12.5px; font-weight:800; cursor:pointer;" onclick="filterExcelDailyView_('year_diff')" title="클릭시 년도 상이 건만 필터링">
@@ -11277,7 +11293,10 @@ function renderExcelDailyResult_() {
             전체 (${total})
           </button>
           <button onclick="filterExcelDailyView_('diff')" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:5px; border:1px solid #fca5a5; cursor:pointer; ${EXCEL_DAILY_FILTER==='diff'?'background:#dc2626; color:#fff;':'background:#fff; color:#dc2626;'}">
-            불일치만 (${modCount})
+            주요변경만 (${modCount})
+          </button>
+          <button onclick="filterExcelDailyView_('minor')" style="padding:4px 10px; font-size:12px; font-weight:600; border-radius:5px; border:1px solid #fcd34d; cursor:pointer; ${EXCEL_DAILY_FILTER==='minor'?'background:#b45309; color:#fff;':'background:#fff; color:#92400e;'}">
+            기타변경만 (${minorCount})
           </button>
           ${yearDiffCount > 0 ? `
             <button onclick="filterExcelDailyView_('year_diff')" style="padding:4px 10px; font-size:12px; font-weight:700; border-radius:5px; border:1.5px solid #ef4444; cursor:pointer; ${EXCEL_DAILY_FILTER==='year_diff'?'background:#b91c1c; color:#fff;':'background:#fef2f2; color:#b91c1c;'}">
@@ -11294,7 +11313,7 @@ function renderExcelDailyResult_() {
 
         <div style="display:flex; gap:6px;">
           <button onclick="selectExcelDailyDiffAndNewOnly_()" style="background:#fef2f2; border:1px solid #f87171; color:#b91c1c; border-radius:5px; padding:4px 10px; font-size:12px; font-weight:700; cursor:pointer;">
-            ⚡ 불일치/신규만 선택
+            ⚡ 주요변경/신규만 선택
           </button>
           <button onclick="toggleExcelDailySelectAll_(true)" style="background:#f8fafc; border:1px solid #cbd5e1; color:#334155; border-radius:5px; padding:4px 10px; font-size:12px; font-weight:600; cursor:pointer;">
             ☑️ 전체 선택
@@ -11333,15 +11352,20 @@ function renderExcelDailyResult_() {
     const f = r.excelFields;
     const isNew = r.status === 'NEW';
     const isMod = r.status === 'MODIFIED';
+    const isMinor = r.status === 'MINOR';
     const hasYearDiff = Object.keys(r.yearDiffs || {}).length > 0;
 
     let rowBg = '#ffffff';
     if (hasYearDiff) rowBg = '#fff5f5';
     else if (isMod) rowBg = '#fffafa';
+    else if (isMinor) rowBg = '#fffdf5';
     else if (isNew) rowBg = '#f0fdf4';
     else if (idx % 2 === 1) rowBg = '#f8fafc';
 
     const diffStyle = (field) => {
+      if (r.diffs && r.diffs[field] && r.diffs[field].minor) {
+        return 'background:#fef3c7 !important; color:#92400e !important; border:1px dashed #f59e0b; border-radius:4px; padding:2px 4px; display:inline-block;';
+      }
       if (r.diffs && r.diffs[field]) {
         return 'background:#fee2e2 !important; color:#dc2626 !important; font-weight:bold; border:1.5px solid #ef4444; border-radius:4px; padding:2px 4px; display:inline-block;';
       }
@@ -11351,6 +11375,7 @@ function renderExcelDailyResult_() {
     let statusBadge = '';
     if (isNew) statusBadge = '<span style="background:#dcfce7; color:#15803d; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:700;">✨ 신규</span>';
     else if (hasYearDiff) statusBadge = '<span style="background:#fee2e2; color:#b91c1c; border:1px solid #ef4444; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:800;">🚨 년도상이</span>';
+    else if (isMinor) statusBadge = '<span style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:700;" title="날짜·금액·담당자 외 변경: 업데이트 불필요">📝 기타변경</span>';
     else if (isMod) statusBadge = '<span style="background:#fee2e2; color:#dc2626; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:700;">⚠️ 불일치</span>';
     else statusBadge = '<span style="background:#f1f5f9; color:#475569; padding:2px 6px; border-radius:10px; font-size:11.5px; font-weight:600;">✔️ 일치</span>';
 
@@ -11465,6 +11490,16 @@ function renderExcelDailyResult_() {
           exTxt = Number(exTxt) ? Number(exTxt).toLocaleString() + '원' : exTxt;
         }
 
+        if (d.minor) {
+          return `
+          <div style="margin-bottom:3px; line-height:1.4; opacity:0.85;">
+            <strong style="color:#92400e; font-size:12px;">• ${k}:</strong>
+            <span style="text-decoration:line-through; color:#94a3b8; font-size:12px;">${dbTxt}</span>
+            <span style="color:#b45309; font-size:12px;">➔</span>
+            <span style="background:#fef3c7; color:#92400e; padding:1px 5px; border-radius:3px; font-size:12px; border:1px dashed #f59e0b;">${exTxt}</span>
+            <span style="color:#92400e; font-size:10.5px;">(참고·반영 불필요)</span>
+          </div>`;
+        }
         const isYd = !!(r.yearDiffs && r.yearDiffs[k]);
         let yearWarningTag = '';
         if (isYd) {
@@ -11533,6 +11568,7 @@ function toggleExcelDailySelectAll_(checked) {
   if (EXCEL_DAILY_FILTER === 'diff') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'MODIFIED');
   else if (EXCEL_DAILY_FILTER === 'new') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'NEW');
   else if (EXCEL_DAILY_FILTER === 'same') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'IDENTICAL');
+  else if (EXCEL_DAILY_FILTER === 'minor') targetRows = EXCEL_DAILY_ROWS.filter(r => r.status === 'MINOR');
   else if (EXCEL_DAILY_FILTER === 'year_diff') targetRows = EXCEL_DAILY_ROWS.filter(r => Object.keys(r.yearDiffs || {}).length > 0);
 
   targetRows.forEach(r => { r.selected = checked; });
@@ -11608,12 +11644,14 @@ async function submitExcelDailyBatch_() {
   const newCount = selectedRows.filter(r => r.status === 'NEW').length;
   const modCount = selectedRows.filter(r => r.status === 'MODIFIED').length;
   const sameCount = selectedRows.filter(r => r.status === 'IDENTICAL').length;
+  const minorSel = selectedRows.filter(r => r.status === 'MINOR').length;
   const yearDiffCount = selectedRows.filter(r => Object.keys(r.yearDiffs || {}).length > 0).length;
 
   let msg = `선택한 총 ${selectedRows.length}건을 DB에 일괄 반영하시겠습니까?\n\n`;
   if (newCount > 0) msg += `- 신규 추가: ${newCount}건\n`;
   if (modCount > 0) msg += `- 데이터 수정: ${modCount}건\n`;
   if (yearDiffCount > 0) msg += `  (⚠️ 이 중 ${yearDiffCount}건에 년도 변경이 포함되어 있습니다)\n`;
+  if (minorSel > 0) msg += `- 기타변경(날짜·금액·담당자 외) 수동 선택: ${minorSel}건\n`;
   if (sameCount > 0) msg += `- 동일 데이터 덮어쓰기: ${sameCount}건\n`;
   msg += `\n모든 반영 데이터의 [유형] 항목은 "엑셀등록"으로 자동 저장됩니다.`;
 
